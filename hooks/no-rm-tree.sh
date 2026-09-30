@@ -73,6 +73,17 @@ set -uf
 #   .pio           PlatformIO build cache
 GENERATED_NAMES="node_modules dist coverage .pio"
 
+# LANGUETTE_RM_ALLOW adds to the lists -- the names above and the two
+# agent-owned roots below -- and never replaces them. Colon-separated; an
+# entry is a name (added to GENERATED_NAMES, same rules, including the
+# direct-child-of-$HOME exclusion) or an absolute path (added as a root, like
+# the scratchpad). Names and paths use letters, digits and . _ @ + - only; a
+# path may not hold a . or .. segment and may not be / or $HOME. Unset or
+# empty: the built-in lists, exactly. A value that does not parse warns on
+# every Bash call (hookSpecificOutput.additionalContext) and denies only a
+# recursive rm or find -delete, naming the variable, before the allowlist is
+# consulted: a typo cannot stop unrelated commands, and cannot open the gate.
+
 HERE=$(dirname "$0")
 LIB="$HERE/lib-shell-words.awk"
 
@@ -103,14 +114,72 @@ case $HOME in
   *) deny 'no-rm-tree: $HOME is not an absolute path, cannot resolve targets' ;;
 esac
 
+# physical PATH: the longest existing prefix resolved through symlinks, the
+# rest appended as written. Fails when no resolver is available.
+physical() {
+  ph_p=$1 ph_rest=
+  while [ "$ph_p" != / ] && ! [ -e "$ph_p" ] && ! [ -L "$ph_p" ]; do
+    ph_rest="/${ph_p##*/}$ph_rest"; ph_p=${ph_p%/*}; [ -n "$ph_p" ] || ph_p=/
+  done
+  ph_r=$(readlink -f -- "$ph_p" 2>/dev/null) || ph_r=$(realpath -- "$ph_p" 2>/dev/null) || return 1
+  [ "$ph_r" = / ] && ph_r=
+  printf '%s%s\n' "$ph_r" "$ph_rest"
+}
+
+# The optional LANGUETTE_RM_ALLOW, parsed on every call, before the early exit,
+# so a malformed value is seen whether or not this command is a recursive rm.
+# Fills extra_roots (as written and as the filesystem has them) and appends to
+# GENERATED_NAMES; on a value that does not parse it sets allow_err (and stops
+# at the first bad entry). What to do about it is decided below: warn and allow
+# when no recursive rm or find -delete is in front of the guard, deny when one is.
+extra_roots=; allow_err=
+home_p=$(physical "$HOME") || home_p=$HOME
+bad_allow() { allow_err=$1; return 1; }
+parse_allow() {
+  rest=$LANGUETTE_RM_ALLOW:
+  while [ -n "$rest" ]; do
+    ent=${rest%%:*}; rest=${rest#*:}
+    case $ent in
+      '') bad_allow 'an empty entry'; return ;;
+      *[!A-Za-z0-9._@+/-]*) bad_allow "unsupported character in '$ent'"; return ;;
+      /*)
+        case $ent in
+          */.|*/./*|*/..|*/../*|*//*) bad_allow "'$ent' has an empty, . or .. segment"; return ;;
+        esac
+        ent=${ent%/}
+        { [ -n "$ent" ] && [ "$ent" != "$HOME" ]; } || { bad_allow "'$ent' is / or \$HOME"; return; }
+        # As the filesystem has it too: a symlink to $HOME or / is still $HOME or /.
+        ent_p=$(physical "$ent") || ent_p=$ent
+        { [ -n "$ent_p" ] && [ "$ent_p" != "$HOME" ] && [ "$ent_p" != "$home_p" ]; } || { bad_allow "'$ent' resolves to / or \$HOME"; return; }
+        extra_roots="$extra_roots $ent $ent_p" ;;
+      */*) bad_allow "'$ent' is neither a bare name nor an absolute path"; return ;;
+      . | ..) bad_allow "'$ent' is not a name"; return ;;
+      *) GENERATED_NAMES="$GENERATED_NAMES $ent" ;;
+    esac
+  done
+}
+[ -z "${LANGUETTE_RM_ALLOW:-}" ] || parse_allow
+allow_msg=
+if [ -n "$allow_err" ]; then
+  allow_msg="LANGUETTE_RM_ALLOW is malformed ($allow_err). Recursive rm and find -delete are blocked until it is \
+fixed or unset; other commands run. It must be a colon-separated list of directory names (dist) or absolute paths \
+(/srv/scratch), using only letters, digits and . _ @ + - ; a path may not hold a . or .. segment \
+and may not be / or \$HOME."
+fi
+
 # awk parses and normalises; it prints either one "DENY<tab>reason" line, or
 # one "T<tab>abs<tab>raw" line per recursive target for the allowlist check
 # below. abs never holds a tab (a control character in a target is denied).
 out=$(printf '%s\n' "$cmd" | awk -v cwd="$cwd" -v home="$HOME" "$(cat "$LIB")"'
 function has(t, ch) { return t ~ ("^-[A-Za-z0-9]*" ch "[A-Za-z0-9]*$") }
 function fail(r) { print "DENY\t" r; exit }
+# What the agent ran, as the denial should name it: find -delete is not rm -r.
+function lab(raw) {
+  if (trig == "find") return "find" (raw == "" ? "" : " " raw) " -delete"
+  return "rm -r" (raw == "" ? "" : " " raw)
+}
 function blocked(raw, why) {
-  fail("`rm -r" (raw == "" ? "" : " " raw) "` is blocked: " why \
+  fail("`" lab(raw) "` is blocked: " why \
        ". Resolve the target yourself and spell it out: `rm -rf` on the absolute path of a " \
        "generated directory (node_modules, dist, coverage, .pio ...), the scratchpad, /tmp or an " \
        "agent worktree. Anything else in a repo or under $HOME is the user'\''s -- `git status --short` " \
@@ -148,7 +217,7 @@ function target(idx,   t) {
   }
   t = normalize(t)
   if (t == "/" || t == homeN) blocked(w[idx], "that is " (t == "/" ? "the root of the filesystem" : "$HOME itself"))
-  print "T\t" t "\t" w[idx]
+  print "T\t" t "\t" trig "\t" w[idx]
 }
 
 function segment(a, b, nested,   g, i, x, recursive, dashdash, ntgt, tgt, starts) {
@@ -157,9 +226,10 @@ function segment(a, b, nested,   g, i, x, recursive, dashdash, ntgt, tgt, starts
   if (g) {
     for (i = g + 1; i <= b; i++) if (w[i] == "-delete") break
     if (i <= b) {
-      starts = 0
+      starts = 0; trig = "find"
       for (i = g + 1; i <= b && w[i] !~ /^[-!]/; i++) { starts++; target(i) }
-      if (!starts) blocked("find -delete", "with no start path find deletes under the working directory")
+      if (!starts) blocked("", "with no start path find deletes under the working directory")
+      trig = "rm"
     }
   }
   g = cmd_index(w, k, a, b, "(^|/)rm$", nested, "^(git|yadm|svn|hg|jj|gsutil)$")
@@ -180,7 +250,7 @@ function segment(a, b, nested,   g, i, x, recursive, dashdash, ntgt, tgt, starts
   for (i = 1; i <= ntgt; i++) target(tgt[i])
 }
 
-BEGIN { homeN = normalize(home) }
+BEGIN { homeN = normalize(home); trig = "rm" }
 { buf = buf $0 "\n" }
 END {
   buf = strip_heredocs(buf)
@@ -207,7 +277,15 @@ END {
   }
 }') || deny 'no-rm-tree: awk failed, cannot inspect the command'
 
-[ -n "$out" ] || exit 0
+# Nothing recursive in front of the guard: a malformed LANGUETTE_RM_ALLOW only
+# warns, on every Bash call, and the command runs.
+if [ -z "$out" ]; then
+  [ -z "$allow_msg" ] || jq -cn --arg m "no-rm-tree: $allow_msg" '{hookSpecificOutput:{hookEventName:"PreToolUse",additionalContext:$m}}'
+  exit 0
+fi
+# A recursive rm or find -delete is being judged: fail closed, before the
+# allowlist is consulted.
+[ -z "$allow_msg" ] || deny "no-rm-tree: $allow_msg"
 tab=$(printf '\t')
 case $out in
   "DENY$tab"*) deny "$(printf '%s\n' "$out" | head -n 1 | cut -f 2-)" ;;
@@ -217,18 +295,6 @@ esac
 
 scratch="$HOME/.local/state/claude-tmpdir"
 worktrees="$HOME/.claude/worktrees"
-
-# physical PATH: the longest existing prefix resolved through symlinks, the
-# rest appended as written. Fails when no resolver is available.
-physical() {
-  ph_p=$1 ph_rest=
-  while [ "$ph_p" != / ] && ! [ -e "$ph_p" ] && ! [ -L "$ph_p" ]; do
-    ph_rest="/${ph_p##*/}$ph_rest"; ph_p=${ph_p%/*}; [ -n "$ph_p" ] || ph_p=/
-  done
-  ph_r=$(readlink -f -- "$ph_p" 2>/dev/null) || ph_r=$(realpath -- "$ph_p" 2>/dev/null) || return 1
-  [ "$ph_r" = / ] && ph_r=
-  printf '%s%s\n' "$ph_r" "$ph_rest"
-}
 
 # is_under PATH ROOT...: PATH is one of the ROOTs or inside one.
 is_under() {
@@ -265,19 +331,23 @@ tmp_p=$(physical /tmp) || tmp_p=/tmp
 scratch_p=$(physical "$scratch") || scratch_p=$scratch
 worktrees_p=$(physical "$worktrees") || worktrees_p=$worktrees
 allowed() {
-  is_under "$1" /tmp "$scratch" "$worktrees" "$tmp_p" "$scratch_p" "$worktrees_p" || is_generated "$1"
+  is_under "$1" /tmp "$scratch" "$worktrees" "$tmp_p" "$scratch_p" "$worktrees_p" $extra_roots || is_generated "$1"
 }
 
-while IFS=$tab read -r tag abs raw; do
+while IFS=$tab read -r tag abs kind raw; do
   [ "$tag" = T ] || continue
-  allowed "$abs" || deny "\`rm -r $raw\` is blocked: only the scratchpad, /tmp, agent worktrees and \
+  case $kind in
+    find) what="find $raw -delete" ;;
+    *) what="rm -r $raw" ;;
+  esac
+  allowed "$abs" || deny "\`$what\` is blocked: only the scratchpad, /tmp, agent worktrees and \
 the generated directories named in no-rm-tree.sh (node_modules, dist, coverage, .pio ...) may be \
 removed recursively, and $abs is none of those. \`git status --short $raw\` and \`git clean -n $raw\` \
 show what is there; \`git rm\` tracked files by path, and hand anything untracked to the user -- a \
 directory they own can hold downloads and logs no session knows about."
   phys=$(physical "$abs") || deny "no-rm-tree: cannot resolve $abs through the filesystem (no \
-readlink -f or realpath here), so \`rm -r $raw\` is blocked. Install coreutils or ask the user."
-  [ "$phys" = "$abs" ] || allowed "$phys" || deny "\`rm -r $raw\` is blocked: $abs resolves through \
+readlink -f or realpath here), so \`$what\` is blocked. Install coreutils or ask the user."
+  [ "$phys" = "$abs" ] || allowed "$phys" || deny "\`$what\` is blocked: $abs resolves through \
 a symlink to $phys, which is not a generated directory, the scratchpad, /tmp or an agent worktree. \
 rm follows a trailing slash into the link's target."
 done <<EOF
