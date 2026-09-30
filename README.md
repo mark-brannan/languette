@@ -79,6 +79,13 @@ fixtures/run.sh                             # the scanner and guard contract, an
 AWK_PATH=/dir/with/an/awk fixtures/run.sh   # the same under another awk
 ```
 
+CI also checks the shape of `hooks/hooks.json` (`fixtures/run.sh --shape`: a
+top-level object whose `hooks.PreToolUse` is an array of entries, each with a
+`matcher` and `hooks[].command`), because `claude plugin validate --strict`
+passes a garbage one. That is a shape check only, with no model call and no
+login. The headless smoke test, which installs the plugin in a scratch project
+and confirms a recursive `rm` is really blocked, stays manual: it needs both.
+
 `fixtures/` holds the contract as data: a command in, tokens or a verdict
 out. The scanner (`hooks/lib-shell-words.awk`) and the three guards are
 copied from [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles)

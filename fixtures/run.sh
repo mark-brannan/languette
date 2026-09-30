@@ -3,6 +3,10 @@
 #
 #   fixtures/run.sh            check every fixture; exit 1 on any mismatch
 #   fixtures/run.sh --table    print the failure-mode table the README quotes
+#   fixtures/run.sh --shape [FILE]
+#                              only check that FILE (default hooks/hooks.json)
+#                              has the shape Claude Code loads; CI runs this
+#                              once, the full run repeats it
 #
 # One fixture per line. Three kinds:
 #   tokens   {command, tokens}   scan() of the command, one entry per token:
@@ -16,7 +20,7 @@
 #                                a documented known gap: the guard allows,
 #                                silently, and that is the contract.
 #
-# It also checks the wiring in hooks/hooks.json (see below).
+# It also checks the shape of hooks/hooks.json and its wiring (see below).
 # AWK_PATH, as in the guard suites, is a directory whose `awk` is the
 # implementation under test.
 set -uo pipefail
@@ -25,6 +29,41 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 LIB="$ROOT/hooks/lib-shell-words.awk"
 [ -n "${AWK_PATH:-}" ] && PATH="$AWK_PATH:$PATH"
 FIX="$ROOT/fixtures/scanner.jsonl $ROOT/fixtures/guards.jsonl"
+
+# hooks_shape FILE: print one line per way FILE is not what Claude Code loads
+# from a plugin's hooks/hooks.json -- a top-level object whose `hooks` holds
+# `PreToolUse`, an array of entries, each with a string `matcher` and a
+# non-empty `hooks` array of objects with a string `command`. `claude plugin
+# validate --strict` accepts a hooks.json that is garbage, so this is the only
+# thing that notices. A shape check only: it proves nothing about what Claude
+# Code does with the file (the headless smoke test is still run by hand).
+hooks_shape() {
+  jq -r '
+    def kind: type;
+    if type != "object" then "top level is \(kind), want an object"
+    elif (.hooks | type) != "object" then "\"hooks\" is \(.hooks | kind), want an object (a top-level \"PreToolUse\" is not where Claude Code looks)"
+    elif (.hooks.PreToolUse | type) != "array" then "hooks.PreToolUse is \(.hooks.PreToolUse | kind), want an array"
+    elif (.hooks.PreToolUse | length) == 0 then "hooks.PreToolUse is empty"
+    else
+      .hooks.PreToolUse | to_entries[] | .key as $i | .value |
+      if type != "object" then "PreToolUse[\($i)] is \(kind), want an object"
+      elif (.matcher | type) != "string" then "PreToolUse[\($i)].matcher is \(.matcher | kind), want a string"
+      elif (.hooks | type) != "array" or (.hooks | length) == 0 then "PreToolUse[\($i)].hooks is \(.hooks | kind), want a non-empty array"
+      else .hooks | to_entries[] | .key as $j | .value |
+        if type != "object" then "PreToolUse[\($i)].hooks[\($j)] is \(kind), want an object"
+        elif (.command | type) != "string" or .command == "" then "PreToolUse[\($i)].hooks[\($j)].command is \(.command | kind), want a non-empty string"
+        else empty end
+      end
+    end' "$1" 2>&1
+}
+
+if [ "${1:-}" = "--shape" ]; then
+  f=${2:-$ROOT/hooks/hooks.json}
+  problems=$(hooks_shape "$f")
+  if [ -n "$problems" ]; then printf 'hooks.json shape: %s\n' "$f"; printf '  %s\n' "$problems"; exit 1; fi
+  printf 'hooks.json shape ok: %s\n' "$f"
+  exit 0
+fi
 
 if [ "${1:-}" = "--table" ]; then
   printf '| Command | Verdict | Why |\n|---|---|---|\n'
@@ -102,6 +141,8 @@ done < <(cat $FIX)
 # A plain `sh missing.sh` exits 127, which Claude Code reads as a non-blocking
 # error, so both failures have to come out as a deny decision.
 HJ="$ROOT/hooks/hooks.json"
+shape=$(hooks_shape "$HJ")
+if [ -n "$shape" ]; then bad "hooks.json is not the shape Claude Code loads" "$shape"; else pass=$((pass + 1)); fi
 CRASH=$(mktemp -d)
 mkdir -p "$CRASH/hooks"
 printf 'exit 3\n' > "$CRASH/hooks/crash.sh"

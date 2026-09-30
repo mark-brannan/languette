@@ -44,6 +44,10 @@ jobs:
           set -euo pipefail
           sudo apt-get update -q
           sudo apt-get install -y -q mawk gawk original-awk jq
+      # No model call, no login: a shape check on the file Claude Code loads.
+      # `claude plugin validate --strict` passes a garbage hooks.json.
+      - name: hooks/hooks.json has the shape Claude Code loads
+        run: bash fixtures/run.sh --shape
       - name: Guard suites and fixture contract under each awk
         run: |
           set -euo pipefail
