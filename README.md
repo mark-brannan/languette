@@ -1,8 +1,8 @@
-Languette: your hooks need guards.
+**Languette**: sharp hooks need strong guards.
+
+*A deterministic check against risky actions by coding agents.*
 
 ![Jacques Callot, Drill with halberds (NGV 32320, public domain)](assets/callot-drill-with-halberds.jpg)
-
-A deterministic check on the actions coding agents take.
 
 Languette is a set of `PreToolUse` hooks for Claude Code. Each one reads the
 Bash command an agent is about to run and decides: allow, ask, or deny. No
