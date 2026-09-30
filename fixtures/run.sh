@@ -33,25 +33,27 @@ FIX="$ROOT/fixtures/scanner.jsonl $ROOT/fixtures/guards.jsonl"
 # hooks_shape FILE: print one line per way FILE is not what Claude Code loads
 # from a plugin's hooks/hooks.json -- a top-level object whose `hooks` holds
 # `PreToolUse`, an array of entries, each with a string `matcher` and a
-# non-empty `hooks` array of objects with a string `command`. `claude plugin
+# non-empty `hooks` array of objects with `type: "command"` and a string
+# `command` (Claude Code runs a hook by its `type`; without it, or with
+# `type: "prompt"`, the `command` is never run). `claude plugin
 # validate --strict` accepts a hooks.json that is garbage, so this is the only
 # thing that notices. A shape check only: it proves nothing about what Claude
 # Code does with the file (the headless smoke test is still run by hand).
 hooks_shape() {
   jq -r '
-    def kind: type;
-    if type != "object" then "top level is \(kind), want an object"
-    elif (.hooks | type) != "object" then "\"hooks\" is \(.hooks | kind), want an object (a top-level \"PreToolUse\" is not where Claude Code looks)"
-    elif (.hooks.PreToolUse | type) != "array" then "hooks.PreToolUse is \(.hooks.PreToolUse | kind), want an array"
+    if type != "object" then "top level is \(type), want an object"
+    elif (.hooks | type) != "object" then "\"hooks\" is \(.hooks | type), want an object (a top-level \"PreToolUse\" is not where Claude Code looks)"
+    elif (.hooks.PreToolUse | type) != "array" then "hooks.PreToolUse is \(.hooks.PreToolUse | type), want an array"
     elif (.hooks.PreToolUse | length) == 0 then "hooks.PreToolUse is empty"
     else
       .hooks.PreToolUse | to_entries[] | .key as $i | .value |
-      if type != "object" then "PreToolUse[\($i)] is \(kind), want an object"
-      elif (.matcher | type) != "string" then "PreToolUse[\($i)].matcher is \(.matcher | kind), want a string"
-      elif (.hooks | type) != "array" or (.hooks | length) == 0 then "PreToolUse[\($i)].hooks is \(.hooks | kind), want a non-empty array"
+      if type != "object" then "PreToolUse[\($i)] is \(type), want an object"
+      elif (.matcher | type) != "string" then "PreToolUse[\($i)].matcher is \(.matcher | type), want a string"
+      elif (.hooks | type) != "array" or (.hooks | length) == 0 then "PreToolUse[\($i)].hooks is \(.hooks | type), want a non-empty array"
       else .hooks | to_entries[] | .key as $j | .value |
-        if type != "object" then "PreToolUse[\($i)].hooks[\($j)] is \(kind), want an object"
-        elif (.command | type) != "string" or .command == "" then "PreToolUse[\($i)].hooks[\($j)].command is \(.command | kind), want a non-empty string"
+        if type != "object" then "PreToolUse[\($i)].hooks[\($j)] is \(type), want an object"
+        elif .type != "command" then "PreToolUse[\($i)].hooks[\($j)].type is \(.type | tojson), want \"command\""
+        elif (.command | type) != "string" or .command == "" then "PreToolUse[\($i)].hooks[\($j)].command is \(.command | type), want a non-empty string"
         else empty end
       end
     end' "$1" 2>&1
@@ -143,6 +145,23 @@ done < <(cat $FIX)
 HJ="$ROOT/hooks/hooks.json"
 shape=$(hooks_shape "$HJ")
 if [ -n "$shape" ]; then bad "hooks.json is not the shape Claude Code loads" "$shape"; else pass=$((pass + 1)); fi
+# And the shape check must reject what #8 found `validate --strict` passing.
+SHAPE=$(mktemp)
+while IFS= read -r wrong; do
+  printf '%s' "$wrong" > "$SHAPE"
+  if [ -z "$(hooks_shape "$SHAPE")" ]; then bad "hooks_shape accepted $wrong"; else pass=$((pass + 1)); fi
+done <<'WRONG'
+{"PreToolUse": 5}
+[]
+{"hooks": {"PreToolUse": []}}
+{"hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": "x"}]}]}}
+{"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": []}]}}
+{"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"command": "x"}]}]}}
+{"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "prompt", "command": "x"}]}]}}
+{"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": ""}]}]}}
+not json
+WRONG
+rm -f "$SHAPE"
 CRASH=$(mktemp -d)
 mkdir -p "$CRASH/hooks"
 printf 'exit 3\n' > "$CRASH/hooks/crash.sh"

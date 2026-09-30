@@ -81,7 +81,7 @@ AWK_PATH=/dir/with/an/awk fixtures/run.sh   # the same under another awk
 
 CI also checks the shape of `hooks/hooks.json` (`fixtures/run.sh --shape`: a
 top-level object whose `hooks.PreToolUse` is an array of entries, each with a
-`matcher` and `hooks[].command`), because `claude plugin validate --strict`
+`matcher` and `hooks[]` of `type: "command"` with a `command`), because `claude plugin validate --strict`
 passes a garbage one. That is a shape check only, with no model call and no
 login. The headless smoke test, which installs the plugin in a scratch project
 and confirms a recursive `rm` is really blocked, stays manual: it needs both.
