@@ -20,7 +20,81 @@
 @@ -78,2 sha256:94cfebaad9e35e794bdeae5e8420df8d1d552dfc7033af5e31b37a0187f26b75
 +#   .pio           PlatformIO build cache
 +GENERATED_NAMES="node_modules dist coverage .pio"
++
++# LANGUETTE_RM_ALLOW adds to the lists -- the names above and the two
++# agent-owned roots below -- and never replaces them. Colon-separated; an
++# entry is a name (added to GENERATED_NAMES, same rules, including the
++# direct-child-of-$HOME exclusion) or an absolute path (added as a root, like
++# the scratchpad). Names and paths use letters, digits and . _ @ + - only; a
++# path may not hold a . or .. segment and may not be / or $HOME. Unset or
++# empty: the built-in lists, exactly. Anything else that does not parse
++# denies every recursive rm, with a message naming the variable -- checked
++# only once a recursive rm is in front of the guard, so a typo cannot stop
++# unrelated commands.
+@@ -117,0 sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
++# What the agent ran, as the denial should name it: find -delete is not rm -r.
++function lab(raw) {
++  if (trig == "find") return "find" (raw == "" ? "" : " " raw) " -delete"
++  return "rm -r" (raw == "" ? "" : " " raw)
++}
+@@ -118,1 sha256:92c858269450d74842bb61b9e8046913026abb2afef9e15865f1b728b91d4aa7
++  fail("`" lab(raw) "` is blocked: " why \
 @@ -122,1 sha256:4cb51066d889b4d696c3d9bbd86f3a1b764c55c6aca5233a80ad99542f0a75f4
 +       "/ `git clean -n` show what is there; `git rm` tracked files by path and hand the rest to the user.")
+@@ -156,1 sha256:33d47a7e4dbc155751e10563297f5e89078685e0dfd9a31131061697333c333d
++  print "T\t" t "\t" trig "\t" w[idx]
+@@ -165,1 sha256:96271a1565eaf53ee8d32a5c7e389f82123fc2760b0e5232368ccb52e1569d32
++      starts = 0; trig = "find"
+@@ -167,1 sha256:6bd2c853d2354054189e527a55cb945fdb93587c892c9384777fe70a90b68322
++      if (!starts) blocked("", "with no start path find deletes under the working directory")
++      trig = "rm"
+@@ -188,1 sha256:32e9f1a8bc62a7f386ad73e148de1be9117b3736ef89bf5a4d32558315ae7147
++BEGIN { homeN = normalize(home); trig = "rm" }
+@@ -238,0 sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
++# The optional LANGUETTE_RM_ALLOW, parsed once, only now that there is a
++# target to judge. Fills extra_roots (as written and as the filesystem has
++# them) and appends to GENERATED_NAMES; denies on a value that does not parse.
++extra_roots=
++bad_allow() {
++  deny "no-rm-tree: LANGUETTE_RM_ALLOW is malformed ($1), so recursive rm is blocked until it is \
++fixed or unset. It must be a colon-separated list of directory names (dist) or absolute paths \
++(/srv/scratch), using only letters, digits and . _ @ + - ; a path may not hold a . or .. segment \
++and may not be / or \$HOME."
++}
++if [ -n "${LANGUETTE_RM_ALLOW:-}" ]; then
++  rest=$LANGUETTE_RM_ALLOW:
++  while [ -n "$rest" ]; do
++    ent=${rest%%:*}; rest=${rest#*:}
++    case $ent in
++      '') bad_allow 'an empty entry' ;;
++      *[!A-Za-z0-9._@+/-]*) bad_allow "unsupported character in '$ent'" ;;
++      /*)
++        case $ent in
++          */.|*/./*|*/..|*/../*|*//*) bad_allow "'$ent' has an empty, . or .. segment" ;;
++        esac
++        ent=${ent%/}
++        { [ -n "$ent" ] && [ "$ent" != "$HOME" ]; } || bad_allow "'$ent' is / or \$HOME"
++        ent_p=$(physical "$ent") || ent_p=$ent
++        extra_roots="$extra_roots $ent $ent_p" ;;
++      */*) bad_allow "'$ent' is neither a bare name nor an absolute path" ;;
++      . | ..) bad_allow "'$ent' is not a name" ;;
++      *) GENERATED_NAMES="$GENERATED_NAMES $ent" ;;
++    esac
++  done
++fi
++
+@@ -273,1 sha256:e42f188241609727dea4520edd8ab816f48e2114142b8fcb68e46ef7c1611b75
++  is_under "$1" /tmp "$scratch" "$worktrees" "$tmp_p" "$scratch_p" "$worktrees_p" $extra_roots || is_generated "$1"
+@@ -276,1 sha256:3b8a94ed1bae0cb270972973ba56d6d3bd3d9dc2ec4240d17422e4c92136f8bd
++while IFS=$tab read -r tag abs kind raw; do
+@@ -278,1 sha256:0af002ee98f010149cdd440df2fee172fcc45a6813d6be03c914178a1d2e933e
++  case $kind in
++    find) what="find $raw -delete" ;;
++    *) what="rm -r $raw" ;;
++  esac
++  allowed "$abs" || deny "\`$what\` is blocked: only the scratchpad, /tmp, agent worktrees and \
 @@ -282,1 sha256:220cec471811fa8e3adeb697bea915ba57444f04d4a8adfb36cd9b7f8bb99b22
 +directory they own can hold downloads and logs no session knows about."
+@@ -284,2 sha256:f110b44bab24c2826555bc889019dac5435c40ec4e0edff8ccdaadcc0d3b8cdc
++readlink -f or realpath here), so \`$what\` is blocked. Install coreutils or ask the user."
++  [ "$phys" = "$abs" ] || allowed "$phys" || deny "\`$what\` is blocked: $abs resolves through \

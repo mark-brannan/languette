@@ -8,6 +8,7 @@ set -uo pipefail
 HOOK="$(cd "$(dirname "$0")" && pwd)/no-rm-tree.sh"
 [ -n "${AWK_PATH:-}" ] && PATH="$AWK_PATH:$PATH"
 pass=0; fail=0
+unset LANGUETTE_RM_ALLOW   # an ambient value would change every verdict below
 CWD_A="$HOME/project"
 CWD_B="$HOME/project/sub"
 
@@ -139,6 +140,53 @@ check allow 'symlink under /tmp into /tmp'    "rm -rf $S/inside/x"
 check allow 'plain dir under /tmp'            "rm -rf $S/real"
 check allow 'nonexistent under /tmp'          "rm -rf $S/not/yet/here"
 rm -rf "$S"
+
+# --- the denial names what the agent ran ---
+# reason WANT DESC CMD NEEDLE [ALLOW]: verdict WANT, and when it denies the
+# reason contains NEEDLE. ALLOW, when given, is LANGUETTE_RM_ALLOW (even "").
+reason() {
+  local want=$1 desc=$2 cmd=$3 needle=$4 out got why
+  if [ $# -ge 5 ]; then export LANGUETTE_RM_ALLOW=$5; else unset LANGUETTE_RM_ALLOW; fi
+  out=$(jq -n --arg c "$cmd" --arg d "$CWD_A" '{tool_name:"Bash",tool_input:{command:$c},cwd:$d}' | timeout 5 sh "$HOOK" 2>&1)
+  unset LANGUETTE_RM_ALLOW
+  why=$(jq -r '.hookSpecificOutput.permissionDecisionReason // empty' <<<"$out" 2>/dev/null)
+  if grep -q '"permissionDecision":"deny"' <<<"$out"; then got=deny; else got=allow; fi
+  if [ "$got" != "$want" ]; then
+    fail=$((fail + 1)); printf 'FAIL (want %s, got %s): %s\n  cmd: %s\n  hook output: %s\n' "$want" "$got" "$desc" "$cmd" "$out"
+  elif [ -n "$needle" ] && [ "$got" = deny ] && ! grep -qF -- "$needle" <<<"$why"; then
+    fail=$((fail + 1)); printf 'FAIL: %s\n  reason lacks "%s": %s\n' "$desc" "$needle" "$why"
+  else pass=$((pass + 1)); fi
+}
+reason deny  'find -delete names find, not rm -r'   'find build -delete'               '`find build -delete` is blocked'
+reason deny  'find -delete, no start path'          'find -name "*.log" -delete'       '`find -delete` is blocked'
+reason deny  'find -delete, glob start path'        'find b* -delete'                  '`find b* -delete` is blocked'
+reason deny  'find -delete under $HOME names find'  'find ~/Downloads -delete'         '`find ~/Downloads -delete` is blocked'
+reason deny  'rm -r still names rm -r'              'rm -rf build'                     '`rm -r build` is blocked'
+reason deny  'find -exec rm -rf still names rm -r'  'find . -exec rm -rf {} +'         '`rm -r` is blocked'
+
+# --- LANGUETTE_RM_ALLOW: adds to the built-in lists, never replaces them ---
+reason deny  'unset: a custom name is denied'       'rm -rf proj/build'                'is none of those'
+reason deny  'empty is unset'                       'rm -rf proj/build'                'is none of those' ''
+reason allow 'name added'                           'rm -rf proj/build'                ''  build
+reason allow 'name added, deeper'                   'rm -rf proj/build/sub'            ''  build
+reason allow 'name added, find -delete'             'find proj/build -delete'          ''  build
+reason allow 'one of several names'                 'rm -rf proj/.next'                ''  build:.next:out
+reason deny  'names not listed stay denied'         'rm -rf proj/examples'             'is none of those' build:.next
+reason allow 'built-in names survive a value'       'rm -rf proj/node_modules'         ''  build
+reason allow 'built-in roots survive a value'       "rm -rf $HOME/.claude/worktrees/x" ''  build
+reason deny  'added name is not a direct child of $HOME' "rm -rf $HOME/build"         'is none of those' build
+reason allow 'absolute path added as a root'        'rm -rf /srv/agent-area/x'         ''  /srv/agent-area
+reason allow 'absolute path, trailing slash'        'rm -rf /srv/agent-area/x'         ''  /srv/agent-area/
+reason deny  'outside the added root'               'rm -rf /srv/other/x'              'is none of those' /srv/agent-area
+reason deny  'sibling sharing a prefix'             'rm -rf /srv/agent-area2/x'        'is none of those' /srv/agent-area
+
+# --- LANGUETTE_RM_ALLOW: garbage denies, naming the variable ---
+for bad in 'build:' ':build' 'a::b' ':' 'a b' 'dist*' '$X' 'a/b' 'rel/path' '.' '..' '/' '//' "$HOME" "$HOME/" \
+           '/srv/../etc' '/srv/./x' '/srv//x' 'a;b' '"x"'; do
+  reason deny  "garbage [$bad]"                     'rm -rf /tmp/ok'                   'LANGUETTE_RM_ALLOW' "$bad"
+done
+reason allow 'garbage does not touch a command with no recursive rm' 'ls -la'          '' 'a b'
+reason allow 'garbage does not touch a single-file rm'               'rm build.log'    '' 'a b'
 
 # --- fail closed ---
 # A PATH holding only sh and the coreutils the hook needs: no jq, no awk.
