@@ -185,6 +185,10 @@ for bad in 'build:' ':build' 'a::b' ':' 'a b' 'dist*' '$X' 'a/b' 'rel/path' '.' 
            '/srv/../etc' '/srv/./x' '/srv//x' 'a;b' '"x"'; do
   reason deny  "garbage [$bad]"                     'rm -rf /tmp/ok'                   'LANGUETTE_RM_ALLOW' "$bad"
 done
+L=$(mktemp -d /tmp/no-rm-tree-link.XXXXXX); ln -s "$HOME" "$L/home"; ln -s / "$L/root"
+reason deny  'symlink to $HOME as a root'          'rm -rf proj/x'                    'LANGUETTE_RM_ALLOW' "$L/home"
+reason deny  'symlink to / as a root'              'rm -rf proj/x'                    'LANGUETTE_RM_ALLOW' "$L/root"
+rm -rf "$L"
 reason allow 'garbage does not touch a command with no recursive rm' 'ls -la'          '' 'a b'
 reason allow 'garbage does not touch a single-file rm'               'rm build.log'    '' 'a b'
 

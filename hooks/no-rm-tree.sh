@@ -80,9 +80,9 @@ GENERATED_NAMES="node_modules dist coverage .pio"
 # the scratchpad). Names and paths use letters, digits and . _ @ + - only; a
 # path may not hold a . or .. segment and may not be / or $HOME. Unset or
 # empty: the built-in lists, exactly. Anything else that does not parse
-# denies every recursive rm, with a message naming the variable -- checked
-# only once a recursive rm is in front of the guard, so a typo cannot stop
-# unrelated commands.
+# denies every recursive rm and find -delete, with a message naming the
+# variable -- checked only once one is in front of the guard, so a typo
+# cannot stop unrelated commands.
 
 HERE=$(dirname "$0")
 LIB="$HERE/lib-shell-words.awk"
@@ -251,8 +251,9 @@ physical() {
 # target to judge. Fills extra_roots (as written and as the filesystem has
 # them) and appends to GENERATED_NAMES; denies on a value that does not parse.
 extra_roots=
+home_p=$(physical "$HOME") || home_p=$HOME
 bad_allow() {
-  deny "no-rm-tree: LANGUETTE_RM_ALLOW is malformed ($1), so recursive rm is blocked until it is \
+  deny "no-rm-tree: LANGUETTE_RM_ALLOW is malformed ($1), so recursive rm and find -delete are blocked until it is \
 fixed or unset. It must be a colon-separated list of directory names (dist) or absolute paths \
 (/srv/scratch), using only letters, digits and . _ @ + - ; a path may not hold a . or .. segment \
 and may not be / or \$HOME."
@@ -270,7 +271,9 @@ if [ -n "${LANGUETTE_RM_ALLOW:-}" ]; then
         esac
         ent=${ent%/}
         { [ -n "$ent" ] && [ "$ent" != "$HOME" ]; } || bad_allow "'$ent' is / or \$HOME"
+        # As the filesystem has it too: a symlink to $HOME or / is still $HOME or /.
         ent_p=$(physical "$ent") || ent_p=$ent
+        { [ -n "$ent_p" ] && [ "$ent_p" != "$HOME" ] && [ "$ent_p" != "$home_p" ]; } || bad_allow "'$ent' resolves to / or \$HOME"
         extra_roots="$extra_roots $ent $ent_p" ;;
       */*) bad_allow "'$ent' is neither a bare name nor an absolute path" ;;
       . | ..) bad_allow "'$ent' is not a name" ;;
