@@ -1,0 +1,17 @@
+# .claude/hooks/no-git-footguns.sh (dotfiles) -> hooks/no-git-footguns.sh. Each hunk replaces the named dotfiles lines
+# (sha256-checked) with the + lines; nothing else differs.
+@@ -2,2 sha256:57dabee0a789a688fd93d75f80fe67d40e6a936c493e23a1f8f2b7f75d654986
++# Blocks the git moves that have bitten users, or sit in the same class as
++# ones that have, and that an agent session never has a good reason to make:
+@@ -6,2 sha256:e7b0bbc38890a76e8d350d57eb3dc04fe52b94a16ab0ab79a33746725079edfa
++#                     git commit -a  -> where the worktree is $HOME it stages
++#                     the home directory; elsewhere it sweeps in a parallel
++#                     session's files.
+@@ -10,1 sha256:74017b818ff9d85c91726ed91c3e3ff051afe0026551d0dab7859cc6d2852b19
++#                     entry. apply/drop by sha pass.
+@@ -19,1 sha256:f81027e679a67581094443ac860ce2bcb33292bf2e0a07405757d43bb928875d
++# `yadm` (a git wrapper for managing dotfiles) is treated as `git`.
+@@ -94,1 sha256:4a153c0c773e7c2aa6ee4365a0139bfd556dc9767abab813cff7dd9a1e098a28
++          fail("`git add -A` is blocked: stage by path. Where the worktree is $HOME it stages the home directory; " \
+@@ -168,1 sha256:4480f3625f2a1c854c0aba95f6de69ff1a223a2eafdfb9af539333b6c28e3f49
++               "a shared checkout that work may not be yours. Ask the user to run it themselves, or reach " \

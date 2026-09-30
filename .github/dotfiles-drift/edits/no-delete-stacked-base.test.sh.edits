@@ -1,0 +1,9 @@
+# .claude/hooks/no-delete-stacked-base.test.sh (dotfiles) -> hooks/no-delete-stacked-base.test.sh. Each hunk replaces the named dotfiles lines
+# (sha256-checked) with the + lines; nothing else differs.
+@@ -3,1 sha256:06cc9deee21cc2e2fdfaadfdb318fc836b78af56be0cfbd2558c3fbed1c1c956
++#   bash hooks/no-delete-stacked-base.test.sh
+@@ -5,1 sha256:4485810c92c7cb9e8037ad26bf22e966362b547fa7c0448f3b46cd447a451043
++# nawk, busybox) to check portability; CI runs it under mawk, gawk and
++# original-awk.
+@@ -13,1 sha256:358e2993e4e87bbf9598dc6029f94b8b0f4443f7b8d62cd77cb6e70341c61c8c
++CWD="$(cd "$(dirname "$0")/.." && pwd)"

@@ -1,0 +1,54 @@
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "rm -rf build", "cwd": "$HOME/project", "note": "not an allowlisted generated dir", "table": true, "reason_has": "is none of those"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "allow", "command": "rm -rf node_modules", "cwd": "$HOME/project", "note": "allowlisted", "table": true}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "rm -rf \"$DIR\"", "cwd": "$HOME/project", "note": "unresolvable word; loud", "table": true, "reason_has": "variable or command substitution"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "rm -rf dist{,2}", "cwd": "$HOME/project", "note": "brace expansion unresolved; loud", "table": true, "reason_has": "glob or brace expansion"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "sh -c \"rm -rf build\"", "cwd": "$HOME/project", "note": "nested text scanned", "table": true, "reason_has": "rm -r build"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "find build -delete", "cwd": "$HOME/project", "note": "rule covers find -delete", "table": true, "reason_has": "is none of those"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "allow", "command": "python3 -c \"shutil.rmtree('build')\"", "cwd": "$HOME/project", "note": "no rule; silent", "table": true, "gap": "known gap: deletion from inside an interpreter is out of scope"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "allow", "command": "./cleanup.sh", "cwd": "$HOME/project", "note": "no rule; silent", "table": true, "gap": "known gap: a script's contents are never read"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "rm -rf examples", "cwd": "$HOME/project", "note": "a misc directory in a repo is the user's"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "rm -Rf src", "cwd": "$HOME/project", "note": "any recursive spelling"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "rm --rec build", "cwd": "$HOME/project", "note": "GNU long-option prefix of --recursive"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "allow", "command": "rm --rec node_modules", "cwd": "$HOME/project", "note": "the prefix spelling on an allowlisted dir"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "rm -rf ~", "cwd": "$HOME/project", "note": "never $HOME itself"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "rm -rf dist/*", "cwd": "$HOME/project", "note": "a glob could name anything"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "rm -rf dist/../src", "cwd": "$HOME/project", "note": "a .. segment steps out"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "cd x && rm -rf y", "cwd": "$HOME/project", "note": "a relative target after a cd cannot be resolved"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "r\\m -rf examples", "cwd": "$HOME/project", "note": "an escaped command word is still rm"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "find ~/precious -type f | xargs rm -rf", "cwd": "$HOME/project", "note": "rm reached through xargs has no visible target"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "echo \"rm -rf examples\" | sh", "cwd": "$HOME/project", "note": "prose piped into a shell is executed"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "deny", "command": "rm -rf ~/dist", "cwd": "$HOME/project", "note": "a generated name directly under $HOME is just a directory"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "allow", "command": "rm -rf dist/assets", "cwd": "$HOME/project", "note": "a component of the path is allowlisted"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "allow", "command": "rm -rf /tmp/whatever", "cwd": "$HOME/project", "note": "/tmp is the agent's"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "allow", "command": "rm foo.txt", "cwd": "$HOME/project", "note": "not recursive"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "allow", "command": "git rm -r examples", "cwd": "$HOME/project", "note": "rm is git's subcommand here"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "allow", "command": "echo \"do not rm -rf examples\"", "cwd": "$HOME/project", "note": "prose that names the command is not the command"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "allow", "command": "grep -rn \"rm -rf\" .", "cwd": "$HOME/project", "note": "grep's pattern is prose"}
+{"kind": "verdict", "guard": "no-rm-tree", "want": "allow", "command": "rm -rf node_modules 2>/dev/null", "cwd": "$HOME/project", "note": "a redirection is not a target"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "git add -A", "cwd": "$HOME/project", "note": "blanket staging"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "git add .", "cwd": "$HOME/project", "note": "blanket staging, dot"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "git commit -am \"x\"", "cwd": "$HOME/project", "note": "commit -a is add -u in disguise"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "git stash pop", "cwd": "$HOME/project", "note": "the stash stack is shared across worktrees"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "git push --force origin foo", "cwd": "$HOME/project", "note": "bare force push"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "git push --force-with-lease origin main", "cwd": "$HOME/project", "note": "force to main"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "git checkout .", "cwd": "$HOME/project", "note": "discards uncommitted work"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "git clean -fd", "cwd": "$HOME/project", "note": "deletes untracked files"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "git branch -D foo", "cwd": "$HOME/project", "note": "throws away unmerged work"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "git reset --hard HEAD~1", "cwd": "$HOME/project", "note": "discards uncommitted work"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "sudo git add -A", "cwd": "$HOME/project", "note": "git reached through a wrapper"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "\\git add -A", "cwd": "$HOME/project", "note": "escaped command word"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "deny", "command": "sh -c 'git add -A && git commit -m x'", "cwd": "$HOME/project", "note": "nested text scanned"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "allow", "command": "git add hooks/foo.sh README.md", "cwd": "$HOME/project", "note": "staging by path"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "allow", "command": "git commit -m \"block git add -A everywhere\"", "cwd": "$HOME/project", "note": "prose in a commit message"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "allow", "command": "git push --force-with-lease origin claude/foo", "cwd": "$HOME/project", "note": "the one legitimate force"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "allow", "command": "git stash apply abc123", "cwd": "$HOME/project", "note": "apply by sha"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "allow", "command": "git branch -d foo", "cwd": "$HOME/project", "note": "-d refuses when there is something to lose"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "allow", "command": "git restore --staged .", "cwd": "$HOME/project", "note": "unstaging is reversible"}
+{"kind": "verdict", "guard": "no-git-footguns", "want": "allow", "command": "git reset --soft HEAD~1", "cwd": "$HOME/project", "note": "reversible"}
+{"kind": "verdict", "guard": "no-delete-stacked-base", "want": "ask", "command": "git push origin --delete \"$b\"", "cwd": "$HOME/project", "note": "a variable branch cannot be looked up: ask, not allow"}
+{"kind": "verdict", "guard": "no-delete-stacked-base", "want": "ask", "command": "git push origin --delete claude/old-*", "cwd": "$HOME/project", "note": "a glob cannot be looked up"}
+{"kind": "verdict", "guard": "no-delete-stacked-base", "want": "ask", "command": "git -C /elsewhere push origin --delete claude/base-branch", "cwd": "$HOME/project", "note": "git pointed at another repository"}
+{"kind": "verdict", "guard": "no-delete-stacked-base", "want": "allow", "command": "git push origin main", "cwd": "$HOME/project", "note": "not a deletion"}
+{"kind": "verdict", "guard": "no-delete-stacked-base", "want": "allow", "command": "git status", "cwd": "$HOME/project", "note": "unrelated"}
+{"kind": "verdict", "guard": "no-delete-stacked-base", "want": "allow", "command": "gh pr merge 2 --delete-branch", "cwd": "$HOME/project", "note": "the safe deletion names no branch"}
+{"kind": "verdict", "guard": "no-delete-stacked-base", "want": "allow", "command": "echo 'git push origin --delete claude/base-branch'", "cwd": "$HOME/project", "note": "a deletion quoted into prose"}

@@ -8,6 +8,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Daily, so a change in the guards' source surfaces as a red run here
+  # without waiting for a languette PR (see the dotfiles-drift job).
+  schedule:
+    - cron: "17 6 * * *"
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -22,8 +26,73 @@ jobs:
       contents: read
     uses: mark-brannan/.github/.github/workflows/nonempty-diff.yml@main
 
+  # The awk scanner is what the guards stand on, and awk is not one language:
+  # the three implementations are co-installed in ONE job (mawk, gawk and
+  # original-awk each Provide awk through update-alternatives and do not
+  # Conflict, so /usr/bin/{mawk,gawk,original-awk} all exist) and a symlink
+  # picks one per pass through AWK_PATH. Every implementation is reported
+  # even after one fails: the finding this exists for is "mawk is fine,
+  # original-awk is not".
+  guard-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install mawk, gawk, original-awk and jq
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q mawk gawk original-awk jq
+      - name: Guard suites and fixture contract under each awk
+        run: |
+          set -euo pipefail
+          status=0
+          for impl in mawk gawk original-awk; do
+            d=$(mktemp -d)
+            ln -s "$(command -v "$impl")" "$d/awk"
+            for t in hooks/no-rm-tree.test.sh \
+                     hooks/no-git-footguns.test.sh \
+                     hooks/no-delete-stacked-base.test.sh \
+                     fixtures/run.sh; do
+              echo "::group::$t under $impl"
+              if AWK_PATH=$d bash "$t"; then echo "ok"; else status=1; echo "::error::$t failed under $impl"; fi
+              echo "::endgroup::"
+            done
+          done
+          exit $status
+      - name: The README table is the fixtures' table
+        run: |
+          set -euo pipefail
+          diff <(bash fixtures/run.sh --table) \
+               <(sed -n '/<!-- fixtures-table -->/,/<!-- \/fixtures-table -->/p' README.md | sed '1d;$d')
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: |
+          set -euo pipefail
+          command -v shellcheck || (sudo apt-get update -q && sudo apt-get install -y -q shellcheck)
+          shellcheck --severity=warning hooks/*.sh fixtures/run.sh
+
+  # Three guards and the scanner are copies of files in mark-brannan/dotfiles
+  # with house material stripped. Equal means: dotfiles main plus the
+  # reviewed edits in .github/dotfiles-drift/edits is byte-for-byte the copy.
+  # Fails with the diff when either side moves. Retire this job when dotfiles
+  # consumes the plugin instead of keeping copies.
+  dotfiles-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: python3 .github/dotfiles-drift/drift.py check
+
   ci-gate:
-    needs: [nonempty]
+    needs: [nonempty, guard-tests, shellcheck, dotfiles-drift]
     if: always()
     permissions: {}
     uses: mark-brannan/.github/.github/workflows/ci-gate.yml@main
