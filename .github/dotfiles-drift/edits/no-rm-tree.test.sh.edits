@@ -1,0 +1,14 @@
+# .claude/hooks/no-rm-tree.test.sh (dotfiles) -> hooks/no-rm-tree.test.sh. Each hunk replaces the named dotfiles lines
+# (sha256-checked) with the + lines; nothing else differs.
+@@ -2,1 sha256:49134b5a6ed374e7bc88ee69d189b00c80c9ca48306a8de128212ddb98e1ee61
++# Tests for no-rm-tree.sh. Run: bash hooks/no-rm-tree.test.sh
+@@ -4,1 sha256:4485810c92c7cb9e8037ad26bf22e966362b547fa7c0448f3b46cd447a451043
++# nawk, busybox) to check portability; CI runs it under mawk, gawk and original-awk.
+@@ -47,1 sha256:f818edf5ed259afdb1531bfebf766ec81c944f1c9cb7f5680e7148349c294a79
++check deny  'rm -rf tilde-user'               'rm -rf ~someone/foo'
+@@ -54,1 sha256:8d59e834d35dbfb158d02a9dc0ccf594afe55f0b8d20d8fd15c87c378411f05b
++# --- deny: rm reached through another command ---
+@@ -68,1 sha256:cdf899b5a2a50666eb3aa3ab957045b6969646a0db13fc342348e72a3d0fb2b6
++# --- deny: quoting and escapes ---
+@@ -94,1 sha256:0bc43312c319d9134b2beb411cf467b216a452f1b7a05d46b99718cd50fa94c9
++check allow 'rm -rf ./dist coverage'          'rm -rf ./dist coverage'

@@ -1,0 +1,17 @@
+{
+  "name": "languette",
+  "owner": {
+    "name": "Mark Brannan"
+  },
+  "metadata": {
+    "description": "Deterministic guards for coding-agent actions."
+  },
+  "plugins": [
+    {
+      "name": "languette",
+      "source": "./",
+      "description": "Fail-closed PreToolUse guards: recursive rm, git footguns, deleting a branch an open PR is stacked on.",
+      "version": "0.1.0"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+# .claude/hooks/no-rm-tree.sh (dotfiles) -> hooks/no-rm-tree.sh. Each hunk replaces the named dotfiles lines
+# (sha256-checked) with the + lines; nothing else differs.
+@@ -7,6 sha256:75fc33c60f5fd9adc4a504d24bd7da5e4c1661db738672477763aaa2998e8186
++# The scar: an agent ran `rm -rf examples` to sweep the untracked leftovers
++# of a refactor and destroyed captures and a watch log the user was using
++# as an ongoing download area. `git rm --cached` had already handled the
++# tracked files; the `rm -rf` existed only to sweep the rest, and the rest
++# was the user's.
+@@ -24,4 sha256:427362e4a864d3aa5c287492e7081712c29052a7b113f5c56e800b8a635fe87f
++# repo's tracked or working directories, `public/` included -- one project's
++# generated `public/` is another's tracked source, so the name stays off the
++# list.
+@@ -47,2 sha256:75042f90019db1d61a7a968e05ca957e4bef765fd35181f640a8a67e9757f77d
++# tracked that is `git rm`'s job, and looking at the target before deleting
++# it is the agent's job otherwise. `git rm` and `yadm rm` are untouched -- there rm
+@@ -65,2 sha256:b93f09a5b3c18d7d60b62f735073476777022ed59168f76de8d112164271be10
++# unreadable payload -> deny. The hook configuration adds one more layer: if
++# this file is missing or crashes, the wrapper there denies.
+@@ -74,3 sha256:182d5029060152347a8ea1a9c569c36078922bc8f22f549110abaea5a3c9e967
+@@ -78,2 sha256:94cfebaad9e35e794bdeae5e8420df8d1d552dfc7033af5e31b37a0187f26b75
++#   .pio           PlatformIO build cache
++GENERATED_NAMES="node_modules dist coverage .pio"
+@@ -122,1 sha256:4cb51066d889b4d696c3d9bbd86f3a1b764c55c6aca5233a80ad99542f0a75f4
++       "/ `git clean -n` show what is there; `git rm` tracked files by path and hand the rest to the user.")
+@@ -282,1 sha256:220cec471811fa8e3adeb697bea915ba57444f04d4a8adfb36cd9b7f8bb99b22
++directory they own can hold downloads and logs no session knows about."
