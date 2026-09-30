@@ -63,6 +63,34 @@
 +reason deny  'symlink to $HOME as a root'          'rm -rf proj/x'                    'LANGUETTE_RM_ALLOW' "$L/home"
 +reason deny  'symlink to / as a root'              'rm -rf proj/x'                    'LANGUETTE_RM_ALLOW' "$L/root"
 +rm -rf "$L"
-+reason allow 'garbage does not touch a command with no recursive rm' 'ls -la'          '' 'a b'
-+reason allow 'garbage does not touch a single-file rm'               'rm build.log'    '' 'a b'
++
++# --- LANGUETTE_RM_ALLOW: garbage warns on every Bash call, denies only the recursive ones ---
++# warning WANT DESC CMD ALLOW: the verdict is allow, and WANT says whether the
++# output carries the additionalContext warning naming the variable (yes) or is
++# empty (no). Never a deny, never a permissionDecision at all.
++warning() {
++  local want=$1 desc=$2 cmd=$3 out ctx
++  if [ $# -ge 4 ]; then export LANGUETTE_RM_ALLOW=$4; else unset LANGUETTE_RM_ALLOW; fi
++  out=$(jq -n --arg c "$cmd" --arg d "$CWD_A" '{tool_name:"Bash",tool_input:{command:$c},cwd:$d}' | timeout 5 sh "$HOOK" 2>&1)
++  unset LANGUETTE_RM_ALLOW
++  ctx=$(jq -r '.hookSpecificOutput.additionalContext // empty' <<<"$out" 2>/dev/null)
++  if grep -q 'permissionDecision' <<<"$out"; then
++    fail=$((fail + 1)); printf 'FAIL: %s\n  expected no verdict, got: %s\n' "$desc" "$out"
++  elif [ "$want" = yes ] && ! { grep -qF LANGUETTE_RM_ALLOW <<<"$ctx" && jq -e '.hookSpecificOutput.hookEventName == "PreToolUse"' <<<"$out" >/dev/null; }; then
++    fail=$((fail + 1)); printf 'FAIL: %s\n  no warning naming LANGUETTE_RM_ALLOW: %s\n' "$desc" "$out"
++  elif [ "$want" = no ] && [ -n "$out" ]; then
++    fail=$((fail + 1)); printf 'FAIL: %s\n  expected silence, got: %s\n' "$desc" "$out"
++  else pass=$((pass + 1)); fi
++}
++for bad in 'a b' 'build:' 'rel/path' '/' "$HOME"; do
++  warning yes "warn, allow: ls with [$bad]"            'ls -la'                     "$bad"
++  warning yes "warn, allow: single-file rm [$bad]"     'rm build.log'               "$bad"
++  warning yes "warn, allow: git rm [$bad]"             'git rm -r --cached build'   "$bad"
++  reason  deny "deny: rm -rf in an allowed dir [$bad]" 'rm -rf /tmp/ok'             'LANGUETTE_RM_ALLOW' "$bad"
++  reason  deny "deny: find -delete [$bad]"             'find /tmp/ok -delete'       'LANGUETTE_RM_ALLOW' "$bad"
++done
++warning no  'unset: silent'                            'ls -la'
++warning no  'empty: silent'                            'rm -rf /tmp/ok' ''
++warning no  'valid value: silent'                      'ls -la'                     'build:/srv/agent-area'
++warning no  'valid value, allowed rm: silent'          'rm -rf proj/build'          'build'
 +

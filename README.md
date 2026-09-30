@@ -81,9 +81,11 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 - Entries use letters, digits and `. _ @ + -` only; a path may not hold a
   `.` or `..` segment and may not be `/` or `$HOME`.
 - A value that does not parse (an empty entry, a glob, a space, a relative
-  path with a slash) denies every recursive `rm` and `find -delete`, with a
-  message naming `LANGUETTE_RM_ALLOW`. Commands without one are untouched, so
-  a typo cannot stop unrelated work.
+  path with a slash) warns on every Bash call, through
+  `hookSpecificOutput.additionalContext`, and denies only a recursive `rm` or
+  `find -delete`, with a message naming `LANGUETTE_RM_ALLOW`. Every other
+  command runs, so a typo cannot stop unrelated work, and it cannot open the
+  gate either.
 
 Other agent hosts are a roadmap item, not a promise: the
 scripts read the Claude Code payload shape.

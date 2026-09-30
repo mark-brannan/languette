@@ -79,10 +79,10 @@ GENERATED_NAMES="node_modules dist coverage .pio"
 # direct-child-of-$HOME exclusion) or an absolute path (added as a root, like
 # the scratchpad). Names and paths use letters, digits and . _ @ + - only; a
 # path may not hold a . or .. segment and may not be / or $HOME. Unset or
-# empty: the built-in lists, exactly. Anything else that does not parse
-# denies every recursive rm and find -delete, with a message naming the
-# variable -- checked only once one is in front of the guard, so a typo
-# cannot stop unrelated commands.
+# empty: the built-in lists, exactly. A value that does not parse warns on
+# every Bash call (hookSpecificOutput.additionalContext) and denies only a
+# recursive rm or find -delete, naming the variable, before the allowlist is
+# consulted: a typo cannot stop unrelated commands, and cannot open the gate.
 
 HERE=$(dirname "$0")
 LIB="$HERE/lib-shell-words.awk"
@@ -113,6 +113,59 @@ case $HOME in
   /*) : ;;
   *) deny 'no-rm-tree: $HOME is not an absolute path, cannot resolve targets' ;;
 esac
+
+# physical PATH: the longest existing prefix resolved through symlinks, the
+# rest appended as written. Fails when no resolver is available.
+physical() {
+  ph_p=$1 ph_rest=
+  while [ "$ph_p" != / ] && ! [ -e "$ph_p" ] && ! [ -L "$ph_p" ]; do
+    ph_rest="/${ph_p##*/}$ph_rest"; ph_p=${ph_p%/*}; [ -n "$ph_p" ] || ph_p=/
+  done
+  ph_r=$(readlink -f -- "$ph_p" 2>/dev/null) || ph_r=$(realpath -- "$ph_p" 2>/dev/null) || return 1
+  [ "$ph_r" = / ] && ph_r=
+  printf '%s%s\n' "$ph_r" "$ph_rest"
+}
+
+# The optional LANGUETTE_RM_ALLOW, parsed on every call, before the early exit,
+# so a malformed value is seen whether or not this command is a recursive rm.
+# Fills extra_roots (as written and as the filesystem has them) and appends to
+# GENERATED_NAMES; on a value that does not parse it sets allow_err (and stops
+# at the first bad entry). What to do about it is decided below: warn and allow
+# when no recursive rm or find -delete is in front of the guard, deny when one is.
+extra_roots=; allow_err=
+home_p=$(physical "$HOME") || home_p=$HOME
+bad_allow() { allow_err=$1; return 1; }
+parse_allow() {
+  rest=$LANGUETTE_RM_ALLOW:
+  while [ -n "$rest" ]; do
+    ent=${rest%%:*}; rest=${rest#*:}
+    case $ent in
+      '') bad_allow 'an empty entry'; return ;;
+      *[!A-Za-z0-9._@+/-]*) bad_allow "unsupported character in '$ent'"; return ;;
+      /*)
+        case $ent in
+          */.|*/./*|*/..|*/../*|*//*) bad_allow "'$ent' has an empty, . or .. segment"; return ;;
+        esac
+        ent=${ent%/}
+        { [ -n "$ent" ] && [ "$ent" != "$HOME" ]; } || { bad_allow "'$ent' is / or \$HOME"; return; }
+        # As the filesystem has it too: a symlink to $HOME or / is still $HOME or /.
+        ent_p=$(physical "$ent") || ent_p=$ent
+        { [ -n "$ent_p" ] && [ "$ent_p" != "$HOME" ] && [ "$ent_p" != "$home_p" ]; } || { bad_allow "'$ent' resolves to / or \$HOME"; return; }
+        extra_roots="$extra_roots $ent $ent_p" ;;
+      */*) bad_allow "'$ent' is neither a bare name nor an absolute path"; return ;;
+      . | ..) bad_allow "'$ent' is not a name"; return ;;
+      *) GENERATED_NAMES="$GENERATED_NAMES $ent" ;;
+    esac
+  done
+}
+[ -z "${LANGUETTE_RM_ALLOW:-}" ] || parse_allow
+allow_msg=
+if [ -n "$allow_err" ]; then
+  allow_msg="LANGUETTE_RM_ALLOW is malformed ($allow_err). Recursive rm and find -delete are blocked until it is \
+fixed or unset; other commands run. It must be a colon-separated list of directory names (dist) or absolute paths \
+(/srv/scratch), using only letters, digits and . _ @ + - ; a path may not hold a . or .. segment \
+and may not be / or \$HOME."
+fi
 
 # awk parses and normalises; it prints either one "DENY<tab>reason" line, or
 # one "T<tab>abs<tab>raw" line per recursive target for the allowlist check
@@ -224,7 +277,15 @@ END {
   }
 }') || deny 'no-rm-tree: awk failed, cannot inspect the command'
 
-[ -n "$out" ] || exit 0
+# Nothing recursive in front of the guard: a malformed LANGUETTE_RM_ALLOW only
+# warns, on every Bash call, and the command runs.
+if [ -z "$out" ]; then
+  [ -z "$allow_msg" ] || jq -cn --arg m "no-rm-tree: $allow_msg" '{hookSpecificOutput:{hookEventName:"PreToolUse",additionalContext:$m}}'
+  exit 0
+fi
+# A recursive rm or find -delete is being judged: fail closed, before the
+# allowlist is consulted.
+[ -z "$allow_msg" ] || deny "no-rm-tree: $allow_msg"
 tab=$(printf '\t')
 case $out in
   "DENY$tab"*) deny "$(printf '%s\n' "$out" | head -n 1 | cut -f 2-)" ;;
@@ -234,53 +295,6 @@ esac
 
 scratch="$HOME/.local/state/claude-tmpdir"
 worktrees="$HOME/.claude/worktrees"
-
-# physical PATH: the longest existing prefix resolved through symlinks, the
-# rest appended as written. Fails when no resolver is available.
-physical() {
-  ph_p=$1 ph_rest=
-  while [ "$ph_p" != / ] && ! [ -e "$ph_p" ] && ! [ -L "$ph_p" ]; do
-    ph_rest="/${ph_p##*/}$ph_rest"; ph_p=${ph_p%/*}; [ -n "$ph_p" ] || ph_p=/
-  done
-  ph_r=$(readlink -f -- "$ph_p" 2>/dev/null) || ph_r=$(realpath -- "$ph_p" 2>/dev/null) || return 1
-  [ "$ph_r" = / ] && ph_r=
-  printf '%s%s\n' "$ph_r" "$ph_rest"
-}
-
-# The optional LANGUETTE_RM_ALLOW, parsed once, only now that there is a
-# target to judge. Fills extra_roots (as written and as the filesystem has
-# them) and appends to GENERATED_NAMES; denies on a value that does not parse.
-extra_roots=
-home_p=$(physical "$HOME") || home_p=$HOME
-bad_allow() {
-  deny "no-rm-tree: LANGUETTE_RM_ALLOW is malformed ($1), so recursive rm and find -delete are blocked until it is \
-fixed or unset. It must be a colon-separated list of directory names (dist) or absolute paths \
-(/srv/scratch), using only letters, digits and . _ @ + - ; a path may not hold a . or .. segment \
-and may not be / or \$HOME."
-}
-if [ -n "${LANGUETTE_RM_ALLOW:-}" ]; then
-  rest=$LANGUETTE_RM_ALLOW:
-  while [ -n "$rest" ]; do
-    ent=${rest%%:*}; rest=${rest#*:}
-    case $ent in
-      '') bad_allow 'an empty entry' ;;
-      *[!A-Za-z0-9._@+/-]*) bad_allow "unsupported character in '$ent'" ;;
-      /*)
-        case $ent in
-          */.|*/./*|*/..|*/../*|*//*) bad_allow "'$ent' has an empty, . or .. segment" ;;
-        esac
-        ent=${ent%/}
-        { [ -n "$ent" ] && [ "$ent" != "$HOME" ]; } || bad_allow "'$ent' is / or \$HOME"
-        # As the filesystem has it too: a symlink to $HOME or / is still $HOME or /.
-        ent_p=$(physical "$ent") || ent_p=$ent
-        { [ -n "$ent_p" ] && [ "$ent_p" != "$HOME" ] && [ "$ent_p" != "$home_p" ]; } || bad_allow "'$ent' resolves to / or \$HOME"
-        extra_roots="$extra_roots $ent $ent_p" ;;
-      */*) bad_allow "'$ent' is neither a bare name nor an absolute path" ;;
-      . | ..) bad_allow "'$ent' is not a name" ;;
-      *) GENERATED_NAMES="$GENERATED_NAMES $ent" ;;
-    esac
-  done
-fi
 
 # is_under PATH ROOT...: PATH is one of the ROOTs or inside one.
 is_under() {

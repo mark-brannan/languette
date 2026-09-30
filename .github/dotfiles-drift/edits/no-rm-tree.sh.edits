@@ -27,10 +27,64 @@
 +# direct-child-of-$HOME exclusion) or an absolute path (added as a root, like
 +# the scratchpad). Names and paths use letters, digits and . _ @ + - only; a
 +# path may not hold a . or .. segment and may not be / or $HOME. Unset or
-+# empty: the built-in lists, exactly. Anything else that does not parse
-+# denies every recursive rm and find -delete, with a message naming the
-+# variable -- checked only once one is in front of the guard, so a typo
-+# cannot stop unrelated commands.
++# empty: the built-in lists, exactly. A value that does not parse warns on
++# every Bash call (hookSpecificOutput.additionalContext) and denies only a
++# recursive rm or find -delete, naming the variable, before the allowlist is
++# consulted: a typo cannot stop unrelated commands, and cannot open the gate.
+@@ -111,0 sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
++# physical PATH: the longest existing prefix resolved through symlinks, the
++# rest appended as written. Fails when no resolver is available.
++physical() {
++  ph_p=$1 ph_rest=
++  while [ "$ph_p" != / ] && ! [ -e "$ph_p" ] && ! [ -L "$ph_p" ]; do
++    ph_rest="/${ph_p##*/}$ph_rest"; ph_p=${ph_p%/*}; [ -n "$ph_p" ] || ph_p=/
++  done
++  ph_r=$(readlink -f -- "$ph_p" 2>/dev/null) || ph_r=$(realpath -- "$ph_p" 2>/dev/null) || return 1
++  [ "$ph_r" = / ] && ph_r=
++  printf '%s%s\n' "$ph_r" "$ph_rest"
++}
++
++# The optional LANGUETTE_RM_ALLOW, parsed on every call, before the early exit,
++# so a malformed value is seen whether or not this command is a recursive rm.
++# Fills extra_roots (as written and as the filesystem has them) and appends to
++# GENERATED_NAMES; on a value that does not parse it sets allow_err (and stops
++# at the first bad entry). What to do about it is decided below: warn and allow
++# when no recursive rm or find -delete is in front of the guard, deny when one is.
++extra_roots=; allow_err=
++home_p=$(physical "$HOME") || home_p=$HOME
++bad_allow() { allow_err=$1; return 1; }
++parse_allow() {
++  rest=$LANGUETTE_RM_ALLOW:
++  while [ -n "$rest" ]; do
++    ent=${rest%%:*}; rest=${rest#*:}
++    case $ent in
++      '') bad_allow 'an empty entry'; return ;;
++      *[!A-Za-z0-9._@+/-]*) bad_allow "unsupported character in '$ent'"; return ;;
++      /*)
++        case $ent in
++          */.|*/./*|*/..|*/../*|*//*) bad_allow "'$ent' has an empty, . or .. segment"; return ;;
++        esac
++        ent=${ent%/}
++        { [ -n "$ent" ] && [ "$ent" != "$HOME" ]; } || { bad_allow "'$ent' is / or \$HOME"; return; }
++        # As the filesystem has it too: a symlink to $HOME or / is still $HOME or /.
++        ent_p=$(physical "$ent") || ent_p=$ent
++        { [ -n "$ent_p" ] && [ "$ent_p" != "$HOME" ] && [ "$ent_p" != "$home_p" ]; } || { bad_allow "'$ent' resolves to / or \$HOME"; return; }
++        extra_roots="$extra_roots $ent $ent_p" ;;
++      */*) bad_allow "'$ent' is neither a bare name nor an absolute path"; return ;;
++      . | ..) bad_allow "'$ent' is not a name"; return ;;
++      *) GENERATED_NAMES="$GENERATED_NAMES $ent" ;;
++    esac
++  done
++}
++[ -z "${LANGUETTE_RM_ALLOW:-}" ] || parse_allow
++allow_msg=
++if [ -n "$allow_err" ]; then
++  allow_msg="LANGUETTE_RM_ALLOW is malformed ($allow_err). Recursive rm and find -delete are blocked until it is \
++fixed or unset; other commands run. It must be a colon-separated list of directory names (dist) or absolute paths \
++(/srv/scratch), using only letters, digits and . _ @ + - ; a path may not hold a . or .. segment \
++and may not be / or \$HOME."
++fi
++
 @@ -117,0 sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 +# What the agent ran, as the denial should name it: find -delete is not rm -r.
 +function lab(raw) {
@@ -50,42 +104,17 @@
 +      trig = "rm"
 @@ -188,1 sha256:32e9f1a8bc62a7f386ad73e148de1be9117b3736ef89bf5a4d32558315ae7147
 +BEGIN { homeN = normalize(home); trig = "rm" }
-@@ -238,0 sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-+# The optional LANGUETTE_RM_ALLOW, parsed once, only now that there is a
-+# target to judge. Fills extra_roots (as written and as the filesystem has
-+# them) and appends to GENERATED_NAMES; denies on a value that does not parse.
-+extra_roots=
-+home_p=$(physical "$HOME") || home_p=$HOME
-+bad_allow() {
-+  deny "no-rm-tree: LANGUETTE_RM_ALLOW is malformed ($1), so recursive rm and find -delete are blocked until it is \
-+fixed or unset. It must be a colon-separated list of directory names (dist) or absolute paths \
-+(/srv/scratch), using only letters, digits and . _ @ + - ; a path may not hold a . or .. segment \
-+and may not be / or \$HOME."
-+}
-+if [ -n "${LANGUETTE_RM_ALLOW:-}" ]; then
-+  rest=$LANGUETTE_RM_ALLOW:
-+  while [ -n "$rest" ]; do
-+    ent=${rest%%:*}; rest=${rest#*:}
-+    case $ent in
-+      '') bad_allow 'an empty entry' ;;
-+      *[!A-Za-z0-9._@+/-]*) bad_allow "unsupported character in '$ent'" ;;
-+      /*)
-+        case $ent in
-+          */.|*/./*|*/..|*/../*|*//*) bad_allow "'$ent' has an empty, . or .. segment" ;;
-+        esac
-+        ent=${ent%/}
-+        { [ -n "$ent" ] && [ "$ent" != "$HOME" ]; } || bad_allow "'$ent' is / or \$HOME"
-+        # As the filesystem has it too: a symlink to $HOME or / is still $HOME or /.
-+        ent_p=$(physical "$ent") || ent_p=$ent
-+        { [ -n "$ent_p" ] && [ "$ent_p" != "$HOME" ] && [ "$ent_p" != "$home_p" ]; } || bad_allow "'$ent' resolves to / or \$HOME"
-+        extra_roots="$extra_roots $ent $ent_p" ;;
-+      */*) bad_allow "'$ent' is neither a bare name nor an absolute path" ;;
-+      . | ..) bad_allow "'$ent' is not a name" ;;
-+      *) GENERATED_NAMES="$GENERATED_NAMES $ent" ;;
-+    esac
-+  done
+@@ -215,1 sha256:22c670a8650d59582a426bed9265357ba9efa7d14ee867300c0caf1950c5ca80
++# Nothing recursive in front of the guard: a malformed LANGUETTE_RM_ALLOW only
++# warns, on every Bash call, and the command runs.
++if [ -z "$out" ]; then
++  [ -z "$allow_msg" ] || jq -cn --arg m "no-rm-tree: $allow_msg" '{hookSpecificOutput:{hookEventName:"PreToolUse",additionalContext:$m}}'
++  exit 0
 +fi
-+
++# A recursive rm or find -delete is being judged: fail closed, before the
++# allowlist is consulted.
++[ -z "$allow_msg" ] || deny "no-rm-tree: $allow_msg"
+@@ -225,12 sha256:3a83d470759e25094150fb1f24f9208f71a60a5a62b07a24af12b928c94937dd
 @@ -273,1 sha256:e42f188241609727dea4520edd8ab816f48e2114142b8fcb68e46ef7c1611b75
 +  is_under "$1" /tmp "$scratch" "$worktrees" "$tmp_p" "$scratch_p" "$worktrees_p" $extra_roots || is_generated "$1"
 @@ -276,1 sha256:3b8a94ed1bae0cb270972973ba56d6d3bd3d9dc2ec4240d17422e4c92136f8bd
