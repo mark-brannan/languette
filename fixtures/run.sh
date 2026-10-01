@@ -135,14 +135,14 @@ got_of() {
   cmd=$(jq -j .command <<<"$2")
   case $kind in
     tokens | texts)
-      if [ "$1" = python ]; then printf '%s' "$cmd" | python3 -I "$ROOT/languette/scan.py" "$kind" 2>&1 | jq -c . 2>&1
+      if [ "$1" = python ]; then printf '%s' "$cmd" | python3 -IB "$ROOT/languette/scan.py" "$kind" 2>&1 | jq -c . 2>&1
       else printf '%s' "$cmd" | scan_json "$kind" 2>&1 | jq -c . 2>&1; fi ;;
     verdict)
       guard=$(jq -r .guard <<<"$2")
       cwd=$(jq -r .cwd <<<"$2"); cwd=${cwd/#\$HOME/$HOME}
       if [ "$1" = python ] && [ "${PY_GUARDS#* "$guard" }" = "$PY_GUARDS" ]; then echo SKIP; return; fi
       jq -n --arg c "$cmd" --arg d "$cwd" '{tool_name:"Bash",tool_input:{command:$c},cwd:$d}' |
-        if [ "$1" = python ]; then timeout 5 python3 -I "$ROOT/languette/run.py" --guard "$guard" 2>&1
+        if [ "$1" = python ]; then timeout 5 python3 -IB "$ROOT/languette/run.py" --guard "$guard" 2>&1
         else timeout 5 sh "$ROOT/hooks/$guard.sh" 2>&1; fi ;;
   esac
 }
