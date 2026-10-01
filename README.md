@@ -90,6 +90,48 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 Other agent hosts are a roadmap item, not a promise: the
 scripts read the Claude Code payload shape.
 
+## Configuration
+
+One boolean per guard, every one on by default:
+
+| Key | Guard |
+|---|---|
+| `no_git_footguns` | `no-git-footguns` |
+| `no_rm_tree` | `no-rm-tree` |
+| `no_delete_stacked_base` | `no-delete-stacked-base` |
+
+Turn one off with `/plugin configure languette@languette`, or at install:
+
+```
+claude plugin install languette@languette --config no_rm_tree=false
+```
+
+Claude Code hands each key to the hook as `CLAUDE_PLUGIN_OPTION_<KEY>`, and
+`hooks/hooks.json` skips a guard only when that variable is exactly `false`.
+Unset, empty or any other value runs the guard, so a misconfiguration cannot
+open the gate. A guard that is on still fails closed when its script is
+missing or crashes.
+
+Measured on Claude Code 2.1.258, with a throwaway plugin loaded by
+`--plugin-dir` and options supplied through `pluginConfigs`:
+
+| Setting | Env in the hook |
+|---|---|
+| key `flag_off`, boolean `false` | `CLAUDE_PLUGIN_OPTION_FLAG_OFF=false` |
+| key `flag_on`, boolean `true` | `CLAUDE_PLUGIN_OPTION_FLAG_ON=true` |
+| key `camelKey`, boolean `false` | `CLAUDE_PLUGIN_OPTION_CAMELKEY=false` |
+| `multiple` string `["a b","c,d"]` | `CLAUDE_PLUGIN_OPTION_LIST_VALS=a b,c,d` |
+| `multiple` string `[]` | `CLAUDE_PLUGIN_OPTION_LIST_VALS=` |
+| key unset, though the manifest gives a `default` | variable absent |
+
+The name is the key upper-cased, underscores kept and camelCase not split.
+Booleans are the words `true` and `false`, not `1` and `0`. A list is joined
+with a bare comma and no escaping, so it cannot be split back apart when an
+item holds a comma. A string `"false"` is indistinguishable from a boolean
+`false`. A `default` did not reach the environment under `--plugin-dir`; the
+installed-plugin path was not measured, which is why the guards treat unset
+as on.
+
 ## Working on it
 
 ```
