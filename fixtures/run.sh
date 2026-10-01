@@ -179,12 +179,28 @@ while IFS= read -r c; do
   case $got in deny | ask) pass=$((pass + 1)) ;; *) bad "wiring: $name did not judge a payload through hooks.json (got: ${got:-nothing})" ;; esac
   got=$(printf '%s' "$payload" | CLAUDE_PLUGIN_ROOT=/nonexistent sh -c "$c" 2>&1 | decision)
   if [ "$got" = deny ]; then pass=$((pass + 1)); else bad "wiring: $name is fail-open when the script is missing (got: ${got:-nothing})"; fi
+  # Toggle: CLAUDE_PLUGIN_OPTION_<KEY>=false skips the guard (no output, exit
+  # 0). Unset, empty or anything else is not "false" and runs it, so $got is
+  # the deny from above. The probe above ran with the variable unset.
+  var="CLAUDE_PLUGIN_OPTION_$(printf '%s' "$name" | tr 'a-z-' 'A-Z_')"
+  out=$(printf '%s' "$payload" | env "$var=false" CLAUDE_PLUGIN_ROOT="$ROOT" sh -c "$c" 2>&1); rc=$?
+  if [ "$rc" -eq 0 ] && [ -z "$out" ]; then pass=$((pass + 1)); else bad "wiring: $name still ran with $var=false (rc=$rc, out: $out)"; fi
+  for v in "" 0 False no true 1; do
+    got=$(printf '%s' "$payload" | env "$var=$v" CLAUDE_PLUGIN_ROOT="$ROOT" sh -c "$c" 2>&1 | decision)
+    case $got in deny | ask) pass=$((pass + 1)) ;; *) bad "wiring: $name was skipped with $var='$v' (got: ${got:-nothing})" ;; esac
+  done
   cp "$CRASH/hooks/crash.sh" "$CRASH/hooks/$name.sh"
   got=$(printf '%s' "$payload" | CLAUDE_PLUGIN_ROOT="$CRASH" sh -c "$c" 2>&1 | decision)
   if [ "$got" = deny ]; then pass=$((pass + 1)); else bad "wiring: $name is fail-open when the script crashes (got: ${got:-nothing})"; fi
 done < <(jq -r '.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[].command' "$HJ")
 [ "$(jq '[.hooks.PreToolUse[].hooks[]] | length' "$HJ")" = 3 ] || bad "wiring: hooks.json should wire exactly the three guards"
 rm -rf "$CRASH"
+# Every guard has exactly one userConfig key, a boolean defaulting to true.
+PJ="$ROOT/.claude-plugin/plugin.json"
+want='["no_delete_stacked_base","no_git_footguns","no_rm_tree"]'
+[ "$(jq -c '.userConfig | keys' "$PJ")" = "$want" ] || bad "userConfig: keys should be exactly $want"
+[ "$(jq '[.userConfig[] | select(.type == "boolean" and .default == true and .title and .description)] | length' "$PJ")" = 3 ] ||
+  bad "userConfig: every key should be a titled, described boolean defaulting to true"
 
 printf 'fixtures: %d passed, %d failed (awk: %s)\n' "$pass" "$fail" "$(command -v awk)"
 [ "$fail" -eq 0 ]

@@ -15,5 +15,25 @@
     "bash",
     "git",
     "pretooluse"
-  ]
+  ],
+  "userConfig": {
+    "no_git_footguns": {
+      "type": "boolean",
+      "title": "Block git footguns",
+      "description": "Deny blanket staging (git add -A), stash pop/drop, force pushes, discarding checkouts and git branch -D. Leave on unless you want these git commands through unchecked.",
+      "default": true
+    },
+    "no_rm_tree": {
+      "type": "boolean",
+      "title": "Block recursive rm",
+      "description": "Deny recursive rm and find -delete outside scratch areas and generated directories. Leave on unless you want recursive deletes through unchecked.",
+      "default": true
+    },
+    "no_delete_stacked_base": {
+      "type": "boolean",
+      "title": "Block deleting a stacked base branch",
+      "description": "Deny deleting a remote branch that an open pull request is based on or headed from. Leave on unless you want remote branch deletions through unchecked.",
+      "default": true
+    }
+  }
 }
