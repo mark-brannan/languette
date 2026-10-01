@@ -15,16 +15,24 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from languette.guards import no_rm_tree  # noqa: E402
+
+def _out(event, fields):
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": event, **fields}}, separators=(",", ":")))
+
+
+# A guard that cannot even be imported is a deny too, not a traceback and a
+# non-zero exit that only the hooks.json wrapper would turn into one.
+try:
+    from languette.guards import no_rm_tree
+except Exception as e:  # noqa: BLE001
+    _out("PreToolUse", {"permissionDecision": "deny",
+                        "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"})
+    sys.exit(0)
 
 # (hook event, tool name) -> guards, in the order they judge.
 GUARDS = {
     ("PreToolUse", "Bash"): (no_rm_tree,),
 }
-
-
-def _out(event, fields):
-    print(json.dumps({"hookSpecificOutput": {"hookEventName": event, **fields}}, separators=(",", ":")))
 
 
 def main(argv):
