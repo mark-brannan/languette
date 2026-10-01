@@ -108,11 +108,9 @@ login. The headless smoke test, which installs the plugin in a scratch project
 and confirms a recursive `rm` is really blocked, stays manual: it needs both.
 
 `fixtures/` holds the contract as data: a command in, tokens or a verdict
-out. The scanner (`hooks/lib-shell-words.awk`) and the three guards are
-copied from [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles)
-with house material stripped. `.github/dotfiles-drift/drift.py check` fails,
-with the diff, when either side moves; `drift.py regen` rewrites the reviewed
-edits after a deliberate change.
+out. The scanner (`hooks/lib-shell-words.awk`) and the three guards began as
+copies of the guards in [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles);
+this repo is where they are maintained now.
 
 The product name appears in `.claude-plugin/plugin.json`,
 `.claude-plugin/marketplace.json` and the install lines above; the scripts
