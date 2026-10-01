@@ -2,6 +2,14 @@
 # Runs the scanner and guard contract in fixtures/*.jsonl.
 #
 #   fixtures/run.sh            check every fixture; exit 1 on any mismatch
+#   fixtures/run.sh --engine python
+#                              the same against languette/ (the Python proof of
+#                              concept); a verdict for a guard it has not
+#                              ported is skipped, and the hooks.json wiring
+#                              checks, which run the shell guards, are not run
+#   fixtures/run.sh --diff     run both engines over every fixture; exit 1 if
+#                              any result the Python engine produces differs
+#                              from the awk engine's, right or wrong
 #   fixtures/run.sh --table    print the failure-mode table the README quotes
 #   fixtures/run.sh --shape [FILE]
 #                              only check that FILE (default hooks/hooks.json)
@@ -29,6 +37,13 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 LIB="$ROOT/hooks/lib-shell-words.awk"
 [ -n "${AWK_PATH:-}" ] && PATH="$AWK_PATH:$PATH"
 FIX="$ROOT/fixtures/scanner.jsonl $ROOT/fixtures/guards.jsonl"
+ENGINE="awk"
+if [ "${1:-}" = "--engine" ]; then
+  ENGINE=${2:-}; shift 2 || true
+  case $ENGINE in awk | python) : ;; *) echo "run.sh: --engine is awk or python" >&2; exit 2 ;; esac
+fi
+# The guards languette/ has a Python port of; a verdict for any other is skipped.
+PY_GUARDS=" no-rm-tree "
 
 # hooks_shape FILE: print one line per way FILE is not what Claude Code loads
 # from a plugin's hooks/hooks.json -- a top-level object whose `hooks` holds
@@ -108,26 +123,63 @@ END {
 }'
 }
 
-pass=0; fail=0
+pass=0; fail=0; skip=0
 bad() { fail=$((fail + 1)); printf 'FAIL: %s\n' "$1"; shift; printf '  %s\n' "$@"; }
+
+# got_of ENGINE LINE: what ENGINE makes of fixture LINE -- the compact JSON
+# array for tokens and texts, the hook's raw output for a verdict -- or the
+# word SKIP when ENGINE has no port of the guard.
+got_of() {
+  local kind cmd guard cwd
+  kind=$(jq -r .kind <<<"$2")
+  cmd=$(jq -j .command <<<"$2")
+  case $kind in
+    tokens | texts)
+      if [ "$1" = python ]; then printf '%s' "$cmd" | python3 -I "$ROOT/languette/scan.py" "$kind" 2>&1 | jq -c . 2>&1
+      else printf '%s' "$cmd" | scan_json "$kind" 2>&1 | jq -c . 2>&1; fi ;;
+    verdict)
+      guard=$(jq -r .guard <<<"$2")
+      cwd=$(jq -r .cwd <<<"$2"); cwd=${cwd/#\$HOME/$HOME}
+      if [ "$1" = python ] && [ "${PY_GUARDS#* "$guard" }" = "$PY_GUARDS" ]; then echo SKIP; return; fi
+      jq -n --arg c "$cmd" --arg d "$cwd" '{tool_name:"Bash",tool_input:{command:$c},cwd:$d}' |
+        if [ "$1" = python ]; then timeout 5 python3 -I "$ROOT/languette/run.py" --guard "$guard" 2>&1
+        else timeout 5 sh "$ROOT/hooks/$guard.sh" 2>&1; fi ;;
+  esac
+}
+decision_of() {
+  local d
+  d=$(jq -r '.hookSpecificOutput.permissionDecision // empty' <<<"$1" 2>/dev/null)
+  printf '%s\n' "${d:-allow}"
+}
+
+if [ "${1:-}" = "--diff" ]; then
+  same=0
+  while IFS= read -r line; do
+    p=$(got_of python "$line")
+    if [ "$p" = SKIP ]; then skip=$((skip + 1)); continue; fi
+    a=$(got_of awk "$line")
+    if [ "$(jq -r .kind <<<"$line")" = verdict ]; then a=$(decision_of "$a"); p=$(decision_of "$p"); fi
+    if [ "$a" = "$p" ]; then same=$((same + 1)); else
+      bad "engines differ on: $(jq -c .command <<<"$line")" "awk:    $a" "python: $p"; fi
+  done < <(cat $FIX)
+  printf 'engines: %d agree, %d differ, %d skipped (no Python port)\n' "$same" "$fail" "$skip"
+  [ "$fail" -eq 0 ]; exit
+fi
 
 while IFS= read -r line; do
   kind=$(jq -r .kind <<<"$line")
   cmd=$(jq -j .command <<<"$line")
+  out=$(got_of "$ENGINE" "$line")
   case $kind in
     tokens | texts)
       want=$(jq -c ".$kind" <<<"$line")
-      got=$(printf '%s' "$cmd" | scan_json "$kind" 2>&1 | jq -c . 2>&1)
-      if [ "$got" = "$want" ]; then pass=$((pass + 1)); else
-        bad "$kind of: $cmd" "want: $want" "got:  $got"; fi ;;
+      if [ "$out" = "$want" ]; then pass=$((pass + 1)); else
+        bad "$kind of: $cmd" "want: $want" "got:  $out"; fi ;;
     verdict)
+      if [ "$out" = SKIP ]; then skip=$((skip + 1)); continue; fi
       guard=$(jq -r .guard <<<"$line"); want=$(jq -r .want <<<"$line")
-      cwd=$(jq -r .cwd <<<"$line"); cwd=${cwd/#\$HOME/$HOME}
       rh=$(jq -r '.reason_has // empty' <<<"$line")
-      out=$(jq -n --arg c "$cmd" --arg d "$cwd" '{tool_name:"Bash",tool_input:{command:$c},cwd:$d}' \
-        | timeout 5 sh "$ROOT/hooks/$guard.sh" 2>&1)
-      got=$(jq -r '.hookSpecificOutput.permissionDecision // empty' <<<"$out" 2>/dev/null)
-      [ -n "$got" ] || got=allow
+      got=$(decision_of "$out")
       reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason // empty' <<<"$out" 2>/dev/null)
       if [ "$got" != "$want" ]; then bad "$guard, want $want, got $got: $cmd" "hook output: $out"
       elif [ -n "$rh" ] && ! grep -qF -- "$rh" <<<"$reason"; then
@@ -136,6 +188,11 @@ while IFS= read -r line; do
     *) bad "unknown fixture kind: $kind" ;;
   esac
 done < <(cat $FIX)
+
+if [ "$ENGINE" = python ]; then
+  printf 'fixtures: %d passed, %d failed, %d skipped (python: %s)\n' "$pass" "$fail" "$skip" "$(command -v python3)"
+  [ "$fail" -eq 0 ]; exit
+fi
 
 # Wiring: each command in hooks/hooks.json must fail closed. Run it the way
 # Claude Code does, with CLAUDE_PLUGIN_ROOT set, three ways: the script is
