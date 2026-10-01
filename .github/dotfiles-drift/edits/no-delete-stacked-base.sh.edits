@@ -1,5 +1,0 @@
-# .claude/hooks/no-delete-stacked-base.sh (dotfiles) -> hooks/no-delete-stacked-base.sh. Each hunk replaces the named dotfiles lines
-# (sha256-checked) with the + lines; nothing else differs.
-@@ -20,3 sha256:4651749f90bd89d9a06235cc49521d883c9e7a09aa2c04a4b0cd7ed98656d12e
-+# flight belong on parallel branches off main; this hook only has something
-+# to say once one branch is another PR's base.

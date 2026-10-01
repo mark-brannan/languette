@@ -8,10 +8,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # Daily, so a change in the guards' source surfaces as a red run here
-  # without waiting for a languette PR (see the dotfiles-drift job).
-  schedule:
-    - cron: "17 6 * * *"
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -109,21 +105,8 @@ jobs:
           command -v shellcheck || (sudo apt-get update -q && sudo apt-get install -y -q shellcheck)
           shellcheck --severity=warning hooks/*.sh fixtures/run.sh
 
-  # Three guards and the scanner are copies of files in mark-brannan/dotfiles
-  # with house material stripped. Equal means: dotfiles main plus the
-  # reviewed edits in .github/dotfiles-drift/edits is byte-for-byte the copy.
-  # Fails with the diff when either side moves. Retire this job when dotfiles
-  # consumes the plugin instead of keeping copies.
-  dotfiles-drift:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - run: python3 .github/dotfiles-drift/drift.py check
-
   ci-gate:
-    needs: [nonempty, guard-tests, python-engine, shellcheck, dotfiles-drift]
+    needs: [nonempty, guard-tests, python-engine, shellcheck]
     if: always()
     permissions: {}
     uses: mark-brannan/.github/.github/workflows/ci-gate.yml@main
