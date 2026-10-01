@@ -3,3 +3,14 @@
 @@ -20,3 sha256:4651749f90bd89d9a06235cc49521d883c9e7a09aa2c04a4b0cd7ed98656d12e
 +# flight belong on parallel branches off main; this hook only has something
 +# to say once one branch is another PR's base.
+@@ -38,7 sha256:99614a885305e82890a8aeaeb106c0d1dd581f1d02789a567f58242fce76297f
+@@ -67,3 sha256:9e3b349a69db6e3c162fd777a6422102fd2758a3b89d40cb0ce9851b975a9ac7
+@@ -72,1 sha256:98286c3adeb3a3d3b600ec60c1c9be77025514e0cb3dc7a9cc9967b966e2cf85
++    jq -cn --arg d "$1" --arg r "$2" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:$d,permissionDecisionReason:$r}}'
+@@ -74,1 sha256:b4585af7e7af12a225a8b034aaf90e8baaa65d1490139485774eb4443b3c555e
++    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"no-delete-stacked-base: jq is missing, so the command cannot be inspected."}}\n'
+@@ -208,9 sha256:f4a7b4bc77af72fe8aede7dc9dd32511ce691fa9b8597e819d113c0cbc41cdd6
+@@ -221,1 sha256:20143bfa5e7751e915484afcd038ac826e5167dd70b32ac7927cf758a1cf85fe
++  (cd "$payload_cwd" 2>/dev/null && gh pr list --state open "$@" --json number,title,baseRefName,headRefName 2>/dev/null)
+@@ -224,1 sha256:aa921759c423c54d230abdda36d105fb8585b26bdf9ffd9a00cb56fbadffbd2f
++  ask "no-delete-stacked-base: this deletes remote branch \`$1\`, but the open-PR list could not be read (no auth, no network, or not a GitHub repo), so PRs stacked on it can't be checked. Confirm by hand first:

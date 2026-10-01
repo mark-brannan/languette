@@ -7,3 +7,8 @@
 +# original-awk.
 @@ -13,1 sha256:358e2993e4e87bbf9598dc6029f94b8b0f4443f7b8d62cd77cb6e70341c61c8c
 +CWD="$(cd "$(dirname "$0")/.." && pwd)"
+@@ -41,13 sha256:e126dcc634ae9334fcc1f6a234040852e9adc37f3336f84b0653a42589b0fb03
+@@ -60,1 sha256:d41ad2e031fa9c9587fb5546f733feb1644025d619cdb62c29a60a7e5fb41b9a
++  out=$(printf '%s' "$json" | env "$@" GH_CALLS="$STUB_DIR/calls" PATH="$STUB_DIR:$PATH" sh "$HOOK" 2>&1)
+@@ -78,5 sha256:59c6aafbab182d93fa19c10b095ddba4ac298fa4df59015fd536dce459d0e978
+@@ -114,19 sha256:40179720c5011b2c09bcf5011ff8ce8959b962778f51d5da13ea0bc32e5fdc6a

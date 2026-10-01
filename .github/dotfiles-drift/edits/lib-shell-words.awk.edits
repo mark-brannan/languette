@@ -1,2 +1,11 @@
 # .claude/hooks/lib-shell-words.awk (dotfiles) -> hooks/lib-shell-words.awk. Each hunk replaces the named dotfiles lines
 # (sha256-checked) with the + lines; nothing else differs.
+@@ -69,3 sha256:952f951cc26d43fe171903b8b9c57522181fc4987a46b63983834c830f3d1652
++#                Runs of separators collapse to one.
+@@ -74,1 sha256:d5ed24108eb7b52a5da4599b426aa5f709f3676912a42de0005d3d9b1d5f6788
++function scan(b, w, k, q,   L, i, c, d, n) {
+@@ -76,1 sha256:9e6b1168be81c0465946dece201f6a62f0d55f48fa4be4cbfd036708fa61d493
++  delete SW_live
+@@ -122,3 sha256:6673f46672afc44406b1b07e7ad0416f8473cf3fbebd0e98d754654e528e4952
++      sw_emit(w, k, q); sw_sep(w, k)
++      while (substr(b, i + 1, 1) ~ /[;|&]/) i++

@@ -94,3 +94,4 @@
 +warning no  'valid value: silent'                      'ls -la'                     'build:/srv/agent-area'
 +warning no  'valid value, allowed rm: silent'          'rm -rf proj/build'          'build'
 +
+@@ -157,3 sha256:f3500ec5a5f4e05c566e2bd1da033b7477956e82582a5a94449df5a4af9422cd

@@ -3,15 +3,34 @@
 @@ -2,2 sha256:57dabee0a789a688fd93d75f80fe67d40e6a936c493e23a1f8f2b7f75d654986
 +# Blocks the git moves that have bitten users, or sit in the same class as
 +# ones that have, and that an agent session never has a good reason to make:
-@@ -6,2 sha256:e7b0bbc38890a76e8d350d57eb3dc04fe52b94a16ab0ab79a33746725079edfa
+@@ -5,4 sha256:33be22155c1b7e870b95583a518d7401f19d6756d690cb8c7f07aaf6843de918
++#   blanket staging   git add -A / --all / . / ./ / -u with no path,
 +#                     git commit -a  -> where the worktree is $HOME it stages
 +#                     the home directory; elsewhere it sweeps in a parallel
 +#                     session's files.
-@@ -10,1 sha256:74017b818ff9d85c91726ed91c3e3ff051afe0026551d0dab7859cc6d2852b19
+@@ -11,1 sha256:74017b818ff9d85c91726ed91c3e3ff051afe0026551d0dab7859cc6d2852b19
 +#                     entry. apply/drop by sha pass.
-@@ -19,1 sha256:f81027e679a67581094443ac860ce2bcb33292bf2e0a07405757d43bb928875d
+@@ -20,1 sha256:f81027e679a67581094443ac860ce2bcb33292bf2e0a07405757d43bb928875d
 +# `yadm` (a git wrapper for managing dotfiles) is treated as `git`.
-@@ -94,1 sha256:4a153c0c773e7c2aa6ee4365a0139bfd556dc9767abab813cff7dd9a1e098a28
+@@ -40,3 sha256:9e3b349a69db6e3c162fd777a6422102fd2758a3b89d40cb0ce9851b975a9ac7
+@@ -45,1 sha256:046945997ec9f8cdf26ae76da331cb405f9de789d43c7c615f56a0d55e0ea9d7
++    jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
+@@ -47,1 sha256:4e17c30f8dcf15fceceffc858bda21fb56c417121a542934737662b6263600c9
++    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"no-git-footguns: jq missing, cannot inspect the command"}}\n'
+@@ -65,2 sha256:34c26841c5e868a2ce18abdef49e0db2a876e87b87e64e14cef61f6acb254371
+@@ -82,1 sha256:80b42c58d583cc60efdba867c19304b3c55660edac15ede46c740520fac47649
++function segment(lo, hi, nested,   g, i, na, sub_, a, paths, upd, op, refs, force, lease, tomain, del, staged, wt, wh, dry) {
+@@ -94,1 sha256:d7ad8fb5d1578ad57571ce4179d41ccbe171615e89c9ce2ed6961766568318a0
++    for (i++; i <= hi; i++) a[++na] = w[i]
+@@ -97,1 sha256:bcc29749838472912e94eee8af6dc03479cd075db611964672f946102e478a81
++      paths = 0; upd = 0
+@@ -99,0 sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
++        if (a[i] == "-A" || pfx(a[i],"--all") || pfx(a[i],"--no-ignore-removal") || has(a[i], "A"))
 +          fail("`git add -A` is blocked: stage by path. Where the worktree is $HOME it stages the home directory; " \
-@@ -168,1 sha256:4480f3625f2a1c854c0aba95f6de69ff1a223a2eafdfb9af539333b6c28e3f49
++               "elsewhere it sweeps in files a parallel session is working on.")
+@@ -100,1 sha256:2657ffee121c8c3c9c87fdaa175d3f0936e048ee0051f15b0399ee12cadfc906
+@@ -102,1 sha256:e070d8abc2d53d51f481105659377caef7e797619a32010df6b540f4d51b8eb6
++        else if (a[i] !~ /^-/) paths++
+@@ -104,4 sha256:5f7223ab0fb0f5c78f508a115d88342d557680c9555b38c48aa96804be0aef33
+@@ -176,1 sha256:4480f3625f2a1c854c0aba95f6de69ff1a223a2eafdfb9af539333b6c28e3f49
 +               "a shared checkout that work may not be yours. Ask the user to run it themselves, or reach " \

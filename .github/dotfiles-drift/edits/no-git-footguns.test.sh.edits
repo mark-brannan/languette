@@ -4,3 +4,5 @@
 +# Tests for no-git-footguns.sh. Run: bash hooks/no-git-footguns.test.sh
 @@ -33,1 sha256:f94a364078dc98bdab73cf508bffa0b9a6de11a5393f496f8517f2450d427fcf
 +check allow 'add by path'               'git add hooks/foo.sh README.md'
+@@ -40,46 sha256:ccba3f58519b6d4574e63d09cd25d2f4a2b6b9f53233755416ba8980eea25d90
+@@ -219,3 sha256:f3500ec5a5f4e05c566e2bd1da033b7477956e82582a5a94449df5a4af9422cd
