@@ -34,6 +34,13 @@
 #                           so the PR list read here says nothing about
 #                           it. (`gh api` names its repo in the endpoint,
 #                           and that repo is the one queried.)
+#   gh hangs, or cannot -> ASK. `gh pr list` runs under `timeout 20`; a
+#   be bounded (no          stalled network or a login prompt exits 124,
+#   timeout/gtimeout)       which reads like any other failure. Without
+#                           timeout (macOS lacking coreutils) the call is
+#                           not made at all: an unbounded gh would stall the
+#                           hook until the harness kills it, and a killed
+#                           hook is not a decision.
 #   command unparseable  -> DENY. Inspection failing is not the same as
 #   (no jq/awk/library)     inspection coming back empty.
 #
@@ -194,14 +201,23 @@ fi
 
 command -v gh >/dev/null 2>&1 || ask "no-delete-stacked-base: this deletes a remote branch, but \`gh\` is not installed, so open PRs based on it can't be checked. Deleting a branch an open PR points at closes that PR silently."
 
+# Bound every gh call (see the header). GNU coreutils names it `timeout`;
+# Homebrew's coreutils installs it as `gtimeout`.
+TIMEOUT=""
+for t in timeout gtimeout; do
+  if command -v "$t" >/dev/null 2>&1; then TIMEOUT=$t; break; fi
+done
+[ -n "$TIMEOUT" ] || ask "no-delete-stacked-base: this deletes a remote branch, but neither \`timeout\` nor \`gtimeout\` is installed (macOS: \`brew install coreutils\`), so the open-PR list can't be read without risking a hang. Deleting a branch an open PR points at closes that PR silently. Confirm by hand first:
+  gh pr list --state open --json number,baseRefName,headRefName"
+
 # Server-side filter per branch, so the answer does not depend on how many
 # open PRs the repository has. The jq select is a belt for the same braces.
 pr_list() {  # pr_list <repo|-> <--base|--head> <branch>
   if [ "$1" = "-" ]; then set -- "$2" "$3"; else set -- -R "$1" "$2" "$3"; fi
-  (cd "$payload_cwd" 2>/dev/null && gh pr list --state open "$@" --json number,title,baseRefName,headRefName 2>/dev/null)
+  (cd "$payload_cwd" 2>/dev/null && "$TIMEOUT" 20 gh pr list --state open "$@" --json number,title,baseRefName,headRefName 2>/dev/null)
 }
 unreadable() {
-  ask "no-delete-stacked-base: this deletes remote branch \`$1\`, but the open-PR list could not be read (no auth, no network, or not a GitHub repo), so PRs stacked on it can't be checked. Confirm by hand first:
+  ask "no-delete-stacked-base: this deletes remote branch \`$1\`, but the open-PR list could not be read (no auth, no network, a 20s timeout, or not a GitHub repo), so PRs stacked on it can't be checked. Confirm by hand first:
   gh pr list --state open --json number,baseRefName,headRefName"
 }
 

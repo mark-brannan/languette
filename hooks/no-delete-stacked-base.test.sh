@@ -39,13 +39,26 @@ JSON
 STUB
 chmod +x "$STUB_DIR/gh"
 
+# `timeout` is stubbed too: it passes through by default, and with
+# TIMEOUT_HANG set behaves as a gh that outlived its 20 seconds (exit 124,
+# nothing run, nothing printed). The real 20s is never waited out here.
+# It records its duration argument so the test can see the bound is 20.
+cat > "$STUB_DIR/timeout" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$1" >> "${GH_CALLS:?}.timeout"
+[ -n "${TIMEOUT_HANG:-}" ] && exit 124
+shift
+exec "$@"
+STUB
+chmod +x "$STUB_DIR/timeout"
+
 # check <deny|ask|allow> <description> <command> [env assignment...]
 check() {
   local want=$1 desc=$2 cmd=$3; shift 3
   local out got json
   json=$(jq -n --arg c "$cmd" --arg d "$CWD" '{tool_name:"Bash",tool_input:{command:$c},cwd:$d}')
   : > "$STUB_DIR/calls"
-  out=$(printf '%s' "$json" | env "$@" GH_CALLS="$STUB_DIR/calls" PATH="$STUB_DIR:$PATH" sh "$HOOK" 2>&1)
+  out=$(printf '%s' "$json" | env "$@" GH_CALLS="$STUB_DIR/calls" PATH="${CHECK_PATH:-$STUB_DIR:$PATH}" sh "$HOOK" 2>&1)
   LAST_OUT=$out
   case "$out" in
     *'"permissionDecision":"deny"'*) got=deny ;;
@@ -94,6 +107,25 @@ check ask 'branch named by a glob'     'git push origin --delete claude/old-*'
 check ask 'gh cannot answer'           'git push origin --delete claude/base-branch' GH_FAIL=1
 check deny 'bare pr/merge/-d words after a real delete do not excuse it' \
                                         'git push origin --delete claude/base-branch pr merge -d'
+
+# --- must ask: a hung gh, or no way to bound it ---------------------------
+check ask 'gh pr list that outlives the timeout' 'git push origin --delete claude/base-branch' TIMEOUT_HANG=1
+check ask 'a hung gh on the --head lookup too'   'git push origin --delete claude/lonely' TIMEOUT_HANG=1
+check ask 'gh api DELETE with a hung gh'         'gh api -X DELETE repos/o/r/git/refs/heads/claude/base-branch' TIMEOUT_HANG=1
+check deny 'timeout in place: the bound is passed and a live PR still denies' 'git push origin --delete claude/base-branch'
+grep -qx 20 "$STUB_DIR/calls.timeout" || { fail=$((fail + 1)); printf 'FAIL: gh pr list was not run under timeout 20\n'; }
+# No timeout and no gtimeout on PATH: the hook must not run gh unbounded and
+# must not allow. A PATH holding only the tools the hook needs, plus the stub.
+NOTO_DIR="$STUB_DIR/notimeout"; mkdir "$NOTO_DIR"
+for t in sh jq awk cat dirname grep; do
+  ln -s "$(command -v "$t")" "$NOTO_DIR/$t" 2>/dev/null || { fail=$((fail + 1)); printf 'FAIL: test setup: no %s\n' "$t"; }
+done
+cp "$STUB_DIR/gh" "$NOTO_DIR/gh"
+CHECK_PATH="$NOTO_DIR"
+check ask 'no timeout or gtimeout: asks, never allows' 'git push origin --delete claude/already-merged'
+check ask 'no timeout: asks even for a branch with no PR' 'git push origin --delete claude/base-branch'
+[ -s "$STUB_DIR/calls" ] && { fail=$((fail + 1)); printf 'FAIL: gh was run with no timeout available\n'; }
+CHECK_PATH=""
 
 # --- must ask: git pointed at a repository that is not the cwd -------------
 check ask 'git -C another repo'        'git -C /elsewhere push origin --delete claude/base-branch'
