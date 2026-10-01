@@ -1,6 +1,0 @@
-# .claude/hooks/no-git-footguns.test.sh (dotfiles) -> hooks/no-git-footguns.test.sh. Each hunk replaces the named dotfiles lines
-# (sha256-checked) with the + lines; nothing else differs.
-@@ -2,1 sha256:e50b8e01c579514f1d50eddd8ad87c20bcf40277d718796f4d1ad2414440dad9
-+# Tests for no-git-footguns.sh. Run: bash hooks/no-git-footguns.test.sh
-@@ -33,1 sha256:f94a364078dc98bdab73cf508bffa0b9a6de11a5393f496f8517f2450d427fcf
-+check allow 'add by path'               'git add hooks/foo.sh README.md'
