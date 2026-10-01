@@ -40,13 +40,15 @@ STUB
 chmod +x "$STUB_DIR/gh"
 
 # `timeout` is stubbed too: it passes through by default, and with
-# TIMEOUT_HANG set behaves as a gh that outlived its 20 seconds (exit 124,
-# nothing run, nothing printed). The real 20s is never waited out here.
-# It records its duration argument so the test can see the bound is 20.
+# TIMEOUT_HANG=<n> its n-th call behaves as a gh that outlived its 20
+# seconds (exit 124, nothing run, nothing printed). The real 20s is never
+# waited out here. It records its duration argument, one line per call, so
+# a test can see the bound is 20 and how many calls were made.
 cat > "$STUB_DIR/timeout" <<'STUB'
 #!/bin/sh
 printf '%s\n' "$1" >> "${GH_CALLS:?}.timeout"
-[ -n "${TIMEOUT_HANG:-}" ] && exit 124
+n=$(($(wc -l < "${GH_CALLS}.timeout")))
+[ "${TIMEOUT_HANG:-0}" -eq "$n" ] && exit 124
 shift
 exec "$@"
 STUB
@@ -57,7 +59,7 @@ check() {
   local want=$1 desc=$2 cmd=$3; shift 3
   local out got json
   json=$(jq -n --arg c "$cmd" --arg d "$CWD" '{tool_name:"Bash",tool_input:{command:$c},cwd:$d}')
-  : > "$STUB_DIR/calls"
+  : > "$STUB_DIR/calls"; : > "$STUB_DIR/calls.timeout"
   out=$(printf '%s' "$json" | env "$@" GH_CALLS="$STUB_DIR/calls" PATH="${CHECK_PATH:-$STUB_DIR:$PATH}" sh "$HOOK" 2>&1)
   LAST_OUT=$out
   case "$out" in
@@ -109,9 +111,13 @@ check deny 'bare pr/merge/-d words after a real delete do not excuse it' \
                                         'git push origin --delete claude/base-branch pr merge -d'
 
 # --- must ask: a hung gh, or no way to bound it ---------------------------
-check ask 'gh pr list that outlives the timeout' 'git push origin --delete claude/base-branch' TIMEOUT_HANG=1
-check ask 'a hung gh on the --head lookup too'   'git push origin --delete claude/lonely' TIMEOUT_HANG=1
-check ask 'gh api DELETE with a hung gh'         'gh api -X DELETE repos/o/r/git/refs/heads/claude/base-branch' TIMEOUT_HANG=1
+# The --base lookup is the first gh call; the --head lookup is the second and
+# only runs when the first came back. Hanging call 2 on a branch nothing is
+# based on proves the head lookup is bounded too, not just the first call.
+check ask 'gh pr list that outlives the timeout (--base lookup)' 'git push origin --delete claude/base-branch' TIMEOUT_HANG=1
+check ask 'a hung gh on the --head lookup'        'git push origin --delete claude/lonely' TIMEOUT_HANG=2
+[ "$(wc -l < "$STUB_DIR/calls.timeout")" -eq 2 ] || { fail=$((fail + 1)); printf 'FAIL: the --head lookup was never reached (timeout calls: %s)\n' "$(wc -l < "$STUB_DIR/calls.timeout")"; }
+check ask 'gh api DELETE spelling runs gh under the same bound' 'gh api -X DELETE repos/o/r/git/refs/heads/claude/base-branch' TIMEOUT_HANG=1
 check deny 'timeout in place: the bound is passed and a live PR still denies' 'git push origin --delete claude/base-branch'
 grep -qx 20 "$STUB_DIR/calls.timeout" || { fail=$((fail + 1)); printf 'FAIL: gh pr list was not run under timeout 20\n'; }
 # No timeout and no gtimeout on PATH: the hook must not run gh unbounded and
