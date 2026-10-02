@@ -80,16 +80,19 @@ its other Claude Code settings:
   "approve_label": "Run conformance"}]}
 ```
 
-The file is read from `$CLAUDE_PROJECT_DIR`, else the git toplevel of the
-command's working directory. No file, and the guard says nothing. A file that
-does not parse denies every Bash command until it is fixed, because the guard
-can no longer tell what the repo meant to cover.
+The file is read from the nearest directory at or above the command's
+working directory that has one, stopping at the repo root, else from
+`$CLAUDE_PROJECT_DIR`. No file, and the guard says nothing. A file that does
+not parse denies every Bash command until it is fixed, because the guard can
+no longer tell what the repo meant to cover.
 
 A matching command is denied with the cost, the cheaper forms, and an
 instruction: ask the user through `AskUserQuestion`, naming the id, the exact
 command and why now, with one option labelled exactly `approve_label`. When
 the transcript shows the user picked that option, the next matching command
-runs, and the approval is spent: one yes is one run. Spent approvals are
+runs, and the approval is spent: one yes is one run. A command that runs it
+twice needs two; one in a loop or `xargs` is denied whatever was approved.
+Only the user's answer counts, never the question's text. Spent approvals are
 listed beside the transcript in `<transcript>.languette-ask`.
 
 Matching uses the same scanner as the other guards, so `timeout 3h npm run
