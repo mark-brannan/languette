@@ -27,6 +27,15 @@
 #                                payload; want is deny, ask or allow. gap marks
 #                                a documented known gap: the guard allows,
 #                                silently, and that is the contract.
+#                                ask-first verdicts also take a project dir
+#                                ($PROJ in cwd), made fresh per fixture as a
+#                                git repo: ask_config (object, or a string
+#                                written raw) is its .claude/languette-ask.json;
+#                                transcript (array of records, or "missing")
+#                                its session transcript; spent the ids already
+#                                spent; project_env false leaves
+#                                CLAUDE_PROJECT_DIR unset; rerun is the decision
+#                                a second identical call must get.
 #
 # It also checks the shape of hooks/hooks.json and its wiring (see below).
 # AWK_PATH, as in the guard suites, is a directory whose `awk` is the
@@ -43,7 +52,28 @@ if [ "${1:-}" = "--engine" ]; then
   case $ENGINE in awk | python) : ;; *) echo "run.sh: --engine is awk or python" >&2; exit 2 ;; esac
 fi
 # The guards languette/ has a Python port of; a verdict for any other is skipped.
-PY_GUARDS=" no-rm-tree "
+PY_GUARDS=" no-rm-tree ask-first "
+# The guards with no shell twin: every engine runs their Python, --diff skips them.
+PY_ONLY=" ask-first "
+in_list() { [ "${1#* "$2" }" != "$1" ]; }
+
+# ask_setup LINE: a fresh project dir in $FIXDIR for an ask-first fixture.
+FIXDIR=""
+ask_setup() {
+  FIXDIR=$(mktemp -d)
+  mkdir -p "$FIXDIR/.claude" "$FIXDIR/sub"
+  git -C "$FIXDIR" init -q
+  if jq -e 'has("ask_config")' <<<"$1" >/dev/null; then
+    jq -j 'if (.ask_config | type) == "string" then .ask_config else (.ask_config | tojson) end' <<<"$1" \
+      > "$FIXDIR/.claude/languette-ask.json"
+  fi
+  case $(jq -r '.transcript | type' <<<"$1") in
+    array) jq -c '.transcript[]' <<<"$1" > "$FIXDIR/t.jsonl" ;;
+    string) : ;;                               # "missing": no file at all
+    *) : > "$FIXDIR/t.jsonl" ;;
+  esac
+  if jq -e 'has("spent")' <<<"$1" >/dev/null; then jq -r '.spent[]' <<<"$1" > "$FIXDIR/t.jsonl.languette-ask"; fi
+}
 
 # hooks_shape FILE: print one line per way FILE is not what Claude Code loads
 # from a plugin's hooks/hooks.json -- a top-level object whose `hooks` holds
@@ -139,10 +169,13 @@ got_of() {
       else printf '%s' "$cmd" | scan_json "$kind" 2>&1 | jq -c . 2>&1; fi ;;
     verdict)
       guard=$(jq -r .guard <<<"$2")
-      cwd=$(jq -r .cwd <<<"$2"); cwd=${cwd/#\$HOME/$HOME}
-      if [ "$1" = python ] && [ "${PY_GUARDS#* "$guard" }" = "$PY_GUARDS" ]; then echo SKIP; return; fi
-      jq -n --arg c "$cmd" --arg d "$cwd" '{tool_name:"Bash",tool_input:{command:$c},cwd:$d}' |
-        if [ "$1" = python ]; then timeout 5 python3 -IB "$ROOT/languette/run.py" --guard "$guard" 2>&1
+      cwd=$(jq -r .cwd <<<"$2"); cwd=${cwd/#\$HOME/$HOME}; cwd=${cwd/#\$PROJ/$FIXDIR}
+      if [ "$1" = python ] && ! in_list "$PY_GUARDS" "$guard"; then echo SKIP; return; fi
+      local penv=(-u CLAUDE_PROJECT_DIR)
+      if [ -n "$FIXDIR" ] && [ "$(jq -r '.project_env' <<<"$2")" != false ]; then penv=("CLAUDE_PROJECT_DIR=$FIXDIR"); fi
+      jq -n --arg c "$cmd" --arg d "$cwd" --arg t "${FIXDIR:+$FIXDIR/t.jsonl}" \
+        '{tool_name:"Bash",tool_input:{command:$c},cwd:$d} + (if $t == "" then {} else {transcript_path:$t} end)' |
+        if [ "$1" = python ] || in_list "$PY_ONLY" "$guard"; then env "${penv[@]}" timeout 5 python3 -IB "$ROOT/languette/run.py" --guard "$guard" 2>&1
         else timeout 5 sh "$ROOT/hooks/$guard.sh" 2>&1; fi ;;
   esac
 }
@@ -155,6 +188,7 @@ decision_of() {
 if [ "${1:-}" = "--diff" ]; then
   same=0
   while IFS= read -r line; do
+    if in_list "$PY_ONLY" "$(jq -r '.guard // ""' <<<"$line")"; then skip=$((skip + 1)); continue; fi
     p=$(got_of python "$line")
     if [ "$p" = SKIP ]; then skip=$((skip + 1)); continue; fi
     a=$(got_of awk "$line")
@@ -169,7 +203,12 @@ fi
 while IFS= read -r line; do
   kind=$(jq -r .kind <<<"$line")
   cmd=$(jq -j .command <<<"$line")
+  FIXDIR=""
+  [ "$(jq -r '.guard // ""' <<<"$line")" = ask-first ] && ask_setup "$line"
   out=$(got_of "$ENGINE" "$line")
+  rerun=$(jq -r '.rerun // empty' <<<"$line")
+  [ -n "$rerun" ] && out2=$(got_of "$ENGINE" "$line")
+  [ -n "$FIXDIR" ] && rm -rf "$FIXDIR"
   case $kind in
     tokens | texts)
       want=$(jq -c ".$kind" <<<"$line")
@@ -184,6 +223,8 @@ while IFS= read -r line; do
       if [ "$got" != "$want" ]; then bad "$guard, want $want, got $got: $cmd" "hook output: $out"
       elif [ -n "$rh" ] && ! grep -qF -- "$rh" <<<"$reason"; then
         bad "$guard denied, but the reason does not name what it saw ($rh): $cmd" "reason: $reason"
+      elif [ -n "$rerun" ] && [ "$(decision_of "$out2")" != "$rerun" ]; then
+        bad "$guard, want $rerun on the second call, got $(decision_of "$out2"): $cmd" "hook output: $out2"
       else pass=$((pass + 1)); fi ;;
     *) bad "unknown fixture kind: $kind" ;;
   esac
@@ -222,16 +263,23 @@ rm -f "$SHAPE"
 CRASH=$(mktemp -d)
 mkdir -p "$CRASH/hooks"
 printf 'exit 3\n' > "$CRASH/hooks/crash.sh"
+# ask-first judges only in a project that lists the command.
+ASKP=$(mktemp -d); mkdir -p "$ASKP/.claude"
+printf '%s' '{"commands":[{"id":"walk","match":[{"cmd":"npm","args":["run","walk"]}],"cost":"long","approve_label":"Run walk"}]}' \
+  > "$ASKP/.claude/languette-ask.json"
 decision() { jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null; }
 while IFS= read -r c; do
-  name=$(sed -n 's|.*/hooks/\([a-z-]*\)\.sh".*|\1|p' <<<"$c" | head -n 1)
+  name=$(sed -n 's|.*/hooks/\([a-z-]*\)\.sh".*|\1|p;s|.*languette/run\.py" --guard \([a-z-]*\);.*|\1|p' <<<"$c" | head -n 1)
   case $name in
+    ask-first) cmd='npm run walk' ;;
     no-git-footguns) cmd='git add -A' ;;
     no-rm-tree) cmd='rm -rf build' ;;
     no-delete-stacked-base) cmd='git push origin --delete "$b"' ;;
     *) bad "wiring: no payload known for $name"; continue ;;
   esac
-  payload=$(jq -n --arg c "$cmd" --arg d "$HOME/project" '{tool_name:"Bash",tool_input:{command:$c},cwd:$d}')
+  payload=$(jq -n --arg c "$cmd" --arg d "$HOME/project" --arg t "$ASKP/t.jsonl" \
+    '{tool_name:"Bash",tool_input:{command:$c},cwd:$d,transcript_path:$t}')
+  export CLAUDE_PROJECT_DIR="$ASKP"
   got=$(printf '%s' "$payload" | CLAUDE_PLUGIN_ROOT="$ROOT" sh -c "$c" 2>&1 | decision)
   case $got in deny | ask) pass=$((pass + 1)) ;; *) bad "wiring: $name did not judge a payload through hooks.json (got: ${got:-nothing})" ;; esac
   got=$(printf '%s' "$payload" | CLAUDE_PLUGIN_ROOT=/nonexistent sh -c "$c" 2>&1 | decision)
@@ -246,17 +294,19 @@ while IFS= read -r c; do
     got=$(printf '%s' "$payload" | env "$var=$v" CLAUDE_PLUGIN_ROOT="$ROOT" sh -c "$c" 2>&1 | decision)
     case $got in deny | ask) pass=$((pass + 1)) ;; *) bad "wiring: $name was skipped with $var='$v' (got: ${got:-nothing})" ;; esac
   done
-  cp "$CRASH/hooks/crash.sh" "$CRASH/hooks/$name.sh"
+  if [ "$name" = ask-first ]; then mkdir -p "$CRASH/languette"; printf 'raise SystemExit(3)\n' > "$CRASH/languette/run.py"
+  else cp "$CRASH/hooks/crash.sh" "$CRASH/hooks/$name.sh"; fi
   got=$(printf '%s' "$payload" | CLAUDE_PLUGIN_ROOT="$CRASH" sh -c "$c" 2>&1 | decision)
   if [ "$got" = deny ]; then pass=$((pass + 1)); else bad "wiring: $name is fail-open when the script crashes (got: ${got:-nothing})"; fi
 done < <(jq -r '.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[].command' "$HJ")
-[ "$(jq '[.hooks.PreToolUse[].hooks[]] | length' "$HJ")" = 3 ] || bad "wiring: hooks.json should wire exactly the three guards"
-rm -rf "$CRASH"
+unset CLAUDE_PROJECT_DIR
+[ "$(jq '[.hooks.PreToolUse[].hooks[]] | length' "$HJ")" = 4 ] || bad "wiring: hooks.json should wire exactly the four guards"
+rm -rf "$CRASH" "$ASKP"
 # Every guard has exactly one userConfig key, a boolean defaulting to true.
 PJ="$ROOT/.claude-plugin/plugin.json"
-want='["no_delete_stacked_base","no_git_footguns","no_rm_tree"]'
+want='["ask_first","no_delete_stacked_base","no_git_footguns","no_rm_tree"]'
 [ "$(jq -c '.userConfig | keys' "$PJ")" = "$want" ] || bad "userConfig: keys should be exactly $want"
-[ "$(jq '[.userConfig[] | select(.type == "boolean" and .default == true and .title and .description)] | length' "$PJ")" = 3 ] ||
+[ "$(jq '[.userConfig[] | select(.type == "boolean" and .default == true and .title and .description)] | length' "$PJ")" = 4 ] ||
   bad "userConfig: every key should be a titled, described boolean defaulting to true"
 
 printf 'fixtures: %d passed, %d failed (awk: %s)\n' "$pass" "$fail" "$(command -v awk)"

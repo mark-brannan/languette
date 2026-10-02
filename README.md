@@ -21,7 +21,7 @@ Without the plugin system, clone the repo and point `settings.json` at the
 scripts. Keep the wrapper: a plain `sh missing.sh` exits 127, which Claude
 Code treats as a non-blocking error, so a guard that vanished would let every
 command through. The wrapper turns a missing or crashing script into a deny.
-`hooks/hooks.json` has the three entries to copy; this is one:
+`hooks/hooks.json` has the four entries to copy; this is one:
 
 ```json
 {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command",
@@ -29,7 +29,7 @@ command through. The wrapper turns a missing or crashing script into a deny.
 ```
 
 Requires `jq` and a POSIX `awk` (the suites run under mawk, gawk and
-original-awk); `no-delete-stacked-base` also uses `gh`.
+original-awk); `no-delete-stacked-base` also uses `gh`, and `ask-first` needs `python3` (standard library only).
 
 ## The promise
 
@@ -64,6 +64,42 @@ drifts.
 - `no-rm-tree`: recursive `rm` and `find -delete` are denied unless the target is a generated directory (`node_modules`, `dist`, `coverage`, `.pio`), `/tmp` (where Claude Code keeps its scratchpad by default), `~/.local/state/claude-tmpdir` or `~/.claude/worktrees`. Worktrees Claude Code makes under a repo's own `.claude/worktrees/` are not on the list yet. An agent once swept a directory of the user's captures away with `rm -rf examples`.
 - `no-git-footguns`: `git add -A`, `commit -a`, `stash pop`, force-push, `checkout .`, `clean -f`, `branch -D` and `reset --hard` are denied. Each throws work away, often in a checkout shared with another session.
 - `no-delete-stacked-base`: deleting a remote branch asks GitHub whether an open PR uses it, and denies if so, because GitHub silently closes every PR stacked on a branch deleted outside a merge.
+- `ask-first`: a command the repo lists as costly is denied until the user approves that one run. An agent once ran a 46-minute conformance walk on a 16-core workstation to check a small change, held the load near 20 throughout, then started it again. See below.
+
+## Ask first
+
+A repo names its expensive commands in `.claude/languette-ask.json`, beside
+its other Claude Code settings:
+
+```json
+{"commands": [{"id": "conformance",
+  "match": [{"cmd": "npm", "args": ["run", "conformance"]},
+            {"cmd": "tsx", "script": "research/conformance/run.ts"}],
+  "cost": "full walk ~759M records, ~46 min, load ~20 on 16 cores",
+  "cheaper": "--sample=N, --jobs=N",
+  "approve_label": "Run conformance"}]}
+```
+
+The file is read from the nearest directory at or above the command's
+working directory that has one, stopping at the repo root, else from
+`$CLAUDE_PROJECT_DIR`. No file, and the guard says nothing. A file that does
+not parse denies every Bash command until it is fixed, because the guard can
+no longer tell what the repo meant to cover.
+
+A matching command is denied with the cost, the cheaper forms, and an
+instruction: ask the user through `AskUserQuestion`, naming the id, the exact
+command and why now, with one option labelled exactly `approve_label`. When
+the transcript shows the user picked that option, the next matching command
+runs, and the approval is spent: one yes is one run. A command that runs it
+twice needs two; one in a loop or `xargs` is denied whatever was approved.
+Only the user's answer counts, never the question's text. Spent approvals are
+listed beside the transcript in `<transcript>.languette-ask`.
+
+Matching uses the same scanner as the other guards, so `timeout 3h npm run
+conformance`, `sh -c "..."`, `npx tsx research/conformance/run.ts` and `yarn
+conformance` all count, while `grep`, `git commit -m`, `cat` and `pkill -f`
+naming the script do not. This guard runs on the Python engine
+(`languette/`); the others are still shell.
 
 The built-in allowlists are constants in the scripts (`GENERATED_NAMES` in
 `no-rm-tree.sh`). To allow more, set `LANGUETTE_RM_ALLOW` to a colon-separated
@@ -99,6 +135,7 @@ One boolean per guard, every one on by default:
 | `no_git_footguns` | `no-git-footguns` |
 | `no_rm_tree` | `no-rm-tree` |
 | `no_delete_stacked_base` | `no-delete-stacked-base` |
+| `ask_first` | `ask-first` |
 
 Turn one off with `/plugin configure languette@languette`, or at install:
 

@@ -197,11 +197,12 @@ def seg_cmd(s, a, b):
     return None
 
 
-def texts_of(text):
+def texts_of(text, prose=PROSE):
     """[(text, nested)]: the text itself plus, recursively, every quoted string
     in it that holds whitespace and may run. A segment's quoted strings are
     skipped only when it is led by a prose consumer, holds no executor, and no
-    segment of its text is a shell. Capped so a pathological command cannot spin."""
+    segment of its text is a shell. `prose` widens the consumer set for a
+    guard whose command names also appear as arguments (pkill -f). Capped so a pathological command cannot spin."""
     out = [(text, False)]
     x = 0
     while x < len(out) and len(out) < NESTED_CAP:
@@ -209,7 +210,7 @@ def texts_of(text):
         for a, b in s.segments():
             c = seg_cmd(s, a, b)
             ex = s.shellseg or any(s.k[j] == "w" and s.w[j] in EXEC for j in range(a, b + 1))
-            if ex or c is None or s.w[c] not in PROSE:
+            if ex or c is None or s.w[c] not in prose:
                 for j in range(a, b + 1):
                     if len(out) >= NESTED_CAP:
                         break
@@ -219,7 +220,7 @@ def texts_of(text):
     return out
 
 
-def cmd_index(s, a, b, cmd, nested, parents=None):
+def cmd_index(s, a, b, cmd, nested, parents=None, prose=PROSE):
     """Index in a..b of the word that is the command `cmd` (a compiled regex)
     describes, or None. Top level: any word counts unless the word before it
     matches `parents`, or the segment is led by a prose consumer and no segment
@@ -231,7 +232,7 @@ def cmd_index(s, a, b, cmd, nested, parents=None):
             if (s.k[i] == "w" and cmd.search(s.w[i]) and
                     not (i > a and s.k[i - 1] == "w" and parents is not None and parents.search(s.w[i - 1]))):
                 return i
-            if i == c and s.w[c] in PROSE and not s.shellseg:
+            if i == c and s.w[c] in prose and not s.shellseg:
                 return None
         return None
     wrap = False
