@@ -1,6 +1,5 @@
 {
   "name": "languette",
-  "version": "0.1.0",
   "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, git footguns, deleting a branch an open PR is stacked on, and costly commands the repo says to ask about first.",
   "author": {
     "name": "Mark Brannan"
