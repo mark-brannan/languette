@@ -67,6 +67,33 @@ jobs:
           diff <(bash fixtures/run.sh --table) \
                <(sed -n '/<!-- fixtures-table -->/,/<!-- \/fixtures-table -->/p' README.md | sed '1d;$d')
 
+  # The Python proof of concept (languette/, unwired): its fixtures, and the
+  # same fixtures through both engines, failing on any result that differs.
+  # python3, jq and the runner's default awk are on the image; nothing installed.
+  python-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Standard library only under languette/
+        run: |
+          python3 -I - <<'EOF'
+          import ast, pathlib, sys
+          bad = [f"{f}: {n}" for f in pathlib.Path("languette").rglob("*.py")
+                 for node in ast.walk(ast.parse(f.read_text()))
+                 for n in ([a.name for a in node.names] if isinstance(node, ast.Import) else
+                           [node.module] if isinstance(node, ast.ImportFrom) and node.level == 0 else [])
+                 if n.split(".")[0] not in sys.stdlib_module_names | {"languette"}]
+          print("\n".join(bad) or "stdlib only")
+          sys.exit(bool(bad))
+          EOF
+      - name: Fixture contract under the Python engine
+        run: bash fixtures/run.sh --engine python
+      - name: Both engines agree on every fixture
+        run: bash fixtures/run.sh --diff
+
   shellcheck:
     runs-on: ubuntu-latest
     steps:
@@ -79,7 +106,7 @@ jobs:
           shellcheck --severity=warning hooks/*.sh fixtures/run.sh
 
   ci-gate:
-    needs: [nonempty, guard-tests, shellcheck]
+    needs: [nonempty, guard-tests, python-engine, shellcheck]
     if: always()
     permissions: {}
     uses: mark-brannan/.github/.github/workflows/ci-gate.yml@main

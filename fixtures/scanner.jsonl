@@ -32,3 +32,4 @@
 {"kind": "texts", "command": "mytool --run \"rm -rf x\"", "texts": ["0:mytool --run \"rm -rf x\"\n", "1:rm -rf x"], "note": "an unknown consumer is scanned like an executor"}
 {"kind": "texts", "command": "cat <<EOF\nnever run rm -rf x\nEOF", "texts": ["0:cat  HEREDOC \n"], "note": "heredoc bodies are dropped before scanning"}
 {"kind": "texts", "command": "git add foo.sh\ngit commit -F- <<'EOF'\nnever git add -A\nEOF", "texts": ["0:git add foo.sh\ngit commit -F-  HEREDOC \n"], "note": "a heredoc body that mentions a command is not that command"}
+{"kind": "tokens", "command": "echo a\r\nb", "tokens": ["w:echo", "w:a\r", ";", "w:b"], "note": "a \\r is a byte in a word, not a line end, in both engines"}
