@@ -10,7 +10,7 @@
     {
       "name": "languette",
       "source": "./",
-      "description": "Fail-closed PreToolUse guards: recursive rm, git footguns, deleting a branch an open PR is stacked on.",
+      "description": "Fail-closed PreToolUse guards: recursive rm, git footguns, deleting a branch an open PR is stacked on, costly commands the repo says to ask about first.",
       "version": "0.1.0"
     }
   ]

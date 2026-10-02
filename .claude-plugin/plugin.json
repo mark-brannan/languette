@@ -1,7 +1,7 @@
 {
   "name": "languette",
   "version": "0.1.0",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, git footguns and deleting a branch an open PR is stacked on.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, git footguns, deleting a branch an open PR is stacked on, and costly commands the repo says to ask about first.",
   "author": {
     "name": "Mark Brannan"
   },
@@ -33,6 +33,12 @@
       "type": "boolean",
       "title": "Block deleting a stacked base branch",
       "description": "Deny deleting a remote branch that an open pull request is based on or headed from. Leave on unless you want remote branch deletions through unchecked.",
+      "default": true
+    },
+    "ask_first": {
+      "type": "boolean",
+      "title": "Ask before costly commands",
+      "description": "Deny a command the repo lists in .claude/languette-ask.json until the user approves that one run through AskUserQuestion. Leave on unless you want those commands through unasked.",
       "default": true
     }
   }
