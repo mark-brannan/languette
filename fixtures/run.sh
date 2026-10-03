@@ -30,7 +30,7 @@
 #                                ask-first verdicts also take a project dir
 #                                ($PROJ in cwd), made fresh per fixture as a
 #                                git repo: ask_config (object, or a string
-#                                written raw) is its .claude/languette-ask.json;
+#                                written raw) is its .languette/ask-first.json;
 #                                transcript (array of records, or "missing")
 #                                its session transcript; spent the ids already
 #                                spent; project_env false leaves
@@ -61,11 +61,11 @@ in_list() { [ "${1#* "$2" }" != "$1" ]; }
 FIXDIR=""
 ask_setup() {
   FIXDIR=$(mktemp -d)
-  mkdir -p "$FIXDIR/.claude" "$FIXDIR/sub"
+  mkdir -p "$FIXDIR/.languette" "$FIXDIR/sub"
   git -C "$FIXDIR" init -q
   if jq -e 'has("ask_config")' <<<"$1" >/dev/null; then
     jq -j 'if (.ask_config | type) == "string" then .ask_config else (.ask_config | tojson) end' <<<"$1" \
-      > "$FIXDIR/.claude/languette-ask.json"
+      > "$FIXDIR/.languette/ask-first.json"
   fi
   case $(jq -r '.transcript | type' <<<"$1") in
     array) jq -c '.transcript[]' <<<"$1" > "$FIXDIR/t.jsonl" ;;
@@ -264,9 +264,9 @@ CRASH=$(mktemp -d)
 mkdir -p "$CRASH/hooks"
 printf 'exit 3\n' > "$CRASH/hooks/crash.sh"
 # ask-first judges only in a project that lists the command.
-ASKP=$(mktemp -d); mkdir -p "$ASKP/.claude"
+ASKP=$(mktemp -d); mkdir -p "$ASKP/.languette"
 printf '%s' '{"commands":[{"id":"walk","match":[{"cmd":"npm","args":["run","walk"]}],"cost":"long","approve_label":"Run walk"}]}' \
-  > "$ASKP/.claude/languette-ask.json"
+  > "$ASKP/.languette/ask-first.json"
 decision() { jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null; }
 while IFS= read -r c; do
   name=$(sed -n 's|.*/hooks/\([a-z-]*\)\.sh".*|\1|p;s|.*languette/run\.py" --guard \([a-z-]*\);.*|\1|p' <<<"$c" | head -n 1)

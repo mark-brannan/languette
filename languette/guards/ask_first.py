@@ -1,16 +1,15 @@
 """ask-first: a command the repo names as costly runs only after the user said
 yes to it, once, through AskUserQuestion.
 
-The repo owns the list, in <project>/.claude/languette-ask.json, where
+The repo owns the list, in <project>/.languette/ask-first.json, where
 <project> is the nearest directory at or above the payload's cwd that has one,
 stopping at the repo root, else $CLAUDE_PROJECT_DIR:
 
-    {"commands": [{"id": "conformance",
-                   "match": [{"cmd": "npm", "args": ["run", "conformance"]},
-                             {"cmd": "tsx", "script": "research/conformance/run.ts"}],
-                   "cost": "full walk ~46 min, load ~20 on 16 cores",
-                   "cheaper": "--sample=N, --jobs=N",
-                   "approve_label": "Run conformance"}]}
+    {"commands": [{"id": "e2e",
+                   "match": [{"cmd": "npm", "args": ["run", "e2e"]},
+                             {"cmd": "node", "script": "scripts/e2e.mjs"}],
+                   "cost": "> 40 minutes, using all CPU cores on a typical desktop",
+                   "approve_label": "Run e2e"}]}
 
 No file is silence. A file that does not parse, or does not have this shape,
 denies every Bash command until it is fixed: the guard cannot tell what it
@@ -20,17 +19,19 @@ A match entry is a command word (`cmd`, by basename) followed by `args` as
 a run of its non-option words (so an option's value, `npm --prefix web run
 x`, cannot hide it), and/or any later word that is `script` or ends in
 `/script`. npm, pnpm, yarn and bun stand in for each other (`yarn
-conformance` is `npm run conformance`, `run-script` is `run`), and npx, bunx,
+e2e` is `npm run e2e`, `run-script` is `run`), and npx, bunx,
 `pnpm exec|dlx` and `yarn exec|dlx` launch `cmd`. Wrappers, chains, `sh -c "..."` and `echo ... |
 sh` are seen through by the scanner; prose (grep, git commit -m, cat, echo
 into nothing) and process tools (pkill -f, pgrep) are not commands.
 
-Approval is in the transcript: an AskUserQuestion tool_use whose input names
-the id, whose answer (tool_result, not is_error) to one of its questions is
-exactly approve_label. Each approval allows one run: its tool_use id is
-appended to <transcript>.languette-ask and never counts again. A command that
-runs a listed one twice needs two approvals; one inside a loop or xargs is
-denied outright, since no count of approvals covers it.
+Approval is in the transcript: an AskUserQuestion tool_use whose answer
+(tool_result, not is_error) to one of its questions is exactly approve_label;
+the question's text is the agent's and proves nothing. approve_labels are
+unique within the file, so one click approves one command. Each approval
+allows one run: its tool_use id is appended to <transcript>.languette-ask and
+never counts again. A command that runs a listed one twice needs two
+approvals; one inside a loop or xargs is denied outright, since no count of
+approvals covers it.
 """
 
 import json
@@ -40,7 +41,7 @@ import re
 from languette import scan as sw
 
 NAME = "ask-first"
-CONFIG = ".claude/languette-ask.json"
+CONFIG = ".languette/ask-first.json"
 
 PM = frozenset("npm pnpm yarn bun".split())
 LAUNCH = frozenset("npx bunx pnpm yarn bun".split())
@@ -102,7 +103,7 @@ def _load(path):
         raise _Bad(f"unreadable ({e.strerror})")
     if not isinstance(cfg, dict) or not isinstance(cfg.get("commands"), list) or not cfg["commands"]:
         raise _Bad('the top level must be {"commands": [...]} with at least one command')
-    seen = set()
+    seen, labels = set(), set()
     for n, c in enumerate(cfg["commands"]):
         where = f"commands[{n}]"
         if not isinstance(c, dict):
@@ -113,6 +114,10 @@ def _load(path):
         if c["id"] in seen:
             raise _Bad(f"{where}.id '{c['id']}' is a duplicate")
         seen.add(c["id"])
+        if c["approve_label"] in labels:
+            raise _Bad(f"{where}.approve_label '{c['approve_label']}' is shared with another command; "
+                       "a click must approve exactly one")
+        labels.add(c["approve_label"])
         if "cheaper" in c and not isinstance(c["cheaper"], str):
             raise _Bad(f"{where}.cheaper must be a string")
         if not isinstance(c.get("match"), list) or not c["match"]:
@@ -197,19 +202,6 @@ def _text(content):
     return ""
 
 
-def _names(inp, cid):
-    """Does the question name cid as a word, outside the option labels (the
-    approve label alone, "Run conformance", would otherwise name it)?"""
-    def strip(x):
-        if isinstance(x, dict):
-            return {k: strip(v) for k, v in x.items() if k != "label"}
-        if isinstance(x, list):
-            return [strip(v) for v in x]
-        return x
-    text = json.dumps(strip(inp), ensure_ascii=False)
-    return re.search(r"(?<![\w-])" + re.escape(cid) + r"(?![\w-])", text) is not None
-
-
 def _questions(inp):
     qs = inp.get("questions") if isinstance(inp, dict) else None
     return [q["question"] for q in qs or () if isinstance(q, dict) and isinstance(q.get("question"), str)]
@@ -230,8 +222,8 @@ def _said(rec, c, questions, label):
                      _text(c.get("content")), re.M) is not None
 
 
-def _approvals(transcript, cid, label):
-    """tool_use ids of AskUserQuestion calls naming cid that the user answered with label."""
+def _approvals(transcript, label):
+    """tool_use ids of AskUserQuestion calls that the user answered with label."""
     asks, yes = {}, []
     with open(transcript, encoding="utf-8") as f:
         for line in f:
@@ -246,8 +238,7 @@ def _approvals(transcript, cid, label):
             for c in content:
                 if not isinstance(c, dict):
                     continue
-                if c.get("type") == "tool_use" and c.get("name") == "AskUserQuestion" and \
-                        _names(c.get("input"), cid):
+                if c.get("type") == "tool_use" and c.get("name") == "AskUserQuestion":
                     asks[c.get("id")] = _questions(c.get("input"))
                 elif c.get("type") == "tool_result" and c.get("tool_use_id") in asks and not c.get("is_error"):
                     if _said(rec, c, asks[c["tool_use_id"]], label):
@@ -297,7 +288,7 @@ def check(payload, env=os.environ):
         if os.path.exists(spent_path):
             with open(spent_path, encoding="utf-8") as f:
                 spent = {x.strip() for x in f if x.strip()}
-        approved = {c["id"]: [i for i in _approvals(tp, c["id"], c["approve_label"]) if i not in spent]
+        approved = {c["id"]: [i for i in _approvals(tp, c["approve_label"]) if i not in spent]
                     for c in hits}
     except (OSError, ValueError) as e:
         return _deny(f"ask-first: cannot read the session transcript to look for the user's approval "
@@ -312,7 +303,7 @@ def check(payload, env=os.environ):
                     if runs[c["id"]] > 1 else "") + f". Cost: {c['cost']}."
                  + (f" Cheaper forms: {c['cheaper']}." if c.get("cheaper") else ""))
             p += (f" If a cheaper form answers the question, use it instead. Otherwise call AskUserQuestion: "
-                  f"name `{c['id']}`, give the exact command (`{cmd.strip()}`), why it must run now, and the "
+                  f"give the exact command (`{cmd.strip()}`), why it must run now, and the "
                   f"cost above, with one option labelled exactly \"{c['approve_label']}\" and one to skip. "
                   "One approval is one run; ask again before running it again.")
             parts.append(p)
