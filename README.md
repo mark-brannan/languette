@@ -85,7 +85,8 @@ not parse, or in which two commands share an `approve_label`, denies every
 Bash command until it is fixed, because the guard can no longer tell what the
 repo meant to cover.
 
-A matching command is denied with the cost and an instruction: ask the user
+A matching command is denied with the cost, the cheaper forms if the entry
+lists them (`"cheaper"`, free text), and an instruction: ask the user
 through `AskUserQuestion`, giving the exact command and why now, with one
 option labelled exactly `approve_label`. When the transcript shows the user
 picked that option, the next matching command runs, and the approval is spent:
@@ -95,7 +96,7 @@ the question's text. Spent approvals are listed beside the transcript in
 `<transcript>.languette-ask`.
 
 Matching uses the same scanner as the other guards, so `timeout 3h npm run
-e2e`, `sh -c "..."`, `npx node scripts/e2e.mjs` and `yarn e2e` all count,
+e2e`, `sh -c "..."`, `pnpm exec node ./scripts/e2e.mjs` and `yarn e2e` all count,
 while `grep`, `git commit -m`, `cat` and `pkill -f` naming the script do not.
 This guard runs on the Python engine (`languette/`); the others are still
 shell.

@@ -27,10 +27,11 @@ into nothing) and process tools (pkill -f, pgrep) are not commands.
 Approval is in the transcript: an AskUserQuestion tool_use whose answer
 (tool_result, not is_error) to one of its questions is exactly approve_label;
 the question's text is the agent's and proves nothing. approve_labels are
-unique within the file, so one click approves one command. Each approval allows one run: its tool_use id is
-appended to <transcript>.languette-ask and never counts again. A command that
-runs a listed one twice needs two approvals; one inside a loop or xargs is
-denied outright, since no count of approvals covers it.
+unique within the file, so one click approves one command. Each approval
+allows one run: its tool_use id is appended to <transcript>.languette-ask and
+never counts again. A command that runs a listed one twice needs two
+approvals; one inside a loop or xargs is denied outright, since no count of
+approvals covers it.
 """
 
 import json
