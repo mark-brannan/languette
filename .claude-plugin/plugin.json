@@ -36,7 +36,7 @@
     "ask_first": {
       "type": "boolean",
       "title": "Ask before costly commands",
-      "description": "Deny a command the repo lists in .claude/languette-ask.json until the user approves that one run through AskUserQuestion. Leave on unless you want those commands through unasked.",
+      "description": "Deny a command the repo lists in .languette/ask-first.json until the user approves that one run through AskUserQuestion. Leave on unless you want those commands through unasked.",
       "default": true
     }
   }

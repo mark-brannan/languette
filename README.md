@@ -64,42 +64,44 @@ drifts.
 - `no-rm-tree`: recursive `rm` and `find -delete` are denied unless the target is a generated directory (`node_modules`, `dist`, `coverage`, `.pio`), `/tmp` (where Claude Code keeps its scratchpad by default), `~/.local/state/claude-tmpdir` or `~/.claude/worktrees`. Worktrees Claude Code makes under a repo's own `.claude/worktrees/` are not on the list yet. An agent once swept a directory of the user's captures away with `rm -rf examples`.
 - `no-git-footguns`: `git add -A`, `commit -a`, `stash pop`, force-push, `checkout .`, `clean -f`, `branch -D` and `reset --hard` are denied. Each throws work away, often in a checkout shared with another session.
 - `no-delete-stacked-base`: deleting a remote branch asks GitHub whether an open PR uses it, and denies if so, because GitHub silently closes every PR stacked on a branch deleted outside a merge.
-- `ask-first`: a command the repo lists as costly is denied until the user approves that one run. An agent once ran a 46-minute conformance walk on a 16-core workstation to check a small change, held the load near 20 throughout, then started it again. See below.
+- `ask-first`: a command the repo lists as costly is denied until the user approves that one run. An agent once ran a 46-minute test sweep on a 16-core workstation to check a small change, held the load near 20 throughout, then started it again. See below.
 
 ## Ask first
 
-A repo names its expensive commands in `.claude/languette-ask.json`, beside
-its other Claude Code settings:
+A repo names its expensive commands in `.languette/ask-first.json`:
 
 ```json
-{"commands": [{"id": "conformance",
-  "match": [{"cmd": "npm", "args": ["run", "conformance"]},
-            {"cmd": "tsx", "script": "research/conformance/run.ts"}],
-  "cost": "full walk ~759M records, ~46 min, load ~20 on 16 cores",
-  "cheaper": "--sample=N, --jobs=N",
-  "approve_label": "Run conformance"}]}
+{"commands": [{"id": "e2e",
+  "match": [{"cmd": "npm", "args": ["run", "e2e"]},
+            {"cmd": "node", "script": "scripts/e2e.mjs"}],
+  "cost": "> 40 minutes, using all CPU cores on a typical desktop",
+  "approve_label": "Run e2e"}]}
 ```
 
 The file is read from the nearest directory at or above the command's
 working directory that has one, stopping at the repo root, else from
 `$CLAUDE_PROJECT_DIR`. No file, and the guard says nothing. A file that does
-not parse denies every Bash command until it is fixed, because the guard can
-no longer tell what the repo meant to cover.
+not parse, or in which two commands share an `approve_label`, denies every
+Bash command until it is fixed, because the guard can no longer tell what the
+repo meant to cover.
 
-A matching command is denied with the cost, the cheaper forms, and an
-instruction: ask the user through `AskUserQuestion`, naming the id, the exact
-command and why now, with one option labelled exactly `approve_label`. When
-the transcript shows the user picked that option, the next matching command
-runs, and the approval is spent: one yes is one run. A command that runs it
-twice needs two; one in a loop or `xargs` is denied whatever was approved.
-Only the user's answer counts, never the question's text. Spent approvals are
-listed beside the transcript in `<transcript>.languette-ask`.
+A matching command is denied with the cost and an instruction: ask the user
+through `AskUserQuestion`, giving the exact command and why now, with one
+option labelled exactly `approve_label`. When the transcript shows the user
+picked that option, the next matching command runs, and the approval is spent:
+one yes is one run. A command that runs it twice needs two; one in a loop or
+`xargs` is denied whatever was approved. Only the user's click counts, never
+the question's text. Spent approvals are listed beside the transcript in
+`<transcript>.languette-ask`.
 
 Matching uses the same scanner as the other guards, so `timeout 3h npm run
-conformance`, `sh -c "..."`, `npx tsx research/conformance/run.ts` and `yarn
-conformance` all count, while `grep`, `git commit -m`, `cat` and `pkill -f`
-naming the script do not. This guard runs on the Python engine
-(`languette/`); the others are still shell.
+e2e`, `sh -c "..."`, `npx node scripts/e2e.mjs` and `yarn e2e` all count,
+while `grep`, `git commit -m`, `cat` and `pkill -f` naming the script do not.
+This guard runs on the Python engine (`languette/`); the others are still
+shell.
+
+Known gaps: a run inside a script (`./ci.sh`) or behind a variable (`$CMD`) is
+not seen.
 
 The built-in allowlists are constants in the scripts (`GENERATED_NAMES` in
 `no-rm-tree.sh`). To allow more, set `LANGUETTE_RM_ALLOW` to a colon-separated
