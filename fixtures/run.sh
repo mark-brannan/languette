@@ -35,7 +35,8 @@
 #                                its session transcript; spent the ids already
 #                                spent; project_env false leaves
 #                                CLAUDE_PROJECT_DIR unset; rerun is the decision
-#                                a second identical call must get.
+#                                a second identical call must get; files maps
+#                                a project-relative path to its contents.
 #
 # It also checks the shape of hooks/hooks.json and its wiring (see below).
 # AWK_PATH, as in the guard suites, is a directory whose `awk` is the
@@ -73,6 +74,11 @@ ask_setup() {
     *) : > "$FIXDIR/t.jsonl" ;;
   esac
   if jq -e 'has("spent")' <<<"$1" >/dev/null; then jq -r '.spent[]' <<<"$1" > "$FIXDIR/t.jsonl.languette-ask"; fi
+  local f
+  while IFS= read -r f; do
+    mkdir -p "$(dirname "$FIXDIR/$f")"
+    jq -j --arg f "$f" '.files[$f]' <<<"$1" > "$FIXDIR/$f"
+  done < <(jq -r '.files // {} | keys[]' <<<"$1")
 }
 
 # hooks_shape FILE: print one line per way FILE is not what Claude Code loads

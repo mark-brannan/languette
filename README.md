@@ -75,10 +75,24 @@ its other Claude Code settings:
 {"commands": [{"id": "conformance",
   "match": [{"cmd": "npm", "args": ["run", "conformance"]},
             {"cmd": "tsx", "script": "research/conformance/run.ts"}],
-  "cost": "full walk ~759M records, ~46 min, load ~20 on 16 cores",
+  "cost_from": {"file": "research/conformance/run.ts",
+                "pattern": "^// +Local cost: (.+)$"},
   "cheaper": "--sample=N, --jobs=N",
   "approve_label": "Run conformance"}]}
 ```
+
+`cost_from` reads the cost from a file the repo already keeps, here the
+usage comment at the top of the script, so the figure is updated in one
+place:
+
+```
+//   Local cost: full walk ~46 min, load ~20 on 16 cores
+```
+
+The pattern's one group is the cost. A plain `"cost": "..."` string works
+instead, for a command with no usage text to read; a command has one or the
+other. If the source cannot be read or has no matching line, the command is
+still gated, and the refusal says the cost source has drifted.
 
 The file is read from the nearest directory at or above the command's
 working directory that has one, stopping at the repo root, else from
@@ -98,7 +112,9 @@ listed beside the transcript in `<transcript>.languette-ask`.
 Matching uses the same scanner as the other guards, so `timeout 3h npm run
 conformance`, `sh -c "..."`, `npx tsx research/conformance/run.ts` and `yarn
 conformance` all count, while `grep`, `git commit -m`, `cat` and `pkill -f`
-naming the script do not. This guard runs on the Python engine
+naming the script do not. Known gaps: a run hidden inside a script
+(`./ci.sh` that calls `npm run conformance`) or behind a variable (`$CMD`)
+is not seen, so it runs unasked. This guard runs on the Python engine
 (`languette/`); the others are still shell.
 
 The built-in allowlists are constants in the scripts (`GENERATED_NAMES` in

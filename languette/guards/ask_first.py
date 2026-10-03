@@ -12,6 +12,16 @@ stopping at the repo root, else $CLAUDE_PROJECT_DIR:
                    "cheaper": "--sample=N, --jobs=N",
                    "approve_label": "Run conformance"}]}
 
+`cost` may instead be `cost_from`, a file in the repo and a regex whose one
+group is the cost, so the figure lives where the command's own usage text
+does and is updated in one place:
+
+    "cost_from": {"file": "research/conformance/run.ts",
+                  "pattern": "^// +Local cost: (.+)$"}
+
+A source that cannot be read, or has no matching line, leaves the command
+gated and says the source has drifted.
+
 No file is silence. A file that does not parse, or does not have this shape,
 denies every Bash command until it is fixed: the guard cannot tell what it
 was meant to cover.
@@ -107,12 +117,18 @@ def _load(path):
         where = f"commands[{n}]"
         if not isinstance(c, dict):
             raise _Bad(f"{where} is not an object")
-        for key in ("id", "cost", "approve_label"):
+        for key in ("id", "approve_label"):
             if not isinstance(c.get(key), str) or not c[key].strip():
                 raise _Bad(f"{where}.{key} must be a non-empty string")
         if c["id"] in seen:
             raise _Bad(f"{where}.id '{c['id']}' is a duplicate")
         seen.add(c["id"])
+        if ("cost" in c) == ("cost_from" in c):
+            raise _Bad(f"{where} needs exactly one of cost and cost_from")
+        if "cost" in c and (not isinstance(c["cost"], str) or not c["cost"].strip()):
+            raise _Bad(f"{where}.cost must be a non-empty string")
+        if "cost_from" in c:
+            _cost_from(c["cost_from"], f"{where}.cost_from")
         if "cheaper" in c and not isinstance(c["cheaper"], str):
             raise _Bad(f"{where}.cheaper must be a string")
         if not isinstance(c.get("match"), list) or not c["match"]:
@@ -128,6 +144,39 @@ def _load(path):
             if "script" in e and (not isinstance(e["script"], str) or not e["script"].strip("./")):
                 raise _Bad(f"{w}.script must be a non-empty path")
     return cfg["commands"]
+
+
+def _cost_from(cf, where):
+    if not isinstance(cf, dict) or not isinstance(cf.get("file"), str) or not isinstance(cf.get("pattern"), str):
+        raise _Bad(f'{where} must be {{"file": ..., "pattern": ...}}')
+    f = cf["file"]
+    if not f or f.startswith("/") or ".." in f.split("/"):
+        raise _Bad(f"{where}.file must be a path inside the repo, relative to it")
+    try:
+        rx = re.compile(cf["pattern"], re.M)
+    except re.error as e:
+        raise _Bad(f"{where}.pattern is not a regex ({e})")
+    if rx.groups != 1:
+        raise _Bad(f"{where}.pattern must have exactly one group, the cost")
+
+
+def _cost(c, path):
+    """The cost text for command c of the config at path."""
+    if "cost" in c:
+        return c["cost"]
+    cf = c["cost_from"]
+    src = os.path.join(os.path.dirname(os.path.dirname(path)), cf["file"])
+    try:
+        with open(src, encoding="utf-8", errors="replace") as f:
+            m = re.search(cf["pattern"], f.read(1 << 20), re.M)
+    except OSError as e:
+        m, why = None, f"cannot be read ({e.strerror})"
+    else:
+        why = f"has no line matching {cf['pattern']!r}"
+    if m and m.group(1) and m.group(1).strip():
+        return m.group(1).strip()
+    return (f"unknown, because {cf['file']} {why}: the cost source has drifted, "
+            f"so tell the user it needs fixing")
 
 
 def _base(w):
@@ -309,7 +358,7 @@ def check(payload, env=os.environ):
         for c in missing:
             p = (f"`{c['id']}` ({path}) needs the user's approval for each run"
                  + (f"; this command runs it {runs[c['id']]} times and has {len(approved[c['id']])} unspent"
-                    if runs[c["id"]] > 1 else "") + f". Cost: {c['cost']}."
+                    if runs[c["id"]] > 1 else "") + f". Cost: {_cost(c, path)}."
                  + (f" Cheaper forms: {c['cheaper']}." if c.get("cheaper") else ""))
             p += (f" If a cheaper form answers the question, use it instead. Otherwise call AskUserQuestion: "
                   f"name `{c['id']}`, give the exact command (`{cmd.strip()}`), why it must run now, and the "
