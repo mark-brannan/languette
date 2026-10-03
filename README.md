@@ -194,5 +194,3 @@ this repo is where they are maintained now.
 The product name appears in `.claude-plugin/plugin.json`,
 `.claude-plugin/marketplace.json` and the install lines above; the scripts
 name themselves, so a rename touches those and nothing else.
-
-MIT licensed.
