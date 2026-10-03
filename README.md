@@ -172,6 +172,54 @@ item holds a comma. A string `"false"` is indistinguishable from a boolean
 installed-plugin path was not measured, which is why the guards treat unset
 as on.
 
+## Strong guards
+
+A guard is a function. It takes the command and the payload around it and
+returns a verdict: deny with a reason, ask, a warning, or nothing. It runs
+nothing, asks no model, and the same inputs give the same verdict every time.
+What it reads besides the command is named in its header: the filesystem for
+`no-rm-tree`, the repo's list and the session transcript for `ask-first`,
+GitHub for `no-delete-stacked-base`, nothing for `no-git-footguns`. A guard
+that cannot decide denies and says what it saw. A guard that crashes is a deny
+naming the guard; the runner holds that rule once, so no guard has to.
+
+The guards share one scanner, `languette/scan.py`, which turns the command
+into words and nested texts and resolves every ambiguity toward more words
+reaching the guard, and one vocabulary for verdicts, `languette/verdict.py`.
+A new guard is one module with a `check` function and its scenarios. It adds
+no runner, no wrapper and no harness.
+
+The contract is written as scenarios, in Gherkin, under `features/`: a command
+and its context in, a verdict out, in the words a person uses to state the
+rule.
+
+```gherkin
+Scenario: a target the guard cannot resolve is denied on sight
+  Given the working directory is "$HOME/project"
+  When the agent runs `rm -rf "$DIR"`
+  Then the guard denies, naming "variable or command substitution"
+```
+
+Every scenario runs against every engine a guard has: the Python module
+in-process, and the shell script by subprocess under each awk CI installs.
+The engines must agree, and the table under the promise above is generated
+from the scenarios tagged for it. Assertions are PyHamcrest matchers that
+speak the promise, `denies`, `is_silent`, `warns_about`, so a failure prints
+the guard's reason beside what was expected. Above the scenarios sit
+properties, checked over generated commands: a guard fails closed on any
+exception; a verdict on a text is never looser when that text is nested in
+`sh -c`, `eval` or a pipe to a shell; adding a rule or an allowlist name never
+turns a deny into an allow.
+
+The scenarios are the seam between the people who set the rules and the code
+that enforces them. Whether a scenario is written by hand or derived from a
+model of the guard is open. Either way it is what a reviewer reads, and the
+code is judged against it.
+
+The hooks need only the standard library, and CI proves it with an import walk
+over `languette/`. The tests need `pytest`, `pytest-bdd` and `PyHamcrest`;
+the hooks do not.
+
 ## Working on it
 
 ```
