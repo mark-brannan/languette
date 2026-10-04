@@ -322,7 +322,7 @@ if grep -q '^UNSEEN	' "$META"; then
 fi
 
 denylist=$TERMS_FILE
-[ -r "$denylist" ] || deny "the private-terms file ($denylist), set as the private_terms_file option, is unreadable, so text bound for a public repo cannot be checked. Fix the path in the plugin's private_terms_file option (claude plugin config), or clear the option to turn the check off. To post without the check, target the private repo itself: --repo $PRIVATE_REPO."
+[ -r "$denylist" ] || deny "the private-terms file ($denylist), set as the private_terms_file option, is unreadable, so text bound for a public repo cannot be checked. Fix the path in the plugin's private_terms_file option (/plugin configure languette@languette), or clear the option to turn the check off. To post without the check, target the private repo itself: --repo $PRIVATE_REPO."
 sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^#/d' -e '/^$/d' "$denylist" > "$WORK/terms"
 [ -s "$WORK/terms" ] || deny "the private-terms file ($denylist) is readable but has no terms in it -- only comments and blank lines, or nothing at all. An empty list matches nothing, so every post would pass unchecked, which is indistinguishable from a check that ran. Populate it (one term per line, # for comments) and retry. To post without the check, target the private repo itself: --repo $PRIVATE_REPO."
 

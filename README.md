@@ -68,6 +68,9 @@ Each guard denies one class of command:
   costly, until you approve that one run (an agent once ran a 46-minute,
   all-core test sweep to check a small change, then started it again). See
   [Ask first](#ask-first).
+- [`prose-budget-commit`](hooks/prose-budget-commit.sh): a `git commit`
+  whose staged prose runs over the repo's own word budgets, as counted by
+  [`prose-budget`](https://github.com/mark-brannan/claude), where installed.
 
 ## The promise
 
@@ -130,20 +133,12 @@ meant. Spent approvals are kept beside the session transcript, in
 ## Configuration
 
 Every guard is on by default. Turn one off with
-`/plugin configure languette@languette`, or at install:
+`/plugin configure languette@languette`, or at install, by its name with
+underscores:
 
 ```
 claude plugin install languette@languette --config no_rm_tree=false
 ```
-
-| Key | Guard |
-|---|---|
-| `no_git_footguns` | `no-git-footguns` |
-| `no_rm_tree` | `no-rm-tree` |
-| `no_delete_stacked_base` | `no-delete-stacked-base` |
-| `ask_first` | `ask-first` |
-| `issue_door` | `issue-door` |
-| `public_issue_guard` | `public-issue-guard` |
 
 `public-issue-guard` also takes `private_terms_file`, a text file of terms,
 one per line, matched case-insensitively as plain text (`#` for comments). Set
@@ -218,6 +213,7 @@ guard reads beyond the command, it declares:
 | `no-delete-stacked-base` | GitHub, through `gh` |
 | `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `public-issue-guard` | the terms file named by `private_terms_file`, the files a command posts, and `git remote` for the checkout's origin |
+| `prose-budget-commit` | the staged diff, through `prose-budget` |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes
 is a deny naming the guard; the runner holds that rule, so no guard has to.

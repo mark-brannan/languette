@@ -56,6 +56,12 @@
       "title": "Private terms file",
       "description": "A text file of terms that must not appear in text posted to a public GitHub repo: one per line, matched case-insensitively as plain text, # for comments. With no file set, the public-issue guard allows everything.",
       "required": false
+    },
+    "prose_budget_commit": {
+      "type": "boolean",
+      "title": "Check staged prose against the repo's budgets before a commit",
+      "description": "Deny a git commit when mark-brannan/claude's prose-budget engine finds the staged diff over a repo's own budgets. A no-op where that engine isn't installed or the repo has no budgets config. Leave on unless you want staged prose through unchecked.",
+      "default": true
     }
   }
 }

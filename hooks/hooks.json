@@ -23,6 +23,11 @@
             "type": "command",
             "command": "[ \"${CLAUDE_PLUGIN_OPTION_ASK_FIRST-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard ask-first; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (ask-first) is missing from the plugin directory or crashed, so commands the repo marks ask-first could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking whether this command needs the user's approval first"
+          },
+          {
+            "type": "command",
+            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/prose-budget-commit.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"prose-budget-commit.sh is missing from the plugin directory or crashed, so staged prose could not be checked against the repo budgets. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking staged prose against the repo's budgets"
           }
         ]
       },

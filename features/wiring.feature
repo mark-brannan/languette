@@ -17,6 +17,8 @@ Feature: wiring
       """
       Wanderlust
       """
+    And the stub "prose-budget" is the engine
+    And PROSE_BUDGET_FAIL is "1"
 
   Scenario Outline: each hooks.json command judges a payload
     Given the hook is the hooks.json command for "<guard>"
@@ -24,12 +26,13 @@ Feature: wiring
     Then the guard <verdict>
 
     Examples:
-      | guard                  | command                       | verdict |
-      | no-git-footguns        | git add -A                    | denies  |
-      | no-rm-tree             | rm -rf build                  | denies  |
-      | no-delete-stacked-base | git push origin --delete "$b" | asks    |
-      | ask-first              | npm run walk                  | denies  |
-      | issue-door             | gh issue create -t t -b b     | denies  |
+      | guard                  | command                       | verdict   |
+      | no-git-footguns        | git add -A                    | denies    |
+      | no-rm-tree             | rm -rf build                  | denies    |
+      | no-delete-stacked-base | git push origin --delete "$b" | asks      |
+      | ask-first              | npm run walk                  | denies    |
+      | issue-door             | gh issue create -t t -b b     | denies    |
+      | prose-budget-commit    | git commit -m x               | denies    |
       | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
 
   # The prompt hook is the only thing that opens the door. Dropped or
@@ -54,6 +57,7 @@ Feature: wiring
       | ask-first              | npm run walk                  |
       | issue-door             | gh issue create -t t -b b     |
       | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust |
+      | prose-budget-commit    | git commit -m x               |
 
   Scenario Outline: a script that crashes is a deny
     Given the hook is the hooks.json command for "<guard>"
@@ -69,6 +73,7 @@ Feature: wiring
       | ask-first              | npm run walk                  |
       | issue-door             | gh issue create -t t -b b     |
       | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust |
+      | prose-budget-commit    | git commit -m x               |
 
   Scenario Outline: the option set to false skips the guard
     Given the hook is the hooks.json command for "<guard>"
@@ -84,6 +89,7 @@ Feature: wiring
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | npm run walk                  |
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | gh issue create -t t -b b     |
       | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | gh issue comment 3 -R o/r -b Wanderlust |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | git commit -m x               |
 
   # Only the exact word false skips: unset, empty or anything else runs the
   # guard, so a misconfiguration cannot open the gate.
@@ -131,3 +137,9 @@ Feature: wiring
       | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | denies    |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | denies    |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | False | git commit -m x               | denies    |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | no    | git commit -m x               | denies    |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | true  | git commit -m x               | denies    |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 1     | git commit -m x               | denies    |
