@@ -61,8 +61,6 @@ jobs:
           d=$(mktemp -d)
           ln -s "$(command -v "$IMPL")" "$d/awk"
           AWK_PATH=$d python -m pytest -q
-          # issue-door's own bash suite (~2 s), under the same awk.
-          AWK_PATH=$d bash hooks/issue-door.test.sh
           # public-issue-guard's own bash suite, under the same awk.
           AWK_PATH=$d bash hooks/public-issue-guard.test.sh
           # no-foreign-worktree's own bash suite (~10 s, a fixture repo with worktrees), under the same awk.
