@@ -32,5 +32,7 @@ interface is; this file says who decided it and why, one line each.
 
 ## Shell parser: Solace, 2026-10-04
 
-- Languette goes to a real shell parser in place of the awk scanner. It is
-  part of the value proposition. Which parser, and when, are open in #4.
+- Languette goes to a real shell parser (#4); it is part of the value
+  proposition.
+- The engines cascade: a guard uses whichever the user has installed, the
+  parser first and awk last.
