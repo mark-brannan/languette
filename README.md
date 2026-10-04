@@ -35,7 +35,9 @@ It needs:
 - `jq` and a POSIX `awk`, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
 - `python3`, standard library only, for `ask-first`;
-- `gh`, for `no-delete-stacked-base`.
+- `gh`, for `no-delete-stacked-base`;
+- `prose-budget` ([mark-brannan/claude](https://github.com/mark-brannan/claude)),
+  optional, for `prose-budget-commit`. Without it the guard is a no-op.
 
 Without the plugin system, see [Installing by hand](#installing-by-hand).
 
@@ -60,6 +62,11 @@ Each guard denies one class of command:
   costly, until you approve that one run (an agent once ran a 46-minute,
   all-core test sweep to check a small change, then started it again). See
   [Ask first](#ask-first).
+- [`prose-budget-commit`](hooks/prose-budget-commit.sh): a `git commit`
+  whose staged diff trips a repo's own documentation budgets, checked by
+  running [mark-brannan/claude](https://github.com/mark-brannan/claude)'s
+  `prose-budget` engine with `--staged`. A repo with no budgets config, or
+  a machine with no `prose-budget` installed, is untouched.
 
 ## The promise
 
@@ -135,6 +142,7 @@ claude plugin install languette@languette --config no_rm_tree=false
 | `no_delete_stacked_base` | `no-delete-stacked-base` |
 | `ask_first` | `ask-first` |
 | `issue_door` | `issue-door` |
+| `prose_budget_commit` | `prose-budget-commit` |
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
@@ -201,6 +209,7 @@ guard reads beyond the command, it declares:
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
 | `no-delete-stacked-base` | GitHub, through `gh` |
 | `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
+| `prose-budget-commit` | the staged diff, through the `prose-budget` engine at `$PROSE_BUDGET` or on PATH |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes
 is a deny naming the guard; the runner holds that rule, so no guard has to.

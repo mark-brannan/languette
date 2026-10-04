@@ -28,7 +28,7 @@ from languette import run, scan  # noqa: E402
 ENGINES = ("python", "shell")
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
-         "TIMEOUT_HANG", "LANGUETTE_STUB_LOG")
+         "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET", "PROSE_BUDGET_FAIL")
 
 
 _REAL_HOME = os.environ.get("HOME")
@@ -252,6 +252,12 @@ def _symlink(ctx, path, target):
 @given('the stubs "gh" and "timeout" are first on PATH')
 def _stubs(ctx):
     ctx.stubs, ctx.stub_log = True, ctx.mkdtemp()
+
+
+@given('the stub "prose-budget" is the engine')
+def _prose_budget_stub(ctx):
+    ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
+    ctx.env["PROSE_BUDGET"] = str(ROOT / "tests/stubs/prose-budget")
 
 
 @given(parsers.re(r'PATH holds only "(?P<tools>[^"]*)"(?P<gh> and the stub "gh")?'))
