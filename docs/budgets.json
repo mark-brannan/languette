@@ -1,0 +1,13 @@
+{
+  "$comment": "README caps set just above its size on 2026-10-04, after the guards-list rewrite (267 lines, 1937 words). Configuration is the one section over 300 words, grandfathered as found. Two README lines name the session transcript, a real file, grandfathered by hash. docs/ is left out of narration: agent_decisions.md is a log and narrates by design. Raising any cap lands alone, with its reason.",
+  "lines": {"README.md": 280},
+  "sections": {"targets": ["README.md"], "max_words": 300, "exempt": ["Configuration"]},
+  "delta": {"max_words": 40},
+  "narration": {
+    "targets": ["README.md"],
+    "grandfathered": [
+      {"file": "README.md", "hash": "69c254bca621"},
+      {"file": "README.md", "hash": "8b962e83cf7d"}
+    ]
+  }
+}

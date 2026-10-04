@@ -79,8 +79,15 @@ jobs:
           command -v shellcheck || (sudo apt-get update -q && sudo apt-get install -y -q shellcheck)
           shellcheck --severity=warning hooks/*.sh tests/stubs/*
 
+  # Line, section and per-change word caps on the README, from
+  # docs/budgets.json. Raising a cap is its own PR that says why.
+  prose-budget:
+    permissions:
+      contents: read
+    uses: mark-brannan/.github/.github/workflows/prose-budget.yml@main
+
   ci-gate:
-    needs: [nonempty, tests, shellcheck]
+    needs: [nonempty, tests, shellcheck, prose-budget]
     if: always()
     permissions: {}
     uses: mark-brannan/.github/.github/workflows/ci-gate.yml@main
