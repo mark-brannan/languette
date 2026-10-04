@@ -37,6 +37,7 @@ command.
 import json
 import os
 import re
+import stat
 
 from languette import scan as sw
 from languette.verdict import Refuse, deny
@@ -60,9 +61,13 @@ DEPTH = 4                                      # heredocs feeding shells feeding
 READS = frozenset("list get search read".split())
 # A word after the read verb that makes the tool a write after all.
 WRITE_WORDS = frozenset("add set create update edit write apply put post patch assign rename replace "
-                        "upsert merge and or then".split())
-# Commands that may share the call with a gh that reads a file: none can write one.
-INERT = frozenset("cd pushd popd true :".split())
+                        "upsert merge modify change toggle attach tag mark link insert append save store "
+                        "mutate sync push commit delete remove clear reset move copy and or then".split())
+# Commands that may share the call with a gh that reads a file. None writes a
+# byte to stdout that could become labels, so a redirect on one only
+# truncates the file (pushd and popd print the directory stack).
+INERT = frozenset("cd true :".split())
+MAX_READ = 1 << 20
 WORDS = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")
 
 
@@ -139,10 +144,21 @@ def _read(path, ctx):
             raise Refuse("is a relative path, and the guard cannot tell where the command stands")
         p = os.path.join(cwd, p)
     try:
-        with open(p, encoding="utf-8") as f:
-            return f.read()
-    except (OSError, UnicodeDecodeError) as e:
-        raise Refuse(f"cannot be read ({getattr(e, 'strerror', None) or e})")
+        # Non-blocking, so a FIFO cannot stall the hook into its timeout.
+        fd = os.open(p, os.O_RDONLY | os.O_NONBLOCK)
+    except OSError as e:
+        raise Refuse(f"cannot be read ({e.strerror or e})")
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        raise Refuse("is not a regular file")
+    with os.fdopen(fd, "rb") as f:
+        data = f.read(MAX_READ + 1)
+    if len(data) > MAX_READ:
+        raise Refuse(f"is over {MAX_READ} bytes")
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as e:
+        raise Refuse(f"cannot be read ({e})")
 
 
 def _payloads(src, live, ctx):
@@ -309,14 +325,15 @@ def _alias(f, s, g, b, act):
 
 def _alone(scans):
     """Every segment is the gh, a shell running quoted text the scan already
-    holds, or a command that writes no file."""
+    holds (not built at run time), or a command that writes no file."""
     for s, nested in scans:
         for a, b in s.segments():
             if a > b or sw.cmd_index(s, a, b, GH, nested) is not None:
                 continue
             c = sw.seg_cmd(s, a, b)
             w = s.w[c].rsplit("/", 1)[-1] if c is not None else None
-            if w not in INERT and not (w in sw.SHELL and any(s.k[j] == "q" for j in range(c, b + 1))):
+            quoted = [j for j in range(c, b + 1) if s.k[j] == "q"] if c is not None else []
+            if w not in INERT and not (w in sw.SHELL and quoted and not any(s.live[j] for j in quoted)):
                 return False
     return True
 

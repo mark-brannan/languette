@@ -161,6 +161,17 @@ Feature: no-bypass-labels
         | echo '{"labels":["churn-ok"]}' > {PROJ}/ready.json && gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json |
         | cp x.json {PROJ}/ready.json; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json               |
         | sh -c 'echo churn-ok > {PROJ}/ready.json && gh api repos/o/r/issues/12/labels -F labels[]=@{PROJ}/ready.json' |
+        | sh -c "$(cat /tmp/w.sh)"; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json                   |
+        | pushd /tmp > {PROJ}/ready.json; gh api repos/o/r/issues/12/labels -F labels[]=@{PROJ}/ready.json       |
+
+    Scenario Outline: a file that is not a regular file is not read
+      When the agent runs `gh api repos/o/r/issues/12/labels --input <path>`
+      Then the guard denies, naming "<why>"
+
+      Examples:
+        | path       | why                   |
+        | /dev/zero  | not a regular file    |
+        | /tmp       | not a regular file    |
 
     Scenario Outline: a labels payload in a heredoc fed to --input - is read
       When the agent runs:
@@ -248,6 +259,8 @@ Feature: no-bypass-labels
         | mcp__x__list_and_label       | denies, naming "churn-ok"  |
         | mcp__x__search_then_label    | denies, naming "churn-ok"  |
         | mcp__x__labels_get           | denies, naming "churn-ok"  |
+        | mcp__x__get_issue_modify_labels | denies, naming "churn-ok" |
+        | mcp__x__list_issue_tag       | denies, naming "churn-ok"  |
 
   Rule: a label the guard cannot read is denied, saying why
 
