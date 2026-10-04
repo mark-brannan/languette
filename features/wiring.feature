@@ -129,3 +129,61 @@ Feature: wiring
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | no    | git commit -m x               | denies    |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | true  | git commit -m x               | denies    |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 1     | git commit -m x               | denies    |
+
+  # no-checkout-home is opt-in, the reverse of the guards above: it runs only
+  # when its option is exactly "true", so a misconfiguration leaves it off.
+  Scenario: the opt-in guard judges when its option is true
+    Given the hook is the hooks.json command for "no-checkout-home"
+    And HOME is "{TMP}"
+    And a git repository at "{TMP}"
+    And the working directory is "{TMP}"
+    And CLAUDE_PLUGIN_OPTION_NO_CHECKOUT_HOME is "true"
+    When the agent runs `git checkout some-branch`
+    Then the guard denies
+
+  Scenario: the opt-in guard stays silent when its option is unset
+    Given the hook is the hooks.json command for "no-checkout-home"
+    And HOME is "{TMP}"
+    And a git repository at "{TMP}"
+    And the working directory is "{TMP}"
+    And CLAUDE_PLUGIN_OPTION_NO_CHECKOUT_HOME is unset
+    When the agent runs `git checkout some-branch`
+    Then the guard is silent
+
+  Scenario Outline: the opt-in guard stays silent for any value but true
+    Given the hook is the hooks.json command for "no-checkout-home"
+    And HOME is "{TMP}"
+    And a git repository at "{TMP}"
+    And the working directory is "{TMP}"
+    And CLAUDE_PLUGIN_OPTION_NO_CHECKOUT_HOME is "<value>"
+    When the agent runs `git checkout some-branch`
+    Then the guard is silent
+
+    Examples:
+      | value |
+      | false |
+      |       |
+      | 0     |
+      | True  |
+      | 1     |
+      | yes   |
+
+  Scenario: with the opt-in guard on, a script missing from the plugin directory is a deny
+    Given the hook is the hooks.json command for "no-checkout-home"
+    And CLAUDE_PLUGIN_OPTION_NO_CHECKOUT_HOME is "true"
+    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
+    When the agent runs `git checkout some-branch`
+    Then the guard denies
+
+  Scenario: with the opt-in guard on, a script that crashes is a deny
+    Given the hook is the hooks.json command for "no-checkout-home"
+    And the plugin's script for "no-checkout-home" crashes
+    And CLAUDE_PLUGIN_OPTION_NO_CHECKOUT_HOME is "true"
+    When the agent runs `git checkout some-branch`
+    Then the guard denies
+
+  Scenario: with the opt-in guard off, a missing script is silent
+    Given the hook is the hooks.json command for "no-checkout-home"
+    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
+    When the agent runs `git checkout some-branch`
+    Then the guard is silent

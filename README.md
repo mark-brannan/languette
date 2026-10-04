@@ -56,6 +56,12 @@ Each guard denies one class of command:
   once filed a batch of duplicate issues on a plan approved once, the batch
   buried in it). One per turn: it opens on your prompt, the first write
   spends it.
+- [`no-checkout-home`](hooks/no-checkout-home.sh) (opt-in, off by default): a
+  `git` or `yadm` `checkout` or `switch` that would change the branch checked
+  out in your home directory, for a `$HOME` that is itself a worktree (yadm, a
+  bare-repo setup). The branch stays switched for every shell and session on
+  the machine until someone switches it back; work on a branch in a worktree.
+  `yadm` is denied from any directory, since it always works on `$HOME`.
 - [`ask-first`](languette/guards/ask_first.py): a command the repo lists as
   costly, until you approve that one run (an agent once ran a 46-minute,
   all-core test sweep to check a small change, then started it again). See
@@ -124,9 +130,9 @@ meant. Spent approvals are kept beside the session transcript, in
 
 ## Configuration
 
-Every guard is on by default. Turn one off with
-`/plugin configure languette@languette`, or at install, by its name with
-underscores:
+Every guard is on by default except `no-checkout-home`, which is opt-in.
+Turn one off (or that one on) with `/plugin configure languette@languette`,
+or at install, by its name with underscores:
 
 ```
 claude plugin install languette@languette --config no_rm_tree=false
@@ -134,6 +140,8 @@ claude plugin install languette@languette --config no_rm_tree=false
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
+`no_checkout_home` is the reverse: it runs only when its setting is exactly
+`true`, so a misconfiguration leaves it off.
 
 ### Allowing more for `no-rm-tree`
 
@@ -197,6 +205,7 @@ guard reads beyond the command, it declares:
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
 | `no-delete-stacked-base` | GitHub, through `gh` |
 | `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
+| `no-checkout-home` | `$HOME`, and what `git rev-parse --show-toplevel` resolves to |
 | `prose-budget-commit` | the staged diff, through `prose-budget` |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes

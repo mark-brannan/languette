@@ -50,6 +50,12 @@
       "title": "Check staged prose against the repo's budgets before a commit",
       "description": "Deny a git commit when mark-brannan/claude's prose-budget engine finds the staged diff over a repo's own budgets. A no-op where that engine isn't installed or the repo has no budgets config. Leave on unless you want staged prose through unchecked.",
       "default": true
+    },
+    "no_checkout_home": {
+      "type": "boolean",
+      "title": "Block switching the branch checked out in $HOME",
+      "description": "Opt-in, off by default. Deny git or yadm checkout and switch that would change the branch checked out in your home directory, for a $HOME that is itself a worktree (yadm, a bare-repo setup). Turn on only if $HOME is a git worktree.",
+      "default": false
     }
   }
 }

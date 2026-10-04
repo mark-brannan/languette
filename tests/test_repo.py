@@ -14,7 +14,9 @@ import readme_table
 from conftest import hooks_json_commands, hooks_json_prompt_command
 
 ROOT = Path(__file__).resolve().parent.parent
-GUARDS = {"no-git-footguns", "no-rm-tree", "no-delete-stacked-base", "ask-first", "issue-door", "prose-budget-commit"}
+GUARDS = {"no-git-footguns", "no-rm-tree", "no-delete-stacked-base", "ask-first", "issue-door", "prose-budget-commit", "no-checkout-home"}
+# Guards that are off unless the user turns them on: their option defaults to false.
+OPT_IN = {"no_checkout_home"}
 
 
 def hooks_shape(text):
@@ -114,12 +116,13 @@ def test_hooks_json_wires_exactly_the_guards():
     assert_that(set(hooks_json_commands()), equal_to(GUARDS))
 
 
-def test_every_guard_has_one_boolean_option_defaulting_to_true():
+def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():
     uc = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())["userConfig"]
     assert_that(sorted(uc), equal_to(sorted(g.replace("-", "_") for g in GUARDS)))
     for key, opt in uc.items():
-        assert opt.get("type") == "boolean" and opt.get("default") is True and opt.get("title") \
-            and opt.get("description"), f"userConfig.{key}: want a titled, described boolean defaulting to true"
+        want = key not in OPT_IN
+        assert opt.get("type") == "boolean" and opt.get("default") is want and opt.get("title") \
+            and opt.get("description"), f"userConfig.{key}: want a titled, described boolean defaulting to {str(want).lower()}"
 
 
 def test_languette_imports_only_the_standard_library():

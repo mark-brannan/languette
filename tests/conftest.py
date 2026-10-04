@@ -244,6 +244,22 @@ def _mkdir(ctx, path):
     Path(ctx.expand(path)).mkdir(parents=True, exist_ok=True)
 
 
+@given(parsers.parse('a git repository at "{path}"'))
+def _git_init(ctx, path):
+    d = Path(ctx.expand(path))
+    d.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", str(d)], check=True)
+
+
+@given(parsers.parse('a yadm-style repository at "{path}" whose work tree is "{wt}"'))
+def _yadm_repo(ctx, path, wt):
+    d = Path(ctx.expand(path))
+    d.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(d)], check=True)
+    for k, v in (("core.bare", "false"), ("core.worktree", ctx.expand(wt))):
+        subprocess.run(["git", "--git-dir", str(d), "config", k, v], check=True)
+
+
 @given(parsers.parse('the symlink "{path}" to "{target}"'))
 def _symlink(ctx, path, target):
     Path(ctx.expand(path)).symlink_to(ctx.expand(target))
