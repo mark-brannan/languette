@@ -94,8 +94,8 @@ Feature: wiring
 
     Examples:
       | guard            | option           | command                           |
-      | ask-first        | ASK_FIRST        | npm run walk                      |
-      | no-bypass-labels | NO_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
+      | ask-first        | ask_first        | npm run walk                      |
+      | no-bypass-labels | no_bypass_labels | gh pr edit 4 --add-label churn-ok |
 
   # Whatever the fallback does wrong, python3 being absent must not open the gate.
   Scenario Outline: with python3 absent from PATH, a shell fallback that crashes or is missing is a deny
