@@ -16,15 +16,19 @@ Three routes reach a label, and each is read:
   set`, which is those flags for later;
 - gh api: a write whose -f/-F/--field/--raw-field key names a label (or
   `new_name` on a labels/ path), a JSON payload passed by --input (a file,
-  or `-` fed by a heredoc), and a graphql mutation that applies or renames
-  labels by ID, which the guard cannot map to names;
-- an MCP tool's field whose name says label, unless the tool's name says it
-  reads (list, get, search, read). An unknown tool is a write.
+  or `-` fed by a heredoc) on any path, and a graphql mutation that applies
+  or renames labels by ID, which the guard cannot map to names;
+- an MCP tool's field whose name says label, at any depth, and every string
+  field of a tool whose name says label, unless the tool's name leads with a
+  read verb (list, get, search, read) and says nothing that writes. An
+  unknown tool is a write.
 
 The gh is found through wrappers, `sh -c`, `eval`, a pipe into a shell, and
 a heredoc fed to a shell, which is code; a heredoc fed to anything else is
 text. A label the guard cannot read (built at run time, in a file it cannot
-open, from stdin with no heredoc, by ID) is a deny that says why. A label
+open, from stdin with no heredoc, by ID) is a deny that says why. A file is
+read at hook time, so it is trusted only when nothing else in the command
+runs before gh and could rewrite it. A label
 named in text (a body, a title, a commit message, a heredoc) is not a label
 applied: the scanner never descends into the quoted text of a gh or git
 command.
@@ -47,13 +51,29 @@ LABEL_FLAGS = frozenset("--label --add-label -l".split())
 # gh api flags whose value is not a field, a method or the path.
 API_VALUED = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 # Paths whose write can carry labels in an --input payload.
-LABEL_PATH = re.compile(r"repos/[^/]+/[^/]+/(?:issues(?:/[^/]+(?:/labels)?)?|labels/[^/]+)/?")
-RENAME_PATH = re.compile(r"repos/[^/]+/[^/]+/labels/[^/]+/?")
+REPO = r"(?:repos/[^/]+/[^/]+|repositories/[^/]+)"
+LABEL_PATH = re.compile(REPO + r"/(?:issues(?:/[^/]+(?:/labels)?)?|labels/[^/]+)/?")
+RENAME_PATH = re.compile(REPO + r"/labels/[^/]+/?")
 GRAPHQL_LABELS = re.compile(r"addLabelsToLabelable|labelIds|updateLabel")
 GRAPHQL_WHY = "the graphql mutation applies or renames labels by ID, and label IDs are names the guard cannot read"
-BY_ID = re.compile(r"id", re.I)
 DEPTH = 4                                      # heredocs feeding shells feeding heredocs
-READ_TOOL = re.compile(r"(?:^|_)(?:list|get|search|read)(?:_|\Z)")
+READS = frozenset("list get search read".split())
+# A word after the read verb that makes the tool a write after all.
+WRITE_WORDS = frozenset("add set create update edit write apply put post patch assign rename replace "
+                        "upsert merge and or then".split())
+# Commands that may share the call with a gh that reads a file: none can write one.
+INERT = frozenset("cd pushd popd true :".split())
+WORDS = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")
+
+
+def _words(name):
+    """snake_case, kebab-case and camelCase split into lower-case words."""
+    return [w.lower() for w in WORDS.findall(name)]
+
+
+def _reads(tool):
+    w = _words(tool.rsplit("__", 1)[-1])
+    return bool(w) and w[0] in READS and not WRITE_WORDS.intersection(w[1:])
 
 
 def bypass_labels(env):
@@ -92,14 +112,23 @@ class _Found:
             self.unseen.append(f"{what} is not a list of label names")
 
 
+def _glued(t):
+    """The value of a glued short flag: pflag reads -lx and -l=x alike."""
+    return t[3:] if t[2:3] == "=" else t[2:]
+
+
 def _wv(s, i):
     return s.q[i] if s.k[i] == "q" else s.w[i]
 
 
-def _read(path, cwd, env, moved):
+def _read(path, ctx):
     """The text of the file `path` names, as the shell will open it; raises
     Refuse, with what is wrong with the path, when the guard cannot open the
-    same file."""
+    same file, or when another command in the call could rewrite it first."""
+    cwd, env, moved = ctx["cwd"], ctx["env"], ctx["moved"]
+    if not ctx["alone"]:
+        raise Refuse("is read at hook time, and another command in the same call could rewrite it before gh "
+                     "reads it; run the gh on its own")
     p = path
     if p == "~" or p.startswith("~/"):
         if not env.get("HOME"):
@@ -127,7 +156,7 @@ def _payloads(src, live, ctx):
             raise Refuse("the heredoc feeding --input is built at run time (an unquoted delimiter and a $ or backtick)")
         return [body for body, _ in ctx["bodies"]]
     try:
-        return [_read(src, ctx["cwd"], ctx["env"], ctx["moved"])]
+        return [_read(src, ctx)]
     except Refuse as e:
         raise Refuse(f"the --input file `{src}` {e}")
 
@@ -146,7 +175,7 @@ def _input(f, src, live, path, ctx):
         try:
             doc = json.loads(t)
         except ValueError:
-            if src != "-":                     # a heredoc may feed another command
+            if src != "-" and LABEL_PATH.fullmatch(path):  # a heredoc may feed another command
                 f.unseen.append(f"the --input payload `{src}` is not JSON")
             continue
         if isinstance(doc, list):
@@ -155,7 +184,7 @@ def _input(f, src, live, path, ctx):
             for key in ("labels", "new_name"):
                 if key in doc and (key == "labels" or RENAME_PATH.fullmatch(path)):
                     f.names(doc[key], f"the --input payload's {key}")
-    if src == "-" and not any(_parses(t) for t in texts) and path != "graphql":
+    if src == "-" and not any(_parses(t) for t in texts) and LABEL_PATH.fullmatch(path):
         f.unseen.append("no heredoc in the command holds the JSON the --input payload reads from stdin")
 
 
@@ -178,12 +207,12 @@ def _api(f, s, i, b, ctx):
         elif t.startswith("--method="):
             method = t[9:].upper()
         elif t.startswith("-X") and len(t) > 2:
-            method = t[2:].upper()
+            method = _glued(t).upper()
         elif t in ("-f", "-F", "--field", "--raw-field"):
             fields.append((t, *nxt) if nxt else (t, "", False))
             j += 1
         elif t[:2] in ("-f", "-F") and len(t) > 2:
-            fields.append((t[:2], t[2:], s.live[j]))
+            fields.append((t[:2], _glued(t), s.live[j]))
         elif t.startswith(("--field=", "--raw-field=")):
             fields.append((t.split("=", 1)[0], t.split("=", 1)[1], s.live[j]))
         elif t == "--input":
@@ -204,7 +233,7 @@ def _api(f, s, i, b, ctx):
             v = kv.split("=", 1)[1] if "=" in kv else kv
             if v.startswith("@") and flag in ("-F", "--field"):
                 try:
-                    v = _read(v[1:], ctx["cwd"], ctx["env"], ctx["moved"])
+                    v = _read(v[1:], ctx)
                 except Refuse as e:
                     f.unseen.append(f"the graphql field reads the file `{v[1:]}`, which {e}")
                     continue
@@ -221,14 +250,13 @@ def _api(f, s, i, b, ctx):
             continue
         if v.startswith("@") and flag in ("-F", "--field"):
             try:
-                f.value(_read(v[1:], ctx["cwd"], ctx["env"], ctx["moved"]).strip(), live)
+                f.value(_read(v[1:], ctx).strip(), live)
             except Refuse as e:
                 f.unseen.append(f"the field {key} reads the file `{v[1:]}`, which {e}")
         else:
             f.value(v, live, f"the field {key}")
-    if LABEL_PATH.fullmatch(p):
-        for src, live in inputs:
-            _input(f, src, live, p, ctx)
+    for src, live in inputs:
+        _input(f, src, live, p, ctx)
 
 
 def _gh(f, s, g, b, ctx):
@@ -260,7 +288,7 @@ def _gh(f, s, g, b, ctx):
         elif t.startswith(glued):
             f.value(t.split("=", 1)[1], s.live[j])
         elif t.startswith(short) and len(t) > 2 and not t.startswith("--"):
-            f.value(t[2:], s.live[j])
+            f.value(_glued(t), s.live[j])
         j += 1
 
 
@@ -279,13 +307,28 @@ def _alias(f, s, g, b, act):
         f.unseen.append(f"the alias file `{src}` may define an alias that applies a label")
 
 
-def _bash(f, cmd, cwd, env, depth=0):
+def _alone(scans):
+    """Every segment is the gh, a shell running quoted text the scan already
+    holds, or a command that writes no file."""
+    for s, nested in scans:
+        for a, b in s.segments():
+            if a > b or sw.cmd_index(s, a, b, GH, nested) is not None:
+                continue
+            c = sw.seg_cmd(s, a, b)
+            w = s.w[c].rsplit("/", 1)[-1] if c is not None else None
+            if w not in INERT and not (w in sw.SHELL and any(s.k[j] == "q" for j in range(c, b + 1))):
+                return False
+    return True
+
+
+def _bash(f, cmd, cwd, env, depth=0, alone=True):
     text = sw.strip_heredocs(cmd + "\n")
     texts = sw.texts_of(text)
     scans = [(sw.Scan(t), nested) for t, nested in texts]
     bodies = sw.heredocs(cmd + "\n")
     ctx = {"cwd": cwd, "env": env, "bodies": bodies,
-           "moved": any(k == "w" and w in ("cd", "pushd", "popd") for s, _ in scans for k, w in zip(s.k, s.w))}
+           "moved": any(k == "w" and w in ("cd", "pushd", "popd") for s, _ in scans for k, w in zip(s.k, s.w)),
+           "alone": alone and _alone(scans)}
     for s, nested in scans:
         for a, b in s.segments():
             if a > b:
@@ -304,8 +347,30 @@ def _bash(f, cmd, cwd, env, depth=0):
                     if bodies[k][1]:
                         f.unseen.append("the heredoc fed to a shell is built at run time (an unquoted delimiter and a $ or backtick)")
                     else:
-                        _bash(f, bodies[k][0], cwd, env, depth + 1)
+                        _bash(f, bodies[k][0], cwd, env, depth + 1, ctx["alone"])
                 k += 1
+
+
+def _mcp(f, v, any_string, depth=0):
+    """Every field, at any depth, whose name says label; in a tool whose name
+    says label, every string too, since `add_label` may carry the name in
+    `name` or `value`."""
+    if depth > 16:
+        f.unseen.append("the input nests too deep to read")
+    elif isinstance(v, dict):
+        for key, x in v.items():
+            words = _words(key) if isinstance(key, str) else []
+            if not ("label" in words or "labels" in words):
+                _mcp(f, x, any_string, depth + 1)
+            elif ("id" in words or "ids" in words) and x not in (None, []):
+                f.unseen.append(f"the field {key} names labels by ID, which the guard cannot map to names")
+            else:
+                f.names(x, f"the field {key}")
+    elif isinstance(v, list):
+        for x in v:
+            _mcp(f, x, any_string, depth + 1)
+    elif isinstance(v, str) and any_string:
+        f.labels.extend(_split(v))
 
 
 def check(payload, env=os.environ):
@@ -318,13 +383,9 @@ def check(payload, env=os.environ):
             return None
         _bash(f, cmd, payload.get("cwd"), env)
     elif isinstance(tool, str) and tool.startswith("mcp__"):
-        if not isinstance(inp, dict) or READ_TOOL.search(tool.rsplit("__", 1)[-1]):
+        if not isinstance(inp, dict) or _reads(tool):
             return None
-        for key in (k for k in inp if "label" in k.lower()):
-            if BY_ID.search(key.replace("label", "").replace("Label", "")) and inp[key] not in (None, []):
-                f.unseen.append(f"the field {key} names labels by ID, which the guard cannot map to names")
-            else:
-                f.names(inp[key], f"the field {key}")
+        _mcp(f, inp, "label" in _words(tool.rsplit("__", 1)[-1]) or "labels" in _words(tool.rsplit("__", 1)[-1]))
     else:
         return None
     bad = bypass_labels(env)

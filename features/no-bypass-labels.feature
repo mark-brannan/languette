@@ -27,6 +27,7 @@ Feature: no-bypass-labels
         | gh pr create -t t -b b --label churn-ok               | churn-ok       |
         | gh pr create -t t -b b -l mixed-loops-ok              | mixed-loops-ok |
         | gh pr create -t t -b b -lchurn-ok                     | churn-ok       |
+        | gh pr create -t t -b b -l=churn-ok                    | churn-ok       |
         | gh pr new -t t -b b --label churn-ok                  | churn-ok       |
         | gh issue create -t t -b b --label=churn-ok            | churn-ok       |
         | gh issue edit 3 --add-label mixed-loops-ok            | mixed-loops-ok |
@@ -122,6 +123,8 @@ Feature: no-bypass-labels
         | gh api repos/o/r/issues/12/labels -f labels=churn-ok                      | churn-ok       |
         | gh api -X POST repos/o/r/issues/12/labels -f labels[]=churn-ok            | churn-ok       |
         | gh api -X PUT repos/o/r/issues/12/labels -f labels[]="churn-ok "          | churn-ok       |
+        | gh api repos/o/r/issues/12/labels -f=labels[]=churn-ok                    | churn-ok       |
+        | gh api -X=PUT repositories/1/issues/12/labels -f labels[]=churn-ok        | churn-ok       |
 
     Scenario: a labels payload in the file --input names is read
       Given a project directory
@@ -136,8 +139,28 @@ Feature: no-bypass-labels
         """
       When the agent runs `gh api repos/o/r/issues/12/labels --input labels.json`
       Then the guard denies, naming "churn-ok"
+      When the agent runs `gh api repositories/1/issues/12/labels --input labels.json`
+      Then the guard denies, naming "churn-ok"
+      When the agent runs `gh api -X PATCH some/path/the/guard/does/not/know --input labels.json`
+      Then the guard denies, naming "churn-ok"
       When the agent runs `gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json`
       Then the guard is silent
+
+    Scenario Outline: a file another command in the call could rewrite first is not read
+      Given a project directory
+      And the working directory is "{PROJ}"
+      And the file "ready.json" holds:
+        """
+        ["ready"]
+        """
+      When the agent runs `<command>`
+      Then the guard denies, naming "rewrite"
+
+      Examples:
+        | command                                                                                                 |
+        | echo '{"labels":["churn-ok"]}' > {PROJ}/ready.json && gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json |
+        | cp x.json {PROJ}/ready.json; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json               |
+        | sh -c 'echo churn-ok > {PROJ}/ready.json && gh api repos/o/r/issues/12/labels -F labels[]=@{PROJ}/ready.json' |
 
     Scenario Outline: a labels payload in a heredoc fed to --input - is read
       When the agent runs:
@@ -204,8 +227,12 @@ Feature: no-bypass-labels
         | mcp__github__update_issue                | {"owner":"o","repo":"r","issue_number":12,"label":"churn-ok"}                   | churn-ok       |
         | mcp__gitlab__update_issue                | {"project_id":"o/r","issue_iid":12,"add_labels":"churn-ok"}                     | churn-ok       |
         | mcp__some_server__some_tool              | {"labels":["churn-ok"]}                                                         | churn-ok       |
+        | mcp__some_server__some_tool              | {"issue":{"labels":["churn-ok"]}}                                               | churn-ok       |
+        | mcp__some_server__some_tool              | {"ops":[{"add":{"labels":"churn-ok"}}]}                                         | churn-ok       |
+        | mcp__github__add_label                   | {"owner":"o","repo":"r","issue_number":12,"name":"churn-ok"}                    | churn-ok       |
+        | mcp__gitea__addIssueLabels               | {"owner":"o","repo":"r","index":3,"value":["churn-ok"]}                         | churn-ok       |
 
-    Scenario Outline: a tool reads only when its name says so; an unknown tool writes
+    Scenario Outline: a tool reads only when its name leads with a read verb and says no write; an unknown tool writes
       When the agent calls MCP tool "<tool>" with input `{"owner":"o","repo":"r","labels":["churn-ok"]}`
       Then the guard <verdict>
 
@@ -217,6 +244,10 @@ Feature: no-bypass-labels
         | mcp__github__read_issue      | is silent                  |
         | mcp__github__issue_write     | denies, naming "churn-ok"  |
         | mcp__github__getting_started | denies, naming "churn-ok"  |
+        | mcp__github__get_or_add_labels | denies, naming "churn-ok" |
+        | mcp__x__list_and_label       | denies, naming "churn-ok"  |
+        | mcp__x__search_then_label    | denies, naming "churn-ok"  |
+        | mcp__x__labels_get           | denies, naming "churn-ok"  |
 
   Rule: a label the guard cannot read is denied, saying why
 
@@ -256,6 +287,7 @@ Feature: no-bypass-labels
         | command                                                     |
         | gh label edit ready --name churn-ok                         |
         | gh label edit ready -n CHURN-OK -R o/r                      |
+        | gh label edit ready -n=churn-ok                             |
         | gh api -X PATCH repos/o/r/labels/ready -f new_name=churn-ok |
 
   Rule: a label named in text, a read, or another label is not a bypass applied
@@ -328,6 +360,9 @@ Feature: no-bypass-labels
         | mcp__github__update_issue            | {"owner":"o","repo":"r","issue_number":12,"labels":[]}                |
         | mcp__github__update_issue            | {"owner":"o","repo":"r","issue_number":12,"labels":null}              |
         | mcp__github__update_issue            | {"owner":"o","repo":"r","issue_number":12,"labelIds":[]}              |
+        | mcp__x__update_issue                 | {"owner":"o","repo":"r","issue_number":12,"valid_labels":["ready"]}   |
+        | mcp__x__update_issue                 | {"owner":"o","repo":"r","guidelines_labels":["ready"]}                |
+        | mcp__github__add_label               | {"owner":"o","repo":"r","issue_number":12,"name":"ready"}             |
 
     Scenario: a tool that is neither Bash nor MCP is silent
       When the agent calls tool "Write" with input `{"file_path":"/tmp/x.md","content":"gh pr edit 1 --add-label churn-ok"}`
