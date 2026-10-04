@@ -38,10 +38,12 @@
 # literal `$VAR`, a quoted path with spaces) denies rather than skips, same
 # as an unresolvable `cd`/`-C`; so does a `diff`/`ls-files` that itself
 # fails. A path starting with `-` is prefixed `./` before it reaches the
-# engine, so it can't be read as one of the engine's own options. Residual
-# gap: an `add`/`commit` pair that `cd`s between the two resolves both
-# against the commit's own directory, which is wrong if they really do run
-# in different places.
+# engine, so it can't be read as one of the engine's own options. A
+# pathspec that is a directory on disk also denies -- `--file` would just
+# silently drop it, leaving everything under it unchecked. Residual gap:
+# an `add`/`commit` pair that `cd`s between the two resolves both against
+# the commit's own directory, which is wrong if they really do run in
+# different places.
 #
 # Exit 1 is a finding and denies. Exit 2 is a bad budgets config (or an
 # engine too old for --staged/--file) and denies too, saying so: the repo
@@ -124,13 +126,14 @@ function collect_add(lo, hi,   i) {
     if (w[i] ~ /^-/) {
       if (w[i] ~ /^--(a|al|all)$/ || (w[i] ~ /^-[A-Za-z]+$/ && w[i] ~ /A/)) { ALLFLAG = 1; ALLNEW = 1 }
       else if (w[i] ~ /^--(u|up|upd|upda|updat|update)$/ || (w[i] ~ /^-[A-Za-z]+$/ && w[i] ~ /u/)) ALLFLAG = 1
-      # A short cluster of only known scope-safe letters, or a known
-      # scope-safe long option, changes nothing about what gets staged.
-      # Anything else -- an option this guard does not recognize -- widens
-      # rather than silently keeping the narrower, named-paths-only check.
-      else if (w[i] ~ /^-[nvfpei]+$/) { }
-      else if (w[i] ~ /^--(dry-run|verbose|force|patch|edit|interactive|ignore-errors|ignore-removal|no-ignore-removal|renormalize|sparse)$/) { }
-      else if (w[i] ~ /^--chmod(=.*)?$/) { }
+      # -n/-v (dry-run/verbose) are the only `add` flags that provably
+      # change nothing about what gets staged. Everything else -- -f
+      # (stages a gitignored file `ls-files --exclude-standard` would
+      # miss), -p/-i (either can stage untracked content interactively),
+      # or an option this guard does not recognize -- widens rather than
+      # silently keeping the narrower, named-paths-only check.
+      else if (w[i] ~ /^-[nv]+$/) { }
+      else if (w[i] ~ /^--(dry-run|verbose)$/) { }
       else { ALLFLAG = 1; ALLNEW = 1 }
       continue
     }
@@ -199,6 +202,19 @@ done
 
 [ "$badpaths" = "1" ] && deny "Blocked by prose-budget-commit: this commit's pathspec could not be resolved (an unexpanded variable, or a quoted path with spaces), so the unstaged prose it commits could not be checked. Spell the path plainly and retry."
 
+# A directory pathspec isn't lexically obvious the way a trailing "/" or a
+# glob is (the awk scanner has no filesystem to check "docs" against), so
+# it is caught here instead: --file would just silently drop it (it is not
+# a regular file), leaving everything under it unchecked.
+while IFS= read -r p; do
+  [ -n "$p" ] || continue
+  case $p in /*) target=$p ;; *) target=$dir/$p ;; esac
+  [ -d "$target" ] \
+    && deny "Blocked by prose-budget-commit: \"$p\" is a directory; this guard does not expand a directory pathspec into the files under it. Name the files directly, or stage/commit by pattern (git add -A, git add ., git commit -a) so the check widens instead."
+done <<EOF
+$(printf '%s' "$paths" | tr '\037' '\n')
+EOF
+
 out=$(cd "$dir" && "$ENGINE" --staged 2>&1)
 rc=$?
 case $rc in
@@ -224,7 +240,8 @@ if [ "$allflag" = "1" ] || [ "$allnew" = "1" ]; then
     */yadm|yadm) binary=$(command -v yadm 2>/dev/null) ;;
     *) binary=$(command -v git 2>/dev/null) ;;
   esac
-  [ -n "$binary" ] || exit 0
+  [ -n "$binary" ] \
+    || deny "Blocked by prose-budget-commit: neither git nor yadm could be found on PATH, so this commit's unstaged changes outside the staged index could not be checked. Fix PATH, then retry the commit."
   reporoot=$(cd "$dir" 2>/dev/null && "$binary" rev-parse --show-toplevel 2>&1)
   rrc=$?
   [ "$rrc" -eq 0 ] \

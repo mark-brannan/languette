@@ -156,6 +156,24 @@ Feature: prose-budget-commit
     Then the guard is silent
     And the stub "prose-budget" was called with "--file ./--staged"
 
+  Scenario: a pathspec that is a directory on disk is denied, not silently dropped
+    When the agent runs `git commit -m x sub`
+    Then the guard denies, naming "is a directory"
+
+  Scenario: an `add` flag this guard doesn't recognize widens rather than narrows
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    And the file "README.md" is committed
+    And the file "README.md" holds:
+      """
+      y
+      """
+    When the agent runs `git add --unknown-flag && git commit -m x`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "README.md"
+
   Scenario: a plain commit with nothing outside the index is not also checked by path
     When the agent runs `git commit -m x`
     Then the guard is silent
