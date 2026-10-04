@@ -284,6 +284,30 @@ def _symlink(ctx, path, target):
     Path(ctx.expand(path)).symlink_to(ctx.expand(target))
 
 
+@given("the claude plugin's door file is already present")
+def _claude_door_present(ctx):
+    Path(ctx.doordir(), f"claude-issue-door.{ctx.session}").write_text("")
+
+
+@then("the claude plugin's door file is still present")
+def _claude_door_still(ctx):
+    assert Path(ctx.doordir(), f"claude-issue-door.{ctx.session}").exists()
+
+
+@given(parsers.parse('the door file is a symlink to "{target}"'))
+def _door_symlink(ctx, target):
+    victim = Path(ctx.expand(target))
+    victim.write_text("keep")
+    Path(ctx.doordir(), f"languette-issue-door.{ctx.session}").symlink_to(victim)
+
+
+@then(parsers.parse('the door file is a plain file and "{target}" still holds "{content}"'))
+def _door_replaced(ctx, target, content):
+    door = Path(ctx.doordir(), f"languette-issue-door.{ctx.session}")
+    assert not door.is_symlink(), "door file is still a symlink"
+    assert Path(ctx.expand(target)).read_text() == content
+
+
 @given('the stubs "gh" and "timeout" are first on PATH')
 def _stubs(ctx):
     ctx.stubs, ctx.stub_log = True, ctx.mkdtemp()
