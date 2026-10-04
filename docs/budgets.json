@@ -1,8 +1,8 @@
 {
-  "$comment": "README caps set just above its size on 2026-10-04, after the guards-list rewrite (267 lines, 1937 words). Configuration is the one section over 300 words, grandfathered as found. Two README lines name the session transcript, a real file, grandfathered by hash. docs/ is left out of narration: agent_decisions.md is a log and narrates by design. Raising any cap lands alone, with its reason.",
-  "lines": {"README.md": 280},
-  "sections": {"targets": ["README.md"], "max_words": 300, "exempt": ["Configuration"]},
-  "delta": {"max_words": 40},
+  "$comment": "README caps set about 20% above its size on 2026-10-04 (271 lines, so 325; largest capped section 193 words, so 232). Configuration is the one section over 300 words, grandfathered as found. Two README lines name the session transcript, a real file, grandfathered by hash. docs/ is left out of narration and of the per-change delta: agent_decisions.md is a log that agent-decision appends to, and narrates by design. Raising any cap lands alone, with its reason.",
+  "lines": {"README.md": 325},
+  "sections": {"targets": ["README.md"], "max_words": 232, "exempt": ["Configuration"]},
+  "delta": {"targets": ["README.md"], "max_words": 40},
   "narration": {
     "targets": ["README.md"],
     "grandfathered": [
