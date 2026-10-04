@@ -29,7 +29,9 @@ if ! command -v jq >/dev/null 2>&1 || ! command -v awk >/dev/null 2>&1 || [ ! -r
   exit 0
 fi
 door="${TMPDIR:-/tmp}/languette-issue-door.$(printf '%s' "$p" | jq -r '.session_id // "none"' | tr -c 'A-Za-z0-9_\n-' _)"
-[ "${1:-}" = prompt ] && { : > "$door"; exit 0; }
+# Replace, never follow: a symlink pre-planted at the door path must not be
+# truncated through. rm drops the link itself; noclobber refuses to open one.
+[ "${1:-}" = prompt ] && { rm -f "$door"; (set -C; : > "$door") 2>/dev/null; exit 0; }
 
 loop=0
 case $(printf '%s' "$p" | jq -r '.tool_name // ""') in
