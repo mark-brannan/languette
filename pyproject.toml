@@ -1,0 +1,10 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+bdd_features_base_dir = "features"
+markers = [
+  "python: run the scenario against languette/ in-process",
+  "shell: run the scenario against hooks/<guard>.sh",
+  "shell_only: run the scenario against the shell engine only",
+  "table: the scenario's examples are the README's table",
+]

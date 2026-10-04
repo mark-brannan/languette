@@ -39,6 +39,7 @@ import os
 import re
 
 from languette import scan as sw
+from languette.verdict import Refuse, deny
 
 NAME = "ask-first"
 CONFIG = ".languette/ask-first.json"
@@ -54,18 +55,10 @@ RUN = frozenset("run run-script rum urn".split())
 LOOP = frozenset("for while until select xargs parallel watch".split())
 
 
-class _Bad(Exception):
-    pass
-
-
-def _deny(reason):
-    return {"permissionDecision": "deny", "permissionDecisionReason": reason}
-
-
 def _config(payload, env):
     """The governing config path, or None when no project has one. The nearest
     at or above cwd wins, because the agent may have cd'd into another repo;
-    then $CLAUDE_PROJECT_DIR's. Raises _Bad when cwd is unusable and the
+    then $CLAUDE_PROJECT_DIR's. Raises Refuse when cwd is unusable and the
     project dir gives no answer either: unknown is not the same as none."""
     cwd = payload.get("cwd")
     if isinstance(cwd, str) and cwd.startswith("/") and os.path.isdir(cwd):
@@ -83,13 +76,13 @@ def _config(payload, env):
     if proj and os.path.lexists(os.path.join(proj, CONFIG)):
         return os.path.join(proj, CONFIG)
     if cwd:
-        raise _Bad(f"the payload's cwd {cwd!r} is not a directory, so the repo's list cannot be found")
+        raise Refuse(f"the payload's cwd {cwd!r} is not a directory, so the repo's list cannot be found")
     return None
 
 
 def _strs(v, what):
     if not isinstance(v, list) or not v or not all(isinstance(x, str) and x for x in v):
-        raise _Bad(f"{what} must be a non-empty list of non-empty strings")
+        raise Refuse(f"{what} must be a non-empty list of non-empty strings")
     return v
 
 
@@ -98,40 +91,40 @@ def _load(path):
         with open(path, encoding="utf-8") as f:
             cfg = json.load(f)
     except ValueError as e:
-        raise _Bad(f"not JSON ({e})")
+        raise Refuse(f"not JSON ({e})")
     except OSError as e:
-        raise _Bad(f"unreadable ({e.strerror})")
+        raise Refuse(f"unreadable ({e.strerror})")
     if not isinstance(cfg, dict) or not isinstance(cfg.get("commands"), list) or not cfg["commands"]:
-        raise _Bad('the top level must be {"commands": [...]} with at least one command')
+        raise Refuse('the top level must be {"commands": [...]} with at least one command')
     seen, labels = set(), set()
     for n, c in enumerate(cfg["commands"]):
         where = f"commands[{n}]"
         if not isinstance(c, dict):
-            raise _Bad(f"{where} is not an object")
+            raise Refuse(f"{where} is not an object")
         for key in ("id", "cost", "approve_label"):
             if not isinstance(c.get(key), str) or not c[key].strip():
-                raise _Bad(f"{where}.{key} must be a non-empty string")
+                raise Refuse(f"{where}.{key} must be a non-empty string")
         if c["id"] in seen:
-            raise _Bad(f"{where}.id '{c['id']}' is a duplicate")
+            raise Refuse(f"{where}.id '{c['id']}' is a duplicate")
         seen.add(c["id"])
         if c["approve_label"] in labels:
-            raise _Bad(f"{where}.approve_label '{c['approve_label']}' is shared with another command; "
+            raise Refuse(f"{where}.approve_label '{c['approve_label']}' is shared with another command; "
                        "a click must approve exactly one")
         labels.add(c["approve_label"])
         if "cheaper" in c and not isinstance(c["cheaper"], str):
-            raise _Bad(f"{where}.cheaper must be a string")
+            raise Refuse(f"{where}.cheaper must be a string")
         if not isinstance(c.get("match"), list) or not c["match"]:
-            raise _Bad(f"{where}.match must be a non-empty list")
+            raise Refuse(f"{where}.match must be a non-empty list")
         for m, e in enumerate(c["match"]):
             w = f"{where}.match[{m}]"
             if not isinstance(e, dict) or not isinstance(e.get("cmd"), str) or not re.fullmatch(r"[A-Za-z0-9._+-]+", e["cmd"]):
-                raise _Bad(f"{w}.cmd must be a bare command name")
+                raise Refuse(f"{w}.cmd must be a bare command name")
             if "args" not in e and "script" not in e:
-                raise _Bad(f"{w} needs args or script, or it would match every {e['cmd']}")
+                raise Refuse(f"{w} needs args or script, or it would match every {e['cmd']}")
             if "args" in e:
                 _strs(e["args"], f"{w}.args")
             if "script" in e and (not isinstance(e["script"], str) or not e["script"].strip("./")):
-                raise _Bad(f"{w}.script must be a non-empty path")
+                raise Refuse(f"{w}.script must be a non-empty path")
     return cfg["commands"]
 
 
@@ -252,14 +245,14 @@ def check(payload, env=os.environ):
         return None
     try:
         path = _config(payload, env)
-    except _Bad as e:
-        return _deny(f"ask-first: {e}. A gate that cannot look fails closed: retry from the project directory.")
+    except Refuse as e:
+        return deny(f"ask-first: {e}. A gate that cannot look fails closed: retry from the project directory.")
     if not path:
         return None
     try:
         commands = _load(path)
-    except _Bad as e:
-        return _deny(f"ask-first: {path} is invalid: {e}. Every Bash command is denied until it is fixed, "
+    except Refuse as e:
+        return deny(f"ask-first: {path} is invalid: {e}. Every Bash command is denied until it is fixed, "
                      "because the guard cannot tell which commands the repo meant to cover. Fix it with "
                      "the Edit tool, or tell the user.")
     runs, looped = {}, []
@@ -275,7 +268,7 @@ def check(payload, env=os.environ):
     if not hits:
         return None
     if looped:
-        return _deny("ask-first: " + ", ".join(f"`{c['id']}`" for c in looped) + " inside a loop, xargs, "
+        return deny("ask-first: " + ", ".join(f"`{c['id']}`" for c in looped) + " inside a loop, xargs, "
                      "parallel or watch runs an unknown number of times, and each run needs its own "
                      "approval. Run it once, on its own.")
 
@@ -291,7 +284,7 @@ def check(payload, env=os.environ):
         approved = {c["id"]: [i for i in _approvals(tp, c["approve_label"]) if i not in spent]
                     for c in hits}
     except (OSError, ValueError) as e:
-        return _deny(f"ask-first: cannot read the session transcript to look for the user's approval "
+        return deny(f"ask-first: cannot read the session transcript to look for the user's approval "
                      f"({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
 
     missing = [c for c in hits if len(approved[c["id"]]) < runs[c["id"]]]
@@ -307,11 +300,11 @@ def check(payload, env=os.environ):
                   f"cost above, with one option labelled exactly \"{c['approve_label']}\" and one to skip. "
                   "One approval is one run; ask again before running it again.")
             parts.append(p)
-        return _deny("ask-first: " + "\n\n".join(parts))
+        return deny("ask-first: " + "\n\n".join(parts))
     try:
         with open(spent_path, "a", encoding="utf-8") as f:
             for c in hits:
                 f.writelines(i + "\n" for i in approved[c["id"]][:runs[c["id"]]])
     except OSError as e:
-        return _deny(f"ask-first: the approval could not be recorded as spent ({e}), so it is not used.")
+        return deny(f"ask-first: the approval could not be recorded as spent ({e}), so it is not used.")
     return None

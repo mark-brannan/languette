@@ -251,15 +251,3 @@ def cmd_index(s, a, b, cmd, nested, parents=None, prose=PROSE):
         return None
     return None
 
-
-if __name__ == "__main__":
-    # fixtures/run.sh --engine python: stdin is the command, argv[1] is
-    # tokens or texts; prints the fixture's JSON array.
-    import json
-    import sys
-    buf = sys.stdin.read()
-    if sys.argv[1] == "tokens":
-        out = Scan(buf).tokens()
-    else:  # exactly what the hooks feed texts_of: the text plus a newline, heredocs stripped
-        out = [("1:" if nested else "0:") + t for t, nested in texts_of(strip_heredocs(buf + "\n"))]
-    print(json.dumps(out))

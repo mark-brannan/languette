@@ -65,7 +65,8 @@ Measured, with the payload `{tool_name: Bash, tool_input.command, cwd: ~/project
 
 The two `allow` rows marked known gap are documented and deliberate: a guard
 for shell text does not read scripts or interpreters. The table is generated
-from the guards' tests, and CI fails if it drifts.
+from the scenarios tagged `@table` in `features/no-rm-tree.feature`
+(`python3 tests/readme_table.py`), and CI fails if it drifts.
 
 ## The guards
 
@@ -199,7 +200,7 @@ is a deny naming the guard; the runner holds that rule, so no guard has to.
 
 The contract is written as scenarios, in the words a person uses to state the
 rule, and every scenario runs against every engine a guard has, Python and
-shell alike (in progress: [#31](https://github.com/mark-brannan/languette/pull/31)):
+shell alike:
 
 ```gherkin
 Scenario: a target the guard cannot resolve is denied on sight
@@ -217,24 +218,24 @@ which the code is proven.
 ## Working on it
 
 ```
-bash hooks/no-rm-tree.test.sh               # the three suites
-bash hooks/no-git-footguns.test.sh
-bash hooks/no-delete-stacked-base.test.sh
-fixtures/run.sh                             # the scanner and guard contract, and the hooks.json wiring
-AWK_PATH=/dir/with/an/awk fixtures/run.sh   # the same under another awk
+pip install -r requirements-dev.txt
+python3 -m pytest                       # every scenario, every engine
+AWK_PATH=/dir/with/an/awk python3 -m pytest
+python3 tests/readme_table.py           # regenerate the table
 ```
 
-CI also checks the shape of `hooks/hooks.json` (`fixtures/run.sh --shape`: a
-top-level object whose `hooks.PreToolUse` is an array of entries, each with a
-`matcher` and `hooks[]` of `type: "command"` with a `command`), because `claude plugin validate --strict`
+Running the tests needs pytest, pytest-bdd and PyHamcrest; the hooks do not.
+
+The same run checks the shape of `hooks/hooks.json` (a top-level object
+whose `hooks.PreToolUse` is an array of entries, each with a `matcher` and
+`hooks[]` of `type: "command"` with a `command`), because `claude plugin validate --strict`
 passes a garbage one. That is a shape check only, with no model call and no
 login. The headless smoke test, which installs the plugin in a scratch project
 and confirms a recursive `rm` is really blocked, stays manual: it needs both.
 
-`fixtures/` holds the contract as data (witness test cases): a command in,
-tokens or a verdict out, until [#31](https://github.com/mark-brannan/languette/pull/31)
-moves it to scenarios under `features/`. The scanner (`hooks/lib-shell-words.awk`)
-and the three guards began as copies of the guards in [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles);
+`features/` holds the contract as scenarios: a command in, tokens or a
+verdict out. The scanner (`hooks/lib-shell-words.awk`) and the three guards began as
+copies of the guards in [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles);
 this repo is where they are maintained now.
 
 The product name appears in `.claude-plugin/plugin.json`,
