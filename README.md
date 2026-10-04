@@ -21,7 +21,8 @@ few words in it that can do damage. When it hears one, it tells the agent
 
 ## Install
 
-The guards run as `PreToolUse` hooks in Claude Code today; other agent hosts
+The guards run as `PreToolUse` hooks in Claude Code today (`issue-door` also
+runs on `UserPromptSubmit`, which opens its door); other agent hosts
 are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
 ```
@@ -199,6 +200,7 @@ guard reads beyond the command, it declares:
 | `no-rm-tree` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
 | `no-delete-stacked-base` | GitHub, through `gh` |
+| `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes
 is a deny naming the guard; the runner holds that rule, so no guard has to.

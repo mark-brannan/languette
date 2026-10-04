@@ -294,6 +294,13 @@ def hooks_json_commands():
     return out
 
 
+def hooks_json_prompt_command():
+    """The one UserPromptSubmit command in hooks/hooks.json (issue-door's)."""
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
+    [h] = [h for e in hj["hooks"]["UserPromptSubmit"] for h in e["hooks"]]
+    return h["command"]
+
+
 # --- When ----------------------------------------------------------------
 
 # Greedy to the last backtick, so a command may hold backticks of its own.
@@ -317,6 +324,15 @@ def _open_door(ctx):
     ctx.arg = "prompt"
     ctx.run(json.dumps({"session_id": ctx.session, "prompt": "yes, file it"}))
     ctx.arg = None
+
+
+@when("the human speaks, through the hooks.json prompt hook")
+def _open_door_via_hooks_json(ctx):
+    # The UserPromptSubmit command exactly as hooks.json writes it, run the way
+    # Claude Code runs it; the PreToolUse hook is restored for the next step.
+    pretool, ctx.hook = ctx.hook, hooks_json_prompt_command()
+    ctx.run(json.dumps({"session_id": ctx.session, "prompt": "yes, file it"}))
+    ctx.hook = pretool
 
 
 @when(parsers.re(r'the agent calls MCP tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))

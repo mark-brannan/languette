@@ -27,6 +27,14 @@ Feature: wiring
       | ask-first              | npm run walk                  | denies  |
       | issue-door             | gh issue create -t t -b b     | denies  |
 
+  # The prompt hook is the only thing that opens the door. Dropped or
+  # mis-argumented in hooks.json, the PreToolUse hook would deny every create.
+  Scenario: the hooks.json prompt hook opens the door the hooks.json issue-door hook spends
+    Given the hook is the hooks.json command for "issue-door"
+    When the human speaks, through the hooks.json prompt hook
+    And the agent runs `gh issue create -t t -b b`
+    Then the guard is silent
+
   Scenario Outline: a script missing from the plugin directory is a deny
     Given the hook is the hooks.json command for "<guard>"
     And CLAUDE_PLUGIN_ROOT is "/nonexistent"
