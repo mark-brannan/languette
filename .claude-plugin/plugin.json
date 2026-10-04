@@ -45,6 +45,30 @@
       "description": "Deny a second GitHub issue create, transfer or delete in the same human turn, and any inside a loop or xargs. Leave on unless you want issue creates, transfers and deletes through unchecked.",
       "default": true
     },
+    "public_issue_guard": {
+      "type": "boolean",
+      "title": "Keep private terms out of public issues and PRs",
+      "description": "Deny issue and PR text posted to a public GitHub repo that names a term from your private-terms file. Does nothing until you also set the private terms file. Leave on unless you want that text through unchecked.",
+      "default": true
+    },
+    "private_terms_file": {
+      "type": "file",
+      "title": "Private terms file",
+      "description": "A text file of terms that must not appear in text posted to a public GitHub repo: one per line, matched case-insensitively as plain text, # for comments. With no file set, the public-issue guard allows everything.",
+      "required": false
+    },
+    "private_repos": {
+      "type": "string",
+      "title": "Private repos",
+      "description": "Repos whose issue and PR text is never scanned, as owner/name, comma-separated. Empty by default: every repo is scanned.",
+      "required": false
+    },
+    "prose_budget_commit": {
+      "type": "boolean",
+      "title": "Check staged prose against the repo's budgets before a commit",
+      "description": "Deny a git commit when mark-brannan/claude's prose-budget engine finds the staged diff over a repo's own budgets. A no-op where that engine isn't installed or the repo has no budgets config. Leave on unless you want staged prose through unchecked.",
+      "default": true
+    },
     "no_checkout_home": {
       "type": "boolean",
       "title": "Block switching the branch checked out in $HOME",

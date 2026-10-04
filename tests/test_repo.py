@@ -14,10 +14,12 @@ import readme_table
 from conftest import hooks_json_commands, hooks_json_prompt_command
 
 ROOT = Path(__file__).resolve().parent.parent
-GUARDS = {"no-git-footguns", "no-rm-tree", "no-delete-stacked-base", "ask-first", "issue-door", "no-checkout-home",
-          "no-foreign-worktree"}
+GUARDS = {"no-git-footguns", "no-rm-tree", "no-delete-stacked-base", "ask-first", "issue-door",
+          "public-issue-guard", "prose-budget-commit", "no-checkout-home", "no-foreign-worktree"}
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"no_checkout_home", "no_foreign_worktree"}
+# Options that are not a guard's on/off toggle: name -> type.
+OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string"}
 # Guards that also judge file-editing tools and EnterWorktree, so they match more than Bash.
 WIDE_MATCHER = {"no-foreign-worktree": "Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree"}
 
@@ -128,8 +130,12 @@ def test_the_foreign_worktree_guard_matches_the_file_tools_and_enterworktree():
 
 def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():
     uc = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())["userConfig"]
-    assert_that(sorted(uc), equal_to(sorted(g.replace("-", "_") for g in GUARDS)))
+    assert_that(sorted(uc), equal_to(sorted([g.replace("-", "_") for g in GUARDS] + list(OTHER_OPTIONS))))
     for key, opt in uc.items():
+        if key in OTHER_OPTIONS:
+            assert opt.get("type") == OTHER_OPTIONS[key] and opt.get("required") is False and opt.get("title") \
+                and opt.get("description"), f"userConfig.{key}: want a titled, described, optional {OTHER_OPTIONS[key]}"
+            continue
         want = key not in OPT_IN
         assert opt.get("type") == "boolean" and opt.get("default") is want and opt.get("title") \
             and opt.get("description"), f"userConfig.{key}: want a titled, described boolean defaulting to {str(want).lower()}"
@@ -197,3 +203,27 @@ def test_the_issue_door_matcher_covers_the_tool(tool):
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__add_issue_comment"])
 def test_the_issue_door_matcher_leaves_other_tools_alone(tool):
     assert_that(re.fullmatch(_issue_door_matcher(), tool), is_(None))
+
+
+def _public_issue_guard_matcher():
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
+    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("public-issue-guard.sh" in h["command"] for h in e["hooks"])]
+    return e["matcher"]
+
+
+def _mcp_tools_the_public_issue_guard_handles():
+    # From the guard's own `case`, so a tool added there must be matched here.
+    text = (ROOT / "hooks/public-issue-guard.sh").read_text()
+    suffixes = set(re.findall(r"mcp__\*__(\w+)", text))
+    assert suffixes >= {"create_issue", "add_issue_comment", "create_pull_request", "pull_request_review_write"}
+    return sorted(f"{prefix}{s}" for s in suffixes for prefix in ("mcp__github__", "mcp__plugin_github_github__"))
+
+
+@pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_public_issue_guard_handles())
+def test_the_public_issue_guard_matcher_covers_the_tool(tool):
+    assert_that(re.fullmatch(_public_issue_guard_matcher(), tool), is_not(None))
+
+
+@pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__list_pull_requests"])
+def test_the_public_issue_guard_matcher_leaves_other_tools_alone(tool):
+    assert_that(re.fullmatch(_public_issue_guard_matcher(), tool), is_(None))

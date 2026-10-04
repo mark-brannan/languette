@@ -28,7 +28,8 @@ from languette import run, scan  # noqa: E402
 ENGINES = ("python", "shell")
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
-         "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "CLAUDE_CODE_TMPDIR", "CLAIM_STAMP_BIN")
+         "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH",
+         "CLAUDE_CODE_TMPDIR", "CLAIM_STAMP_BIN")
 
 
 _REAL_HOME = os.environ.get("HOME")
@@ -213,6 +214,13 @@ def _file(ctx, rel, docstring):
     f.write_text(docstring)
 
 
+@given("the private terms file holds:")
+def _terms(ctx, docstring):
+    f = Path(ctx.mkdtemp()) / "private-terms.txt"
+    f.write_text(ctx.expand(docstring) + "\n")
+    ctx.env["CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE"] = str(f)
+
+
 @given("the transcript holds:")
 def _transcript(ctx, docstring):
     (ctx.proj / "t.jsonl").write_text(docstring + "\n")
@@ -252,6 +260,15 @@ def _git_init(ctx, path):
     subprocess.run(["git", "init", "-q", "-b", "main", str(d)], check=True)
 
 
+@given(parsers.parse('a yadm-style repository at "{path}" whose work tree is "{wt}"'))
+def _yadm_repo(ctx, path, wt):
+    d = Path(ctx.expand(path))
+    d.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(d)], check=True)
+    for k, v in (("core.bare", "false"), ("core.worktree", ctx.expand(wt))):
+        subprocess.run(["git", "--git-dir", str(d), "config", k, v], check=True)
+
+
 @given(parsers.parse('a linked worktree "{path}" of the repository at "{repo}"'))
 def _linked_worktree(ctx, path, repo):
     r, d = ctx.expand(repo), ctx.expand(path)
@@ -270,6 +287,28 @@ def _symlink(ctx, path, target):
 @given('the stubs "gh" and "timeout" are first on PATH')
 def _stubs(ctx):
     ctx.stubs, ctx.stub_log = True, ctx.mkdtemp()
+
+
+@given('the stub "prose-budget" is the engine')
+def _prose_budget_stub(ctx):
+    ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
+    ctx.env["PROSE_BUDGET"] = str(ROOT / "tests/stubs/prose-budget")
+
+
+@given('the stub "prose-budget" is the engine, at a relative path')
+def _prose_budget_stub_relative(ctx):
+    assert ctx.proj, "test setup: a relative PROSE_BUDGET needs a project directory"
+    ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
+    dest = ctx.proj / "prose-budget"
+    shutil.copy(ROOT / "tests/stubs/prose-budget", dest)
+    dest.chmod(0o755)
+    ctx.env["PROSE_BUDGET"] = "./prose-budget"
+
+
+@given('the stub "prose-budget" is the engine, by bare name on PATH')
+def _prose_budget_stub_bare(ctx):
+    ctx.stubs, ctx.stub_log = True, ctx.stub_log or ctx.mkdtemp()
+    ctx.env["PROSE_BUDGET"] = "prose-budget"
 
 
 @given(parsers.re(r'PATH holds only "(?P<tools>[^"]*)"(?P<gh> and the stub "gh")?'))
@@ -421,6 +460,13 @@ def _silent(ctx):
 @then(parsers.re(r'the guard warns about "(?P<text>.*)"'))
 def _warns(ctx, text):
     assert_that(ctx.verdict, warns_about(text))
+
+
+@then(parsers.re(r'the guard allows, rewriting the command to "(?P<text>.*)"'))
+def _rewrites(ctx, text):
+    assert ctx.verdict.decision == "allow", ctx.verdict.show()
+    got = ctx.verdict.out.get("updatedInput", {}).get("command")
+    assert got == ctx.expand(text), f"rewritten to {got!r}, want {ctx.expand(text)!r}"
 
 
 @then(parsers.re(r'the stub "(?P<name>[a-z]+)" was called with "(?P<text>.*)"'))
