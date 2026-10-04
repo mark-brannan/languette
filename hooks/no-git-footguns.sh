@@ -17,6 +17,12 @@
 #                     away uncommitted work, same as reset --hard.
 #   branch -D         throws away unmerged work; -d refuses, use that.
 #
+# Each rule has its own switch, read here from the environment: the plugin
+# options no_git_footguns_blanket_staging, _stash, _force_push, _discard and
+# _branch_delete (env CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_<NAME>). A rule is
+# skipped only when its option is exactly `false`. The whole-guard option
+# no_git_footguns=false is read by hooks.json and skips all five.
+#
 # `yadm` (a git wrapper for managing dotfiles) is treated as `git`.
 #
 # Scanning is shared with no-rm-tree.sh: lib-shell-words.awk (read its
@@ -60,6 +66,17 @@ function dst(t,  i) { sub(/^\+/, "", t); i = index(t, ":"); if (i) t = substr(t,
 function ismain(t) { return t ~ /^(refs\/heads\/)?(main|master)$/ }
 function whole(t) { return t ~ /^(\.|\.\/|\.\/\*|:\/|:\/\.|\*)$/ }
 function fail(r) { print r; exit }
+# Per-rule switch: CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_<RULE> exactly "false"
+# turns that rule off. Unset, empty or anything else leaves it on.
+function off(rule) { return ENVIRON["CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_" rule] == "false" }
+function rule_of(s) {
+  if (s == "add" || s == "commit") return "BLANKET_STAGING"
+  if (s == "stash") return "STASH"
+  if (s == "push") return "FORCE_PUSH"
+  if (s == "checkout" || s == "restore" || s == "clean" || s == "reset") return "DISCARD"
+  if (s == "branch") return "BRANCH_DELETE"
+  return ""
+}
 { buf = buf $0 "\n" }
 END {
   buf = strip_heredocs(buf)
@@ -74,7 +91,7 @@ END {
     }
   }
 }
-function segment(lo, hi, nested,   g, i, na, sub_, a, paths, upd, op, refs, force, lease, tomain, del, staged, wt, wh, dry) {
+function segment(lo, hi, nested,   r_, g, i, na, sub_, a, paths, upd, op, refs, force, lease, tomain, del, staged, wt, wh, dry) {
     g = cmd_index(w, k, lo, hi, "(^|/)(git|yadm)$", nested, "")
     if (!g) return
     # Skip global options; -C/-c/--git-dir/--work-tree take a value.
@@ -85,6 +102,8 @@ function segment(lo, hi, nested,   g, i, na, sub_, a, paths, upd, op, refs, forc
     }
     if (i > hi) return
     sub_ = w[i]
+    r_ = rule_of(sub_)
+    if (r_ != "" && off(r_)) return
     na = 0
     for (i++; i <= hi; i++) a[++na] = w[i]
 
