@@ -244,6 +244,13 @@ def _mkdir(ctx, path):
     Path(ctx.expand(path)).mkdir(parents=True, exist_ok=True)
 
 
+@given(parsers.parse('a git repository at "{path}"'))
+def _git_init(ctx, path):
+    d = Path(ctx.expand(path))
+    d.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", str(d)], check=True)
+
+
 @given(parsers.parse('the symlink "{path}" to "{target}"'))
 def _symlink(ctx, path, target):
     Path(ctx.expand(path)).symlink_to(ctx.expand(target))
