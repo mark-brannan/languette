@@ -50,6 +50,11 @@ Each guard denies one class of command:
   away, often in a checkout another session shares.
 - [`no-delete-stacked-base`](hooks/no-delete-stacked-base.sh): deleting a
   remote branch that an open PR is based on (GitHub silently closes the PR).
+- [`issue-door`](hooks/issue-door.sh): a second GitHub issue create, transfer
+  or delete in the same human turn, or any inside a loop or `xargs` (an agent
+  once filed a batch of duplicate issues on a plan approved once, the batch
+  buried in it). One per turn: it opens on your prompt, the first write
+  spends it.
 - [`ask-first`](languette/guards/ask_first.py): a command the repo lists as
   costly, until you approve that one run (an agent once ran a 46-minute,
   all-core test sweep to check a small change, then started it again). See
@@ -128,6 +133,7 @@ claude plugin install languette@languette --config no_rm_tree=false
 | `no_rm_tree` | `no-rm-tree` |
 | `no_delete_stacked_base` | `no-delete-stacked-base` |
 | `ask_first` | `ask-first` |
+| `issue_door` | `issue-door` |
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.

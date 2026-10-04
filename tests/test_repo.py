@@ -13,7 +13,7 @@ import readme_table
 from conftest import hooks_json_commands
 
 ROOT = Path(__file__).resolve().parent.parent
-GUARDS = {"no-git-footguns", "no-rm-tree", "no-delete-stacked-base", "ask-first"}
+GUARDS = {"no-git-footguns", "no-rm-tree", "no-delete-stacked-base", "ask-first", "issue-door"}
 
 
 def hooks_shape(text):
@@ -79,9 +79,9 @@ def test_the_shape_check_rejects(wrong):
     assert_that(hooks_shape(wrong), is_not(empty()))
 
 
-def test_hooks_json_wires_exactly_the_four_guards():
+def test_hooks_json_wires_exactly_the_five_guards():
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    assert_that([h for e in hj["hooks"]["PreToolUse"] for h in e["hooks"]], has_length(4))
+    assert_that([h for e in hj["hooks"]["PreToolUse"] for h in e["hooks"]], has_length(len(GUARDS)))
     assert_that(set(hooks_json_commands()), equal_to(GUARDS))
 
 

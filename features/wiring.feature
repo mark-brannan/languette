@@ -25,6 +25,7 @@ Feature: wiring
       | no-rm-tree             | rm -rf build                  | denies  |
       | no-delete-stacked-base | git push origin --delete "$b" | asks    |
       | ask-first              | npm run walk                  | denies  |
+      | issue-door             | gh issue create -t t -b b     | denies  |
 
   Scenario Outline: a script missing from the plugin directory is a deny
     Given the hook is the hooks.json command for "<guard>"
@@ -38,6 +39,7 @@ Feature: wiring
       | no-rm-tree             | rm -rf build                  |
       | no-delete-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
+      | issue-door             | gh issue create -t t -b b     |
 
   Scenario Outline: a script that crashes is a deny
     Given the hook is the hooks.json command for "<guard>"
@@ -51,6 +53,7 @@ Feature: wiring
       | no-rm-tree             | rm -rf build                  |
       | no-delete-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
+      | issue-door             | gh issue create -t t -b b     |
 
   Scenario Outline: the option set to false skips the guard
     Given the hook is the hooks.json command for "<guard>"
@@ -64,6 +67,7 @@ Feature: wiring
       | no-rm-tree             | CLAUDE_PLUGIN_OPTION_NO_RM_TREE             | rm -rf build                  |
       | no-delete-stacked-base | CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE | git push origin --delete "$b" |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | npm run walk                  |
+      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | gh issue create -t t -b b     |
 
   # Only the exact word false skips: unset, empty or anything else runs the
   # guard, so a misconfiguration cannot open the gate.
@@ -99,3 +103,9 @@ Feature: wiring
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | no    | npm run walk                  | denies  |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | true  | npm run walk                  | denies  |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | 1     | npm run walk                  | denies  |
+      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             |       | gh issue create -t t -b b     | denies  |
+      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | 0     | gh issue create -t t -b b     | denies  |
+      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | False | gh issue create -t t -b b     | denies  |
+      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | no    | gh issue create -t t -b b     | denies  |
+      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | true  | gh issue create -t t -b b     | denies  |
+      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | 1     | gh issue create -t t -b b     | denies  |
