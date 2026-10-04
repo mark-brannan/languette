@@ -162,9 +162,29 @@ Feature: no-bypass-labels
         | cp x.json {PROJ}/ready.json; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json               |
         | sh -c 'echo churn-ok > {PROJ}/ready.json && gh api repos/o/r/issues/12/labels -F labels[]=@{PROJ}/ready.json' |
         | sh -c "$(cat /tmp/w.sh)"; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json                   |
+        | bash /tmp/w.sh 'cd /tmp'; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json                   |
+        | sh -e /tmp/w.sh -c 'cd /tmp'; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json               |
+        | source 'cd /tmp'; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json                           |
+        | eval 'cd /tmp' "$W"; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json                        |
         | pushd /tmp > {PROJ}/ready.json; gh api repos/o/r/issues/12/labels -F labels[]=@{PROJ}/ready.json       |
         | gh api repos/o/r/contents/p.json -H 'Accept: application/vnd.github.raw' > {PROJ}/ready.json && gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json |
         | gh release download v1 -p p.json -O {PROJ}/ready.json; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json |
+
+    Scenario Outline: a shell running only quoted text leaves the file readable
+      Given a project directory
+      And the working directory is "{PROJ}"
+      And the file "ready.json" holds:
+        """
+        ["ready"]
+        """
+      When the agent runs `<command>`
+      Then the guard is silent
+
+      Examples:
+        | command                                                                                  |
+        | bash -lc 'cd /tmp' x; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json        |
+        | sh -o pipefail -c 'cd /tmp'; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json |
+        | eval 'cd /tmp'; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json              |
 
     Scenario Outline: a file that is not a regular file is not read
       When the agent runs `gh api repos/o/r/issues/12/labels --input <path>`

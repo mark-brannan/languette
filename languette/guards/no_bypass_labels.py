@@ -339,10 +339,35 @@ def _alone(scans):
                 continue
             c = sw.seg_cmd(s, a, b)
             w = s.w[c].rsplit("/", 1)[-1] if c is not None else None
-            quoted = [j for j in range(c, b + 1) if s.k[j] == "q"] if c is not None else []
-            if w not in INERT and not (w in sw.SHELL and quoted and not any(s.live[j] for j in quoted)):
+            if w not in INERT and not (w in sw.SHELL and _runs_quoted(s, c, b, w)):
                 return False
     return True
+
+
+def _runs_quoted(s, c, b, w):
+    """The shell at c runs only quoted text the scan holds: `eval` whose every
+    operand is quoted, or `sh … -c SCRIPT` whose operand to -c is quoted and
+    no other word before it is an operand (a script file the scan never
+    reads). `source` and `.` always run a file."""
+    fixed = lambda j: s.k[j] == "q" and not s.live[j]
+    if w == "eval":
+        return c < b and all(fixed(j) for j in range(c + 1, b + 1))
+    if w in ("source", "."):
+        return False
+    j = c + 1
+    while j <= b:
+        t = s.w[j] if s.k[j] == "w" else ""
+        if t in ("-o", "+o", "-O", "+O"):
+            j += 2
+        elif t.startswith("--"):
+            j += 1
+        elif t[:1] in "-+" and len(t) > 1:
+            if "c" in t:
+                return j < b and fixed(j + 1)
+            j += 1
+        else:
+            return False                       # an operand before -c: a script file
+    return False
 
 
 def _bash(f, cmd, cwd, env, depth=0, alone=True):
