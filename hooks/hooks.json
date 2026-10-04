@@ -11,7 +11,7 @@
           },
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/no-rm-tree.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_NO_RM_TREE-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard no-rm-tree; else [ -f \"$h\" ] && sh \"$h\"; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (no-rm-tree) is missing from the plugin directory or crashed, so recursive rm could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/no-rm-tree.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_NO_RM_TREE-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard no-rm-tree; else [ -f \"$h\" ] && sh \"$h\"; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py or no-rm-tree.sh (no-rm-tree) is missing from the plugin directory or crashed, so recursive rm could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for a recursive rm"
           },
           {

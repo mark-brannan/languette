@@ -97,6 +97,32 @@ Feature: wiring
       | ask-first        | ASK_FIRST        | npm run walk                      |
       | no-bypass-labels | NO_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
 
+  # Whatever the fallback does wrong, python3 being absent must not open the gate.
+  Scenario Outline: with python3 absent from PATH, a shell fallback that crashes or is missing is a deny
+    Given the hook is the hooks.json command for "no-rm-tree"
+    And PATH holds only "sh cat printf dirname"
+    And the plugin's shell fallback for "no-rm-tree" <state>
+    When the agent runs `rm -rf build`
+    Then the guard denies
+
+    Examples:
+      | state      |
+      | crashes    |
+      | is missing |
+
+  Scenario Outline: with python3 absent from PATH, the option set to false still skips the guard
+    Given the hook is the hooks.json command for "<guard>"
+    And PATH holds only "sh cat printf dirname"
+    And <option> is "false"
+    When the agent runs `<command>`
+    Then the guard is silent
+
+    Examples:
+      | guard            | option                                | command                           |
+      | no-rm-tree       | CLAUDE_PLUGIN_OPTION_NO_RM_TREE       | rm -rf build                      |
+      | ask-first        | CLAUDE_PLUGIN_OPTION_ASK_FIRST        | npm run walk                      |
+      | no-bypass-labels | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
+
   Scenario Outline: a script that crashes is a deny
     Given the hook is the hooks.json command for "<guard>"
     And the plugin's script for "<guard>" crashes
