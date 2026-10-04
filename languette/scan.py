@@ -85,45 +85,54 @@ def heredoc_subs(s):
 
 
 def _heredocs(b):
-    """Yield (b_after, body) per heredoc, as the awk's twin loops find them;
-    body is None when the opener has no newline or no closing line. An
-    unquoted delimiter's body keeps its command substitutions (heredoc_subs).
-    The search resumes after each heredoc, never inside what it kept, so a
-    `<<X` in a kept substitution cannot pair with a later X line."""
+    """Yield (b_after, body, quoted) per heredoc, as the awk's twin loops find
+    them; body is None when the opener has no newline or no closing line, and
+    quoted says the delimiter was quoted, so the shell expands nothing in it.
+    An unquoted delimiter's body keeps its command substitutions
+    (heredoc_subs). The search resumes after each heredoc, never inside what
+    it kept, so a `<<X` in a kept substitution cannot pair with a later X line."""
     done = ""
     while True:
         m = _OPENER.search(b)
         if not m:
             return
         start = m.start()
-        live = not re.search("[\"']", m.group())
-        d = re.sub(r"^<<-?[ \t]*", "", m.group()).replace('"', "").replace("'", "")
+        raw = re.sub(r"^<<-?[ \t]*", "", m.group())
+        d = raw.replace('"', "").replace("'", "")
+        quoted = raw != d
         nl = b.find("\n", start)
         if nl < 0:
-            yield done + b[:start] + " HEREDOC ", None
+            yield done + b[:start] + " HEREDOC ", None, quoted
             return
         tail = b[nl + 1:]
         e = re.search("(?:^|\n)[ \t]*" + d + "[ \t]*(?:\n|\\Z)", tail)
         if not e:
-            yield done + b[:start] + " HEREDOC ", None
+            yield done + b[:start] + " HEREDOC ", None, quoted
             return
         # awk keeps the last character of the match: the closing newline.
         body = tail[:e.start()]
-        done += b[:start] + " HEREDOC " + (heredoc_subs(body) if live else "")
+        done += b[:start] + " HEREDOC " + ("" if quoted else heredoc_subs(body))
         b = tail[e.end() - 1:]
-        yield done + b, body
+        yield done + b, body, quoted
 
 
 def strip_heredocs(b):
     """Drop every heredoc body but an unquoted one's command substitutions; the
     marker becomes the word HEREDOC."""
-    for b, _ in _heredocs(b):
+    for b, _, _ in _heredocs(b):
         pass
     return b
 
 
 def heredoc_bodies(b):
-    return [body for _, body in _heredocs(b) if body is not None]
+    return [body for body, _ in heredocs(b)]
+
+
+def heredocs(b):
+    """[(body, live)] per closed heredoc; live when the delimiter was unquoted
+    and the body holds a $ or a backtick the shell would expand."""
+    return [(body, not quoted and ("$" in body or "`" in body))
+            for _, body, quoted in _heredocs(b) if body is not None]
 
 
 class Scan:
