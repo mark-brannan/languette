@@ -10,9 +10,10 @@
 # Detection is structural via lib-shell-words.awk (read its header): a
 # commit mentioned in a commit message, a comment, or a heredoc body is
 # not a commit. `cd DIR && git commit` and `git -C DIR commit` run the
-# engine in DIR. `git merge --continue` counts too, since resolving a
-# conflict finishes the merge; the engine's own --staged mode already
-# skips every check mid-merge.
+# engine in DIR, denying rather than skipping the check if DIR cannot be
+# resolved (an unexpanded `~`, a literal `$VAR`). `git merge --continue`
+# counts too, since resolving a conflict finishes the merge; the engine's
+# own --staged mode already skips every check mid-merge.
 set -uf
 
 HERE=$(dirname "$0")
@@ -22,7 +23,12 @@ ENGINE=${PROSE_BUDGET:-$(command -v prose-budget 2>/dev/null)}
 command -v jq >/dev/null 2>&1 || exit 0
 command -v awk >/dev/null 2>&1 || exit 0
 [ -r "$LIB" ] || exit 0
-[ -n "$ENGINE" ] && [ -x "$ENGINE" ] || exit 0
+[ -n "$ENGINE" ] || exit 0
+
+deny() {
+  jq -n --arg r "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $r}}'
+  exit 0
+}
 
 input=$(cat) || exit 0
 [ "$(printf '%s' "$input" | jq -r '.tool_name // ""' 2>/dev/null)" = "Bash" ] || exit 0
@@ -30,6 +36,11 @@ cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) |
 [ -n "$cmd" ] || exit 0
 cwd=$(printf '%s' "$input" | jq -r '.cwd // ""' 2>/dev/null)
 case $cwd in /*) : ;; *) cwd=$PWD ;; esac
+# Resolved against the commit's own cwd, before any `cd` below: a relative
+# $PROSE_BUDGET (e.g. ./bin/prose-budget) means relative to the project, not
+# to wherever this hook process happens to run from.
+case $ENGINE in /*) : ;; *) ENGINE=$cwd/$ENGINE ;; esac
+[ -x "$ENGINE" ] || exit 0
 
 # Prints "COMMIT<TAB>cd-dir<TAB>-C-dir" for the first git/yadm commit found.
 hit=$(printf '%s\n' "$cmd" | awk "$(cat "$LIB")"'
@@ -69,15 +80,15 @@ c_dir=$(printf '%s' "$hit" | cut -f3)
 dir=$cwd
 for step in "$cd_dir" "$c_dir"; do
   [ -n "$step" ] || continue
-  dir=$(cd "$dir" 2>/dev/null && cd "$step" 2>/dev/null && pwd) || exit 0
+  newdir=$(cd "$dir" 2>/dev/null && cd "$step" 2>/dev/null && pwd) \
+    || deny "Blocked by prose-budget-commit: this commit's working directory (\"$step\") could not be resolved, so staged prose could not be checked. Run the commit from a plain, resolvable path."
+  dir=$newdir
 done
 
 out=$(cd "$dir" && "$ENGINE" --staged 2>&1)
 rc=$?
 case $rc in 1|2) ;; *) exit 0 ;; esac
 
-jq -n --arg r "Blocked by prose-budget-commit: prose-budget --staged found:
+deny "Blocked by prose-budget-commit: prose-budget --staged found:
 $out
-Fix the prose and retry the same commit. Do not ask the user; this is settled." \
-  '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $r}}'
-exit 0
+Fix the prose and retry the same commit. Do not ask the user; this is settled."

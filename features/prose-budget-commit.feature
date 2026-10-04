@@ -56,6 +56,22 @@ Feature: prose-budget-commit
     Then the guard denies, naming "sections.max_words"
     And the guard denies, naming "Do not ask the user"
 
+  Scenario Outline: a working directory this guard cannot resolve is denied, not skipped
+    Given PROSE_BUDGET_FAIL is "1"
+    When the agent runs `<command>`
+    Then the guard denies, naming "could not be resolved"
+
+    Examples:
+      | command                               | note                        |
+      | cd nonexistent-dir-xyz && git commit -m x | an unresolvable cd target |
+      | git -C nonexistent-dir-xyz commit -m x    | an unresolvable -C target |
+
+  Scenario: a relative PROSE_BUDGET still resolves after the hook changes directory
+    Given the stub "prose-budget" is the engine, at a relative path
+    And PROSE_BUDGET_FAIL is "1"
+    When the agent runs `cd sub && git commit -m x`
+    Then the guard denies, naming "sections.max_words"
+
   @shell_only
   Scenario: with no engine on PROSE_BUDGET or PATH the guard is silent
     Given PROSE_BUDGET is unset

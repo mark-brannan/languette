@@ -260,6 +260,16 @@ def _prose_budget_stub(ctx):
     ctx.env["PROSE_BUDGET"] = str(ROOT / "tests/stubs/prose-budget")
 
 
+@given('the stub "prose-budget" is the engine, at a relative path')
+def _prose_budget_stub_relative(ctx):
+    assert ctx.proj, "test setup: a relative PROSE_BUDGET needs a project directory"
+    ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
+    dest = ctx.proj / "prose-budget"
+    shutil.copy(ROOT / "tests/stubs/prose-budget", dest)
+    dest.chmod(0o755)
+    ctx.env["PROSE_BUDGET"] = "./prose-budget"
+
+
 @given(parsers.re(r'PATH holds only "(?P<tools>[^"]*)"(?P<gh> and the stub "gh")?'))
 def _bare_path(ctx, tools, gh):
     ctx.bare = ctx.mkdtemp()
