@@ -31,6 +31,7 @@ Feature: wiring
       | no-rm-tree             | rm -rf build                  | denies    |
       | no-delete-stacked-base | git push origin --delete "$b" | asks      |
       | ask-first              | npm run walk                  | denies    |
+      | no-iac-destroy         | terraform destroy             | denies    |
       | issue-door             | gh issue create -t t -b b     | denies    |
       | prose-budget-commit    | git commit -m x               | denies    |
       | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
@@ -55,6 +56,7 @@ Feature: wiring
       | no-rm-tree             | rm -rf build                  |
       | no-delete-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
+      | no-iac-destroy         | terraform destroy             |
       | issue-door             | gh issue create -t t -b b     |
       | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust |
       | prose-budget-commit    | git commit -m x               |
@@ -71,6 +73,7 @@ Feature: wiring
       | no-rm-tree             | rm -rf build                  |
       | no-delete-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
+      | no-iac-destroy         | terraform destroy             |
       | issue-door             | gh issue create -t t -b b     |
       | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust |
       | prose-budget-commit    | git commit -m x               |
@@ -87,6 +90,7 @@ Feature: wiring
       | no-rm-tree             | CLAUDE_PLUGIN_OPTION_NO_RM_TREE             | rm -rf build                  |
       | no-delete-stacked-base | CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE | git push origin --delete "$b" |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | npm run walk                  |
+      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | terraform destroy             |
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | gh issue create -t t -b b     |
       | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | gh issue comment 3 -R o/r -b Wanderlust |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | git commit -m x               |
@@ -125,6 +129,12 @@ Feature: wiring
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | no    | npm run walk                  | denies  |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | true  | npm run walk                  | denies  |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | 1     | npm run walk                  | denies  |
+      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         |       | terraform destroy             | denies  |
+      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | 0     | terraform destroy             | denies  |
+      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | False | terraform destroy             | denies  |
+      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | no    | terraform destroy             | denies  |
+      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | true  | terraform destroy             | denies  |
+      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | 1     | terraform destroy             | denies  |
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             |       | gh issue create -t t -b b     | denies  |
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | 0     | gh issue create -t t -b b     | denies  |
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | False | gh issue create -t t -b b     | denies  |

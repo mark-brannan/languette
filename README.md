@@ -34,7 +34,7 @@ It needs:
 
 - `jq` and a POSIX `awk`, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
-- `python3`, standard library only, for `ask-first`;
+- `python3`, standard library only, for `ask-first` and `no-iac-destroy`;
 - `gh`, for `no-delete-stacked-base`.
 
 Without the plugin system, see [Installing by hand](#installing-by-hand).
@@ -59,6 +59,8 @@ Each guard denies one class of command:
   that reaches into another session's git worktree (opt-in)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
+- [`no-iac-destroy`](languette/guards/no_iac_destroy.py): `terraform destroy`, `kubectl delete` and
+  other infrastructure destroys, until you approve that one run
 - [`prose-budget-commit`](hooks/prose-budget-commit.sh): a `git commit` whose
   staged prose runs over the repo's word budgets
 
@@ -205,6 +207,7 @@ guard reads beyond the command, it declares:
 | `no-git-footguns` | nothing: a pure function of the command |
 | `no-rm-tree` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
+| `no-iac-destroy` | the transcript, the approvals spent |
 | `no-delete-stacked-base` | GitHub, through `gh` |
 | `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `no-checkout-home` | `$HOME`, and what `git rev-parse --show-toplevel` resolves to |

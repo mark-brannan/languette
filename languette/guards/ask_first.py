@@ -43,6 +43,7 @@ from languette.verdict import Refuse, deny
 
 NAME = "ask-first"
 CONFIG = ".languette/ask-first.json"
+SPENT = ".languette-ask"            # appended to the transcript path
 
 PM = frozenset("npm pnpm yarn bun".split())
 LAUNCH = frozenset("npx bunx pnpm yarn bun".split())
@@ -239,6 +240,27 @@ def _approvals(transcript, label):
     return yes
 
 
+def unspent(payload, label):
+    """tool_use ids of the AskUserQuestion calls the user answered with
+    `label` and that no run has spent. Raises OSError when the transcript
+    cannot be read or the payload names no transcript. Shared
+    with no-iac-destroy: one click is one run, whichever guard asked."""
+    tp = payload.get("transcript_path")
+    if not isinstance(tp, str) or not tp:
+        raise OSError("the payload has no transcript_path")
+    spent = set()
+    if os.path.exists(tp + SPENT):
+        with open(tp + SPENT, encoding="utf-8") as f:
+            spent = {x.strip() for x in f if x.strip()}
+    return [i for i in _approvals(tp, label) if i not in spent]
+
+
+def spend(payload, ids):
+    """Record `ids` as spent, beside the transcript. Raises OSError."""
+    with open(payload["transcript_path"] + SPENT, "a", encoding="utf-8") as f:
+        f.writelines(i + "\n" for i in ids)
+
+
 def check(payload, env=os.environ):
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd.strip():
@@ -272,17 +294,8 @@ def check(payload, env=os.environ):
                      "parallel or watch runs an unknown number of times, and each run needs its own "
                      "approval. Run it once, on its own.")
 
-    tp = payload.get("transcript_path")
-    spent_path = (tp + ".languette-ask") if isinstance(tp, str) and tp else None
     try:
-        if not spent_path:
-            raise OSError("the payload has no transcript_path")
-        spent = set()
-        if os.path.exists(spent_path):
-            with open(spent_path, encoding="utf-8") as f:
-                spent = {x.strip() for x in f if x.strip()}
-        approved = {c["id"]: [i for i in _approvals(tp, c["approve_label"]) if i not in spent]
-                    for c in hits}
+        approved = {c["id"]: unspent(payload, c["approve_label"]) for c in hits}
     except (OSError, ValueError) as e:
         return deny(f"ask-first: cannot read the session transcript to look for the user's approval "
                      f"({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
@@ -302,9 +315,7 @@ def check(payload, env=os.environ):
             parts.append(p)
         return deny("ask-first: " + "\n\n".join(parts))
     try:
-        with open(spent_path, "a", encoding="utf-8") as f:
-            for c in hits:
-                f.writelines(i + "\n" for i in approved[c["id"]][:runs[c["id"]]])
+        spend(payload, [i for c in hits for i in approved[c["id"]][:runs[c["id"]]]])
     except OSError as e:
         return deny(f"ask-first: the approval could not be recorded as spent ({e}), so it is not used.")
     return None
