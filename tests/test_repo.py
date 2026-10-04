@@ -15,11 +15,13 @@ from conftest import hooks_json_commands, hooks_json_prompt_command
 
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"no-git-footguns", "no-rm-tree", "no-delete-stacked-base", "ask-first", "issue-door",
-          "public-issue-guard", "prose-budget-commit", "no-checkout-home"}
+          "public-issue-guard", "prose-budget-commit", "no-checkout-home", "no-foreign-worktree"}
 # Guards that are off unless the user turns them on: their option defaults to false.
-OPT_IN = {"no_checkout_home"}
+OPT_IN = {"no_checkout_home", "no_foreign_worktree"}
 # Options that are not a guard's on/off toggle: name -> type.
 OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string"}
+# Guards that also judge file-editing tools and EnterWorktree, so they match more than Bash.
+WIDE_MATCHER = {"no-foreign-worktree": "Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree"}
 
 
 def hooks_shape(text):
@@ -117,6 +119,13 @@ def test_hooks_json_wires_exactly_the_guards():
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
     assert_that([h for e in hj["hooks"]["PreToolUse"] for h in e["hooks"]], has_length(len(GUARDS)))
     assert_that(set(hooks_json_commands()), equal_to(GUARDS))
+
+
+def test_the_foreign_worktree_guard_matches_the_file_tools_and_enterworktree():
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
+    for guard, want in WIDE_MATCHER.items():
+        [e] = [e for e in hj["hooks"]["PreToolUse"] if any(f"/hooks/{guard}.sh" in h["command"] for h in e["hooks"])]
+        assert_that(e["matcher"], equal_to(want))
 
 
 def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():

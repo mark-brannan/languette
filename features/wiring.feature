@@ -201,3 +201,62 @@ Feature: wiring
     And CLAUDE_PLUGIN_ROOT is "/nonexistent"
     When the agent runs `git checkout some-branch`
     Then the guard is silent
+
+  Scenario: the foreign-worktree guard judges when its option is true
+    Given the hook is the hooks.json command for "no-foreign-worktree"
+    And a git repository at "{TMP}/repo"
+    And a linked worktree "{TMP}/repo/.claude/worktrees/mine" of the repository at "{TMP}/repo"
+    And a linked worktree "{TMP}/repo/.claude/worktrees/theirs" of the repository at "{TMP}/repo"
+    And the working directory is "{TMP}/repo/.claude/worktrees/mine"
+    And CLAUDE_PLUGIN_OPTION_NO_FOREIGN_WORKTREE is "true"
+    When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
+    Then the guard denies
+
+  Scenario Outline: the foreign-worktree guard stays silent unless its option is exactly true
+    Given the hook is the hooks.json command for "no-foreign-worktree"
+    And a git repository at "{TMP}/repo"
+    And a linked worktree "{TMP}/repo/.claude/worktrees/mine" of the repository at "{TMP}/repo"
+    And a linked worktree "{TMP}/repo/.claude/worktrees/theirs" of the repository at "{TMP}/repo"
+    And the working directory is "{TMP}/repo/.claude/worktrees/mine"
+    And CLAUDE_PLUGIN_OPTION_NO_FOREIGN_WORKTREE is "<value>"
+    When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
+    Then the guard is silent
+
+    Examples:
+      | value |
+      | false |
+      |       |
+      | 0     |
+      | True  |
+      | 1     |
+      | yes   |
+
+  Scenario: the foreign-worktree guard stays silent when its option is unset
+    Given the hook is the hooks.json command for "no-foreign-worktree"
+    And a git repository at "{TMP}/repo"
+    And a linked worktree "{TMP}/repo/.claude/worktrees/mine" of the repository at "{TMP}/repo"
+    And a linked worktree "{TMP}/repo/.claude/worktrees/theirs" of the repository at "{TMP}/repo"
+    And the working directory is "{TMP}/repo/.claude/worktrees/mine"
+    And CLAUDE_PLUGIN_OPTION_NO_FOREIGN_WORKTREE is unset
+    When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
+    Then the guard is silent
+
+  Scenario: with the foreign-worktree guard on, a script missing from the plugin directory is a deny
+    Given the hook is the hooks.json command for "no-foreign-worktree"
+    And CLAUDE_PLUGIN_OPTION_NO_FOREIGN_WORKTREE is "true"
+    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
+    When the agent runs `git status`
+    Then the guard denies
+
+  Scenario: with the foreign-worktree guard on, a script that crashes is a deny
+    Given the hook is the hooks.json command for "no-foreign-worktree"
+    And the plugin's script for "no-foreign-worktree" crashes
+    And CLAUDE_PLUGIN_OPTION_NO_FOREIGN_WORKTREE is "true"
+    When the agent runs `git status`
+    Then the guard denies
+
+  Scenario: with the foreign-worktree guard off, a missing script is silent
+    Given the hook is the hooks.json command for "no-foreign-worktree"
+    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
+    When the agent runs `git status`
+    Then the guard is silent

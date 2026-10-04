@@ -55,6 +55,8 @@ Each guard denies one class of command:
   private list, posted to a public repo (off until you give it the list)
 - [`no-checkout-home`](hooks/no-checkout-home.sh): switching the branch
   checked out in `$HOME`, when home is itself a worktree (opt-in)
+- [`no-foreign-worktree`](hooks/no-foreign-worktree.sh): a command or edit
+  that reaches into another session's git worktree (opt-in)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
 - [`prose-budget-commit`](hooks/prose-budget-commit.sh): a `git commit` whose
@@ -120,8 +122,9 @@ meant. Spent approvals are kept beside the session transcript, in
 
 ## Configuration
 
-Every guard is on by default except `no-checkout-home`, which is opt-in.
-Turn one off (or that one on) with `/plugin configure languette@languette`,
+Every guard is on by default except `no-checkout-home` and
+`no-foreign-worktree`, which are opt-in. Turn one off (or those on) with
+`/plugin configure languette@languette`,
 or at install, by its name with underscores:
 
 ```
@@ -130,8 +133,8 @@ claude plugin install languette@languette --config no_rm_tree=false
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
-`no_checkout_home` is the reverse: it runs only when its setting is exactly
-`true`, so a misconfiguration leaves it off.
+`no_checkout_home` and `no_foreign_worktree` are the reverse: each runs only
+when its setting is exactly `true`, so a misconfiguration leaves it off.
 
 ### Allowing more for `no-rm-tree`
 
@@ -206,6 +209,7 @@ guard reads beyond the command, it declares:
 | `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `no-checkout-home` | `$HOME`, and what `git rev-parse --show-toplevel` resolves to |
 | `public-issue-guard` | the terms file, the files a post reads, and the checkout's `git remote` |
+| `no-foreign-worktree` | git, for where each path lands, and a record per session in `$TMPDIR` |
 | `prose-budget-commit` | the staged diff, through `prose-budget` |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes
