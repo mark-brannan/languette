@@ -4,6 +4,15 @@
 
 ![Jacques Callot, Drill with halberds (NGV 32320, public domain)](assets/callot-drill-with-halberds.jpg)
 
+*Languette* is French for "little tongue". On a halberd it is the strip of
+iron that runs down the shaft from the head, so a stray blow can't cut through
+the pole. These guards are that strip, between an agent's sharp tools and
+your work.
+
+It's also a pun. Shell is a little language, and languette listens for the
+few words in it that can do damage. When it hears one, it tells the agent
+"hold your tongue!"
+
 Languette is a set of `PreToolUse` hooks for Claude Code. Each one reads the
 Bash command an agent is about to run and decides: allow, ask, or deny. No
 model is involved, and no command is executed to decide.
