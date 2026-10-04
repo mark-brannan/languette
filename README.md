@@ -229,10 +229,13 @@ to Claude Code, and every command goes through. One entry:
 ## Working on it
 
 ```
+sudo apt install jq gawk mawk shellcheck
+python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 python3 -m pytest                       # every scenario, every engine
 AWK_PATH=/dir/with/an/awk python3 -m pytest
 python3 tests/readme_table.py           # regenerate the table
+shellcheck --severity=warning hooks/*.sh tests/stubs/*   # as CI runs it
 ```
 
 Running the tests needs pytest, pytest-bdd and PyHamcrest; the hooks do not.
