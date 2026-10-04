@@ -122,8 +122,9 @@ meant. Spent approvals are kept beside the session transcript, in
 
 ## Configuration
 
-Every guard is on by default except `no-checkout-home`, which is opt-in.
-Turn one off (or that one on) with `/plugin configure languette@languette`,
+Every guard is on by default except `no-checkout-home` and
+`no-foreign-worktree`, which are opt-in. Turn one off (or those on) with
+`/plugin configure languette@languette`,
 or at install, by its name with underscores:
 
 ```
@@ -132,8 +133,8 @@ claude plugin install languette@languette --config no_rm_tree=false
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
-`no_checkout_home` is the reverse: it runs only when its setting is exactly
-`true`, so a misconfiguration leaves it off.
+`no_checkout_home` and `no_foreign_worktree` are the reverse: each runs only
+when its setting is exactly `true`, so a misconfiguration leaves it off.
 
 ### Allowing more for `no-rm-tree`
 
