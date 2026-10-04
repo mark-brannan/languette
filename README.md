@@ -16,6 +16,9 @@ It's also a pun. Shell is a little language, and languette listens for the
 few words in it that can do damage. When it hears one, it tells the agent
 "hold your tongue!"
 
+> *"The wise speak only of what they know, Gríma son of Gálmód. A witless worm have you become. Therefore be silent, and keep your forked tongue behind your teeth. I have not passed through fire and death to bandy crooked words with a serving-man till the lightning falls."*
+— **Gandalf**, in J.R.R Tolkein's *The Two Towers*, Book 3, Chapter 6
+
 ## Install
 
 The guards run as `PreToolUse` hooks in Claude Code today; other agent hosts
@@ -222,6 +225,40 @@ to Claude Code, and every command goes through. One entry:
 {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command",
   "command": "h=\"$HOME/languette/hooks/no-rm-tree.sh\"; { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"no-rm-tree.sh is missing or crashed. This is a gate and fails closed.\"}}'"}]}]}}
 ```
+
+## Strong guards
+
+A guard is a function, pure where it can be: the command and its context in,
+a verdict out. It asks no model and runs nothing. The verdict is **deny**
+with the reason, **ask**, a **warning**, or **nothing** (*allow*). What a
+guard reads beyond the command, it declares:
+
+| Guard | Reads |
+|---|---|
+| `no-git-footguns` | nothing: a pure function of the command |
+| `no-rm-tree` | the filesystem, and `LANGUETTE_RM_ALLOW` |
+| `ask-first` | the repo's list, the session transcript, the approvals spent |
+| `no-delete-stacked-base` | GitHub, through `gh` |
+
+A guard that cannot decide denies and says what it saw. A guard that crashes
+is a deny naming the guard; the runner holds that rule, so no guard has to.
+
+The contract is written as scenarios, in the words a person uses to state the
+rule, and every scenario runs against every engine a guard has, Python and
+shell alike:
+
+```gherkin
+Scenario: a target the guard cannot resolve is denied on sight
+  Given the working directory is "$HOME/project"
+  When the agent runs `rm -rf "$DIR"`
+  Then the guard denies, naming "variable or command substitution"
+```
+
+The scenarios are the seam between the people who set the rules and the code
+that enforces them: a reviewer reads them, and the code is judged against
+them. The road ahead runs toward properties checked over generated commands,
+then a model of each guard from which the scenarios are derived and against
+which the code is proven.
 
 ## Working on it
 
