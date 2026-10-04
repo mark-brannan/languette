@@ -84,6 +84,9 @@ class Ctx:
         self.project_env = True
         self.stubs = False
         self.hook = None                       # a hooks.json command, for wiring
+        self.arg = None                        # an extra CLI argument to the guard script
+        self.session = "s1"                    # session_id in the payload, for issue-door
+        self._doordir = None
         self.stdin = self.verdict = self.scanned = None
         self._dirs = []
 
@@ -91,6 +94,15 @@ class Ctx:
         d = tempfile.mkdtemp(prefix="languette-", dir="/tmp")
         self._dirs.append(d)
         return d
+
+    def doordir(self):
+        # Lazy and once per scenario: issue-door's state lives at
+        # $TMPDIR/languette-issue-door.<session>, and a scenario that opens
+        # the door in one step and spends it in another needs that file to
+        # survive across subprocess calls.
+        if self._doordir is None:
+            self._doordir = self.mkdtemp()
+        return self._doordir
 
     def expand(self, s):
         if "{PROJ}" in s:
@@ -109,7 +121,8 @@ class Ctx:
     # --- running a guard -------------------------------------------------
 
     def payload(self, command):
-        p = {"tool_name": "Bash", "tool_input": {"command": self.expand(command)}, "cwd": self.expand(self.cwd)}
+        p = {"tool_name": "Bash", "tool_input": {"command": self.expand(command)}, "cwd": self.expand(self.cwd),
+             "session_id": self.session}
         if self.proj:
             p["transcript_path"] = f"{self.proj}/t.jsonl"
         return json.dumps(p)
@@ -138,11 +151,14 @@ class Ctx:
         if self.stub_log:
             env["LANGUETTE_STUB_LOG"] = self.stub_log
         env["PATH"] = self.bare or path
+        env["TMPDIR"] = self.doordir()
         if self.hook:
             env["CLAUDE_PLUGIN_ROOT"] = str(ROOT)
             argv = ["sh", "-c", self.hook]
         else:
             argv = ["sh", str(ROOT / f"hooks/{self.guard}.sh")]
+            if self.arg:
+                argv.append(self.arg)
         env.update(self.scenario_env())
         try:
             r = subprocess.run(argv, input=stdin, env=env, capture_output=True, text=True, timeout=5)
@@ -173,6 +189,12 @@ def pytest_bdd_before_scenario(request, feature, scenario):
 @given(parsers.parse('the working directory is "{path}"'))
 def _cwd(ctx, path):
     ctx.cwd = path
+
+
+@given(parsers.parse('the session is "{session}"'))
+@when(parsers.parse('the session is "{session}"'))
+def _session(ctx, session):
+    ctx.session = session
 
 
 @given("a project directory")
@@ -272,6 +294,13 @@ def hooks_json_commands():
     return out
 
 
+def hooks_json_prompt_command():
+    """The one UserPromptSubmit command in hooks/hooks.json (issue-door's)."""
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
+    [h] = [h for e in hj["hooks"]["UserPromptSubmit"] for h in e["hooks"]]
+    return h["command"]
+
+
 # --- When ----------------------------------------------------------------
 
 # Greedy to the last backtick, so a command may hold backticks of its own.
@@ -288,6 +317,27 @@ def _runs_doc(ctx, docstring):
 @when("the agent runs it again")
 def _rerun(ctx):
     ctx.run(ctx.stdin)
+
+
+@when("the human speaks, opening the door")
+def _open_door(ctx):
+    ctx.arg = "prompt"
+    ctx.run(json.dumps({"session_id": ctx.session, "prompt": "yes, file it"}))
+    ctx.arg = None
+
+
+@when("the human speaks, through the hooks.json prompt hook")
+def _open_door_via_hooks_json(ctx):
+    # The UserPromptSubmit command exactly as hooks.json writes it, run the way
+    # Claude Code runs it; the PreToolUse hook is restored for the next step.
+    pretool, ctx.hook = ctx.hook, hooks_json_prompt_command()
+    ctx.run(json.dumps({"session_id": ctx.session, "prompt": "yes, file it"}))
+    ctx.hook = pretool
+
+
+@when(parsers.re(r'the agent calls MCP tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
+def _mcp_call(ctx, tool, inp):
+    ctx.run(json.dumps({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)}))
 
 
 @when("the payload is:")

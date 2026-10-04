@@ -61,6 +61,8 @@ jobs:
           d=$(mktemp -d)
           ln -s "$(command -v "$IMPL")" "$d/awk"
           AWK_PATH=$d python -m pytest -q
+          # issue-door's own bash suite (~2 s), under the same awk.
+          AWK_PATH=$d bash hooks/issue-door.test.sh
 
   shellcheck:
     runs-on: ubuntu-latest

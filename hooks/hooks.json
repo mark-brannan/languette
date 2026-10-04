@@ -25,6 +25,27 @@
             "statusMessage": "Checking whether this command needs the user's approval first"
           }
         ]
+      },
+      {
+        "matcher": "Bash|mcp__.*__(create_issue|issue_write|transfer_issue|delete_issue)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/issue-door.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_ISSUE_DOOR-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"issue-door.sh is missing from the plugin directory or crashed, so this issue create, transfer or delete could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for an issue create, transfer or delete"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/issue-door.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_ISSUE_DOOR-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\" prompt; }; true",
+            "statusMessage": "Opening the issue door for this turn"
+          }
+        ]
       }
     ]
   }

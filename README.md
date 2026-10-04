@@ -21,7 +21,8 @@ few words in it that can do damage. When it hears one, it tells the agent
 
 ## Install
 
-The guards run as `PreToolUse` hooks in Claude Code today; other agent hosts
+The guards run as `PreToolUse` hooks in Claude Code today (`issue-door` also
+runs on `UserPromptSubmit`, which opens its door); other agent hosts
 are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
 ```
@@ -50,6 +51,11 @@ Each guard denies one class of command:
   away, often in a checkout another session shares.
 - [`no-delete-stacked-base`](hooks/no-delete-stacked-base.sh): deleting a
   remote branch that an open PR is based on (GitHub silently closes the PR).
+- [`issue-door`](hooks/issue-door.sh): a second GitHub issue create, transfer
+  or delete in the same human turn, or any inside a loop or `xargs` (an agent
+  once filed a batch of duplicate issues on a plan approved once, the batch
+  buried in it). One per turn: it opens on your prompt, the first write
+  spends it.
 - [`ask-first`](languette/guards/ask_first.py): a command the repo lists as
   costly, until you approve that one run (an agent once ran a 46-minute,
   all-core test sweep to check a small change, then started it again). See
@@ -128,6 +134,7 @@ claude plugin install languette@languette --config no_rm_tree=false
 | `no_rm_tree` | `no-rm-tree` |
 | `no_delete_stacked_base` | `no-delete-stacked-base` |
 | `ask_first` | `ask-first` |
+| `issue_door` | `issue-door` |
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
@@ -193,6 +200,7 @@ guard reads beyond the command, it declares:
 | `no-rm-tree` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
 | `no-delete-stacked-base` | GitHub, through `gh` |
+| `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes
 is a deny naming the guard; the runner holds that rule, so no guard has to.
