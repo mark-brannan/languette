@@ -31,6 +31,28 @@ SCRUB = ("LANGUETTE_RM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_F
          "TIMEOUT_HANG", "LANGUETTE_STUB_LOG")
 
 
+_REAL_HOME = os.environ.get("HOME")
+
+
+def pytest_configure(config):
+    # A throwaway $HOME for the whole run, so no verdict depends on, and no
+    # step can touch, the real one. {HOME}/project is the default cwd. Not
+    # under /tmp: no-rm-tree allows all of /tmp, so every target would pass.
+    home = tempfile.mkdtemp(prefix="languette-home-", dir="/var/tmp")
+    os.mkdir(os.path.join(home, "project"))
+    os.environ["HOME"] = home
+
+
+def pytest_unconfigure(config):
+    home = os.environ["HOME"]
+    if _REAL_HOME is None:
+        del os.environ["HOME"]
+    else:
+        os.environ["HOME"] = _REAL_HOME
+    if os.path.basename(home).startswith("languette-home-"):
+        shutil.rmtree(home, ignore_errors=True)
+
+
 def pytest_generate_tests(metafunc):
     marks = {m.name for m in metafunc.definition.iter_markers()}
     engines = [e for e in ENGINES if e in marks]
