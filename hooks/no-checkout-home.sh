@@ -39,7 +39,14 @@
 # '$HOME'`, which the shell would NOT expand) isn't distinguished from the
 # unquoted form: it only ever adds denials.
 #
-# GATE, fails closed: no jq/awk, no library, unreadable payload -> deny.
+# The command can move git before it runs: a `cd`/`pushd`, an exported
+# `GIT_DIR`, chained `-C`s (cumulative, as git applies them). Each is
+# followed; a `--git-dir` counts when it is $HOME's repo or any repo whose
+# work tree is $HOME (yadm keeps its repo elsewhere).
+#
+# GATE, fails closed: no jq/awk, no library, unreadable payload, or a git
+# checkout/switch whose directory can't be resolved (a variable, `cd -`, a
+# stale session cwd) -> deny.
 set -u
 
 HERE=$(dirname "$0")
@@ -61,26 +68,40 @@ cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
 [ -n "$cmd" ] || exit 0
 
 payload_cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
-[ -n "$payload_cwd" ] || exit 0
-home=$(cd "$HOME" 2>/dev/null && pwd -P) || exit 0
-cwd=$(cd "$payload_cwd" 2>/dev/null && pwd -P) || exit 0
+# A missing $HOME or cwd does not end the check: yadm needs neither, and a
+# git command that needs one it can't have is denied below, not waved through.
+home=$(cd "$HOME" 2>/dev/null && pwd -P) || home=""
+cwd=""
+[ -n "$payload_cwd" ] && cwd=$(cd "$payload_cwd" 2>/dev/null && pwd -P)
 
 # True if plain `git` run from directory $1 would actually operate on
 # $HOME's worktree -- not "is $1 textually under $HOME", which a nested
-# repo (a worktree, any other
-# clone under $HOME) would wrongly trip: git stops walking up at the
-# nearest .git, so it never reaches $HOME's from inside one of those. Ask
-# git directly what it would resolve to.
+# repo (a worktree, any other clone under $HOME) would wrongly trip: git
+# stops walking up at the nearest .git, so it never reaches $HOME's from
+# inside one of those. Ask git directly what it would resolve to.
 git_targets_home() {
   [ "$1" = "$home" ] && return 0
   t=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null)
   [ -n "$t" ] && [ "$t" = "$home" ]
 }
 
-# Resolves a raw -C/--git-dir/--work-tree/GIT_DIR/GIT_WORK_TREE value (as it
-# appeared, unquoted by the scanner) against $home/$payload_cwd, the same
-# way the shell would if the literal text were left unquoted. Echoes the
-# resolved absolute path, or nothing if it doesn't exist.
+# True if git dir $1 is $HOME's: the repo git finds from $HOME (a .git
+# directory or gitfile), or any repo whose core.worktree is $HOME (yadm's
+# repo under ~/.local/share, a bare-repo setup). Either way a checkout
+# through it moves the HEAD that $HOME's shells see, whatever --work-tree says.
+gitdir_is_home() {
+  d=$(cd / && git --git-dir="$1" rev-parse --absolute-git-dir 2>/dev/null) || return 1
+  [ -n "$home_gitdir" ] && [ "$d" = "$home_gitdir" ] && return 0
+  t=$(cd / && git --git-dir="$1" rev-parse --show-toplevel 2>/dev/null)
+  [ -n "$t" ] && [ "$t" = "$home" ]
+}
+home_gitdir=""
+[ -n "$home" ] && home_gitdir=$(git -C "$home" rev-parse --absolute-git-dir 2>/dev/null)
+
+# Resolves a raw -C/--git-dir/--work-tree/GIT_DIR/GIT_WORK_TREE/cd value (as
+# it appeared, unquoted by the scanner) against $home and base directory $2,
+# the same way the shell would if the literal text were left unquoted.
+# Echoes the absolute path, or nothing if it can't be resolved.
 resolve_path_arg() {
   cpath=$1
   # These are case patterns matching a literal leading "~"/"$HOME", not
@@ -92,31 +113,50 @@ resolve_path_arg() {
     '${HOME}'/*) resolved="$home/${cpath#\$\{HOME\}/}" ;;
     '~/'*) resolved="$home/${cpath#\~/}" ;;
     /*) resolved="$cpath" ;;
-    *) resolved="$payload_cwd/$cpath" ;;
+    *) [ -n "$2" ] || return 0; resolved="$2/$cpath" ;;
   esac
-  (cd "$resolved" 2>/dev/null && pwd -P)
+  case "$resolved" in /*) ;; *) return 0 ;; esac
+  # A git dir may be a gitfile, which `cd` can't enter: resolve its parent.
+  if [ -d "$resolved" ]; then (cd "$resolved" 2>/dev/null && pwd -P)
+  elif [ -e "$resolved" ]; then
+    pd=$(cd "$(dirname "$resolved")" 2>/dev/null && pwd -P) && printf '%s/%s\n' "$pd" "$(basename "$resolved")"
+  fi
 }
 
-# awk tokenises with the shared scanner and prints one line per segment that
-# is a real git/yadm checkout/switch and isn't exempted by a `--` pathspec
-# separator:
-#   "DENY"                    -- a yadm invocation: always a hit, decided
-#                                 here since it needs no path resolution.
-#   "G\t<KIND>\t<value>"      -- a git invocation: sh resolves KIND (C, a
-#                                 `-C` target; WORKTREE/GITDIR, a
-#                                 --work-tree/--git-dir or
-#                                 GIT_WORK_TREE=/GIT_DIR= value; CWD, the
-#                                 payload cwd with no value, emitted only
-#                                 when the segment carries none of the
-#                                 other three -- a `-C`/`--work-tree`/
-#                                 `--git-dir` already pins where the
-#                                 command resolves, so the payload cwd is
-#                                 irrelevant once one is present) and
-#                                 denies if any of them targets $HOME.
+# awk tokenises with the shared scanner and prints, in command order:
+#   "DENY"                -- a yadm checkout/switch: always a hit, decided
+#                            here since it needs no path resolution.
+#   "CD\t<value>"         -- a cd/pushd/popd. Subshell parentheses don't
+#                            survive the scanner, so a cd's reach can't be
+#                            bounded: every directory any cd may have left
+#                            the shell in stays a candidate for the rest of
+#                            the command, alongside the payload cwd.
+#   "ENV\t<KIND>\t<value>" -- a GIT_DIR=/GIT_WORK_TREE= outside a git
+#                            segment (`export GIT_DIR=~/.git; git ...`):
+#                            it applies to every later git segment.
+#   "G" ... "E"           -- one git checkout/switch, with its targets in
+#                            order between: "C\t<v>" (-C, cumulative, as git
+#                            applies them), "GITDIR\t<v>" and
+#                            "WORKTREE\t<v>" (flag or inline env).
 out=$(printf '%s\n' "$cmd" | awk "$(cat "$LIB")"'
-function segment(a, b, nested,   g, i, sidx, kind, is_yadm, dashdash, found_target) {
+function segment(a, b, nested,   g, i, sidx, kind, is_yadm, c, v) {
+  c = cmd_index(w, k, a, b, "^(cd|pushd|popd)$", nested, "")
+  if (c) {
+    v = ""
+    for (i = c + 1; i <= b; i++) if (k[i] == "w" && (w[i] !~ /^-/ || w[i] == "-")) { v = w[i]; break }
+    if (w[c] == "popd") v = "-"
+    print "CD\t" v
+    return
+  }
   g = cmd_index(w, k, a, b, "(^|/)(git|yadm)$", nested, "")
-  if (!g) return
+  if (!g) {
+    for (i = a; i <= b; i++) {
+      if (k[i] != "w") continue
+      if (w[i] ~ /^GIT_DIR=/)       print "ENV\tGITDIR\t" substr(w[i], 9)
+      if (w[i] ~ /^GIT_WORK_TREE=/) print "ENV\tWORKTREE\t" substr(w[i], 15)
+    }
+    return
+  }
   is_yadm = (w[g] ~ /(^|\/)yadm$/)
 
   kind = ""
@@ -127,28 +167,27 @@ function segment(a, b, nested,   g, i, sidx, kind, is_yadm, dashdash, found_targ
   }
   if (kind == "") return
 
-  # A bare `--` pathspec separator after the subcommand means a file
-  # restore (checkout only -- switch has no such form).
+  # A `--` pathspec separator with a path after it means a file restore
+  # (checkout only -- switch has no such form). A bare trailing `--`
+  # (`checkout other --`) is still a branch switch.
   if (kind == "CO") {
-    dashdash = 0
-    for (i = sidx + 1; i <= b; i++) if (k[i] == "w" && w[i] == "--") { dashdash = 1; break }
-    if (dashdash) return
+    for (i = sidx + 1; i < b; i++) if (k[i] == "w" && w[i] == "--" && k[i + 1] == "w") return
   }
 
   if (is_yadm) { print "DENY"; return }
 
-  found_target = 0
+  print "G"
   for (i = a; i <= b; i++) {
     if (k[i] != "w") continue
-    if (w[i] == "-C") { if (i + 1 <= b && k[i + 1] == "w") { print "G\tC\t" w[i + 1]; found_target = 1 }; continue }
-    if (w[i] == "--git-dir")        { if (i + 1 <= b && k[i + 1] == "w") { print "G\tGITDIR\t" w[i + 1]; found_target = 1 }; continue }
-    if (w[i] ~ /^--git-dir=/)       { print "G\tGITDIR\t" substr(w[i], index(w[i], "=") + 1); found_target = 1; continue }
-    if (w[i] == "--work-tree")      { if (i + 1 <= b && k[i + 1] == "w") { print "G\tWORKTREE\t" w[i + 1]; found_target = 1 }; continue }
-    if (w[i] ~ /^--work-tree=/)     { print "G\tWORKTREE\t" substr(w[i], index(w[i], "=") + 1); found_target = 1; continue }
-    if (w[i] ~ /^GIT_DIR=/)         { print "G\tGITDIR\t" substr(w[i], index(w[i], "=") + 1); found_target = 1; continue }
-    if (w[i] ~ /^GIT_WORK_TREE=/)   { print "G\tWORKTREE\t" substr(w[i], index(w[i], "=") + 1); found_target = 1; continue }
+    if (w[i] == "-C")               { if (i + 1 <= b && k[i + 1] == "w") print "C\t" w[i + 1]; continue }
+    if (w[i] == "--git-dir")        { if (i + 1 <= b && k[i + 1] == "w") print "GITDIR\t" w[i + 1]; continue }
+    if (w[i] ~ /^--git-dir=/)       { print "GITDIR\t" substr(w[i], index(w[i], "=") + 1); continue }
+    if (w[i] == "--work-tree")      { if (i + 1 <= b && k[i + 1] == "w") print "WORKTREE\t" w[i + 1]; continue }
+    if (w[i] ~ /^--work-tree=/)     { print "WORKTREE\t" substr(w[i], index(w[i], "=") + 1); continue }
+    if (w[i] ~ /^GIT_DIR=/)         { print "GITDIR\t" substr(w[i], 9); continue }
+    if (w[i] ~ /^GIT_WORK_TREE=/)   { print "WORKTREE\t" substr(w[i], 15); continue }
   }
-  if (!found_target) print "G\tCWD\t"
+  print "E"
 }
 { buf = buf $0 "\n" }
 END {
@@ -166,27 +205,89 @@ END {
 }') || deny "no-checkout-home: awk failed, cannot inspect the command"
 
 [ -n "$out" ] || exit 0
+nl='
+'
 tab=$(printf '\t')
-while IFS="$tab" read -r tag kind value; do
+# cands: every directory the shell may be in, one per line. lost: some cd
+# went somewhere that can't be resolved (a variable, `cd -`, popd).
+cands=$cwd lost=0
+[ -n "$cwd" ] || lost=1
+env_targets=""
+
+# Resolves $1 against every line of $2 into $res, one per line. Sets miss=1
+# if any base gave nothing. No subshell, so both reach the caller.
+resolve_all() {
+  miss=0 res=""
+  # shellcheck disable=SC2088
+  case "$1" in
+    /*|'~'|'~/'*|'$HOME'|'$HOME/'*|'${HOME}'|'${HOME}/'*) set -- "$1" "/" ;;
+  esac
+  while IFS= read -r base; do
+    r=$(resolve_path_arg "$1" "$base")
+    if [ -n "$r" ]; then res="$res$r$nl"; else miss=1; fi
+  done <<B
+$2
+B
+}
+
+judge() {
+  [ -n "$home" ] || deny "no-checkout-home: \$HOME does not resolve, so a git checkout/switch can't be checked against it."
+  bases=$cands blind=$lost
+  pinned=0
+  for line in $env_targets$seg; do
+    IFS="$tab" read -r tk tv <<L
+$line
+L
+    case "$tk" in
+      C)
+        resolve_all "$tv" "$bases"; bases=$res
+        [ "$miss" = 0 ] && [ -n "$bases" ] || blind=1
+        ;;
+      GITDIR|WORKTREE)
+        pinned=1
+        resolve_all "$tv" "$bases"
+        while IFS= read -r r; do
+          [ -n "$r" ] || continue
+          if [ "$tk" = GITDIR ]; then gitdir_is_home "$r" && deny_generic git
+          else [ "$r" = "$home" ] && deny_generic git; fi
+        done <<R
+$res
+R
+        ;;
+    esac
+  done
+  # -C, --git-dir or --work-tree pin where the command resolves, so the
+  # directories only matter when none of the latter two is present.
+  [ "$pinned" = 1 ] && return 0
+  [ "$blind" = 0 ] || deny "no-checkout-home: can't tell which directory this git checkout/switch runs in (a cd, -C or session cwd that doesn't resolve), so it can't be checked against \$HOME. Use an absolute path with git -C."
+  while IFS= read -r d; do
+    [ -n "$d" ] && git_targets_home "$d" && deny_generic git
+  done <<D
+$bases
+D
+  return 0
+}
+
+seg=""
+IFS_SAVE=$IFS
+while IFS="$tab" read -r tag f1 f2; do
   case "$tag" in
     DENY) deny_generic yadm ;;
-    G)
-      case "$kind" in
-        CWD) git_targets_home "$cwd" && deny_generic git ;;
-        C)
-          r=$(resolve_path_arg "$value")
-          [ -n "$r" ] && git_targets_home "$r" && deny_generic git
-          ;;
-        WORKTREE)
-          r=$(resolve_path_arg "$value")
-          [ -n "$r" ] && [ "$r" = "$home" ] && deny_generic git
-          ;;
-        GITDIR)
-          r=$(resolve_path_arg "$value")
-          [ -n "$r" ] && [ "$r" = "$home/.git" ] && deny_generic git
+    CD)
+      case "$f1" in
+        '') cands="$cands$nl$home" ;;
+        -) lost=1 ;;
+        *)
+          resolve_all "$f1" "$cands"
+          [ "$miss" = 0 ] && [ -n "$res" ] || lost=1
+          cands="$cands$nl$res"
           ;;
       esac
       ;;
+    ENV) env_targets="$env_targets$f1$tab$f2$nl" ;;
+    G) seg="" ;;
+    C|GITDIR|WORKTREE) seg="$seg$tag$tab$f1$nl" ;;
+    E) IFS=$nl; judge; IFS=$IFS_SAVE ;;
   esac
 done <<EOF
 $out
