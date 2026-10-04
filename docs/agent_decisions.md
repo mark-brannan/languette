@@ -11,4 +11,4 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - prose-budget-commit ships with the --staged gap (pathspec commit, add && commit in one call) documented, not closed Undo: detect pathspec/chained add in segment() and run the engine on those files ([#36](https://github.com/mark-brannan/languette/pull/36))
 
 ### 20261004t051544z
-- no-checkout-home keeps every directory a cd may leave the shell in as a candidate (scanner drops subshell parens), so cd elsewhere from a session in $HOME then git checkout is denied Undo: resolve cd sequentially (replace the candidate set) and accept the subshell false allow ([#37](https://github.com/mark-brannan/languette/pull/37))
+- no-checkout-home judges git from where the last cd landed (a cd replaces the directory), so `(cd x); git checkout y` from $HOME is a known false allow; Solace chose this over keeping the session cwd as a candidate after transcripts showed 82 of 102 checkouts from $HOME begin with a cd and 0 use a cd subshell. Undo: keep every cd target and the session cwd as candidates ([#37](https://github.com/mark-brannan/languette/pull/37))

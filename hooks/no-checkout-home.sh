@@ -126,11 +126,11 @@ resolve_path_arg() {
 # awk tokenises with the shared scanner and prints, in command order:
 #   "DENY"                -- a yadm checkout/switch: always a hit, decided
 #                            here since it needs no path resolution.
-#   "CD\t<value>"         -- a cd/pushd/popd. Subshell parentheses don't
-#                            survive the scanner, so a cd's reach can't be
-#                            bounded: every directory any cd may have left
-#                            the shell in stays a candidate for the rest of
-#                            the command, alongside the payload cwd.
+#   "CD\t<value>"         -- a cd/pushd/popd: it replaces the directory
+#                            later git segments are judged from. Subshell
+#                            parentheses don't survive the scanner, so
+#                            `(cd x); git checkout y` is judged from x: a
+#                            known false allow (docs/agent_decisions.md).
 #   "ENV\t<KIND>\t<value>" -- a GIT_DIR=/GIT_WORK_TREE= outside a git
 #                            segment (`export GIT_DIR=~/.git; git ...`):
 #                            it applies to every later git segment.
@@ -208,7 +208,8 @@ END {
 nl='
 '
 tab=$(printf '\t')
-# cands: every directory the shell may be in, one per line. lost: some cd
+# cands: the directories the shell may be in, one per line (more than one
+# only after a relative cd from several -C bases). lost: some cd
 # went somewhere that can't be resolved (a variable, `cd -`, popd).
 cands=$cwd lost=0
 [ -n "$cwd" ] || lost=1
@@ -275,12 +276,15 @@ while IFS="$tab" read -r tag f1 f2; do
     DENY) deny_generic yadm ;;
     CD)
       case "$f1" in
-        '') cands="$cands$nl$home" ;;
+        '') cands=$home lost=0 ;;
         -) lost=1 ;;
         *)
+          # A relative cd from a directory already lost stays lost.
+          # shellcheck disable=SC2088
+          case "$f1" in /*|'~'|'~/'*|'$HOME'|'$HOME/'*|'${HOME}'|'${HOME}/'*) lost=0 ;; esac
+          [ "$lost" = 1 ] && continue
           resolve_all "$f1" "$cands"
-          [ "$miss" = 0 ] && [ -n "$res" ] || lost=1
-          cands="$cands$nl$res"
+          if [ "$miss" = 0 ] && [ -n "$res" ]; then cands=$res; else lost=1; fi
           ;;
       esac
       ;;

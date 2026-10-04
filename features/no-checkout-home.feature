@@ -97,9 +97,7 @@ Feature: no-checkout-home
     Then the guard denies
 
   # Fails closed: where the guard can't tell which directory git runs in,
-  # it denies rather than guess. The last row is the price of that: a cd's
-  # reach can't be bounded (the scanner drops subshell parentheses), so the
-  # session's own directory, $HOME here, stays a candidate after the cd.
+  # it denies rather than guess.
   Scenario Outline: a directory the guard can't resolve is denied
     Given the working directory is "<cwd>"
     When the agent runs `<command>`
@@ -111,7 +109,21 @@ Feature: no-checkout-home
       | {PROJ}       | cd "$SOMEWHERE" && git checkout some-branch |
       | {PROJ}       | cd - && git checkout some-branch            |
       | {PROJ}       | git -C "$SOMEWHERE" -C sub checkout x       |
-      | {TMP}        | cd {PROJ} && git checkout some-branch       |
+      | {PROJ}       | cd "$X" && cd sub && git checkout some-branch |
+
+  # A cd replaces the directory git is judged from. The scanner drops
+  # subshell parentheses, so the last row is a known false allow; see
+  # docs/agent_decisions.md.
+  Scenario Outline: a cd away from $HOME is judged from where it lands
+    Given the working directory is "{TMP}"
+    When the agent runs `<command>`
+    Then the guard is silent
+
+    Examples:
+      | command                                                     |
+      | cd {PROJ} && git checkout some-branch                       |
+      | cd {TMP}/.claude/worktrees/fake-task && git switch some-branch |
+      | (cd {PROJ}); git checkout some-branch                       |
 
   # A file restore leaves the branch alone. `switch` has no such form.
   Scenario Outline: a file restore is allowed even in $HOME
