@@ -56,8 +56,7 @@ Measured, with the payload `{tool_name: Bash, tool_input.command, cwd: ~/project
 
 The two `allow` rows marked known gap are documented and deliberate: a guard
 for shell text does not read scripts or interpreters. The table is generated
-from `fixtures/guards.jsonl` (`fixtures/run.sh --table`), and CI fails if it
-drifts.
+from the guards' tests, and CI fails if it drifts.
 
 ## The guards
 
@@ -182,13 +181,13 @@ What it reads besides the command is named in its header: the filesystem and
 transcript and the approvals already spent for `ask-first`; GitHub for
 `no-delete-stacked-base`; nothing for `no-git-footguns`. A guard
 that cannot decide denies and says what it saw. A guard that crashes is a deny
-naming the guard; the runner holds that rule once, so no guard has to.
+naming the guard, and no guard has to handle that itself.
 
-The guards share one scanner, `languette/scan.py`, which turns the command
-into words and nested texts and resolves every ambiguity toward more words
-reaching the guard, and one vocabulary for verdicts, `languette/verdict.py`.
-A new guard is one module with a `check` function and its scenarios. It adds
-no runner, no wrapper and no harness.
+The guards share one scanner, which turns the command into words and nested
+texts and resolves every ambiguity toward more words reaching the guard, and
+one vocabulary for verdicts. A new guard is one module with a `check`
+function and its scenarios. It brings no runner, wrapper or test harness of
+its own.
 
 The contract is written as scenarios, in Gherkin, under `features/`: a command
 and its context in, a verdict out, in the words a person uses to state the
@@ -218,9 +217,9 @@ that enforces them. Whether a scenario is written by hand or derived from a
 model of the guard is open. Either way it is what a reviewer reads, and the
 code is judged against it.
 
-The hooks need only the standard library, and CI proves it with an import walk
-over `languette/`. The tests need `pytest`, `pytest-bdd` and `PyHamcrest`;
-the hooks do not.
+The Python engine needs only the standard library, and CI proves it with an
+import walk over `languette/`. The tests need `pytest`, `pytest-bdd` and
+`PyHamcrest`.
 
 ## Working on it
 
@@ -239,7 +238,7 @@ passes a garbage one. That is a shape check only, with no model call and no
 login. The headless smoke test, which installs the plugin in a scratch project
 and confirms a recursive `rm` is really blocked, stays manual: it needs both.
 
-`fixtures/` holds the contract as data: a command in, tokens or a verdict
+`fixtures/` holds test cases as data: a command in, tokens or a verdict
 out. The scanner (`hooks/lib-shell-words.awk`) and the three guards began as
 copies of the guards in [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles);
 this repo is where they are maintained now.
