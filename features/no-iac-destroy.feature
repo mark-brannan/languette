@@ -340,6 +340,7 @@ Feature: no-iac-destroy
         | command                                                 | note          |
         | for d in a b c; do terraform -chdir=$d destroy; done    | loop          |
         | kubectl get pods -o name \| xargs kubectl delete        | xargs fan-out |
+        | find . -name '*.yaml' -exec kubectl delete -f {} \;     | find -exec   |
         | while read n; do kubectl delete pod $n; done < pods.txt | while         |
 
   Rule: tools outside the rules are not this guard's business

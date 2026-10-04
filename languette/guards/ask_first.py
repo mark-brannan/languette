@@ -53,7 +53,7 @@ PROSE = sw.PROSE | frozenset("pkill pgrep killall ps lsof fuser which type".spli
 # npm's aliases for `run`.
 RUN = frozenset("run run-script rum urn".split())
 # Words that run what follows an unknown number of times.
-LOOP = frozenset("for while until select xargs parallel watch".split())
+LOOP = frozenset("for while until select xargs parallel watch -exec -execdir -ok -okdir".split())
 
 
 def _config(payload, env):
