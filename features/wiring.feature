@@ -13,6 +13,8 @@ Feature: wiring
       {"commands": [{"id": "walk", "match": [{"cmd": "npm", "args": ["run", "walk"]}],
                      "cost": "long", "approve_label": "Run walk"}]}
       """
+    And the stub "prose-budget" is the engine
+    And PROSE_BUDGET_FAIL is "1"
 
   Scenario Outline: each hooks.json command judges a payload
     Given the hook is the hooks.json command for "<guard>"
@@ -20,12 +22,13 @@ Feature: wiring
     Then the guard <verdict>
 
     Examples:
-      | guard                  | command                       | verdict |
-      | no-git-footguns        | git add -A                    | denies  |
-      | no-rm-tree             | rm -rf build                  | denies  |
-      | no-delete-stacked-base | git push origin --delete "$b" | asks    |
-      | ask-first              | npm run walk                  | denies  |
-      | issue-door             | gh issue create -t t -b b     | denies  |
+      | guard                  | command                       | verdict   |
+      | no-git-footguns        | git add -A                    | denies    |
+      | no-rm-tree             | rm -rf build                  | denies    |
+      | no-delete-stacked-base | git push origin --delete "$b" | asks      |
+      | ask-first              | npm run walk                  | denies    |
+      | issue-door             | gh issue create -t t -b b     | denies    |
+      | prose-budget-commit    | git commit -m x               | denies    |
 
   # The prompt hook is the only thing that opens the door. Dropped or
   # mis-argumented in hooks.json, the PreToolUse hook would deny every create.
@@ -48,6 +51,7 @@ Feature: wiring
       | no-delete-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
       | issue-door             | gh issue create -t t -b b     |
+      | prose-budget-commit    | git commit -m x               |
 
   Scenario Outline: a script that crashes is a deny
     Given the hook is the hooks.json command for "<guard>"
@@ -62,6 +66,7 @@ Feature: wiring
       | no-delete-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
       | issue-door             | gh issue create -t t -b b     |
+      | prose-budget-commit    | git commit -m x               |
 
   Scenario Outline: the option set to false skips the guard
     Given the hook is the hooks.json command for "<guard>"
@@ -76,6 +81,7 @@ Feature: wiring
       | no-delete-stacked-base | CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE | git push origin --delete "$b" |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | npm run walk                  |
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | gh issue create -t t -b b     |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | git commit -m x               |
 
   # Only the exact word false skips: unset, empty or anything else runs the
   # guard, so a misconfiguration cannot open the gate.
@@ -117,6 +123,12 @@ Feature: wiring
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | no    | gh issue create -t t -b b     | denies  |
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | true  | gh issue create -t t -b b     | denies  |
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | 1     | gh issue create -t t -b b     | denies  |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | denies    |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | denies    |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | False | git commit -m x               | denies    |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | no    | git commit -m x               | denies    |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | true  | git commit -m x               | denies    |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 1     | git commit -m x               | denies    |
 
   # no-checkout-home is opt-in, the reverse of the guards above: it runs only
   # when its option is exactly "true", so a misconfiguration leaves it off.

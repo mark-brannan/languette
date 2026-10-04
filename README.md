@@ -66,6 +66,9 @@ Each guard denies one class of command:
   costly, until you approve that one run (an agent once ran a 46-minute,
   all-core test sweep to check a small change, then started it again). See
   [Ask first](#ask-first).
+- [`prose-budget-commit`](hooks/prose-budget-commit.sh): a `git commit`
+  whose staged prose runs over the repo's own word budgets, as counted by
+  [`prose-budget`](https://github.com/mark-brannan/claude), where installed.
 
 ## The promise
 
@@ -127,22 +130,13 @@ meant. Spent approvals are kept beside the session transcript, in
 
 ## Configuration
 
-Every guard is on by default except `no-checkout-home`, which is opt-in. Turn
-one off (or that one on) with `/plugin configure languette@languette`, or at
-install:
+Every guard is on by default except `no-checkout-home`, which is opt-in.
+Turn one off (or that one on) with `/plugin configure languette@languette`,
+or at install, by its name with underscores:
 
 ```
 claude plugin install languette@languette --config no_rm_tree=false
 ```
-
-| Key | Guard |
-|---|---|
-| `no_git_footguns` | `no-git-footguns` |
-| `no_rm_tree` | `no-rm-tree` |
-| `no_delete_stacked_base` | `no-delete-stacked-base` |
-| `ask_first` | `ask-first` |
-| `issue_door` | `issue-door` |
-| `no_checkout_home` | `no-checkout-home` (off by default) |
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
@@ -212,6 +206,7 @@ guard reads beyond the command, it declares:
 | `no-delete-stacked-base` | GitHub, through `gh` |
 | `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `no-checkout-home` | `$HOME`, and what `git rev-parse --show-toplevel` resolves to |
+| `prose-budget-commit` | the staged diff, through `prose-budget` |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes
 is a deny naming the guard; the runner holds that rule, so no guard has to.

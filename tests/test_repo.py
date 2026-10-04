@@ -14,7 +14,7 @@ import readme_table
 from conftest import hooks_json_commands, hooks_json_prompt_command
 
 ROOT = Path(__file__).resolve().parent.parent
-GUARDS = {"no-git-footguns", "no-rm-tree", "no-delete-stacked-base", "ask-first", "issue-door", "no-checkout-home"}
+GUARDS = {"no-git-footguns", "no-rm-tree", "no-delete-stacked-base", "ask-first", "issue-door", "prose-budget-commit", "no-checkout-home"}
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"no_checkout_home"}
 

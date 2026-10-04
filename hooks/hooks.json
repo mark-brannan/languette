@@ -26,6 +26,11 @@
           },
           {
             "type": "command",
+            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/prose-budget-commit.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"prose-budget-commit.sh is missing from the plugin directory or crashed, so staged prose could not be checked against the repo budgets. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking staged prose against the repo's budgets"
+          },
+          {
+            "type": "command",
             "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/no-checkout-home.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_NO_CHECKOUT_HOME-}\" != true ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"no-checkout-home.sh is missing from the plugin directory or crashed, so a branch switch in $HOME could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for a branch switch in $HOME"
           }
