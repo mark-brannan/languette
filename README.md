@@ -62,6 +62,13 @@ Each guard denies one class of command:
   bare-repo setup). The branch stays switched for every shell and session on
   the machine until someone switches it back; work on a branch in a worktree.
   `yadm` is denied from any directory, since it always works on `$HOME`.
+- [`no-foreign-worktree`](hooks/no-foreign-worktree.sh) (opt-in, off by
+  default): any command or file edit that reaches into a linked git worktree
+  other than the session's own, and `EnterWorktree(path=...)`. That directory
+  belongs to another session, which may be archived under you; read the branch
+  with `git show <branch>:<path>`, or work in a worktree of your own under the
+  scratchpad. A worktree you made yourself, and a `cd` away and back, stay
+  yours.
 - [`ask-first`](languette/guards/ask_first.py): a command the repo lists as
   costly, until you approve that one run (an agent once ran a 46-minute,
   all-core test sweep to check a small change, then started it again). See
@@ -127,9 +134,9 @@ meant. Spent approvals are kept beside the session transcript, in
 
 ## Configuration
 
-Every guard is on by default except `no-checkout-home`, which is opt-in. Turn
-one off (or that one on) with `/plugin configure languette@languette`, or at
-install:
+Every guard is on by default except `no-checkout-home` and
+`no-foreign-worktree`, which are opt-in. Turn one off (or those on) with
+`/plugin configure languette@languette`, or at install:
 
 ```
 claude plugin install languette@languette --config no_rm_tree=false
@@ -143,11 +150,12 @@ claude plugin install languette@languette --config no_rm_tree=false
 | `ask_first` | `ask-first` |
 | `issue_door` | `issue-door` |
 | `no_checkout_home` | `no-checkout-home` (off by default) |
+| `no_foreign_worktree` | `no-foreign-worktree` (off by default) |
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
-`no_checkout_home` is the reverse: it runs only when its setting is exactly
-`true`, so a misconfiguration leaves it off.
+`no_checkout_home` and `no_foreign_worktree` are the reverse: each runs only
+when its setting is exactly `true`, so a misconfiguration leaves it off.
 
 ### Allowing more for `no-rm-tree`
 
@@ -212,6 +220,7 @@ guard reads beyond the command, it declares:
 | `no-delete-stacked-base` | GitHub, through `gh` |
 | `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `no-checkout-home` | `$HOME`, and what `git rev-parse --show-toplevel` resolves to |
+| `no-foreign-worktree` | git, for what each path named resolves to; the payload's `session_id`; a record per session in `$TMPDIR`; the scratchpad, from `CLAUDE_CODE_TMPDIR` then `$TMPDIR`; optionally `claim-stamp.sh` (`CLAIM_STAMP_BIN`) |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes
 is a deny naming the guard; the runner holds that rule, so no guard has to.

@@ -50,6 +50,12 @@
       "title": "Block switching the branch checked out in $HOME",
       "description": "Opt-in, off by default. Deny git or yadm checkout and switch that would change the branch checked out in your home directory, for a $HOME that is itself a worktree (yadm, a bare-repo setup). Turn on only if $HOME is a git worktree.",
       "default": false
+    },
+    "no_foreign_worktree": {
+      "type": "boolean",
+      "title": "Block reaching into another session's git worktree",
+      "description": "Opt-in, off by default. Deny any command or file edit that reaches into a linked git worktree other than the session's own, and EnterWorktree(path=...). Turn on if you run several sessions against one repo, each in its own worktree.",
+      "default": false
     }
   }
 }

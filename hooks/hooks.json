@@ -40,6 +40,16 @@
             "statusMessage": "Checking for an issue create, transfer or delete"
           }
         ]
+      },
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/no-foreign-worktree.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_NO_FOREIGN_WORKTREE-}\" != true ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"no-foreign-worktree.sh is missing from the plugin directory or crashed, so a reach into a worktree that belongs to another session could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for a reach into another session's worktree"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [

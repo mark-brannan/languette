@@ -28,7 +28,7 @@ from languette import run, scan  # noqa: E402
 ENGINES = ("python", "shell")
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
-         "TIMEOUT_HANG", "LANGUETTE_STUB_LOG")
+         "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "CLAUDE_CODE_TMPDIR", "CLAIM_STAMP_BIN")
 
 
 _REAL_HOME = os.environ.get("HOME")
@@ -187,6 +187,7 @@ def pytest_bdd_before_scenario(request, feature, scenario):
 # --- Given ---------------------------------------------------------------
 
 @given(parsers.parse('the working directory is "{path}"'))
+@when(parsers.parse('the working directory is "{path}"'))
 def _cwd(ctx, path):
     ctx.cwd = path
 
@@ -249,6 +250,16 @@ def _git_init(ctx, path):
     d = Path(ctx.expand(path))
     d.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-q", "-b", "main", str(d)], check=True)
+
+
+@given(parsers.parse('a linked worktree "{path}" of the repository at "{repo}"'))
+def _linked_worktree(ctx, path, repo):
+    r, d = ctx.expand(repo), ctx.expand(path)
+    ident = ["-c", "user.email=t@e", "-c", "user.name=t"]
+    if subprocess.run(["git", "-C", r, "rev-parse", "-q", "--verify", "HEAD"], capture_output=True).returncode:
+        subprocess.run(["git", "-C", r, *ident, "commit", "-q", "--allow-empty", "-m", "init"], check=True)
+    Path(d).parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "-C", r, "worktree", "add", "-q", "-b", Path(d).name, d], check=True)
 
 
 @given(parsers.parse('the symlink "{path}" to "{target}"'))
@@ -347,6 +358,12 @@ def _mcp_call(ctx, tool, inp):
     ctx.run(json.dumps({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)}))
 
 
+@when(parsers.re(r'the agent calls tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
+def _tool_call(ctx, tool, inp):
+    ctx.run(json.dumps({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(ctx.expand(inp)),
+                        "cwd": ctx.expand(ctx.cwd)}))
+
+
 @when("the payload is:")
 def _raw(ctx, docstring):
     ctx.run(docstring)
@@ -388,7 +405,7 @@ def _denies(ctx):
 
 @then(parsers.re(r'the guard denies, naming "(?P<text>.*)"'))
 def _denies_naming(ctx, text):
-    assert_that(ctx.verdict, denies(naming=text))
+    assert_that(ctx.verdict, denies(naming=ctx.expand(text)))
 
 
 @then("the guard asks")
