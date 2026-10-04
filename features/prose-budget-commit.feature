@@ -65,7 +65,7 @@ Feature: prose-budget-commit
     Given PROSE_BUDGET_FAIL is "1"
     When the agent runs `git commit -m x`
     Then the guard denies, naming "sections.max_words"
-    And the guard denies, naming "Do not ask the user"
+    And the guard denies, naming "not a judgment call"
 
   Scenario Outline: a working directory this guard cannot resolve is denied, not skipped
     Given PROSE_BUDGET_FAIL is "1"
