@@ -40,10 +40,11 @@
 # fails. A path starting with `-` is prefixed `./` before it reaches the
 # engine, so it can't be read as one of the engine's own options. A
 # pathspec that is a directory on disk also denies -- `--file` would just
-# silently drop it, leaving everything under it unchecked. Residual gap:
-# an `add`/`commit` pair that `cd`s between the two resolves both against
-# the commit's own directory, which is wrong if they really do run in
-# different places.
+# silently drop it, leaving everything under it unchecked. An `add` that
+# ran in a different directory from the commit (a `cd` or `-C` between
+# them) widens the check rather than reading its paths against the wrong
+# one. A listed file whose name holds a newline denies: it cannot reach the
+# engine intact.
 #
 # Exit 1 is a finding and denies. Exit 2 is a bad budgets config (or an
 # engine too old for --staged/--file) and denies too, saying so: the repo
@@ -141,7 +142,7 @@ function collect_add(lo, hi,   i) {
     addwide_add(w[i])
   }
 }
-function commit_tail(lo, hi,   i) {
+function commit_tail(lo, hi,   i, v) {
   i = lo
   while (i <= hi) {
     if (w[i] == "--") {
@@ -151,8 +152,13 @@ function commit_tail(lo, hi,   i) {
     if (w[i] == "--all") { ALLFLAG = 1; i++; continue }
     if (w[i] ~ /^(-m|--message|-F|--file|-C|--reuse-message|-c|--reedit-message|--fixup|--squash|--author|--date|--template|--pathspec-from-file)$/) { i += 2; continue }
     if (w[i] ~ /^-[A-Za-z]+$/) {
-      if (w[i] ~ /a/) ALLFLAG = 1
-      i += (w[i] ~ /[mFcC]/) ? 2 : 1
+      # A short-option cluster: the first letter that takes a value takes
+      # the rest of the word, or the next word when it is the last letter
+      # -- `-am msg` skips msg, but `-mfix` carries its own message and the
+      # word after it is a pathspec.
+      v = match(w[i], /[mFcCt]/)
+      if (substr(w[i], 2, (v ? v - 2 : length(w[i]))) ~ /a/) ALLFLAG = 1
+      i += (v && v == length(w[i])) ? 2 : 1
       continue
     }
     if (w[i] ~ /^-/) { i++; continue }
@@ -257,31 +263,34 @@ if [ "$allflag" = "1" ] || [ "$allnew" = "1" ]; then
     || deny "Blocked by prose-budget-commit: \"$binary rev-parse --show-toplevel\" failed (exit $rrc), so this commit's unstaged changes could not be checked:
 $reporoot
 Fix whatever made that fail, then retry the commit."
-  if [ "$allflag" = "1" ]; then
-    # -z: a quoted (core.quotePath) name reaches --file as the quoted,
-    # octal-escaped text, not the real path, and would be silently
-    # dropped. --diff-filter=d: a deleted file isn't content to check.
-    extra=$(cd "$reporoot" 2>/dev/null && "$binary" diff -z --name-only --diff-filter=d 2>&1)
+  # $(...) drops NUL bytes, which would run every name in a -z listing
+  # together into one path the engine never finds, so each listing goes
+  # through a file and only `tr` ever sees the NULs (languette#49 review).
+  tmp=$(mktemp -d 2>/dev/null) \
+    || deny "Blocked by prose-budget-commit: could not make a temp directory to list this commit's unstaged changes, so they could not be checked. Retry the commit."
+  trap 'rm -rf "$tmp"' EXIT
+  # listz WHAT GIT-ARGS...: appends each path the listing names, anchored to
+  # the repo root, to $files; a failed listing denies, naming WHAT.
+  listz() {
+    what=$1; shift
+    (cd "$reporoot" && "$binary" "$@") >"$tmp/out" 2>"$tmp/err"
     erc=$?
     [ "$erc" -eq 0 ] \
-      || deny "Blocked by prose-budget-commit: \"$binary diff --name-only\" could not list this commit's unstaged tracked changes (exit $erc), so they could not be checked:
-$extra
+      || deny "Blocked by prose-budget-commit: \"$binary $*\" could not list this commit's $what (exit $erc), so they could not be checked:
+$(cat "$tmp/err")
 Fix whatever made that fail, then retry the commit."
+    [ "$(tr -cd '\n' <"$tmp/out" | wc -c)" -eq 0 ] \
+      || deny "Blocked by prose-budget-commit: one of this commit's $what has a newline in its name, which cannot reach prose-budget intact, so it could not be checked. Rename it, then retry the commit."
     files="$files
-$(printf '%s' "$extra" | tr '\0' '\n' | awk -v r="$reporoot" 'NF { print r "/" $0 }')"
-  fi
-  if [ "$allnew" = "1" ]; then
-    extra=$(cd "$reporoot" 2>/dev/null && "$binary" ls-files -z --others --exclude-standard 2>&1)
-    erc=$?
-    [ "$erc" -eq 0 ] \
-      || deny "Blocked by prose-budget-commit: \"$binary ls-files --others\" could not list this commit's new untracked files (exit $erc), so they could not be checked:
-$extra
-Fix whatever made that fail, then retry the commit."
-    files="$files
-$(printf '%s' "$extra" | tr '\0' '\n' | awk -v r="$reporoot" 'NF { print r "/" $0 }')"
-  fi
+$(tr '\0' '\n' <"$tmp/out" | R=$reporoot awk 'length { print ENVIRON["R"] "/" $0 }')"
+  }
+  # -z: a quoted (core.quotePath) name would reach --file as the quoted,
+  # octal-escaped text, not the real path, and be silently dropped.
+  # --diff-filter=d: a deleted file isn't content to check.
+  [ "$allflag" = "1" ] && listz "unstaged tracked changes" diff -z --name-only --diff-filter=d
+  [ "$allnew" = "1" ] && listz "new untracked files" ls-files -z --others --exclude-standard
 fi
-files=$(printf '%s\n' "$files" | awk 'NF')
+files=$(printf '%s\n' "$files" | awk 'length')
 [ -n "$files" ] || exit 0
 
 set --

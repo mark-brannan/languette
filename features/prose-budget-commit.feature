@@ -142,6 +142,53 @@ Feature: prose-budget-commit
     And the stub "prose-budget" was called with "--file "
     And the stub "prose-budget" was called with "README.md"
 
+  Scenario: a `-a` commit with several changed files checks each one, not their names run together
+    Given the file "NOTES.md" holds:
+      """
+      x
+      """
+    And the file "NOTES.md" is committed
+    And the file "README.md" holds:
+      """
+      x
+      """
+    And the file "README.md" is committed
+    And the file "NOTES.md" holds:
+      """
+      y
+      """
+    And the file "README.md" holds:
+      """
+      y
+      """
+    When the agent runs `git commit -am x`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "/NOTES.md /"
+    And the stub "prose-budget" was called with "/README.md"
+
+  Scenario: an `add` by pattern checks several new files, a non-ASCII name among them
+    Given the file "NOTES.md" holds:
+      """
+      x
+      """
+    And the file "café.md" holds:
+      """
+      x
+      """
+    When the agent runs `git add . && git commit -m x`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "/NOTES.md /"
+    And the stub "prose-budget" was called with "/café.md"
+
+  Scenario: a message stuck to `-m` does not swallow the pathspec after it
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    When the agent runs `git commit -mfix README.md`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "--file README.md"
+
   Scenario: an `add` by pattern also checks a brand-new, still-untracked file
     Given the file "NOTES.md" holds:
       """
