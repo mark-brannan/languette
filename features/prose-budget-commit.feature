@@ -110,6 +110,46 @@ Feature: prose-budget-commit
     When the agent runs `git commit -m x`
     Then the guard denies, naming "sections.max_words"
 
+  Scenario Outline: a commit that reaches outside the staged index also checks those paths directly
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    When the agent runs `<command>`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "--staged"
+    And the stub "prose-budget" was called with "--file README.md"
+
+    Examples:
+      | command                               | note                      |
+      | git commit -m x README.md             | trailing pathspec         |
+      | git commit -m x -- README.md          | pathspec after --         |
+      | git add README.md && git commit -m x  | add, then commit, in one  |
+
+  Scenario: a `-a`/`--all` commit checks every unstaged tracked change, not just what's staged
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    And the file "README.md" is committed
+    And the file "README.md" holds:
+      """
+      y
+      """
+    When the agent runs `git commit -am x`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "--staged"
+    And the stub "prose-budget" was called with "--file README.md"
+
+  Scenario: a plain commit with nothing outside the index is not also checked by path
+    When the agent runs `git commit -m x`
+    Then the guard is silent
+    And the stub "prose-budget" was called 1 times
+
+  Scenario: a pathspec this guard cannot resolve is denied, not skipped
+    When the agent runs `git commit -m x "a file.md"`
+    Then the guard denies, naming "could not be resolved"
+
   @shell_only
   Scenario: with no engine on PROSE_BUDGET or PATH the guard is silent
     Given PROSE_BUDGET is unset
