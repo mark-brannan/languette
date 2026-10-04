@@ -321,3 +321,15 @@ Feature: no-git-footguns
     Given CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_BLANKET_STAGING is "no"
     When the agent runs `git add -A`
     Then the guard denies
+
+  Scenario Outline: one rule off still judges the other rules in the same line
+    Given <setting> is "false"
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | setting                                         | command                                       |
+      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_STASH      | git stash pop; git push --force origin foo    |
+      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_STASH      | git push --force origin foo && git stash pop  |
+      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_DISCARD    | git reset --hard && git branch -D foo         |
+      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_FORCE_PUSH | bash -c 'git push --force origin foo; git add -A' |
