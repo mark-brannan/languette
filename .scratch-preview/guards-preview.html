@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guards list preview</title>
+<style>
+:root{--bg:#fff;--fg:#1f2328;--muted:#656d76;--border:#d0d7de;--code:#f6f8fa;--link:#0969da;--tag:#fff8c5;--tagfg:#7d4e00}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0d1117;--fg:#e6edf3;--muted:#8d96a0;--border:#30363d;--code:#161b22;--link:#4493f8;--tag:#3b2e00;--tagfg:#e3b341}}
+body{margin:0;padding:24px 16px;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{display:grid;grid-template-columns:1fr 1fr;gap:32px;max-width:1500px;margin:0 auto}
+@media (max-width:900px){.wrap{grid-template-columns:1fr}}
+.panel{border:1px solid var(--border);border-radius:8px;padding:24px 32px}
+.panel>.label{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 12px}
+h2{font-size:1.5em;border-bottom:1px solid var(--border);padding-bottom:.3em;margin:0 0 16px}
+ul{padding-left:2em;margin:0}li{margin:.25em 0}
+code{font:85% ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--code);padding:.2em .4em;border-radius:6px}
+a{color:var(--link);text-decoration:none}a code{color:var(--link)}
+.tag{font-size:11px;background:var(--tag);color:var(--tagfg);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle;font-family:-apple-system,sans-serif}
+.note{color:var(--muted);font-size:14px;margin-top:20px}
+</style></head><body>
+<div class="wrap">
+<div class="panel"><p class="label">Shape B · 2–3 lines, why in parentheses</p>
+<h2>The guards</h2>
+<p>Each guard denies one class of command:</p>
+<ul>
+<li><a href="#"><code>no-rm-tree</code></a>: a recursive <code>rm</code> or <code>find -delete</code>, unless the target is a generated directory or a place the agent owns (an agent once took a directory of the user's captures with <code>rm -rf examples</code>).</li>
+<li><a href="#"><code>no-git-footguns</code></a>: <code>git add -A</code>, <code>commit -a</code>, <code>stash pop</code>, force-push, <code>reset --hard</code> and the other moves that throw work away, often in a checkout another session shares.</li>
+<li><a href="#"><code>no-delete-stacked-base</code></a>: deleting a remote branch that an open PR is based on (GitHub silently closes the PR).</li>
+<li><a href="#"><code>issue-door</code></a>: a second GitHub issue create, transfer or delete in the same human turn, or any inside a loop (an agent once filed a batch of duplicate issues on a plan approved once).<span class="tag">shortened</span></li>
+<li><a href="#"><code>public-issue-guard</code></a>: posting a term from your private list to a public GitHub repo (once up, it is in every mirror). Off until you name the list; see <a href="#">Configuration</a>.<span class="tag">new</span></li>
+<li><a href="#"><code>no-checkout-home</code></a> (opt-in, off by default): a <code>git</code> or <code>yadm</code> <code>checkout</code> or <code>switch</code> of the branch in your home directory, when <code>$HOME</code> is itself a worktree (every shell on the machine follows it).<span class="tag">shortened</span></li>
+<li><a href="#"><code>no-foreign-worktree</code></a> (opt-in, off by default): a command or edit that reaches into another session's git worktree (read its branch with <code>git show &lt;branch&gt;:&lt;path&gt;</code> instead).<span class="tag">new</span></li>
+<li><a href="#"><code>ask-first</code></a>: a command the repo lists as costly, until you approve that one run (an agent once ran a 46-minute, all-core test sweep to check a small change, then started it again). See <a href="#">Ask first</a>.</li>
+<li><a href="#"><code>prose-budget-commit</code></a>: a <code>git commit</code> whose staged prose runs over the repo's own word budgets, as counted by <a href="#"><code>prose-budget</code></a>, where installed.</li>
+</ul>
+<p class="note">Five bullets are exactly as on main today. Tags are for this preview only.</p>
+</div>
+<div class="panel"><p class="label">Shape C · one line each</p>
+<h2>The guards</h2>
+<p>Each guard denies one class of command:</p>
+<ul>
+<li><a href="#"><code>no-rm-tree</code></a>: a recursive <code>rm</code> outside a generated or agent-owned directory</li>
+<li><a href="#"><code>no-git-footguns</code></a>: <code>add -A</code>, <code>commit -a</code>, <code>stash pop</code>, force-push, <code>reset --hard</code></li>
+<li><a href="#"><code>no-delete-stacked-base</code></a>: deleting a remote branch an open PR is based on</li>
+<li><a href="#"><code>issue-door</code></a>: a second GitHub issue create, transfer or delete in one human turn</li>
+<li><a href="#"><code>public-issue-guard</code></a>: a private term posted to a public repo</li>
+<li><a href="#"><code>no-checkout-home</code></a> (opt-in): switching the branch checked out in <code>$HOME</code></li>
+<li><a href="#"><code>no-foreign-worktree</code></a> (opt-in): reaching into another session's worktree</li>
+<li><a href="#"><code>ask-first</code></a>: a command the repo lists as costly, until you approve that run</li>
+<li><a href="#"><code>prose-budget-commit</code></a>: a commit whose prose runs over the repo's word budgets</li>
+</ul>
+<p class="note">Every bullet rewritten. The scar stories and the pointers to Configuration and Ask first are gone.</p>
+</div>
+</div>
+</body></html>

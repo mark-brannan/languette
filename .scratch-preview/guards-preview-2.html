@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guards list preview 2</title>
+<style>
+:root{--bg:#fff;--fg:#1f2328;--muted:#656d76;--border:#d0d7de;--code:#f6f8fa;--link:#0969da;--rule:#cf222e}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0d1117;--fg:#e6edf3;--muted:#8d96a0;--border:#30363d;--code:#161b22;--link:#4493f8;--rule:#f85149}}
+body{margin:0;padding:24px 16px;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+.gh{max-width:1012px;margin:0 auto;border:1px solid var(--border);border-radius:8px;padding:32px;box-sizing:border-box;position:relative}
+.gh::after{content:"GitHub file view: content column 1012px, this edge is where a line spills";position:absolute;right:-1px;top:0;bottom:0;border-right:2px dashed var(--rule);width:0;font-size:11px;color:var(--rule);writing-mode:vertical-rl;padding-left:4px}
+h2{font-size:1.5em;border-bottom:1px solid var(--border);padding-bottom:.3em;margin:0 0 16px}
+ul{padding-left:2em;margin:0}li{margin:.25em 0}
+code{font:85% ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--code);padding:.2em .4em;border-radius:6px}
+a{color:var(--link);text-decoration:none}a code{color:var(--link)}
+.note{color:var(--muted);font-size:14px;max-width:1012px;margin:16px auto 0}
+</style></head><body>
+<div class="gh">
+<h2>The guards</h2>
+<p>Each guard denies one class of command:</p>
+<ul>
+<li><a href="#"><code>no-rm-tree</code></a>: a recursive <code>rm</code> or <code>find -delete</code> outside a generated or agent-owned directory</li>
+<li><a href="#"><code>no-git-footguns</code></a>: <code>add -A</code>, <code>commit -a</code>, <code>stash pop</code>, force-push, <code>reset --hard</code> and the other moves that throw work away</li>
+<li><a href="#"><code>no-delete-stacked-base</code></a>: deleting a remote branch an open PR is based on (GitHub silently closes the PR)</li>
+<li><a href="#"><code>issue-door</code></a>: a second GitHub issue create, transfer or delete in one human turn, or any inside a loop</li>
+<li><a href="#"><code>public-issue-guard</code></a>: a term from your private list, posted to a public repo (off until you give it the list)</li>
+<li><a href="#"><code>no-checkout-home</code></a>: switching the branch checked out in <code>$HOME</code>, when home is itself a worktree (opt-in)</li>
+<li><a href="#"><code>no-foreign-worktree</code></a>: a command or edit that reaches into another session's git worktree (opt-in)</li>
+<li><a href="#"><code>ask-first</code></a>: a command the repo lists as costly, until you approve that one run</li>
+<li><a href="#"><code>prose-budget-commit</code></a>: a <code>git commit</code> whose staged prose runs over the repo's word budgets</li>
+</ul>
+</div>
+<p class="note">Names link to the guard's own section where one exists (<code>no-rm-tree</code>, <code>public-issue-guard</code>, <code>ask-first</code>), else to the script. Opt-in is one word at the end. The scar stories move to the hook headers.</p>
+</body></html>
