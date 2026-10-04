@@ -34,6 +34,7 @@ approvals; one inside a loop or xargs is denied outright, since no count of
 approvals covers it.
 """
 
+import fcntl
 import json
 import os
 import re
@@ -240,25 +241,30 @@ def _approvals(transcript, label):
     return yes
 
 
-def unspent(payload, label):
-    """tool_use ids of the AskUserQuestion calls the user answered with
-    `label` and that no run has spent. Raises OSError when the transcript
-    cannot be read or the payload names no transcript. Shared
-    with no-iac-destroy: one click is one run, whichever guard asked."""
+def claim(payload, wants):
+    """Spend one approval per run, atomically. `wants` is {approve_label:
+    runs}. Returns ({label: unspent tool_use ids}, spent): when every label
+    has at least its runs' worth of unspent approvals they are all recorded
+    as spent and `spent` is True; otherwise nothing is spent and the caller
+    says what is missing. Read, check and record happen under an exclusive
+    lock on the spent file, so two hooks judging at once (Claude Code runs
+    parallel Bash calls, each with its own hook process) cannot both pass on
+    one click. Raises OSError when the payload names no transcript, or the
+    transcript or the spent file cannot be read or written. Shared with
+    no-iac-destroy: one click is one run, whichever guard asked."""
     tp = payload.get("transcript_path")
     if not isinstance(tp, str) or not tp:
         raise OSError("the payload has no transcript_path")
-    spent = set()
-    if os.path.exists(tp + SPENT):
-        with open(tp + SPENT, encoding="utf-8") as f:
-            spent = {x.strip() for x in f if x.strip()}
-    return [i for i in _approvals(tp, label) if i not in spent]
-
-
-def spend(payload, ids):
-    """Record `ids` as spent, beside the transcript. Raises OSError."""
-    with open(payload["transcript_path"] + SPENT, "a", encoding="utf-8") as f:
-        f.writelines(i + "\n" for i in ids)
+    yes = {label: _approvals(tp, label) for label in wants}     # the transcript only grows
+    with open(tp + SPENT, "a+", encoding="utf-8") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.seek(0)
+        spent = {x.strip() for x in f if x.strip()}
+        approved = {label: [i for i in ids if i not in spent] for label, ids in yes.items()}
+        if any(len(approved[label]) < n for label, n in wants.items()):
+            return approved, False
+        f.writelines(i + "\n" for label, n in wants.items() for i in approved[label][:n])
+        return approved, True
 
 
 def check(payload, env=os.environ):
@@ -295,27 +301,24 @@ def check(payload, env=os.environ):
                      "approval. Run it once, on its own.")
 
     try:
-        approved = {c["id"]: unspent(payload, c["approve_label"]) for c in hits}
+        approved, spent = claim(payload, {c["approve_label"]: runs[c["id"]] for c in hits})
     except (OSError, ValueError) as e:
-        return deny(f"ask-first: cannot read the session transcript to look for the user's approval "
-                     f"({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
-
-    missing = [c for c in hits if len(approved[c["id"]]) < runs[c["id"]]]
-    if missing:
-        parts = []
-        for c in missing:
-            p = (f"`{c['id']}` ({path}) needs the user's approval for each run"
-                 + (f"; this command runs it {runs[c['id']]} times and has {len(approved[c['id']])} unspent"
-                    if runs[c["id"]] > 1 else "") + f". Cost: {c['cost']}."
-                 + (f" Cheaper forms: {c['cheaper']}." if c.get("cheaper") else ""))
-            p += (f" If a cheaper form answers the question, use it instead. Otherwise call AskUserQuestion: "
-                  f"give the exact command (`{cmd.strip()}`), why it must run now, and the "
-                  f"cost above, with one option labelled exactly \"{c['approve_label']}\" and one to skip. "
-                  "One approval is one run; ask again before running it again.")
-            parts.append(p)
-        return deny("ask-first: " + "\n\n".join(parts))
-    try:
-        spend(payload, [i for c in hits for i in approved[c["id"]][:runs[c["id"]]]])
-    except OSError as e:
-        return deny(f"ask-first: the approval could not be recorded as spent ({e}), so it is not used.")
-    return None
+        return deny(f"ask-first: cannot read the session transcript to look for the user's approval, or "
+                     f"record it as spent ({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
+    if spent:
+        return None
+    parts = []
+    for c in hits:
+        have = len(approved[c["approve_label"]])
+        if have >= runs[c["id"]]:
+            continue
+        p = (f"`{c['id']}` ({path}) needs the user's approval for each run"
+             + (f"; this command runs it {runs[c['id']]} times and has {have} unspent"
+                if runs[c["id"]] > 1 else "") + f". Cost: {c['cost']}."
+             + (f" Cheaper forms: {c['cheaper']}." if c.get("cheaper") else ""))
+        p += (f" If a cheaper form answers the question, use it instead. Otherwise call AskUserQuestion: "
+              f"give the exact command (`{cmd.strip()}`), why it must run now, and the "
+              f"cost above, with one option labelled exactly \"{c['approve_label']}\" and one to skip. "
+              "One approval is one run; ask again before running it again.")
+        parts.append(p)
+    return deny("ask-first: " + "\n\n".join(parts))

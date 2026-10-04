@@ -42,7 +42,7 @@
     "no_iac_destroy": {
       "type": "boolean",
       "title": "Ask before destroying infrastructure",
-      "description": "Deny terraform, pulumi, cdk, aws, gcloud, az, kubectl and helm commands that destroy infrastructure or apply without review until the user approves that one run through AskUserQuestion. Plans, previews and dry runs pass. Leave on unless you want those commands through unasked.",
+      "description": "Deny terraform, terragrunt, pulumi, cdk, aws, gcloud, az, kubectl and helm commands that destroy infrastructure or apply without review until the user approves that one run through AskUserQuestion. Plans, previews and dry runs pass. Leave on unless you want those commands through unasked.",
       "default": true
     },
     "issue_door": {

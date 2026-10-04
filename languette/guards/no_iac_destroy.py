@@ -10,8 +10,8 @@ outright. Unlike ask-first, the list is built in, not the repo's.
 Rules, judged on the words after the tool's name, global options skipped:
 
   rule                      command
-  terraform-destroy         terraform|tofu destroy, or apply -destroy
-  terraform-apply           terraform|tofu apply -auto-approve
+  terraform-destroy         terraform|tofu|terragrunt destroy, or apply -destroy
+  terraform-apply           terraform|tofu|terragrunt apply -auto-approve
   pulumi-destroy            pulumi destroy|down, unless --preview-only
   pulumi-up                 pulumi up|update --yes|-y, unless --preview-only
   cdk-destroy               cdk destroy
@@ -27,19 +27,25 @@ Rules, judged on the words after the tool's name, global options skipped:
                             or =server)
   helm-uninstall            helm uninstall|delete|del|un, unless --dry-run
 
-Plans, previews, reads and --help pass, since no rule names them. The tool is
+Terragrunt is terraform with its own options skipped; `run-all`/`run --all`
+fans out over modules and is one run here. The approval is the rule's, not
+the command's: a click on "Run kubectl delete" pays for the next kubectl
+delete the agent runs, whatever its target, which is why the deny tells the
+agent to put the exact command in the question. Plans, previews, reads and
+--help pass, since no rule names them. The tool is
 found through wrappers, chains, `sh -c "..."`, `echo ... | sh` and the
 launchers npx, bunx, `pnpm|yarn dlx` (`npx aws-cdk@2 destroy`); prose (grep,
 git commit -m, cat) and process tools (pkill -f) that merely name a command
 are not running it. Not seen: a run inside a script (`make destroy`), behind a
 variable (`terraform $ACTION`), in a config file (cdk.json's requireApproval),
-or applying a saved plan (`terraform apply plan.tfplan`).
+or applying a saved plan (`terraform apply plan.tfplan`); nor eksctl, oc,
+helmfile, docker, ansible or a database's DROP.
 """
 
 import re
 
 from languette import scan as sw
-from languette.guards.ask_first import LAUNCH, LOOP, PROSE, spend, unspent
+from languette.guards.ask_first import LAUNCH, LOOP, PROSE, claim
 from languette.verdict import deny
 
 NAME = "no-iac-destroy"
@@ -105,7 +111,7 @@ RULES = {
         "`helm uninstall <release> --dry-run` shows what would go, and `helm status` what is there"),
 }
 
-TOOLS = frozenset("terraform tofu pulumi cdk aws-cdk aws gcloud az kubectl helm".split())
+TOOLS = frozenset("terraform tofu terragrunt pulumi cdk aws-cdk aws gcloud az kubectl helm".split())
 _TOOL = re.compile(r"(?:^|/)(?:" + "|".join(sorted(TOOLS)) + r")(?:@[^/]*)?\Z")
 _ANY = re.compile(r"(?:^|/)(?:" + "|".join(sorted(TOOLS | LAUNCH)) + r")(?:@[^/]*)?\Z")
 _LAUNCHER = re.compile(r"(?:^|/)(?:" + "|".join(sorted(LAUNCH)) + r")\Z")
@@ -114,6 +120,10 @@ HELP = frozenset("-h -help --help".split())
 # Options that take the next word as their value, and so must not be
 # mistaken for the subcommand. Unknown options are read as flags.
 VALUED = {
+    "terragrunt": "--terragrunt-config --config --terragrunt-working-dir --working-dir --terragrunt-download-dir "
+                  "--download-dir --terragrunt-iam-role --iam-assume-role --terragrunt-parallelism --parallelism "
+                  "--terragrunt-include-dir --queue-include-dir --terragrunt-exclude-dir --queue-exclude-dir "
+                  "--terragrunt-log-level --log-level --terragrunt-source --source",
     "pulumi": "--color --cwd -C --profiling --tracing --memprofilerate --verbose -v",
     "cdk": "-a --app -c --context -p --plugin --profile -r --role-arn -o --output --proxy --ca-bundle-path "
            "--toolkit-stack-name --build --lookups --notices",
@@ -185,6 +195,24 @@ def _terraform(rest):
         return "terraform-apply"
 
 
+def _terragrunt(rest):
+    """Terraform, after terragrunt's own options and the run-all forms."""
+    words, skip = [], False
+    for w in rest:
+        if skip:
+            skip = False
+        elif w in VALUED["terragrunt"]:
+            skip = True
+        else:
+            words.append(w)
+    pos = _pos(words)
+    if pos and pos[0] in ("run-all", "run"):
+        words = words[words.index(pos[0]) + 1:]
+    elif pos and pos[0] in ("destroy-all", "apply-all"):
+        words = [pos[0][:-4]] + words[words.index(pos[0]) + 1:]
+    return _terraform(words)
+
+
 def _pulumi(rest):
     sub = (_pos(rest, VALUED["pulumi"]) or [None])[0]
     if _on(_flag(rest, "preview-only")):
@@ -236,7 +264,7 @@ def _delete(rule):
     return lambda rest: rule if "delete" in _pos(rest) else None
 
 
-JUDGE = {"terraform": _terraform, "tofu": _terraform, "pulumi": _pulumi, "cdk": _cdk, "aws": _aws,
+JUDGE = {"terraform": _terraform, "tofu": _terraform, "terragrunt": _terragrunt, "pulumi": _pulumi, "cdk": _cdk, "aws": _aws,
          "gcloud": _delete("gcloud-delete"), "az": _delete("az-delete"), "kubectl": _kubectl, "helm": _helm}
 
 
@@ -290,26 +318,23 @@ def check(payload, env=None):
                     "parallel or watch runs an unknown number of times, and each run needs its own "
                     "approval. Run it once, on its own, after looking at what it would remove.")
     try:
-        approved = {r: unspent(payload, RULES[r][0]) for r in found}
+        approved, spent = claim(payload, {RULES[r][0]: len(found[r]) for r in found})
     except (OSError, ValueError) as e:
-        return deny(f"no-iac-destroy: cannot read the session transcript to look for the user's approval "
-                    f"({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
-    missing = [r for r in found if len(approved[r]) < len(found[r])]
-    if missing:
-        parts = []
-        for r in missing:
-            label, what, cost, instead = RULES[r]
-            n = len(found[r])
-            parts.append(
-                f"`{cmd.strip()}` {what} (`{r}`)"
-                + (f"; it runs the rule {n} times and has {len(approved[r])} unspent approvals" if n > 1 else "")
-                + f". Cost: {cost}. Instead, look first: {instead.format(tool=found[r][0])}."
-                f" If the user then wants this run, call AskUserQuestion: give the exact command, why it must run "
-                f"now and the cost above, with one option labelled exactly \"{label}\" and one to skip. "
-                "One approval is one run; ask again before running it again.")
-        return deny("no-iac-destroy: " + "\n\n".join(parts))
-    try:
-        spend(payload, [i for r in found for i in approved[r][:len(found[r])]])
-    except OSError as e:
-        return deny(f"no-iac-destroy: the approval could not be recorded as spent ({e}), so it is not used.")
-    return None
+        return deny(f"no-iac-destroy: cannot read the session transcript to look for the user's approval, or "
+                    f"record it as spent ({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
+    if spent:
+        return None
+    parts = []
+    for r in found:
+        label, what, cost, instead = RULES[r]
+        n, have = len(found[r]), len(approved[label])
+        if have >= n:
+            continue
+        parts.append(
+            f"`{cmd.strip()}` {what} (`{r}`)"
+            + (f"; it runs the rule {n} times and has {have} unspent approvals" if n > 1 else "")
+            + f". Cost: {cost}. Instead, look first: {instead.format(tool=found[r][0])}."
+            f" If the user then wants this run, call AskUserQuestion: give the exact command, why it must run "
+            f"now and the cost above, with one option labelled exactly \"{label}\" and one to skip. "
+            "One approval is one run; ask again before running it again.")
+    return deny("no-iac-destroy: " + "\n\n".join(parts))

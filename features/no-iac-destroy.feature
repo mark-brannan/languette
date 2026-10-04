@@ -20,6 +20,7 @@ Feature: no-iac-destroy
         | command                                                                        | instead                            |
         | terraform destroy                                                              | terraform plan -destroy            |
         | tofu destroy                                                                   | tofu plan -destroy                 |
+        | terragrunt destroy                                                             | terragrunt plan -destroy           |
         | terraform apply -destroy                                                       | terraform plan -destroy            |
         | terraform apply -auto-approve                                                  | terraform plan` shows the change   |
         | tofu apply -auto-approve                                                       | tofu plan` shows the change        |
@@ -72,6 +73,10 @@ Feature: no-iac-destroy
         | terraform apply --auto-approve                                 | -- spelling                                   |
         | terraform apply -auto-approve=true -var a=b                    | explicit value                                |
         | /usr/local/bin/terraform destroy                               | by path                                       |
+        | terragrunt run-all destroy --terragrunt-non-interactive        | terragrunt, fanned out over modules           |
+        | terragrunt run --all apply -auto-approve                       | terragrunt's newer run form                   |
+        | terragrunt --terragrunt-working-dir infra destroy              | terragrunt's own valued option first          |
+        | terragrunt destroy-all                                         | terragrunt's old spelling                     |
         | timeout 1h terraform destroy                                   | wrapper                                       |
         | sudo -u deploy kubectl delete -f app.yaml                      | sudo                                          |
         | cd infra && terraform destroy                                  | chain                                         |
@@ -124,6 +129,9 @@ Feature: no-iac-destroy
         | terraform destroy --help                                 | help                                |
         | terraform destroy -h                                     | help                                |
         | tofu plan -destroy                                       |                                     |
+        | terragrunt plan -destroy                                 |                                     |
+        | terragrunt run-all plan                                  |                                     |
+        | terragrunt hcl fmt                                       |                                     |
         | terraform state list                                     |                                     |
         | pulumi preview                                           |                                     |
         | pulumi up                                                | prompts the user itself             |
