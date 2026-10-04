@@ -127,10 +127,11 @@ LIB="$HERE/lib-shell-words.awk"
 # of path-shaped words is pathological, not a use case. Cap and move on.
 MAX_CANDIDATES=48
 
-json_str() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | awk 'BEGIN{ORS="\\n"} {print}' | sed 's/\\n$//; s/^/"/; s/$/"/'; }
-deny() { printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\n' "$(json_str "$1")"; exit 0; }
+# jq escapes every control character a path can carry, so the reason is
+# always valid JSON; deny runs only after the jq check below.
+deny() { jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'; exit 0; }
 # The reasons that fire when a tool this hook needs is missing cannot go
-# through json_str -- it needs sed and awk, which is what may be missing.
+# through jq, which is what may be missing.
 # printf is a shell builtin, so this one always emits valid JSON. Keep the
 # message free of double quotes, backslashes and newlines.
 deny_literal() { printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"no-foreign-worktree: %s This is a gate and fails closed."}}\n' "$1"; exit 0; }
@@ -376,6 +377,12 @@ resolve_dir() {
     esac
   done
   [ -d "$r" ] || return 0
+  # A `..` after a directory that does not exist: the shell's cd drops
+  # `nope/..` lexically and lands wherever the rest says, which the walk up
+  # cannot see. Unresolvable, so denied.
+  case "/$rd_rest/" in
+    */../*) deny "no-foreign-worktree: \`$raw\` has a \`..\` after a directory that does not exist, so where it lands cannot be resolved. Spell the path without \`..\`." ;;
+  esac
   rd_dir=$(cd "$r" 2>/dev/null && pwd -P)
 }
 

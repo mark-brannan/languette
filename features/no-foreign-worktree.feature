@@ -29,6 +29,12 @@ Feature: no-foreign-worktree
       | cat {TMP}/repo/.claude/worktrees/theirs/sub/f.txt    |
       | sh -c "cd {TMP}/repo/.claude/worktrees/theirs && ls" |
 
+  Scenario: a .. after a directory that does not exist cannot be resolved, so it is denied
+    When the agent runs `cd {TMP}/repo/.claude/worktrees/nope/../theirs && ls`
+    Then the guard denies, naming "does not exist"
+    When the agent calls tool "Write" with input `{"file_path": "{TMP}/repo/.claude/worktrees/nope/../theirs/f.txt", "content": "x"}`
+    Then the guard denies, naming "does not exist"
+
   Scenario Outline: what is not a private working directory is allowed
     When the agent runs `<command>`
     Then the guard is silent

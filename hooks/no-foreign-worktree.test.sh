@@ -109,6 +109,17 @@ bash_check deny 'removing one'                     "git worktree remove $THEIRS"
 bash_check deny 'inside sh -c'                     "sh -c \"cd $THEIRS && ls\""
 bash_check deny 'from the main worktree'           "git -C $THEIRS status" "$REPO"
 bash_check deny 'from an unrelated cwd'            "git -C $THEIRS status" /tmp
+# cd drops `nope/..` lexically and lands in the sibling; the walk up to an
+# existing directory would stop at the worktrees parent and allow it.
+bash_check deny 'a .. after a missing dir, into a sibling' "cd $WTS/nope/../theirs && ls"
+check_json deny 'Write through a .. after a missing dir' "$(jq -n --arg f "$WTS/nope/../theirs/f.txt" --arg d "$MINE" \
+  '{tool_name:"Write",tool_input:{file_path:$f,content:"x"},cwd:$d}')"
+bash_check allow 'a ref range is not a .. component' 'git log main..theirs'
+# A control character in the reported path must still give valid JSON.
+mkdir -p "$THEIRS/tab	dir"
+out=$(jq -n --arg c "ls '$THEIRS/tab	dir'" --arg d "$MINE" '{tool_name:"Bash",tool_input:{command:$c},cwd:$d}' | bash "$HOOK" 2>&1)
+if jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1 <<<"$out"; then pass=$((pass + 1)); else
+  fail=$((fail + 1)); printf 'FAIL (want valid deny JSON): a tab in the path\n  hook output: %s\n' "$out"; fi
 
 # --- must allow: everywhere that is not a private working directory --------
 bash_check allow 'the main worktree of the repo'   "git -C $REPO status"
