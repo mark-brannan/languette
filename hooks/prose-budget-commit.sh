@@ -220,7 +220,7 @@ rc=$?
 case $rc in
   1) deny "Blocked by prose-budget-commit: prose-budget --staged found:
 $out
-Fix the prose and retry the same commit. Do not ask the user; this is settled." ;;
+Fix the prose and retry the same commit: this is a mechanical length check, not a judgment call that needs anyone's sign-off." ;;
   2) deny "Blocked by prose-budget-commit: prose-budget --staged could not check the staged prose (exit 2: a bad budgets config, or an engine too old for --staged):
 $out
 Fix the config or update the engine, then retry the commit." ;;
@@ -286,7 +286,7 @@ frc=$?
 case $frc in
   1) deny "Blocked by prose-budget-commit: this commit reaches prose outside the staged index (git commit -a/--all, a pathspec commit, or a git add in the same command) -- checked those files directly and prose-budget found:
 $fout
-Fix the prose and retry the same commit. Do not ask the user; this is settled." ;;
+Fix the prose and retry the same commit: this is a mechanical length check, not a judgment call that needs anyone's sign-off." ;;
   2) deny "Blocked by prose-budget-commit: prose-budget --file could not check those files (exit 2: a bad budgets config, or an engine too old for --file):
 $fout
 Fix the config or update the engine, then retry the commit." ;;

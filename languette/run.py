@@ -3,14 +3,15 @@ registered for its hook event and tool, print one decision.
 
     python3 -I languette/run.py [--guard NAME]
 
---guard restricts the run to one guard (the hooks.json wiring runs ask-first
-alone this way). Fails closed: an unreadable payload is a deny,
+--guard restricts the run to one guard (the hooks.json wiring runs each
+Python guard alone this way). Fails closed: an unreadable payload is a deny,
 and a guard that raises is a deny naming the guard. No guard matched, or none
 objected, is exit 0 with no output. Standard library only.
 """
 
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -23,17 +24,18 @@ def _out(event, fields):
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
-    from languette.guards import ask_first, no_rm_tree
+    from languette.guards import ask_first, no_bypass_labels, no_rm_tree
     from languette.verdict import context, deny
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
                                          "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"}))
     sys.exit(0)
 
-# (hook event, tool name) -> guards, in the order they judge.
-GUARDS = {
-    ("PreToolUse", "Bash"): (no_rm_tree, ask_first),
-}
+# (hook event, tool name pattern, guards in the order they judge).
+GUARDS = (
+    ("PreToolUse", re.compile(r"Bash\Z"), (no_rm_tree, ask_first, no_bypass_labels)),
+    ("PreToolUse", re.compile(r"mcp__.+"), (no_bypass_labels,)),
+)
 
 
 def respond(stdin_text, env, only=None):
@@ -48,7 +50,9 @@ def respond(stdin_text, env, only=None):
     # The shell guards never read the event; a payload without one is judged
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
-    guards = [g for g in GUARDS.get((event, payload.get("tool_name")), ()) if only in (None, g.NAME)]
+    tool = payload.get("tool_name")
+    guards = [g for ev, rx, gs in GUARDS if ev == event and isinstance(tool, str) and rx.match(tool)
+              for g in gs if only in (None, g.NAME)]
     reasons, notes = [], []
     for g in guards:
         try:
