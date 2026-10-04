@@ -56,6 +56,14 @@ Each guard denies one class of command:
   once filed a batch of duplicate issues on a plan approved once, the batch
   buried in it). One per turn: it opens on your prompt, the first write
   spends it.
+- [`public-issue-guard`](hooks/public-issue-guard.sh): issue, PR, comment or
+  review text bound for a public GitHub repo that names a term from your
+  private-terms file (a boat's name, a hostname, an account id: once posted it
+  is in GitHub's history and every mirror). It reads flag values, heredocs,
+  `--body-file` contents and the GitHub MCP tools' fields, and denies the
+  `churn-ok` and `mixed-loops-ok` labels, which waive a CI gate and are a
+  human's to apply. Inert until you name the file; see
+  [Configuration](#configuration).
 - [`ask-first`](languette/guards/ask_first.py): a command the repo lists as
   costly, until you approve that one run (an agent once ran a 46-minute,
   all-core test sweep to check a small change, then started it again). See
@@ -135,6 +143,14 @@ claude plugin install languette@languette --config no_rm_tree=false
 | `no_delete_stacked_base` | `no-delete-stacked-base` |
 | `ask_first` | `ask-first` |
 | `issue_door` | `issue-door` |
+| `public_issue_guard` | `public-issue-guard` |
+
+`public-issue-guard` also takes `private_terms_file`, a text file of terms,
+one per line, matched case-insensitively as plain text (`#` for comments). Set
+it with `/plugin configure languette@languette`. Unset or empty, the guard
+allows everything; set but unreadable or without a term in it, it denies every
+post to a public repo and says why. Text bound for
+`mark-brannan/claude_prompts_scratch` is never scanned.
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
@@ -201,6 +217,7 @@ guard reads beyond the command, it declares:
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
 | `no-delete-stacked-base` | GitHub, through `gh` |
 | `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
+| `public-issue-guard` | the terms file named by `private_terms_file`, the files a command posts, and `git remote` for the checkout's origin |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes
 is a deny naming the guard; the runner holds that rule, so no guard has to.

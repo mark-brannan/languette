@@ -13,6 +13,10 @@ Feature: wiring
       {"commands": [{"id": "walk", "match": [{"cmd": "npm", "args": ["run", "walk"]}],
                      "cost": "long", "approve_label": "Run walk"}]}
       """
+    And the private terms file holds:
+      """
+      Wanderlust
+      """
 
   Scenario Outline: each hooks.json command judges a payload
     Given the hook is the hooks.json command for "<guard>"
@@ -26,6 +30,7 @@ Feature: wiring
       | no-delete-stacked-base | git push origin --delete "$b" | asks    |
       | ask-first              | npm run walk                  | denies  |
       | issue-door             | gh issue create -t t -b b     | denies  |
+      | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
 
   # The prompt hook is the only thing that opens the door. Dropped or
   # mis-argumented in hooks.json, the PreToolUse hook would deny every create.
@@ -48,6 +53,7 @@ Feature: wiring
       | no-delete-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
       | issue-door             | gh issue create -t t -b b     |
+      | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust |
 
   Scenario Outline: a script that crashes is a deny
     Given the hook is the hooks.json command for "<guard>"
@@ -62,6 +68,7 @@ Feature: wiring
       | no-delete-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
       | issue-door             | gh issue create -t t -b b     |
+      | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust |
 
   Scenario Outline: the option set to false skips the guard
     Given the hook is the hooks.json command for "<guard>"
@@ -76,6 +83,7 @@ Feature: wiring
       | no-delete-stacked-base | CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE | git push origin --delete "$b" |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | npm run walk                  |
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | gh issue create -t t -b b     |
+      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | gh issue comment 3 -R o/r -b Wanderlust |
 
   # Only the exact word false skips: unset, empty or anything else runs the
   # guard, so a misconfiguration cannot open the gate.
@@ -117,3 +125,9 @@ Feature: wiring
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | no    | gh issue create -t t -b b     | denies  |
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | true  | gh issue create -t t -b b     | denies  |
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | 1     | gh issue create -t t -b b     | denies  |
+      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     |       | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | 0     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | False | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |

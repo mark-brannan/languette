@@ -35,6 +35,16 @@
             "statusMessage": "Checking for an issue create, transfer or delete"
           }
         ]
+      },
+      {
+        "matcher": "Bash|mcp__.*__(create_issue|update_issue|issue_write|add_issue_comment|create_pull_request|update_pull_request|add_pull_request_review_comment|create_pull_request_review|pull_request_review_write|add_comment_to_pending_review|create_and_submit_pull_request_review|submit_pending_pull_request_review)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/public-issue-guard.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"public-issue-guard.sh is missing from the plugin directory or crashed, so text bound for a public GitHub repo could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking issue/PR text against the private-terms list"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [

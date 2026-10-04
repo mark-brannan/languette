@@ -212,6 +212,13 @@ def _file(ctx, rel, docstring):
     f.write_text(docstring)
 
 
+@given("the private terms file holds:")
+def _terms(ctx, docstring):
+    f = Path(ctx.mkdtemp()) / "private-terms.txt"
+    f.write_text(ctx.expand(docstring) + "\n")
+    ctx.env["CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE"] = str(f)
+
+
 @given("the transcript holds:")
 def _transcript(ctx, docstring):
     (ctx.proj / "t.jsonl").write_text(docstring + "\n")
@@ -397,6 +404,13 @@ def _silent(ctx):
 @then(parsers.re(r'the guard warns about "(?P<text>.*)"'))
 def _warns(ctx, text):
     assert_that(ctx.verdict, warns_about(text))
+
+
+@then(parsers.re(r'the guard allows, rewriting the command to "(?P<text>.*)"'))
+def _rewrites(ctx, text):
+    assert ctx.verdict.decision == "allow", ctx.verdict.show()
+    got = ctx.verdict.out.get("updatedInput", {}).get("command")
+    assert got == ctx.expand(text), f"rewritten to {got!r}, want {ctx.expand(text)!r}"
 
 
 @then(parsers.re(r'the stub "(?P<name>[a-z]+)" was called with "(?P<text>.*)"'))
