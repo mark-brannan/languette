@@ -21,6 +21,36 @@
       "description": "Deny blanket staging (git add -A), stash pop/drop, force pushes, discarding checkouts and git branch -D. Leave on unless you want these git commands through unchecked.",
       "default": true
     },
+    "no_git_footguns_blanket_staging": {
+      "type": "boolean",
+      "title": "Block blanket staging",
+      "description": "Deny git add -A, git add . and git commit -a. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
+      "default": true
+    },
+    "no_git_footguns_stash": {
+      "type": "boolean",
+      "title": "Block stash pop, drop and clear",
+      "description": "Deny git stash pop, clear and a bare drop. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
+      "default": true
+    },
+    "no_git_footguns_force_push": {
+      "type": "boolean",
+      "title": "Block force pushes",
+      "description": "Deny bare force pushes, and force pushes or deletes of main. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
+      "default": true
+    },
+    "no_git_footguns_discard": {
+      "type": "boolean",
+      "title": "Block discarding uncommitted work",
+      "description": "Deny git reset --hard, git checkout . or git restore . and git clean -f. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
+      "default": true
+    },
+    "no_git_footguns_branch_delete": {
+      "type": "boolean",
+      "title": "Block git branch -D",
+      "description": "Deny git branch -D and --delete --force. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
+      "default": true
+    },
     "no_rm_tree": {
       "type": "boolean",
       "title": "Block recursive rm",
