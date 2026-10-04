@@ -21,37 +21,95 @@
 # Drop every heredoc body: from the end of the line carrying <<WORD to the
 # line that is exactly WORD. The marker itself becomes a plain word. Runs on
 # the raw text before scan(), so a `<<EOF` inside quotes is stripped too --
-# a doc that *mentions* a command is not that command either way.
-function strip_heredocs(b,  d, eol, endm, tail, start) {
+# a doc that *mentions* a command is not that command either way. With an
+# unquoted delimiter (<<EOF, <<-EOF) the shell runs the body's command
+# substitutions, so those stay behind, each on a line of its own
+# (sw_hd_subs), and scan() reads them as commands like any other $(...).
+function strip_heredocs(b,  d, eol, endm, tail, start, live) {
   while (match(b, /<<-?[ \t]*["']?[A-Za-z_][A-Za-z0-9_]*["']?/)) {
     start = RSTART  # match() below clobbers RSTART; keep the opener's position
-    d = substr(b, start, RLENGTH); sub(/^<<-?[ \t]*/, "", d); gsub(/["']/, "", d)
+    d = substr(b, start, RLENGTH); live = (d !~ /["']/)
+    sub(/^<<-?[ \t]*/, "", d); gsub(/["']/, "", d)
     eol = index(substr(b, start), "\n")
     if (!eol) return substr(b, 1, start - 1) " HEREDOC "
     tail = substr(b, start + eol)
     endm = match(tail, "(^|\n)[ \t]*" d "[ \t]*(\n|$)")
     if (!endm) return substr(b, 1, start - 1) " HEREDOC "
-    b = substr(b, 1, start - 1) " HEREDOC " substr(tail, endm + RLENGTH - 1)
+    b = substr(b, 1, start - 1) " HEREDOC " (live ? sw_hd_subs(substr(tail, 1, endm - 1)) : "") \
+        substr(tail, endm + RLENGTH - 1)
   }
   return b
+}
+
+# sw_hd_subs(s): the $(...) and `...` command substitutions in heredoc body s,
+# each after a newline. A backslash escapes the next character; one that
+# never closes runs to the end of the body.
+function sw_hd_subs(s,   L, i, j, c, out) {
+  L = length(s); out = ""
+  for (i = 1; i <= L; i++) {
+    c = substr(s, i, 1)
+    if (c == "\\") { i++; continue }
+    if (c == "`") {
+      for (j = i + 1; j <= L; j++) {
+        c = substr(s, j, 1)
+        if (c == "\\") { j++; continue }
+        if (c == "`") break
+      }
+      out = out "\n" substr(s, i, j - i + 1); i = j; continue
+    }
+    if (c == "$" && substr(s, i + 1, 1) == "(") {
+      j = sw_hd_close(s, i + 2)
+      out = out "\n" substr(s, i, j - i + 1); i = j
+    }
+  }
+  return out
+}
+
+# sw_hd_close(s, j): index of the `)` closing a `$(` whose text starts at j,
+# or length(s) when none does. Quotes and backslashes inside are honoured.
+function sw_hd_close(s, j,   L, c, d, depth) {
+  L = length(s); depth = 1
+  for (; j <= L; j++) {
+    c = substr(s, j, 1)
+    if (c == "\\") { j++; continue }
+    if (c == "'") {
+      d = index(substr(s, j + 1), "'")
+      if (!d) return L
+      j += d; continue
+    }
+    if (c == "\"") {
+      for (j++; j <= L; j++) {
+        c = substr(s, j, 1)
+        if (c == "\\") { j++; continue }
+        if (c == "\"") break
+      }
+      if (j > L) return L
+      continue
+    }
+    if (c == "(") depth++
+    else if (c == ")") { depth--; if (!depth) return j }
+  }
+  return L
 }
 
 # heredoc_bodies(b, bodies): companion to strip_heredocs -- run on the same
 # original text, it finds the same heredocs in the same order but returns
 # their body text (bodies[1..n]) instead of throwing it away. b itself is
 # untouched (awk passes scalars by value).
-function heredoc_bodies(b, bodies,   d, eol, endm, tail, start, n) {
+function heredoc_bodies(b, bodies,   d, eol, endm, tail, start, n, live) {
   n = 0
   while (match(b, /<<-?[ \t]*["']?[A-Za-z_][A-Za-z0-9_]*["']?/)) {
     start = RSTART
-    d = substr(b, start, RLENGTH); sub(/^<<-?[ \t]*/, "", d); gsub(/["']/, "", d)
+    d = substr(b, start, RLENGTH); live = (d !~ /["']/)
+    sub(/^<<-?[ \t]*/, "", d); gsub(/["']/, "", d)
     eol = index(substr(b, start), "\n")
     if (!eol) return n
     tail = substr(b, start + eol)
     endm = match(tail, "(^|\n)[ \t]*" d "[ \t]*(\n|$)")
     if (!endm) return n
     bodies[++n] = substr(tail, 1, endm - 1)
-    b = substr(b, 1, start - 1) " HEREDOC " substr(tail, endm + RLENGTH - 1)
+    b = substr(b, 1, start - 1) " HEREDOC " (live ? sw_hd_subs(bodies[n]) : "") \
+        substr(tail, endm + RLENGTH - 1)
   }
   return n
 }

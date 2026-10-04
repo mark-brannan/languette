@@ -86,6 +86,15 @@ Feature: scanner
       """
     Then its texts are ["0:cat  HEREDOC \n"]
 
+  Scenario: an unquoted heredoc keeps its command substitutions, one per line
+    When the scanner reads:
+      """
+      cat <<EOF
+      it's $(date +%F) and `id -u`, not \$(whoami)
+      EOF
+      """
+    Then its texts are ["0:cat  HEREDOC \n$(date +%F)\n`id -u`\n"]
+
   Scenario: a heredoc body that mentions a command is not that command
     When the scanner reads:
       """

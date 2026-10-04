@@ -25,14 +25,75 @@ WRAP = frozenset("sudo env command exec time nice nohup timeout doas builtin "
 NESTED_CAP = 64
 
 
+def _sub_end(s, j):
+    """Index just past the `)` closing a `$(` whose text starts at j, or len(s)
+    when none does. Quotes and backslashes inside are honoured."""
+    L, depth = len(s), 1
+    while j < L:
+        c = s[j]
+        if c == "\\":
+            j += 2
+            continue
+        if c == "'":
+            e = s.find("'", j + 1)
+            if e < 0:
+                return L
+            j = e + 1
+            continue
+        if c == '"':
+            j += 1
+            while j < L and s[j] != '"':
+                j += 2 if s[j] == "\\" else 1
+            if j >= L:
+                return L
+            j += 1
+            continue
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if not depth:
+                return j + 1
+        j += 1
+    return L
+
+
+def heredoc_subs(s):
+    """The $(...) and `...` command substitutions in an unquoted heredoc's body,
+    each on a line of its own, for the scanner to read as commands. One that
+    never closes runs to the end of the body."""
+    out, L, i = "", len(s), 0
+    while i < L:
+        c = s[i]
+        if c == "\\":
+            i += 2
+            continue
+        if c == "`":
+            j = i + 1
+            while j < L and s[j] != "`":
+                j += 2 if s[j] == "\\" else 1
+            out += "\n" + s[i:j + 1]
+            i = j + 1
+            continue
+        if c == "$" and s[i + 1:i + 2] == "(":
+            j = _sub_end(s, i + 2)
+            out += "\n" + s[i:j]
+            i = j
+            continue
+        i += 1
+    return out
+
+
 def _heredocs(b):
     """Yield (b_after, body) per heredoc, as the awk's twin loops find them;
-    body is None when the opener has no newline or no closing line."""
+    body is None when the opener has no newline or no closing line. An
+    unquoted delimiter's body keeps its command substitutions (heredoc_subs)."""
     while True:
         m = _OPENER.search(b)
         if not m:
             return
         start = m.start()
+        live = not re.search("[\"']", m.group())
         d = re.sub(r"^<<-?[ \t]*", "", m.group()).replace('"', "").replace("'", "")
         nl = b.find("\n", start)
         if nl < 0:
@@ -44,12 +105,14 @@ def _heredocs(b):
             yield b[:start] + " HEREDOC ", None
             return
         # awk keeps the last character of the match: the closing newline.
-        b = b[:start] + " HEREDOC " + tail[e.end() - 1:]
-        yield b, tail[:e.start()]
+        body = tail[:e.start()]
+        b = b[:start] + " HEREDOC " + (heredoc_subs(body) if live else "") + tail[e.end() - 1:]
+        yield b, body
 
 
 def strip_heredocs(b):
-    """Drop every heredoc body; the marker becomes the word HEREDOC."""
+    """Drop every heredoc body but an unquoted one's command substitutions; the
+    marker becomes the word HEREDOC."""
     for b, _ in _heredocs(b):
         pass
     return b

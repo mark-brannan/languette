@@ -176,6 +176,60 @@ Feature: no-rm-tree
       """
     Then the guard is silent
 
+  Scenario: a command substitution in an unquoted heredoc body is run
+    When the agent runs:
+      """
+      cat <<EOF
+      $(rm -rf examples)
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a command substitution in a <<- heredoc body, tab-indented, is run
+    When the agent runs:
+      """
+      cat <<-EOF
+      	today is $(rm -rf examples)
+      	EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a backtick substitution in an unquoted heredoc body is run
+    When the agent runs:
+      """
+      cat <<EOF
+      `rm -rf examples`
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a single-quoted heredoc delimiter makes the body text, substitutions too
+    When the agent runs:
+      """
+      cat <<'EOF'
+      $(rm -rf examples) `rm -rf examples`
+      EOF
+      """
+    Then the guard is silent
+
+  Scenario: a double-quoted heredoc delimiter makes the body text, substitutions too
+    When the agent runs:
+      """
+      cat <<"EOF"
+      $(rm -rf examples) `rm -rf examples`
+      EOF
+      """
+    Then the guard is silent
+
+  Scenario: an escaped $ in an unquoted heredoc body is text
+    When the agent runs:
+      """
+      cat <<EOF
+      \$(rm -rf examples)
+      EOF
+      """
+    Then the guard is silent
+
   Scenario: a comment is not run
     When the agent runs:
       """
