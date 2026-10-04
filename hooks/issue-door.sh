@@ -54,7 +54,22 @@ case $(printf '%s' "$p" | jq -r '.tool_name // ""') in
         }
       }
       function emit() { print "W"; if (depth > 0 || rep) print "LOOP" }
-      function segment(lo, hi, nested,   g, i, t, path, method, fields, m) {
+      # skip_r(lo, hi): index of the first word at or after lo that is not
+      # a flag -- skipping -R/--repo and the value it takes, and any other
+      # dash-prefixed flag. `gh issue -R o/r create` and `gh -R o/r issue
+      # create` both put -R before the subcommand it names; without this a
+      # flag in that position reads as the subcommand and the write is
+      # never seen. Or 0 if the segment runs out first.
+      function skip_r(lo, hi,   i, t) {
+        for (i = lo; i <= hi; i++) {
+          t = wv(i)
+          if (t == "-R" || t == "--repo") { i++; continue }
+          if (t ~ /^-/) continue
+          return i
+        }
+        return 0
+      }
+      function segment(lo, hi, nested,   g, i, t, path, method, fields, m, sub1, sub2) {
         # A loop word after do/then/else counts too: `do for s in x y` opens one.
         for (i = lo; i <= hi && k[i] == "w"; i++) {
           if (w[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/) continue
@@ -66,10 +81,16 @@ case $(printf '%s' "$p" | jq -r '.tool_name // ""') in
         g = cmd_index(w, k, lo, hi, "(^|/)gh$", nested, "")
         if (!g || g + 1 > hi) return
         for (i = lo; i < g; i++) if (k[i] == "w" && w[i] ~ /(^|\/)(xargs|parallel|find)$/) rep = 1
-        if (w[g + 1] == "issue") { if (g + 2 <= hi && w[g + 2] ~ /^(create|new|transfer|delete)$/) emit(); return }
-        if (w[g + 1] != "api") return
+        sub1 = skip_r(g + 1, hi)
+        if (!sub1) return
+        if (w[sub1] == "issue") {
+          sub2 = skip_r(sub1 + 1, hi)
+          if (sub2 && w[sub2] ~ /^(create|new|transfer|delete)$/) emit()
+          return
+        }
+        if (w[sub1] != "api") return
         path = ""; method = ""; fields = 0; m = 0
-        for (i = g + 2; i <= hi; i++) {
+        for (i = sub1 + 1; i <= hi; i++) {
           t = wv(i)
           m += mutations(t)
           if (t == "-X" || t == "--method") { if (i < hi) method = toupper(w[++i]) }

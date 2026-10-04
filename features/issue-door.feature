@@ -42,6 +42,17 @@ Feature: issue-door
     When the agent runs `gh api graphql -f query='mutation { createIssue(input:{}) { issue { id } } }'`
     Then the guard denies
 
+  Scenario Outline: a -R/--repo flag before the subcommand is still seen
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | command                                      |
+      | gh issue -R o/r create -t t -b b             |
+      | gh issue --repo o/r delete 5                 |
+      | gh -R o/r issue create -t t -b b              |
+      | gh --repo o/r issue transfer 4 o/other        |
+
   Scenario Outline: an MCP identifier write is judged the same as the gh CLI
     When the agent calls MCP tool "<tool>" with input `<input>`
     Then the guard <verdict>
