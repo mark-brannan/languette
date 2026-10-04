@@ -60,8 +60,8 @@ says why. When no rule covers a command, it says nothing.**
 A variable where a path should be, a brace expansion, a quote it can't
 resolve: each is a deny that names what the guard saw. The second half is a
 limit, not a bug. A guard reads shell text; it does not open scripts or read
-other languages. These are real verdicts, generated from the guards' test
-cases for a command run in `~/project`, and CI fails if the table drifts:
+other languages. These are real verdicts, generated from the guards'
+scenarios for a command run in `~/project`, and CI fails if the table drifts:
 
 <!-- fixtures-table -->
 | Command | Verdict | Why |
@@ -196,7 +196,7 @@ is a deny naming the guard; the runner holds that rule, so no guard has to.
 
 The contract is written as scenarios, in the words a person uses to state the
 rule, and every scenario runs against every engine a guard has, Python and
-shell alike (in progress: [#31](https://github.com/mark-brannan/languette/pull/31)):
+shell alike:
 
 ```gherkin
 Scenario: a target the guard cannot resolve is denied on sight
@@ -226,22 +226,21 @@ to Claude Code, and every command goes through. One entry:
 ## Working on it
 
 ```
-bash hooks/no-rm-tree.test.sh               # the three shell suites
-bash hooks/no-git-footguns.test.sh
-bash hooks/no-delete-stacked-base.test.sh
-fixtures/run.sh                             # the scanner and guard contract, and the hooks.json wiring
-AWK_PATH=/dir/with/an/awk fixtures/run.sh   # the same under another awk
+pip install -r requirements-dev.txt
+python3 -m pytest                       # every scenario, every engine
+AWK_PATH=/dir/with/an/awk python3 -m pytest
+python3 tests/readme_table.py           # regenerate the table
 ```
 
-CI also checks the shape of `hooks/hooks.json` (`fixtures/run.sh --shape`),
-because `claude plugin validate --strict` passes a malformed one. The
-headless smoke test, which installs the plugin in a scratch project and
-confirms a recursive `rm` is really blocked, stays manual: it needs a model
-call and a login.
+Running the tests needs pytest, pytest-bdd and PyHamcrest; the hooks do not.
 
-`fixtures/` holds the contract as data (witness test cases): a command in,
-tokens or a verdict out, until [#31](https://github.com/mark-brannan/languette/pull/31)
-moves it to scenarios under `features/`. The scanner (`hooks/lib-shell-words.awk`)
-and the guards began as copies of the ones in
+The same run checks the shape of `hooks/hooks.json`, because
+`claude plugin validate --strict` passes a malformed one. The headless smoke
+test, which installs the plugin in a scratch project and confirms a recursive
+`rm` is really blocked, stays manual: it needs a model call and a login.
+
+`features/` holds the contract as scenarios: a command in, tokens or a
+verdict out. The scanner (`hooks/lib-shell-words.awk`) and the guards began
+as copies of the ones in
 [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles); this repo
 is where they are maintained now.

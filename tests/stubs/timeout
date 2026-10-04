@@ -1,0 +1,10 @@
+#!/bin/sh
+# A stand-in for timeout: logs its arguments to $LANGUETTE_STUB_LOG/timeout
+# and runs the command. With TIMEOUT_HANG=<n> its n-th call acts as a gh
+# that outlived its bound (exit 124, nothing run), so no test waits it out.
+log="${LANGUETTE_STUB_LOG:?}/timeout"
+printf '%s\n' "$*" >> "$log"
+n=$(($(wc -l < "$log")))
+[ "${TIMEOUT_HANG:-0}" -eq "$n" ] && exit 124
+shift
+exec "$@"
