@@ -15,13 +15,16 @@
 # counts too, since resolving a conflict finishes the merge; the engine's
 # own --staged mode already skips every check mid-merge.
 #
-# Known gaps, inherited from the upstream hook this is ported from: only the
-# last `cd` and the last `-C` are seen, so `cd a && cd b` and `git -C a -C b`
-# resolve against the wrong base; and `--staged` only sees what is already
-# in the index at hook time, so `git commit -a`/`--all`/`-am`, a pathspec
-# commit, or `git add . && git commit` in one command can commit unchecked
-# prose. Both narrow what this guard catches; neither makes it deny
-# something it should allow.
+# Each `cd` and `-C` is folded onto the one before it, so `cd a && cd b`
+# and `git -C a -C b` both land in a/b.
+#
+# Known gap: `--staged` only sees what is already in the index at hook
+# time, so `git commit -a`/`--all`/`-am`, a pathspec commit, or
+# `git add . && git commit` in one command can commit unchecked prose.
+#
+# Exit 1 is a finding and denies. Exit 2 is a bad budgets config (or an
+# engine too old for --staged) and denies too, saying so: the repo asked
+# for budgets and they cannot be checked. Any other exit is a no-op.
 set -uf
 
 HERE=$(dirname "$0")
@@ -68,13 +71,14 @@ END {
     }
   }
 }
-function segment(lo, hi, nested,   g, i, dir) {
-  if (w[lo] == "cd" && k[lo + 1] == "w") CD = w[lo + 1]
+function join(base, step) { return (base == "" || step ~ /^\//) ? step : base "/" step }
+function segment(lo, hi, nested,   g, i, j, dir) {
+  if (w[lo] == "cd" && k[lo + 1] == "w") CD = join(CD, w[lo + 1])
   g = cmd_index(w, k, lo, hi, "(^|/)(git|yadm)$", nested, "")
   if (!g) return
   i = g + 1; dir = ""
   while (i <= hi && w[i] ~ /^-/) {
-    if (w[i] == "-C") { dir = w[i + 1]; i++ }
+    if (w[i] == "-C") { dir = join(dir, w[i + 1]); i++ }
     else if (w[i] ~ /^(-c|--git-dir|--work-tree|--namespace)$/) i++
     i++
   }
@@ -97,7 +101,9 @@ done
 
 out=$(cd "$dir" && "$ENGINE" --staged 2>&1)
 rc=$?
-case $rc in 1|2) ;; *) exit 0 ;; esac
+case $rc in 1) ;; 2) deny "Blocked by prose-budget-commit: prose-budget --staged could not check the staged prose (exit 2: a bad budgets config, or an engine too old for --staged):
+$out
+Fix the config or update the engine, then retry the commit." ;; *) exit 0 ;; esac
 
 deny "Blocked by prose-budget-commit: prose-budget --staged found:
 $out

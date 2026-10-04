@@ -77,6 +77,27 @@ Feature: prose-budget-commit
       | cd nonexistent-dir-xyz && git commit -m x | an unresolvable cd target |
       | git -C nonexistent-dir-xyz commit -m x    | an unresolvable -C target |
 
+  Scenario: exit 2, a bad budgets config, denies and says so
+    Given PROSE_BUDGET_CRASH is "2"
+    When the agent runs `git commit -m x`
+    Then the guard denies, naming "bad budgets config"
+
+  Scenario Outline: each cd and -C is folded onto the one before it
+    Given the file "a/b/keep" holds:
+      """
+      x
+      """
+    And PROSE_BUDGET_FAIL is "1"
+    When the agent runs `<command>`
+    Then the guard denies, naming "sections.max_words"
+
+    Examples:
+      | command                          | note                     |
+      | cd a && cd b && git commit -m x  | two cds                  |
+      | git -C a -C b commit -m x        | two -C                   |
+      | cd a && git -C b commit -m x     | a cd, then a -C          |
+      | cd a; cd b; git commit -m x      | separated by semicolons  |
+
   Scenario: a relative PROSE_BUDGET still resolves after the hook changes directory
     Given the stub "prose-budget" is the engine, at a relative path
     And PROSE_BUDGET_FAIL is "1"
