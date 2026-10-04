@@ -2,10 +2,12 @@
 # A stand-in for mark-brannan/claude's bin/prose-budget: no test depends on
 # the real engine being installed. Logs its arguments to
 # $LANGUETTE_STUB_LOG/prose-budget. PROSE_BUDGET_FAIL makes it report a
-# finding (exit 1); unset, it exits 0 (clean).
+# finding (exit 1); PROSE_BUDGET_CRASH=<n> makes it exit n with no output,
+# standing in for a crash; unset, it exits 0 (clean).
 printf '%s\n' "$*" >> "${LANGUETTE_STUB_LOG:?}/prose-budget"
 if [ -n "${PROSE_BUDGET_FAIL:-}" ]; then
   echo "README.md:3: sections.max_words: over budget"
   exit 1
 fi
+[ -n "${PROSE_BUDGET_CRASH:-}" ] && exit "$PROSE_BUDGET_CRASH"
 exit 0

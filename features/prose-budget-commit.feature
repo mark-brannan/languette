@@ -50,6 +50,17 @@ Feature: prose-budget-commit
     When the agent runs `git commit -m x`
     Then the guard is silent
 
+  Scenario Outline: an engine crash with an unusual exit code is a no-op, by design
+    Given PROSE_BUDGET_CRASH is "<code>"
+    When the agent runs `git commit -m x`
+    Then the guard is silent
+
+    Examples:
+      | code |
+      | 126  |
+      | 127  |
+      | 139  |
+
   Scenario: the deny reason carries the engine's findings and the retry instruction
     Given PROSE_BUDGET_FAIL is "1"
     When the agent runs `git commit -m x`

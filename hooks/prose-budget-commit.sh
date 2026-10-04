@@ -14,6 +14,14 @@
 # resolved (an unexpanded `~`, a literal `$VAR`). `git merge --continue`
 # counts too, since resolving a conflict finishes the merge; the engine's
 # own --staged mode already skips every check mid-merge.
+#
+# Known gaps, inherited from the upstream hook this is ported from: only the
+# last `cd` and the last `-C` are seen, so `cd a && cd b` and `git -C a -C b`
+# resolve against the wrong base; and `--staged` only sees what is already
+# in the index at hook time, so `git commit -a`/`--all`/`-am`, a pathspec
+# commit, or `git add . && git commit` in one command can commit unchecked
+# prose. Both narrow what this guard catches; neither makes it deny
+# something it should allow.
 set -uf
 
 HERE=$(dirname "$0")
