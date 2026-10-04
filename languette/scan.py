@@ -87,7 +87,10 @@ def heredoc_subs(s):
 def _heredocs(b):
     """Yield (b_after, body) per heredoc, as the awk's twin loops find them;
     body is None when the opener has no newline or no closing line. An
-    unquoted delimiter's body keeps its command substitutions (heredoc_subs)."""
+    unquoted delimiter's body keeps its command substitutions (heredoc_subs).
+    The search resumes after each heredoc, never inside what it kept, so a
+    `<<X` in a kept substitution cannot pair with a later X line."""
+    done = ""
     while True:
         m = _OPENER.search(b)
         if not m:
@@ -97,17 +100,18 @@ def _heredocs(b):
         d = re.sub(r"^<<-?[ \t]*", "", m.group()).replace('"', "").replace("'", "")
         nl = b.find("\n", start)
         if nl < 0:
-            yield b[:start] + " HEREDOC ", None
+            yield done + b[:start] + " HEREDOC ", None
             return
         tail = b[nl + 1:]
         e = re.search("(?:^|\n)[ \t]*" + d + "[ \t]*(?:\n|\\Z)", tail)
         if not e:
-            yield b[:start] + " HEREDOC ", None
+            yield done + b[:start] + " HEREDOC ", None
             return
         # awk keeps the last character of the match: the closing newline.
         body = tail[:e.start()]
-        b = b[:start] + " HEREDOC " + (heredoc_subs(body) if live else "") + tail[e.end() - 1:]
-        yield b, body
+        done += b[:start] + " HEREDOC " + (heredoc_subs(body) if live else "")
+        b = tail[e.end() - 1:]
+        yield done + b, body
 
 
 def strip_heredocs(b):

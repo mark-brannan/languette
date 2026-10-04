@@ -203,6 +203,17 @@ Feature: no-rm-tree
       """
     Then the guard denies, naming "rm -r examples"
 
+  Scenario: a heredoc opener inside a kept substitution does not hide the lines after the heredoc
+    When the agent runs:
+      """
+      cat <<EOF
+      $(cat <<X)
+      EOF
+      rm -rf examples
+      X
+      """
+    Then the guard denies, naming "rm -r examples"
+
   Scenario: a single-quoted heredoc delimiter makes the body text, substitutions too
     When the agent runs:
       """
