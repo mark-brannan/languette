@@ -149,7 +149,7 @@ Feature: no-bypass-labels
 
   Rule: a label named in text, a read, or another label is not a bypass applied
 
-    Scenario Outline: the guard is silent
+    Scenario Outline: text, a read, a filter or another label is silent
       When the agent runs `<command>`
       Then the guard is silent
 
