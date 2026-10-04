@@ -17,6 +17,9 @@ Languette is a set of `PreToolUse` hooks for Claude Code. Each one reads the
 Bash command an agent is about to run and decides: allow, ask, or deny. No
 model is involved, and no command is executed to decide.
 
+> *"The wise speak only of what they know, Gríma son of Gálmód. A witless worm have you become. Therefore be silent, and keep your forked tongue behind your teeth. I have not passed through fire and death to bandy crooked words with a serving-man till the lightning falls."*
+— **Gandalf**, in J.R.R Tolkein's *The Two Towers*, Book 3, Chapter 6
+
 ## Install
 
 In Claude Code:
