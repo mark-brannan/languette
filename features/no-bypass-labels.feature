@@ -5,9 +5,12 @@ Feature: no-bypass-labels
   The labels are the bypass_labels option, comma-separated, by default
   churn-ok (the churn gate) and mixed-loops-ok (the mixed-loops gate). They
   are matched case-insensitively, as GitHub matches label names, and denied
-  in every repo, public or private. Three routes reach a label: gh's flags,
-  gh api, and an MCP tool's labels field. A label named in text is not a
-  label applied.
+  in every repo, public or private. Three routes reach a label: gh's flags
+  (also stored by gh alias), gh api, and an MCP tool's labels field. The gh
+  is found through wrappers, sh -c, eval, a pipe into a shell and a heredoc
+  fed to a shell, which is code; a heredoc fed to anything else is text. A
+  label named in text is not a label applied. The option is a list of names,
+  matched literally, never a pattern.
 
   Rule: a bypass label applied through gh's flags is denied
 
@@ -53,6 +56,53 @@ Feature: no-bypass-labels
         | /usr/bin/gh pr edit 12 --add-label churn-ok                  |
         | sh -c "gh pr edit 12 --add-label churn-ok"                   |
         | bash -c 'git push && gh pr edit 12 --add-label churn-ok'     |
+        | eval "gh pr edit 12 --add-label churn-ok"                    |
+        | env gh pr edit 12 --add-label churn-ok                       |
+        | command gh pr edit 12 --add-label churn-ok                   |
+        | exec gh pr edit 12 --add-label churn-ok                      |
+        | nohup gh pr edit 12 --add-label churn-ok &                   |
+        | echo "gh pr edit 12 --add-label churn-ok" \| sh              |
+        | echo 12 \| xargs gh pr edit --add-label churn-ok             |
+        | gh pr edit --add-label churn-ok                              |
+        | gh pr edit 12 --add-label churn"-ok"                         |
+        | gh pr edit 12 --add-label 'churn'-ok                         |
+        | gh pr edit 12 --add-label churn\-ok                          |
+        | gh pr edit 12 --add-label churn-ok 2>/dev/null               |
+
+    Scenario Outline: a heredoc fed to a shell is code
+      When the agent runs:
+        """
+        <shell>
+        gh pr edit 12 --add-label churn-ok
+        EOF
+        """
+      Then the guard denies, naming "churn-ok"
+
+      Examples:
+        | shell                 |
+        | bash <<'EOF'          |
+        | sh <<EOF              |
+
+    Scenario: a heredoc fed to a shell and built at run time cannot be read
+      When the agent runs:
+        """
+        bash <<EOF
+        gh pr edit 12 --add-label $L
+        EOF
+        """
+      Then the guard denies, naming "built at run time"
+
+  Rule: an alias that stores a bypass label is applying it, later
+
+    Scenario Outline: gh alias set and import
+      When the agent runs `<command>`
+      Then the guard denies, naming "<why>"
+
+      Examples:
+        | command                                                  | why         |
+        | gh alias set lbl 'pr edit $1 --add-label churn-ok'       | churn-ok    |
+        | gh alias set --shell waive 'gh pr edit "$1" -l CHURN-OK' | churn-ok    |
+        | gh alias import aliases.yml                              | aliases.yml |
 
   Rule: a bypass label applied through gh api is denied
 
@@ -69,6 +119,9 @@ Feature: no-bypass-labels
         | gh api repos/o/r/issues -f title=t -f body=b -f 'labels[]=churn-ok'       | churn-ok       |
         | gh api /repos/o/r/issues/12/labels --raw-field=labels[]=churn-ok          | churn-ok       |
         | gh api https://api.github.com/repos/o/r/issues/12/labels -flabels[]=churn-ok | churn-ok    |
+        | gh api repos/o/r/issues/12/labels -f labels=churn-ok                      | churn-ok       |
+        | gh api -X POST repos/o/r/issues/12/labels -f labels[]=churn-ok            | churn-ok       |
+        | gh api -X PUT repos/o/r/issues/12/labels -f labels[]="churn-ok "          | churn-ok       |
 
     Scenario: a labels payload in the file --input names is read
       Given a project directory
@@ -86,14 +139,51 @@ Feature: no-bypass-labels
       When the agent runs `gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json`
       Then the guard is silent
 
-    Scenario: a labels payload in a heredoc fed to --input - is read
+    Scenario Outline: a labels payload in a heredoc fed to --input - is read
       When the agent runs:
         """
-        gh api repos/o/r/issues/12/labels --input - <<'EOF'
-        {"labels": ["mixed-loops-ok"]}
+        gh api <method> repos/o/r/issues/12/labels --input - <<'EOF'
+        <payload>
         EOF
         """
       Then the guard denies, naming "mixed-loops-ok"
+
+      Examples:
+        | method | payload                        |
+        |        | {"labels": ["mixed-loops-ok"]} |
+        | -X PUT | ["ready", "Mixed-Loops-OK"]    |
+
+    Scenario: a heredoc payload built at run time cannot be read
+      When the agent runs:
+        """
+        gh api repos/o/r/issues/12/labels --input - <<EOF
+        {"labels": ["$L"]}
+        EOF
+        """
+      Then the guard denies, naming "built at run time"
+
+    Scenario Outline: a graphql mutation that applies or renames labels by ID
+      Given a project directory
+      And the working directory is "{PROJ}"
+      And the file "mut.graphql" holds:
+        """
+        mutation { addLabelsToLabelable(input:{labelableId:"x",labelIds:["y"]}) { clientMutationId } }
+        """
+      And the file "mut.json" holds:
+        """
+        {"query": "mutation($ids:[ID!]!) { addLabelsToLabelable(input:{labelableId:\"x\",labelIds:$ids}) { clientMutationId } }", "variables": {"ids": ["y"]}}
+        """
+      When the agent runs `<command>`
+      Then the guard denies, naming "<why>"
+
+      Examples:
+        | command                                                                                                     | why         |
+        | gh api graphql -f query='mutation { addLabelsToLabelable(input:{labelableId:"x",labelIds:["y"]}) { clientMutationId } }' | label IDs |
+        | gh api graphql -f query='mutation($ids:[ID!]!) { addLabelsToLabelable(input:{labelableId:"x",labelIds:$ids}) { clientMutationId } }' -f ids=y | label IDs |
+        | gh api graphql -f query='mutation { updateLabel(input:{id:"x",name:"churn-ok"}) { label { id } } }'        | label IDs   |
+        | gh api graphql -F query=@mut.graphql                                                                        | label IDs   |
+        | gh api graphql --input mut.json                                                                             | label IDs   |
+        | gh api graphql -F query=@missing.graphql                                                                    | missing.graphql |
 
   Rule: a bypass label applied through an MCP tool's labels field is denied
 
@@ -108,6 +198,25 @@ Feature: no-bypass-labels
         | mcp__github__issue_write                 | {"method":"create","owner":"o","repo":"r","title":"t","labels":["churn-ok"]}    | churn-ok       |
         | mcp__plugin_github_github__create_issue  | {"owner":"o","repo":"r","title":"t","labels":["MIXED-LOOPS-OK"]}                | mixed-loops-ok |
         | mcp__gitea__edit_issue                   | {"owner":"o","repo":"r","index":3,"labels":"ready,churn-ok"}                    | churn-ok       |
+        | mcp__github__add_labels                  | {"owner":"o","repo":"r","issue_number":12,"labels":["churn-ok"]}                | churn-ok       |
+        | mcp__github__update_issue                | {"owner":"o","repo":"r","issue_number":12,"labels":[{"name":"churn-ok"}]}       | churn-ok       |
+        | mcp__github__update_issue                | {"owner":"o","repo":"r","issue_number":12,"labels":["Churn-OK "]}               | churn-ok       |
+        | mcp__github__update_issue                | {"owner":"o","repo":"r","issue_number":12,"label":"churn-ok"}                   | churn-ok       |
+        | mcp__gitlab__update_issue                | {"project_id":"o/r","issue_iid":12,"add_labels":"churn-ok"}                     | churn-ok       |
+        | mcp__some_server__some_tool              | {"labels":["churn-ok"]}                                                         | churn-ok       |
+
+    Scenario Outline: a tool reads only when its name says so; an unknown tool writes
+      When the agent calls MCP tool "<tool>" with input `{"owner":"o","repo":"r","labels":["churn-ok"]}`
+      Then the guard <verdict>
+
+      Examples:
+        | tool                         | verdict                    |
+        | mcp__github__get_issue       | is silent                  |
+        | mcp__github__list_issues     | is silent                  |
+        | mcp__github__search_issues   | is silent                  |
+        | mcp__github__read_issue      | is silent                  |
+        | mcp__github__issue_write     | denies, naming "churn-ok"  |
+        | mcp__github__getting_started | denies, naming "churn-ok"  |
 
   Rule: a label the guard cannot read is denied, saying why
 
@@ -124,16 +233,18 @@ Feature: no-bypass-labels
         | gh api repos/o/r/issues/12/labels -F labels[]=@label.txt      | label.txt            |
         | gh api repos/o/r/issues/12/labels --input missing.json        | missing.json         |
         | gh api repos/o/r/issues/12/labels --input -                   | stdin                |
-        | gh api graphql -f query='mutation { addLabelsToLabelable(input:{labelableId:"x",labelIds:["y"]}) { clientMutationId } }' | label IDs |
 
     Scenario Outline: an MCP labels field that is not a list of names
       When the agent calls MCP tool "mcp__github__update_issue" with input `<input>`
-      Then the guard denies, naming "labels"
+      Then the guard denies, naming "<why>"
 
       Examples:
-        | input                                                        |
-        | {"owner":"o","repo":"r","issue_number":12,"labels":5}        |
-        | {"owner":"o","repo":"r","issue_number":12,"labels":[{"x":1}]} |
+        | input                                                        | why      |
+        | {"owner":"o","repo":"r","issue_number":12,"labels":5}        | labels   |
+        | {"owner":"o","repo":"r","issue_number":12,"labels":[{"x":1}]} | labels   |
+        | {"owner":"o","repo":"r","issue_number":12,"labels":[7]}      | labels   |
+        | {"owner":"o","repo":"r","issue_number":12,"labelIds":["x"]}  | labelIds |
+        | {"owner":"o","repo":"r","issue_number":12,"label_ids":[7]}   | by ID    |
 
   Rule: renaming a label into a bypass label is applying it
 
@@ -149,7 +260,7 @@ Feature: no-bypass-labels
 
   Rule: a label named in text, a read, or another label is not a bypass applied
 
-    Scenario Outline: the guard is silent
+    Scenario Outline: text, a read, a filter or another label is silent
       When the agent runs `<command>`
       Then the guard is silent
 
@@ -175,18 +286,33 @@ Feature: no-bypass-labels
         | gh label edit churn-ok --name churn-ok-legacy                    | renaming a bypass away            |
         | gh api repos/o/r/issues/12/labels                                | a read through gh api             |
         | gh api repos/o/r/issues -X GET -f labels=churn-ok                | a filter through gh api           |
+        | gh api repos/o/r/issues -X get -f labels=churn-ok                | the method in any case            |
+        | gh api repos/o/r/issues --method=GET -f labels=churn-ok          | the method glued on               |
+        | gh api repos/o/r/issues/12/labels -f labels[]=@label.txt         | -f never reads a file: a literal  |
+        | gh api repos/o/r/issues/12/labels -f 'labels=["churn-ok"]'       | a string, not an array: no label  |
+        | gh api -X DELETE repos/o/r/issues/12/labels/churn-ok             | taking a bypass off               |
+        | gh api repos/o/r/labels -f name=churn-ok                         | creating it applies it to nothing |
+        | gh api graphql -f query='query { repository(owner:"o",name:"r") { labels(first:10) { nodes { name } } } }' | a graphql read |
+        | gh api graphql -f query='mutation { createLabel(input:{name:"churn-ok",repositoryId:"x",color:"fff"}) { label { id } } }' | creating it through graphql |
+        | gh alias set co 'pr checkout $1'                                 | an alias that applies no label    |
         | gh api repos/o/r/issues/12/labels -f labels[]=ready              | an unrelated label through gh api |
         | gh api repos/o/r/issues/12/comments -f body="needs churn-ok"     | named in a comment through gh api |
         | ls -la                                                           | no gh at all                      |
 
-    Scenario: a label named in a heredoc body is text
+    Scenario Outline: a label named in a heredoc body is text
       When the agent runs:
         """
-        gh pr create -t t -F - <<'EOF'
+        <command> <<EOF
         Needs a human to run gh pr edit --add-label churn-ok.
         EOF
         """
       Then the guard is silent
+
+      Examples:
+        | command                   |
+        | gh pr create -t t -F -    |
+        | cat > NOTES.md            |
+        | python3 -                 |
 
     Scenario Outline: an MCP call that applies no bypass label
       When the agent calls MCP tool "<tool>" with input `<input>`
@@ -199,12 +325,15 @@ Feature: no-bypass-labels
         | mcp__github__create_pull_request     | {"owner":"o","repo":"r","title":"t","body":"waive churn-ok by hand"}  |
         | mcp__github__list_issues             | {"owner":"o","repo":"r","labels":["churn-ok"]}                        |
         | mcp__github__search_issues           | {"query":"label:churn-ok","labels":["churn-ok"]}                      |
+        | mcp__github__update_issue            | {"owner":"o","repo":"r","issue_number":12,"labels":[]}                |
+        | mcp__github__update_issue            | {"owner":"o","repo":"r","issue_number":12,"labels":null}              |
+        | mcp__github__update_issue            | {"owner":"o","repo":"r","issue_number":12,"labelIds":[]}              |
 
     Scenario: a tool that is neither Bash nor MCP is silent
       When the agent calls tool "Write" with input `{"file_path":"/tmp/x.md","content":"gh pr edit 1 --add-label churn-ok"}`
       Then the guard is silent
 
-  Rule: the labels are a setting, and an empty one is the default
+  Rule: the labels are a setting, matched literally, and an empty one is the default
 
     Scenario: bypass_labels replaces the default list
       Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "skip-e2e, Churn-OK"
@@ -225,3 +354,23 @@ Feature: no-bypass-labels
         |       |
         | ,     |
         |  , ,  |
+
+    Scenario: an unset bypass_labels is the default
+      Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is unset
+      When the agent runs `gh pr edit 12 --add-label churn-ok`
+      Then the guard denies, naming "churn-ok"
+
+    Scenario Outline: the option is names, never a pattern or code
+      Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "<value>"
+      When the agent runs `gh pr edit 12 --add-label '<value>'`
+      Then the guard denies, naming "<value>"
+      When the agent runs `gh pr edit 12 --add-label <other>`
+      Then the guard is silent
+
+      Examples:
+        | value           | other    |
+        | *               | churn-ok |
+        | .*              | churn-ok |
+        | a\|b            | a        |
+        | a.b             | axb      |
+        | $(touch /tmp/x) | x        |
