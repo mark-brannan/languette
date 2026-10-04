@@ -44,6 +44,12 @@
       "title": "One issue create, transfer or delete per turn",
       "description": "Deny a second GitHub issue create, transfer or delete in the same human turn, and any inside a loop or xargs. Leave on unless you want issue creates, transfers and deletes through unchecked.",
       "default": true
+    },
+    "prose_budget_commit": {
+      "type": "boolean",
+      "title": "Check staged prose against the repo's budgets before a commit",
+      "description": "Deny a git commit when mark-brannan/claude's prose-budget engine finds the staged diff over a repo's own budgets. A no-op where that engine isn't installed or the repo has no budgets config. Leave on unless you want staged prose through unchecked.",
+      "default": true
     }
   }
 }
