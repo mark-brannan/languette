@@ -171,9 +171,18 @@ function segment(lo, hi, nested,   g, i, j, dir, pj) {
     else if (w[i] ~ /^(-c|--git-dir|--work-tree|--namespace)$/) i++
     i++
   }
-  if (i <= hi && w[i] == "add") { collect_add(i + 1, hi); return }
+  if (i <= hi && (w[i] == "add" || w[i] == "stage")) {
+    # "stage" is a built-in synonym for "add". The directory this add ran
+    # in (cumulative cd plus its own -C) is recorded so the commit below
+    # can tell whether it ran somewhere else -- a literal path collected
+    # here only resolves against the commit own dir if the two agree.
+    ADDSEEN = 1; ADDCTX = CD SUBSEP dir
+    collect_add(i + 1, hi)
+    return
+  }
   if (i <= hi && w[i] == "commit") {
     commit_tail(i + 1, hi)
+    if (ADDSEEN && ADDCTX != (CD SUBSEP dir)) { ALLFLAG = 1; ALLNEW = 1 }
     pj = ""
     for (j = 1; j <= PATHN; j++) pj = pj (pj == "" ? "" : SEP) PATHS[j]
     print "COMMIT\t" CD "\t" dir "\t" (ALLFLAG ? 1 : 0) "\t" (BAD ? 1 : 0) "\t" pj "\t" (ALLNEW ? 1 : 0) "\t" BIN
@@ -249,24 +258,27 @@ if [ "$allflag" = "1" ] || [ "$allnew" = "1" ]; then
 $reporoot
 Fix whatever made that fail, then retry the commit."
   if [ "$allflag" = "1" ]; then
-    extra=$(cd "$reporoot" 2>/dev/null && "$binary" diff --name-only 2>&1)
+    # -z: a quoted (core.quotePath) name reaches --file as the quoted,
+    # octal-escaped text, not the real path, and would be silently
+    # dropped. --diff-filter=d: a deleted file isn't content to check.
+    extra=$(cd "$reporoot" 2>/dev/null && "$binary" diff -z --name-only --diff-filter=d 2>&1)
     erc=$?
     [ "$erc" -eq 0 ] \
       || deny "Blocked by prose-budget-commit: \"$binary diff --name-only\" could not list this commit's unstaged tracked changes (exit $erc), so they could not be checked:
 $extra
 Fix whatever made that fail, then retry the commit."
     files="$files
-$(printf '%s\n' "$extra" | awk -v r="$reporoot" 'NF { print r "/" $0 }')"
+$(printf '%s' "$extra" | tr '\0' '\n' | awk -v r="$reporoot" 'NF { print r "/" $0 }')"
   fi
   if [ "$allnew" = "1" ]; then
-    extra=$(cd "$reporoot" 2>/dev/null && "$binary" ls-files --others --exclude-standard 2>&1)
+    extra=$(cd "$reporoot" 2>/dev/null && "$binary" ls-files -z --others --exclude-standard 2>&1)
     erc=$?
     [ "$erc" -eq 0 ] \
       || deny "Blocked by prose-budget-commit: \"$binary ls-files --others\" could not list this commit's new untracked files (exit $erc), so they could not be checked:
 $extra
 Fix whatever made that fail, then retry the commit."
     files="$files
-$(printf '%s\n' "$extra" | awk -v r="$reporoot" 'NF { print r "/" $0 }')"
+$(printf '%s' "$extra" | tr '\0' '\n' | awk -v r="$reporoot" 'NF { print r "/" $0 }')"
   fi
 fi
 files=$(printf '%s\n' "$files" | awk 'NF')
