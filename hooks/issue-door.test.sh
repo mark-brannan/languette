@@ -105,6 +105,13 @@ shut_door
 printf '{"session_id":"s2","prompt":"go"}' | sh "$HOOK" prompt
 check deny 'other session opened its own door' "$(bash_in 'gh issue create -t t -b b')"
 
+# A symlink pre-planted at the door path is replaced, not written through.
+shut_door
+echo keep > "$SCRATCH/victim"; ln -s "$SCRATCH/victim" "$TMPDIR/languette-issue-door.s1"
+open_door
+if [ "$(cat "$SCRATCH/victim")" = keep ] && [ ! -L "$TMPDIR/languette-issue-door.s1" ]; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: door followed a planted symlink"; fi
+check allow 'door opens over a planted symlink' "$(bash_in 'gh issue create -t t -b b')"
+
 # The deny reason is valid JSON and says what to do.
 reason=$(bash_in 'gh issue create -t t -b b' | sh "$HOOK" | jq -r '.hookSpecificOutput.permissionDecisionReason')
 case $reason in *'wait for their yes'*) pass=$((pass + 1)) ;; *) fail=$((fail + 1)); echo "FAIL: reason lacks the next step: $reason" ;; esac
