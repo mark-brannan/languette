@@ -29,3 +29,10 @@ interface is; this file says who decided it and why, one line each.
 - languette stays unlicensed (all rights reserved), confirming #25. Not
   revisited before 2026-11-04, unless someone outside asks to use or fork it
   first.
+
+## Shell parser: Solace, 2026-10-04
+
+- Languette goes to a real shell parser (#4); it is part of the value
+  proposition.
+- The engines cascade: a guard uses whichever the user has installed, the
+  parser first and awk last.
