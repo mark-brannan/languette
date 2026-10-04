@@ -291,3 +291,33 @@ Feature: no-git-footguns
     Given PATH holds only "sh cat printf dirname"
     When the agent runs `git add -A`
     Then the guard denies
+
+  Scenario Outline: a rule's own setting, off, lets its command through
+    Given <setting> is "false"
+    When the agent runs `<command>`
+    Then the guard is silent
+
+    Examples:
+      | setting                                              | command                     |
+      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_BLANKET_STAGING | git add -A                  |
+      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_STASH           | git stash pop               |
+      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_FORCE_PUSH      | git push --force origin foo |
+      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_DISCARD         | git reset --hard            |
+      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_BRANCH_DELETE   | git branch -D foo           |
+
+  Scenario Outline: turning one rule off leaves the others denying
+    Given CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_BLANKET_STAGING is "false"
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | command                     |
+      | git stash pop               |
+      | git push --force origin foo |
+      | git reset --hard            |
+      | git branch -D foo           |
+
+  Scenario: a setting that is not exactly false leaves the rule on
+    Given CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_BLANKET_STAGING is "no"
+    When the agent runs `git add -A`
+    Then the guard denies

@@ -20,6 +20,8 @@ GUARDS = {"no-git-footguns", "no-rm-tree", "no-delete-stacked-base", "ask-first"
 OPT_IN = {"no_checkout_home", "no_foreign_worktree"}
 # Options that are not a guard's on/off toggle: name -> type.
 OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string"}
+# Per-rule switches inside one guard: boolean, on by default.
+RULE_OPTIONS = {f"no_git_footguns_{r}" for r in ("blanket_staging", "stash", "force_push", "discard", "branch_delete")}
 # Guards that also judge file-editing tools and EnterWorktree, so they match more than Bash.
 WIDE_MATCHER = {"no-foreign-worktree": "Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree"}
 
@@ -130,7 +132,7 @@ def test_the_foreign_worktree_guard_matches_the_file_tools_and_enterworktree():
 
 def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():
     uc = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())["userConfig"]
-    assert_that(sorted(uc), equal_to(sorted([g.replace("-", "_") for g in GUARDS] + list(OTHER_OPTIONS))))
+    assert_that(sorted(uc), equal_to(sorted([g.replace("-", "_") for g in GUARDS] + list(OTHER_OPTIONS) + list(RULE_OPTIONS))))
     for key, opt in uc.items():
         if key in OTHER_OPTIONS:
             assert opt.get("type") == OTHER_OPTIONS[key] and opt.get("required") is False and opt.get("title") \
