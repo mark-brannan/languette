@@ -287,9 +287,11 @@ fi
 # allowlist is consulted.
 [ -z "$allow_msg" ] || deny "no-rm-tree: $allow_msg"
 tab=$(printf '\t')
-case $out in
-  "DENY$tab"*) deny "$(printf '%s\n' "$out" | head -n 1 | cut -f 2-)" ;;
-esac
+# The refusal is the awk's last line: targets judged before it come first, so
+# the DENY is looked for on every line, not only the first. A target the awk
+# refused on sight denies the whole command, whatever allowed targets precede it.
+reason=$(printf '%s\n' "$out" | awk 'index($0, "DENY\t") == 1 { print substr($0, 6); exit }')
+[ -z "$reason" ] || deny "$reason"
 
 # --- allowlist, applied to the path as written and as the filesystem has it
 

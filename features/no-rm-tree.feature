@@ -62,6 +62,21 @@ Feature: no-rm-tree
       """
     Then the guard denies
 
+  Scenario Outline: one target that is not Claude's denies the command, whichever side of an allowed target it stands
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                         | verdict                                           | note                                  |
+      | rm -rf dist "$X"                | denies, naming "variable or command substitution" | allowed, then unresolved              |
+      | rm -rf "$X" dist                | denies, naming "variable or command substitution" | unresolved, then allowed              |
+      | rm -rf dist examples            | denies, naming "is none of those"                 | allowed, then a foreign path          |
+      | rm -rf examples dist            | denies, naming "is none of those"                 | foreign path, then allowed            |
+      | rm -rf dist /tmp/ok "$X"        | denies, naming "variable or command substitution" | two allowed, then unresolved          |
+      | rm -rf dist dist/* node_modules | denies, naming "glob or brace expansion"          | allowed, a glob, allowed              |
+      | find dist /home -delete         | denies, naming "is none of those"                 | find start paths follow the same rule |
+      | rm -rf dist node_modules        | is silent                                         | every target allowed                  |
+
   Scenario Outline: rm reached through another command is still rm
     When the agent runs `<command>`
     Then the guard denies
