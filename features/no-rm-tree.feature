@@ -241,6 +241,110 @@ Feature: no-rm-tree
       """
     Then the guard is silent
 
+  Scenario: a partially quoted heredoc delimiter still closes on its unquoted word
+    When the agent runs:
+      """
+      cat <<E"O"F
+      hi
+      EOF
+      rm -rf examples
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a partially quoted heredoc delimiter makes the body text
+    When the agent runs:
+      """
+      cat <<E"O"F
+      $(rm -rf examples)
+      EOF
+      """
+    Then the guard is silent
+
+  Scenario: a backslash-quoted heredoc delimiter makes the body text
+    When the agent runs:
+      """
+      cat <<\EOF
+      $(rm -rf examples)
+      EOF
+      """
+    Then the guard is silent
+
+  Scenario: the rest of a heredoc opener line is run
+    When the agent runs:
+      """
+      cat <<EOF && rm -rf examples
+      hi
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a here-string is not a heredoc opener
+    When the agent runs:
+      """
+      cat <<<foo; rm -rf examples
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: two heredocs on one line take their bodies in turn, the second unquoted
+    When the agent runs:
+      """
+      cat <<A <<B
+      a
+      A
+      $(rm -rf examples)
+      B
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: two heredocs on one line take their bodies in turn, the second quoted
+    When the agent runs:
+      """
+      cat <<A <<'B'
+      a
+      A
+      $(rm -rf examples)
+      B
+      """
+    Then the guard is silent
+
+  Scenario: a heredoc that never closes is read as commands
+    When the agent runs:
+      """
+      cat <<EOF
+      $(rm -rf examples)
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a heredoc inside bash -c keeps its substitutions
+    When the agent runs:
+      """
+      bash -c 'cat <<EOF
+      $(rm -rf examples)
+      EOF'
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a nested substitution in an unquoted heredoc body is run
+    When the agent runs:
+      """
+      cat <<EOF
+      $(echo $(rm -rf examples) ")")
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a quoted heredoc, then a <<- heredoc with a backtick substitution
+    When the agent runs:
+      """
+      cat <<'A'
+      $(rm -rf src)
+      A
+      cat <<-B
+      	`rm -rf examples`
+      	B
+      """
+    Then the guard denies, naming "rm -r examples"
+
   Scenario: a comment is not run
     When the agent runs:
       """

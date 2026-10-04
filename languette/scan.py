@@ -11,7 +11,7 @@ segment is led by a shell, so `echo ... | sh` is executed text).
 
 import re
 
-_OPENER = re.compile(r"""<<-?[ \t]*["']?[A-Za-z_][A-Za-z0-9_]*["']?""")
+_OPENER = re.compile(r"""(?<!<)<<-?[ \t]*["'\\]?[A-Za-z_][A-Za-z0-9_"'\\]*""")
 _ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _WS = re.compile(r"[ \t\n]")
 
@@ -85,43 +85,49 @@ def heredoc_subs(s):
 
 
 def _heredocs(b):
-    """Yield (b_after, body, quoted) per heredoc, as the awk's twin loops find
-    them; body is None when the opener has no newline or no closing line, and
-    quoted says the delimiter was quoted, so the shell expands nothing in it.
-    An unquoted delimiter's body keeps its command substitutions
-    (heredoc_subs). The search resumes after each heredoc, never inside what
-    it kept, so a `<<X` in a kept substitution cannot pair with a later X line."""
-    done = ""
+    """(stripped, [(body, quoted)]) -- the awk's sw_heredocs walk. Every opener
+    on a line takes its body in turn from the lines below; the rest of the
+    opener line stays. quoted says the delimiter was quoted, so the shell
+    expands nothing in it; an unquoted one's body keeps its command
+    substitutions (heredoc_subs). A body whose closing line never comes stays
+    in the text as commands. body is "" when the opener ends the text. The
+    search resumes after each heredoc, never inside what it kept, so a `<<X`
+    in a kept substitution cannot pair with a later X line."""
+    done, docs = "", []
     while True:
         m = _OPENER.search(b)
         if not m:
-            return
-        start = m.start()
-        raw = re.sub(r"^<<-?[ \t]*", "", m.group())
-        d = raw.replace('"', "").replace("'", "")
-        quoted = raw != d
-        nl = b.find("\n", start)
-        if nl < 0:
-            yield done + b[:start] + " HEREDOC ", None, quoted
-            return
-        tail = b[nl + 1:]
-        e = re.search("(?:^|\n)[ \t]*" + d + "[ \t]*(?:\n|\\Z)", tail)
-        if not e:
-            yield done + b[:start] + " HEREDOC ", None, quoted
-            return
-        # awk keeps the last character of the match: the closing newline.
-        body = tail[:e.start()]
-        done += b[:start] + " HEREDOC " + ("" if quoted else heredoc_subs(body))
-        b = tail[e.end() - 1:]
-        yield done + b, body, quoted
+            return done + b, docs
+        head, b = b[:m.start()], b[m.start():]
+        nl = b.find("\n")
+        seg, tail = (b, "") if nl < 0 else (b[:nl], b[nl + 1:])
+        delims = []
+
+        def opener(o):
+            raw = re.sub(r"^<<-?[ \t]*", "", o.group())
+            d = re.sub(r"""["'\\]""", "", raw)
+            delims.append((d, d != raw))
+            return " HEREDOC "
+        seg = _OPENER.sub(opener, seg)
+        subs, closed = "", nl >= 0
+        for d, quoted in delims:
+            body = ""
+            if closed:
+                e = re.search("(?:^|\n)[ \t]*" + d + "[ \t]*(?:\n|\\Z)", tail)
+                if e:
+                    body, tail = tail[:e.start()], tail[e.end():]
+                    subs += "" if quoted else heredoc_subs(body)
+                else:                       # never closes: keep it, as commands
+                    body, closed = tail, False
+            docs.append((body, quoted))
+        done += head + seg + subs
+        b = "" if nl < 0 else "\n" + tail
 
 
 def strip_heredocs(b):
     """Drop every heredoc body but an unquoted one's command substitutions; the
     marker becomes the word HEREDOC."""
-    for b, _, _ in _heredocs(b):
-        pass
-    return b
+    return _heredocs(b)[0]
 
 
 def heredoc_bodies(b):
@@ -129,10 +135,10 @@ def heredoc_bodies(b):
 
 
 def heredocs(b):
-    """[(body, live)] per closed heredoc; live when the delimiter was unquoted
-    and the body holds a $ or a backtick the shell would expand."""
+    """[(body, live)] per heredoc; live when the delimiter was unquoted and the
+    body holds a $ or a backtick the shell would expand."""
     return [(body, not quoted and ("$" in body or "`" in body))
-            for _, body, quoted in _heredocs(b) if body is not None]
+            for body, quoted in _heredocs(b)[1]]
 
 
 class Scan:

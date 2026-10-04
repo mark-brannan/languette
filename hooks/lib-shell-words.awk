@@ -25,23 +25,69 @@
 # unquoted delimiter (<<EOF, <<-EOF) the shell runs the body's command
 # substitutions, so those stay behind, each on a line of its own
 # (sw_hd_subs), and scan() reads them as commands like any other $(...).
-# The search resumes after each heredoc, never inside what it kept, so a
-# `<<X` in a kept substitution cannot pair with a later X line.
-function strip_heredocs(b,  d, eol, endm, tail, start, live, done) {
-  done = ""
-  while (match(b, /<<-?[ \t]*["']?[A-Za-z_][A-Za-z0-9_]*["']?/)) {
-    start = RSTART  # match() below clobbers RSTART; keep the opener's position
-    d = substr(b, start, RLENGTH); live = (d !~ /["']/)
-    sub(/^<<-?[ \t]*/, "", d); gsub(/["']/, "", d)
-    eol = index(substr(b, start), "\n")
-    if (!eol) return done substr(b, 1, start - 1) " HEREDOC "
-    tail = substr(b, start + eol)
-    endm = match(tail, "(^|\n)[ \t]*" d "[ \t]*(\n|$)")
-    if (!endm) return done substr(b, 1, start - 1) " HEREDOC "
-    done = done substr(b, 1, start - 1) " HEREDOC " (live ? sw_hd_subs(substr(tail, 1, endm - 1)) : "")
-    b = substr(tail, endm + RLENGTH - 1)
+# Any quote or backslash in the word (<<'EOF', <<E"O"F, <<\EOF) quotes it.
+# The rest of the opener line stays, and every opener on it takes its body
+# in turn from the lines below, as the shell does. A body whose closing line
+# never comes stays as it is, read as commands. `<<<` is a here-string, not
+# an opener. The search resumes after each heredoc, never inside what it
+# kept, so a `<<X` in a kept substitution cannot pair with a later X line.
+function strip_heredocs(b,  x) {
+  sw_heredocs(b, x)
+  return SW_hd_out
+}
+
+# heredoc_bodies(b, bodies): companion to strip_heredocs -- run on the same
+# original text, it finds the same heredocs in the same order but returns
+# their body text (bodies[1..n]; "" when the opener ends the text) instead
+# of throwing it away. b itself is untouched (awk passes scalars by value).
+function heredoc_bodies(b, bodies) {
+  return sw_heredocs(b, bodies)
+}
+
+# sw_hd_open(s): 1 when s holds a heredoc opener; SW_hs and SW_hl are its
+# start and length. awk has no lookbehind, so the character before the
+# opener rides in the match and is trimmed off.
+function sw_hd_open(s) {
+  if (!match(s, /(^|[^<])<<-?[ \t]*["'\\]?[A-Za-z_][A-Za-z0-9_"'\\]*/)) return 0
+  SW_hs = RSTART; SW_hl = RLENGTH
+  if (substr(s, SW_hs, 1) != "<") { SW_hs++; SW_hl-- }
+  return 1
+}
+
+# sw_heredocs(b, bodies): the one walk both functions above share. Fills
+# bodies[1..n], returns n, and leaves the stripped text in SW_hd_out.
+function sw_heredocs(b, bodies,   done, n, head, eol, seg, out, raw, nd, ds, dq, i, tail, endm, subs, open, body) {
+  done = ""; n = 0
+  while (sw_hd_open(b)) {
+    head = substr(b, 1, SW_hs - 1); b = substr(b, SW_hs)
+    eol = index(b, "\n")
+    if (eol) { seg = substr(b, 1, eol - 1); tail = substr(b, eol + 1) }
+    else { seg = b; tail = "" }
+    out = ""; nd = 0
+    while (sw_hd_open(seg)) {
+      raw = substr(seg, SW_hs, SW_hl)
+      out = out substr(seg, 1, SW_hs - 1) " HEREDOC "
+      seg = substr(seg, SW_hs + SW_hl)
+      sub(/^<<-?[ \t]*/, "", raw)
+      ds[++nd] = raw; gsub(/["'\\]/, "", ds[nd]); dq[nd] = (ds[nd] != raw)
+    }
+    out = out seg; subs = ""; open = (eol > 0)
+    for (i = 1; i <= nd; i++) {
+      body = ""
+      if (open) {
+        endm = match(tail, "(^|\n)[ \t]*" ds[i] "[ \t]*(\n|$)")
+        if (endm) {
+          body = substr(tail, 1, endm - 1); tail = substr(tail, endm + RLENGTH)
+          if (!dq[i]) subs = subs sw_hd_subs(body)
+        } else { body = tail; open = 0 }   # never closes: keep it, as commands
+      }
+      bodies[++n] = body
+    }
+    done = done head out subs
+    b = eol ? "\n" tail : ""
   }
-  return done b
+  SW_hd_out = done b
+  return n
 }
 
 # sw_hd_subs(s): the $(...) and `...` command substitutions in heredoc body s,
@@ -93,26 +139,6 @@ function sw_hd_close(s, j,   L, c, d, depth) {
     else if (c == ")") { depth--; if (!depth) return j }
   }
   return L
-}
-
-# heredoc_bodies(b, bodies): companion to strip_heredocs -- run on the same
-# original text, it finds the same heredocs in the same order but returns
-# their body text (bodies[1..n]) instead of throwing it away. b itself is
-# untouched (awk passes scalars by value).
-function heredoc_bodies(b, bodies,   d, eol, endm, tail, start, n) {
-  n = 0
-  while (match(b, /<<-?[ \t]*["']?[A-Za-z_][A-Za-z0-9_]*["']?/)) {
-    start = RSTART
-    d = substr(b, start, RLENGTH); sub(/^<<-?[ \t]*/, "", d); gsub(/["']/, "", d)
-    eol = index(substr(b, start), "\n")
-    if (!eol) return n
-    tail = substr(b, start + eol)
-    endm = match(tail, "(^|\n)[ \t]*" d "[ \t]*(\n|$)")
-    if (!endm) return n
-    bodies[++n] = substr(tail, 1, endm - 1)
-    b = substr(tail, endm + RLENGTH - 1)   # resume after it, as strip_heredocs does
-  }
-  return n
 }
 
 # scan(text, w, k, q): tokenise shell text into w[1..n]; returns n.

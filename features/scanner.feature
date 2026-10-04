@@ -95,6 +95,17 @@ Feature: scanner
       """
     Then its texts are ["0:cat  HEREDOC \n$(date +%F)\n`id -u`\n"]
 
+  Scenario: two openers on one line keep the line and take their bodies in turn
+    When the scanner reads:
+      """
+      cat <<A <<'B' | wc
+      $(id -u)
+      A
+      $(whoami)
+      B
+      """
+    Then its texts are ["0:cat  HEREDOC   HEREDOC  | wc\n$(id -u)\n"]
+
   Scenario: a heredoc body that mentions a command is not that command
     When the scanner reads:
       """
