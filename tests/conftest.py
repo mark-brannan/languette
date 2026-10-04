@@ -71,7 +71,10 @@ class Ctx:
         return d
 
     def expand(self, s):
-        s = s.replace("{HOME}", os.environ["HOME"]).replace("{PROJ}", str(self.proj))
+        if "{PROJ}" in s:
+            assert self.proj, f"test setup: {s!r} names {{PROJ}} but the scenario has no project directory"
+            s = s.replace("{PROJ}", str(self.proj))
+        s = s.replace("{HOME}", os.environ["HOME"])
         if "{TMP}" in s:
             self.tmp = self.tmp or self.mkdtemp()
             s = s.replace("{TMP}", self.tmp)
@@ -84,10 +87,7 @@ class Ctx:
     # --- running a guard -------------------------------------------------
 
     def payload(self, command):
-        cwd = self.expand(self.cwd)
-        if cwd.startswith("$HOME"):
-            cwd = os.environ["HOME"] + cwd[len("$HOME"):]
-        p = {"tool_name": "Bash", "tool_input": {"command": self.expand(command)}, "cwd": cwd}
+        p = {"tool_name": "Bash", "tool_input": {"command": self.expand(command)}, "cwd": self.expand(self.cwd)}
         if self.proj:
             p["transcript_path"] = f"{self.proj}/t.jsonl"
         return json.dumps(p)
@@ -101,6 +101,9 @@ class Ctx:
     def run(self, stdin):
         self.stdin = stdin
         if self.engine == "python":
+            # These steps only shape a subprocess; in-process they would do nothing.
+            assert not (self.hook or self.bare or self.stubs), \
+                "test setup: a hook command, a bare PATH or the stubs need the shell engine (@shell_only)"
             env = {"HOME": os.environ["HOME"], **self.scenario_env()}
             self.verdict = Verdict(run.respond(stdin, env, only=self.guard))
             return
