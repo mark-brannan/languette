@@ -23,14 +23,24 @@
 # `git commit -m x -- path/x`), and a `git add path/x && git commit` in one
 # call are also run through `prose-budget --file` against the named paths
 # -- the working-tree content those commands actually commit, not the
-# index. `-a`/`--all`, and an `add` that stages by pattern (`-A`, `-u`,
-# `.`, `*`, `:`) rather than by name, widen that to every path `git diff
-# --name-only` reports changed. A pathspec word this guard cannot resolve
-# (an unexpanded `~`, a literal `$VAR`, a quoted path with spaces) denies
-# rather than skips, same as an unresolvable `cd`/`-C`. Residual gap: an
+# index. `-a`/`--all` and `add -u`/`--update` widen that to every path
+# `diff --name-only` reports changed; an `add` that stages by pattern
+# (`-A`, `--all`, `.`, `*`, `:`) rather than by name also widens it to
+# `ls-files --others --exclude-standard`, since that can commit a
+# brand-new file no diff would show. Both run through whichever of
+# `git`/`yadm` the commit itself used, and both stage repo-wide --
+# `-a`/`add .` is not scoped to `$dir` -- so each path they report is
+# anchored to the repo root as an absolute path rather than read against
+# `$dir`, which would misplace anything outside it. A pathspec
+# word this guard cannot resolve (an unexpanded `~`, a literal `$VAR`, a
+# quoted path with spaces) denies rather than skips, same as an
+# unresolvable `cd`/`-C`; so does a `diff`/`ls-files` that itself fails. A
+# path starting with `-` is prefixed `./` before it reaches the engine, so
+# it can't be read as one of the engine's own options. Residual gap: an
 # `add`/`commit` pair that `cd`s between the two resolves both against the
 # commit's own directory, which is wrong if they really do run in
-# different places.
+# different places; a directory or glob pathspec is passed to `--file`
+# literally, which the engine silently drops rather than expands.
 #
 # Exit 1 is a finding and denies. Exit 2 is a bad budgets config (or an
 # engine too old for --staged/--file) and denies too, saying so: the repo
@@ -65,12 +75,17 @@ case $cwd in /*) : ;; *) cwd=$PWD ;; esac
 case $ENGINE in /*) : ;; */*) ENGINE=$cwd/$ENGINE ;; *) ENGINE=$(command -v "$ENGINE" 2>/dev/null) ;; esac
 [ -x "$ENGINE" ] || exit 0
 
-# Prints "COMMIT<TAB>cd-dir<TAB>-C-dir<TAB>all-flag<TAB>bad-pathspec<TAB>paths"
-# for the first git/yadm commit found. paths is \037-joined: every pathspec
-# word on an `add` before it, plus any trailing pathspec on the commit
-# itself. all-flag is 1 when `-a`/`--all`/`-am` on commit, or a
-# pattern-based `add` (`-A`, `-u`, `.`, `*`, `:`), means every unstaged
-# tracked change is in play, not just the named paths.
+# Prints "COMMIT<TAB>cd-dir<TAB>-C-dir<TAB>all-flag<TAB>bad-pathspec<TAB>paths
+# <TAB>all-new<TAB>binary" for the first git/yadm commit found. paths is
+# \037-joined: every pathspec word on an `add` before it, plus any trailing
+# pathspec on the commit itself. all-flag is 1 when `-a`/`--all`/`-am` on
+# commit, or `add -u`/`--update`, means every unstaged tracked change is in
+# play, not just the named paths. all-new is 1 when an `add` staged by
+# pattern rather than by name (`-A`, `--all`, `.`, `*`, `:`) -- that also
+# picks up brand new, still-untracked files, which a tracked-only diff
+# cannot see. binary is the exact word that ran the commit (`git`, `yadm`,
+# or a path to either), so the fallback diffs the repo the commit actually
+# used.
 hit=$(printf '%s\n' "$cmd" | awk "$(cat "$LIB")"'
 BEGIN { SEP = sprintf("%c", 31) }
 { buf = buf $0 "\n" }
@@ -93,8 +108,12 @@ function addpath(p) { PATHS[++PATHN] = p }
 function collect_add(lo, hi,   i) {
   for (i = lo; i <= hi; i++) {
     if (w[i] == "--") continue
-    if (w[i] ~ /^-/) { if (w[i] ~ /^(-A|--all|-u|--update)$/) ALLFLAG = 1; continue }
-    if (w[i] == "." || w[i] == "*" || w[i] == ":") { ALLFLAG = 1; continue }
+    if (w[i] ~ /^-/) {
+      if (w[i] ~ /^(-A|--all)$/) { ALLFLAG = 1; ALLNEW = 1 }
+      else if (w[i] ~ /^(-u|--update)$/) ALLFLAG = 1
+      continue
+    }
+    if (w[i] == "." || w[i] == "*" || w[i] == ":") { ALLFLAG = 1; ALLNEW = 1; continue }
     if (isbad(i)) { BAD = 1; continue }
     addpath(w[i])
   }
@@ -122,6 +141,7 @@ function segment(lo, hi, nested,   g, i, j, dir, pj) {
   if (w[lo] == "cd" && k[lo + 1] == "w") CD = join(CD, w[lo + 1])
   g = cmd_index(w, k, lo, hi, "(^|/)(git|yadm)$", nested, "")
   if (!g) return
+  BIN = w[g]
   i = g + 1; dir = ""
   while (i <= hi && w[i] ~ /^-/) {
     if (w[i] == "-C") { dir = join(dir, w[i + 1]); i++ }
@@ -133,11 +153,11 @@ function segment(lo, hi, nested,   g, i, j, dir, pj) {
     commit_tail(i + 1, hi)
     pj = ""
     for (j = 1; j <= PATHN; j++) pj = pj (pj == "" ? "" : SEP) PATHS[j]
-    print "COMMIT\t" CD "\t" dir "\t" (ALLFLAG ? 1 : 0) "\t" (BAD ? 1 : 0) "\t" pj
+    print "COMMIT\t" CD "\t" dir "\t" (ALLFLAG ? 1 : 0) "\t" (BAD ? 1 : 0) "\t" pj "\t" (ALLNEW ? 1 : 0) "\t" BIN
     exit
   }
   if (i <= hi && w[i] == "merge") {
-    for (j = i + 1; j <= hi; j++) if (w[j] == "--continue") { print "COMMIT\t" CD "\t" dir "\t0\t0\t"; exit }
+    for (j = i + 1; j <= hi; j++) if (w[j] == "--continue") { print "COMMIT\t" CD "\t" dir "\t0\t0\t\t0\t" BIN; exit }
   }
 }') || exit 0
 case $hit in COMMIT*) ;; *) exit 0 ;; esac
@@ -147,6 +167,8 @@ c_dir=$(printf '%s' "$hit" | cut -f3)
 allflag=$(printf '%s' "$hit" | cut -f4)
 badpaths=$(printf '%s' "$hit" | cut -f5)
 paths=$(printf '%s' "$hit" | cut -f6)
+allnew=$(printf '%s' "$hit" | cut -f7)
+binary=$(printf '%s' "$hit" | cut -f8)
 dir=$cwd
 for step in "$cd_dir" "$c_dir"; do
   [ -n "$step" ] || continue
@@ -169,12 +191,46 @@ Fix the config or update the engine, then retry the commit." ;;
 esac
 
 files=$(printf '%s' "$paths" | tr '\037' '\n')
-[ "$allflag" = "1" ] && files=$(printf '%s\n%s\n' "$files" "$(cd "$dir" 2>/dev/null && git diff --name-only 2>/dev/null)")
+if [ "$allflag" = "1" ] || [ "$allnew" = "1" ]; then
+  # -a/--all and a pattern-based add stage repo-wide, not just under $dir, so
+  # the extra list is gathered repo-root-relative and then anchored to an
+  # absolute path -- a bare relative one here would be read against $dir
+  # below, misplacing anything outside it (languette#49 review).
+  reporoot=$(cd "$dir" 2>/dev/null && "$binary" rev-parse --show-toplevel 2>&1)
+  rrc=$?
+  [ "$rrc" -eq 0 ] \
+    || deny "Blocked by prose-budget-commit: \"$binary rev-parse --show-toplevel\" failed (exit $rrc), so this commit's unstaged changes could not be checked:
+$reporoot
+Fix whatever made that fail, then retry the commit."
+  if [ "$allflag" = "1" ]; then
+    extra=$(cd "$reporoot" 2>/dev/null && "$binary" diff --name-only 2>&1)
+    erc=$?
+    [ "$erc" -eq 0 ] \
+      || deny "Blocked by prose-budget-commit: \"$binary diff --name-only\" could not list this commit's unstaged tracked changes (exit $erc), so they could not be checked:
+$extra
+Fix whatever made that fail, then retry the commit."
+    files="$files
+$(printf '%s\n' "$extra" | awk -v r="$reporoot" 'NF { print r "/" $0 }')"
+  fi
+  if [ "$allnew" = "1" ]; then
+    extra=$(cd "$reporoot" 2>/dev/null && "$binary" ls-files --others --exclude-standard 2>&1)
+    erc=$?
+    [ "$erc" -eq 0 ] \
+      || deny "Blocked by prose-budget-commit: \"$binary ls-files --others\" could not list this commit's new untracked files (exit $erc), so they could not be checked:
+$extra
+Fix whatever made that fail, then retry the commit."
+    files="$files
+$(printf '%s\n' "$extra" | awk -v r="$reporoot" 'NF { print r "/" $0 }')"
+  fi
+fi
 files=$(printf '%s\n' "$files" | awk 'NF')
 [ -n "$files" ] || exit 0
 
 set --
-while IFS= read -r f; do set -- "$@" "$f"; done <<EOF
+while IFS= read -r f; do
+  case $f in -*) f="./$f" ;; esac
+  set -- "$@" "$f"
+done <<EOF
 $files
 EOF
 [ $# -gt 0 ] || exit 0

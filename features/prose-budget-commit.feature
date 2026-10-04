@@ -139,7 +139,22 @@ Feature: prose-budget-commit
     When the agent runs `git commit -am x`
     Then the guard is silent
     And the stub "prose-budget" was called with "--staged"
-    And the stub "prose-budget" was called with "--file README.md"
+    And the stub "prose-budget" was called with "--file "
+    And the stub "prose-budget" was called with "README.md"
+
+  Scenario: an `add` by pattern also checks a brand-new, still-untracked file
+    Given the file "NOTES.md" holds:
+      """
+      x
+      """
+    When the agent runs `git add . && git commit -m x`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "NOTES.md"
+
+  Scenario: a pathspec starting with "-" cannot be read as one of the engine's own options
+    When the agent runs `git commit -m x -- --staged`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "--file ./--staged"
 
   Scenario: a plain commit with nothing outside the index is not also checked by path
     When the agent runs `git commit -m x`
