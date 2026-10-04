@@ -177,9 +177,10 @@ as on.
 A guard is a function. It takes the command and the payload around it and
 returns a verdict: deny with a reason, ask, a warning, or nothing. It runs
 nothing, asks no model, and the same inputs give the same verdict every time.
-What it reads besides the command is named in its header: the filesystem for
-`no-rm-tree`, the repo's list and the session transcript for `ask-first`,
-GitHub for `no-delete-stacked-base`, nothing for `no-git-footguns`. A guard
+What it reads besides the command is named in its header: the filesystem and
+`LANGUETTE_RM_ALLOW` for `no-rm-tree`; the repo's list, the session
+transcript and the approvals already spent for `ask-first`; GitHub for
+`no-delete-stacked-base`; nothing for `no-git-footguns`. A guard
 that cannot decide denies and says what it saw. A guard that crashes is a deny
 naming the guard; the runner holds that rule once, so no guard has to.
 
@@ -208,8 +209,9 @@ speak the promise, `denies`, `is_silent`, `warns_about`, so a failure prints
 the guard's reason beside what was expected. Above the scenarios sit
 properties, checked over generated commands: a guard fails closed on any
 exception; a verdict on a text is never looser when that text is nested in
-`sh -c`, `eval` or a pipe to a shell; adding a rule or an allowlist name never
-turns a deny into an allow.
+`sh -c`, `eval` or a pipe to a shell; adding a rule never turns a deny into an
+allow, and an allowlist name turns a deny into an allow only for the targets
+it names.
 
 The scenarios are the seam between the people who set the rules and the code
 that enforces them. Whether a scenario is written by hand or derived from a
