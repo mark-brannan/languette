@@ -182,25 +182,24 @@ as on.
 
 ## Strong guards
 
-A guard is a function. It takes the command and the payload around it and
-returns a verdict: deny with a reason, ask, a warning, or nothing. It runs
-nothing, asks no model, and the same inputs give the same verdict every time.
-What it reads besides the command is named in its header: the filesystem and
-`LANGUETTE_RM_ALLOW` for `no-rm-tree`; the repo's list, the session
-transcript and the approvals already spent for `ask-first`; GitHub for
-`no-delete-stacked-base`; nothing for `no-git-footguns`. A guard
-that cannot decide denies and says what it saw. A guard that crashes is a deny
-naming the guard, and no guard has to handle that itself.
+A guard is a function, pure where it can be: the command and its context in,
+a verdict out. It asks no model and runs nothing. The verdict is **deny**
+with the reason, **ask**, a **warning**, or **nothing** (*allow*). What a
+guard reads beyond the command, it declares:
 
-The guards share one scanner, which turns the command into words and nested
-texts and resolves every ambiguity toward more words reaching the guard, and
-one vocabulary for verdicts. A new guard is one module with a `check`
-function and its scenarios. It brings no runner, wrapper or test harness of
-its own.
+| Guard | Reads |
+|---|---|
+| `no-git-footguns` | nothing: a pure function of the command |
+| `no-rm-tree` | the filesystem, and `LANGUETTE_RM_ALLOW` |
+| `ask-first` | the repo's list, the session transcript, the approvals spent |
+| `no-delete-stacked-base` | GitHub, through `gh` |
 
-The contract is written as scenarios, in Gherkin, under `features/`: a command
-and its context in, a verdict out, in the words a person uses to state the
-rule.
+A guard that cannot decide denies and says what it saw. A guard that crashes
+is a deny naming the guard; the runner holds that rule, so no guard has to.
+
+The contract is written as scenarios, in the words a person uses to state the
+rule, and every scenario runs against every engine a guard has, Python and
+shell alike (in progress: [#31](https://github.com/mark-brannan/languette/pull/31)):
 
 ```gherkin
 Scenario: a target the guard cannot resolve is denied on sight
@@ -209,26 +208,11 @@ Scenario: a target the guard cannot resolve is denied on sight
   Then the guard denies, naming "variable or command substitution"
 ```
 
-Every scenario runs against every engine a guard has: the Python module
-in-process, and the shell script by subprocess under each awk CI installs.
-The engines must agree, and the table under the promise above is generated
-from the scenarios tagged for it. Assertions are PyHamcrest matchers that
-speak the promise, `denies`, `is_silent`, `warns_about`, so a failure prints
-the guard's reason beside what was expected. Above the scenarios sit
-properties, checked over generated commands: a guard fails closed on any
-exception; a verdict on a text is never looser when that text is nested in
-`sh -c`, `eval` or a pipe to a shell; adding a rule never turns a deny into an
-allow, and an allowlist name turns a deny into an allow only for the targets
-it names.
-
 The scenarios are the seam between the people who set the rules and the code
-that enforces them. Whether a scenario is written by hand or derived from a
-model of the guard is open. Either way it is what a reviewer reads, and the
-code is judged against it.
-
-The Python engine needs only the standard library, and CI proves it with an
-import walk over `languette/`. The tests need `pytest`, `pytest-bdd` and
-`PyHamcrest`.
+that enforces them: a reviewer reads them, and the code is judged against
+them. The road ahead runs toward properties checked over generated commands,
+then a model of each guard from which the scenarios are derived and against
+which the code is proven.
 
 ## Working on it
 
@@ -247,9 +231,10 @@ passes a garbage one. That is a shape check only, with no model call and no
 login. The headless smoke test, which installs the plugin in a scratch project
 and confirms a recursive `rm` is really blocked, stays manual: it needs both.
 
-`fixtures/` holds test cases as data: a command in, tokens or a verdict
-out. The scanner (`hooks/lib-shell-words.awk`) and the three guards began as
-copies of the guards in [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles);
+`fixtures/` holds the contract as data (witness test cases): a command in,
+tokens or a verdict out, until [#31](https://github.com/mark-brannan/languette/pull/31)
+moves it to scenarios under `features/`. The scanner (`hooks/lib-shell-words.awk`)
+and the three guards began as copies of the guards in [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles);
 this repo is where they are maintained now.
 
 The product name appears in `.claude-plugin/plugin.json`,
