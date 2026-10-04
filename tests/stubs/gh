@@ -1,0 +1,17 @@
+#!/bin/sh
+# A stand-in for gh: no test reaches the network. It logs its arguments to
+# $LANGUETTE_STUB_LOG/gh and lists three open PRs whatever the filters (the
+# hook's own select is what is under test). #1 is stacked on
+# claude/base-branch, the head of #2; claude/lonely heads #3 and bases nothing.
+# GH_FAIL makes it fail; GH_TAB puts a tab in a title, which the decision
+# JSON must survive.
+printf '%s\n' "$*" >> "${LANGUETTE_STUB_LOG:?}/gh"
+[ -n "${GH_FAIL:-}" ] && exit 1
+t="stacked change"; [ -n "${GH_TAB:-}" ] && t="stacked\\tchange"
+cat <<JSON
+[
+ {"number":1,"title":"$t","baseRefName":"claude/base-branch","headRefName":"claude/stacked-one"},
+ {"number":2,"title":"the base change","baseRefName":"main","headRefName":"claude/base-branch"},
+ {"number":3,"title":"unrelated","baseRefName":"main","headRefName":"claude/lonely"}
+]
+JSON

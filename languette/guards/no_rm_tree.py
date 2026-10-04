@@ -13,6 +13,7 @@ import os
 import re
 
 from languette import scan as sw
+from languette.verdict import Refuse, context, deny
 
 NAME = "no-rm-tree"
 
@@ -28,10 +29,6 @@ _RM = re.compile(r"(?:^|/)rm\Z")
 _RM_PARENTS = re.compile(r"^(?:git|yadm|svn|hg|jj|gsutil)\Z")
 _CD = re.compile(r"^(?:cd|pushd|popd)\Z")
 _ALLOW_CHARS = re.compile(r"[A-Za-z0-9._@+/-]*")
-
-
-class _Deny(Exception):
-    pass
 
 
 def _physical(p):
@@ -93,7 +90,7 @@ class _Judge:
         return "rm -r" + ("" if raw == "" else " " + raw)
 
     def blocked(self, raw, why):
-        raise _Deny(
+        raise Refuse(
             f"`{self.lab(raw)}` is blocked: {why}. Resolve the target yourself and spell it out: `rm -rf` on "
             "the absolute path of a generated directory (node_modules, dist, coverage, .pio ...), the "
             "scratchpad, /tmp or an agent worktree. Anything else in a repo or under $HOME is the user's -- "
@@ -180,10 +177,6 @@ class _Judge:
                     self.segment(s, a, b, nested)
 
 
-def _deny(reason):
-    return {"permissionDecision": "deny", "permissionDecisionReason": reason}
-
-
 def check(payload, env=os.environ):
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if cmd is None or cmd is False:
@@ -198,7 +191,7 @@ def check(payload, env=os.environ):
         cwd = os.getcwd()
     home = env.get("HOME", "")
     if not home.startswith("/"):
-        return _deny("no-rm-tree: $HOME is not an absolute path, cannot resolve targets")
+        return deny("no-rm-tree: $HOME is not an absolute path, cannot resolve targets")
 
     home_p = _physical(home)
     extra_roots, extra_names, allow_err = [], [], None
@@ -214,14 +207,14 @@ def check(payload, env=os.environ):
     judge, refused = _Judge(cwd, home), None
     try:
         judge.run(cmd + "\n")
-    except _Deny as e:
+    except Refuse as e:
         refused = str(e)
     if refused is None and not judge.targets:
-        return {"additionalContext": "no-rm-tree: " + allow_msg} if allow_msg else None
+        return context("no-rm-tree: " + allow_msg) if allow_msg else None
     if allow_msg:
-        return _deny("no-rm-tree: " + allow_msg)
+        return deny("no-rm-tree: " + allow_msg)
     if refused is not None:
-        return _deny(refused)
+        return deny(refused)
 
     names = GENERATED_NAMES + tuple(extra_names)
     scratch = home + "/.local/state/claude-tmpdir"
@@ -242,7 +235,7 @@ def check(payload, env=os.environ):
     for abs_, kind, raw in judge.targets:
         what = f"find {raw} -delete" if kind == "find" else f"rm -r {raw}"
         if not allowed(abs_):
-            return _deny(
+            return deny(
                 f"`{what}` is blocked: only the scratchpad, /tmp, agent worktrees and the generated "
                 "directories named in no-rm-tree.sh (node_modules, dist, coverage, .pio ...) may be removed "
                 f"recursively, and {abs_} is none of those. `git status --short {raw}` and `git clean -n {raw}` "
@@ -250,7 +243,7 @@ def check(payload, env=os.environ):
                 "-- a directory they own can hold downloads and logs no session knows about.")
         phys = _physical(abs_)
         if phys != abs_ and not allowed(phys):
-            return _deny(
+            return deny(
                 f"`{what}` is blocked: {abs_} resolves through a symlink to {phys}, which is not a generated "
                 "directory, the scratchpad, /tmp or an agent worktree. rm follows a trailing slash into the "
                 "link's target.")

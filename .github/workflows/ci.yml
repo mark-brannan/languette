@@ -22,77 +22,45 @@ jobs:
       contents: read
     uses: mark-brannan/.github/.github/workflows/nonempty-diff.yml@main
 
-  # The awk scanner is what the guards stand on, and awk is not one language:
-  # the three implementations are co-installed in ONE job (mawk, gawk and
-  # original-awk each Provide awk through update-alternatives and do not
-  # Conflict, so /usr/bin/{mawk,gawk,original-awk} all exist) and a symlink
-  # picks one per pass through AWK_PATH. Every implementation is reported
-  # even after one fails: the finding this exists for is "mawk is fine,
-  # original-awk is not".
-  guard-tests:
+  # Every scenario in features/, under each engine, under each awk. The awk
+  # scanner is what the shell guards stand on, and awk is not one language:
+  # one matrix leg per implementation, each picked by a symlink through
+  # AWK_PATH (mawk, gawk and original-awk each Provide awk through
+  # update-alternatives and do not Conflict, so all three install side by
+  # side). fail-fast is off: the finding this exists for is "mawk is fine,
+  # original-awk is not". The same run checks the hooks.json shape (`claude
+  # plugin validate --strict` passes a garbage one), the stdlib-only rule for
+  # languette/ and the README table.
+  tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        awk: [mawk, gawk, original-awk]
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
       - name: Install mawk, gawk, original-awk and jq
         run: |
           set -euo pipefail
           sudo apt-get update -q
           sudo apt-get install -y -q mawk gawk original-awk jq
-      # No model call, no login: a shape check on the file Claude Code loads.
-      # `claude plugin validate --strict` passes a garbage hooks.json.
-      - name: hooks/hooks.json has the shape Claude Code loads
-        run: bash fixtures/run.sh --shape
-      - name: Guard suites and fixture contract under each awk
+      - run: pip install -r requirements-dev.txt
+      - name: Scenarios under ${{ matrix.awk }}
+        env:
+          IMPL: ${{ matrix.awk }}
         run: |
           set -euo pipefail
-          status=0
-          for impl in mawk gawk original-awk; do
-            d=$(mktemp -d)
-            ln -s "$(command -v "$impl")" "$d/awk"
-            for t in hooks/no-rm-tree.test.sh \
-                     hooks/no-git-footguns.test.sh \
-                     hooks/no-delete-stacked-base.test.sh \
-                     fixtures/run.sh; do
-              echo "::group::$t under $impl"
-              if AWK_PATH=$d bash "$t"; then echo "ok"; else status=1; echo "::error::$t failed under $impl"; fi
-              echo "::endgroup::"
-            done
-          done
-          exit $status
-      - name: The README table is the fixtures' table
-        run: |
-          set -euo pipefail
-          diff <(bash fixtures/run.sh --table) \
-               <(sed -n '/<!-- fixtures-table -->/,/<!-- \/fixtures-table -->/p' README.md | sed '1d;$d')
-
-  # The Python proof of concept (languette/, unwired): its fixtures, and the
-  # same fixtures through both engines, failing on any result that differs.
-  # python3, jq and the runner's default awk are on the image; nothing installed.
-  python-engine:
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - name: Standard library only under languette/
-        run: |
-          python3 -I - <<'EOF'
-          import ast, pathlib, sys
-          bad = [f"{f}: {n}" for f in pathlib.Path("languette").rglob("*.py")
-                 for node in ast.walk(ast.parse(f.read_text()))
-                 for n in ([a.name for a in node.names] if isinstance(node, ast.Import) else
-                           [node.module] if isinstance(node, ast.ImportFrom) and node.level == 0 else [])
-                 if n.split(".")[0] not in sys.stdlib_module_names | {"languette"}]
-          print("\n".join(bad) or "stdlib only")
-          sys.exit(bool(bad))
-          EOF
-      - name: Fixture contract under the Python engine
-        run: bash fixtures/run.sh --engine python
-      - name: Both engines agree on every fixture
-        run: bash fixtures/run.sh --diff
+          d=$(mktemp -d)
+          ln -s "$(command -v "$IMPL")" "$d/awk"
+          AWK_PATH=$d python -m pytest -q
 
   shellcheck:
     runs-on: ubuntu-latest
@@ -103,10 +71,10 @@ jobs:
       - run: |
           set -euo pipefail
           command -v shellcheck || (sudo apt-get update -q && sudo apt-get install -y -q shellcheck)
-          shellcheck --severity=warning hooks/*.sh fixtures/run.sh
+          shellcheck --severity=warning hooks/*.sh tests/stubs/*
 
   ci-gate:
-    needs: [nonempty, guard-tests, python-engine, shellcheck]
+    needs: [nonempty, tests, shellcheck]
     if: always()
     permissions: {}
     uses: mark-brannan/.github/.github/workflows/ci-gate.yml@main
