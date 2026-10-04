@@ -1,6 +1,6 @@
 {
   "name": "languette",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, git footguns, deleting a branch an open PR is stacked on, costly commands the repo says to ask about first, and commands that destroy infrastructure.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, and commands that destroy infrastructure.",
   "author": {
     "name": "Mark Brannan"
   },
@@ -67,6 +67,19 @@
       "type": "string",
       "title": "Private repos",
       "description": "Repos whose issue and PR text is never scanned, as owner/name, comma-separated. Empty by default: every repo is scanned.",
+      "required": false
+    },
+    "no_bypass_labels": {
+      "type": "boolean",
+      "title": "Keep CI-gate bypass labels for humans",
+      "description": "Deny a session applying a label that waives a CI gate (bypass_labels) to an issue or PR, through gh, gh api or an MCP tool, in any repo. Leave on unless you want sessions to waive their own gates.",
+      "default": true
+    },
+    "bypass_labels": {
+      "type": "string",
+      "title": "Bypass labels",
+      "description": "Labels that waive a CI gate, so only a human may apply them: comma-separated, matched case-insensitively. Empty means the default, churn-ok,mixed-loops-ok.",
+      "default": "churn-ok,mixed-loops-ok",
       "required": false
     },
     "prose_budget_commit": {

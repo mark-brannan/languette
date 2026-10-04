@@ -34,7 +34,7 @@ It needs:
 
 - `jq` and a POSIX `awk`, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
-- `python3`, standard library only, for `ask-first` and `no-iac-destroy`;
+- `python3`, standard library only, for `ask-first`, `no-bypass-labels` and `no-iac-destroy`;
 - `gh`, for `no-delete-stacked-base`.
 
 Without the plugin system, see [Installing by hand](#installing-by-hand).
@@ -57,6 +57,8 @@ Each guard denies one class of command:
   checked out in `$HOME`, when home is itself a worktree (opt-in)
 - [`no-foreign-worktree`](hooks/no-foreign-worktree.sh): a command or edit
   that reaches into another session's git worktree (opt-in)
+- [`no-bypass-labels`](languette/guards/no_bypass_labels.py): a session
+  applying a label that waives a CI gate, such as `churn-ok`
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
 - [`no-iac-destroy`](languette/guards/no_iac_destroy.py): `terraform destroy`, `kubectl delete` and
@@ -170,6 +172,9 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 
 Without a terms file the guard is off.
 
+`bypass_labels` lists the labels `no-bypass-labels` keeps for humans,
+comma-separated; empty means `churn-ok,mixed-loops-ok`.
+
 <details>
 <summary>How Claude Code passes plugin settings to a hook (measured)</summary>
 
@@ -212,6 +217,7 @@ guard reads beyond the command, it declares:
 | `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `no-checkout-home` | `$HOME`, and what `git rev-parse --show-toplevel` resolves to |
 | `public-issue-guard` | the terms file, the files a post reads, and the checkout's `git remote` |
+| `no-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `no-foreign-worktree` | git, for where each path lands, and a record per session in `$TMPDIR` |
 | `prose-budget-commit` | the staged diff, through `prose-budget` |
 

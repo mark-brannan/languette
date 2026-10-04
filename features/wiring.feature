@@ -5,6 +5,7 @@ Feature: wiring
   A plain `sh missing.sh` exits 127, which Claude Code reads as a
   non-blocking error, so a missing or crashing script has to come out as a
   deny. ask-first judges only in a project that lists the command.
+  no-bypass-labels judges an MCP tool's labels field as well as Bash.
 
   Background:
     Given a project directory
@@ -35,6 +36,12 @@ Feature: wiring
       | issue-door             | gh issue create -t t -b b     | denies    |
       | prose-budget-commit    | git commit -m x               | denies    |
       | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | no-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
+
+  Scenario: the hooks.json command for no-bypass-labels judges an MCP call
+    Given the hook is the hooks.json command for "no-bypass-labels"
+    When the agent calls MCP tool "mcp__github__update_issue" with input `{"owner":"o","repo":"r","issue_number":3,"labels":["churn-ok"]}`
+    Then the guard denies
 
   # The prompt hook is the only thing that opens the door. Dropped or
   # mis-argumented in hooks.json, the PreToolUse hook would deny every create.
@@ -59,6 +66,7 @@ Feature: wiring
       | no-iac-destroy         | terraform destroy             |
       | issue-door             | gh issue create -t t -b b     |
       | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust |
+      | no-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
   Scenario Outline: a script that crashes is a deny
@@ -76,6 +84,7 @@ Feature: wiring
       | no-iac-destroy         | terraform destroy             |
       | issue-door             | gh issue create -t t -b b     |
       | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust |
+      | no-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
   Scenario Outline: the option set to false skips the guard
@@ -93,6 +102,7 @@ Feature: wiring
       | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | terraform destroy             |
       | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | gh issue create -t t -b b     |
       | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | gh issue comment 3 -R o/r -b Wanderlust |
+      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | git commit -m x               |
 
   # Only the exact word false skips: unset, empty or anything else runs the
@@ -153,6 +163,12 @@ Feature: wiring
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | no    | git commit -m x               | denies    |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | true  | git commit -m x               | denies    |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 1     | git commit -m x               | denies    |
+      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       |       | gh pr edit 4 --add-label churn-ok | denies  |
+      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | 0     | gh pr edit 4 --add-label churn-ok | denies  |
+      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | False | gh pr edit 4 --add-label churn-ok | denies  |
+      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | no    | gh pr edit 4 --add-label churn-ok | denies  |
+      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | true  | gh pr edit 4 --add-label churn-ok | denies  |
+      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | 1     | gh pr edit 4 --add-label churn-ok | denies  |
 
   # no-checkout-home is opt-in, the reverse of the guards above: it runs only
   # when its option is exactly "true", so a misconfiguration leaves it off.

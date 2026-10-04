@@ -16,11 +16,11 @@ from conftest import hooks_json_commands, hooks_json_prompt_command
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"no-git-footguns", "no-rm-tree", "no-delete-stacked-base", "ask-first", "issue-door",
           "public-issue-guard", "prose-budget-commit", "no-checkout-home", "no-foreign-worktree",
-          "no-iac-destroy"}
+          "no-bypass-labels", "no-iac-destroy"}
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"no_checkout_home", "no_foreign_worktree"}
 # Options that are not a guard's on/off toggle: name -> type.
-OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string"}
+OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string"}
 # Guards that also judge file-editing tools and EnterWorktree, so they match more than Bash.
 WIDE_MATCHER = {"no-foreign-worktree": "Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree"}
 
@@ -228,3 +228,21 @@ def test_the_public_issue_guard_matcher_covers_the_tool(tool):
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__list_pull_requests"])
 def test_the_public_issue_guard_matcher_leaves_other_tools_alone(tool):
     assert_that(re.fullmatch(_public_issue_guard_matcher(), tool), is_(None))
+
+
+def _no_bypass_labels_matcher():
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
+    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard no-bypass-labels" in h["command"] for h in e["hooks"])]
+    return e["matcher"]
+
+
+# Any MCP tool may carry a labels field; the guard itself tells writes from reads.
+@pytest.mark.parametrize("tool", ["Bash", "mcp__github__update_issue", "mcp__plugin_github_github__issue_write",
+                                  "mcp__gitea__edit_issue"])
+def test_the_no_bypass_labels_matcher_covers_the_tool(tool):
+    assert_that(re.fullmatch(_no_bypass_labels_matcher(), tool), is_not(None))
+
+
+@pytest.mark.parametrize("tool", ["Read", "Write", "Edit"])
+def test_the_no_bypass_labels_matcher_leaves_other_tools_alone(tool):
+    assert_that(re.fullmatch(_no_bypass_labels_matcher(), tool), is_(None))
