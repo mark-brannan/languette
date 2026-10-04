@@ -338,7 +338,7 @@ def _hooks_json(ctx, guard):
 @given(parsers.parse('the plugin\'s script for "{guard}" crashes'))
 def _crash(ctx, guard):
     root = Path(ctx.mkdtemp())
-    if guard == "ask-first":
+    if "languette/run.py" in hooks_json_commands()[guard]:
         (root / "languette").mkdir()
         (root / "languette/run.py").write_text("raise SystemExit(3)\n")
     else:
