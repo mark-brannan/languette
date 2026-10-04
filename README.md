@@ -235,6 +235,7 @@ to Claude Code, and every command goes through. One entry:
 ## Working on it
 
 ```
+git clone https://github.com/mark-brannan/languette && cd languette
 sudo apt install jq gawk mawk shellcheck
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
