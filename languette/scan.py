@@ -26,37 +26,47 @@ NESTED_CAP = 64
 
 
 def _heredocs(b):
-    """Yield (b_after, body) per heredoc, as the awk's twin loops find them;
-    body is None when the opener has no newline or no closing line."""
+    """Yield (b_after, body, quoted) per heredoc, as the awk's twin loops find
+    them; body is None when the opener has no newline or no closing line, and
+    quoted says the delimiter was quoted, so the shell expands nothing in it."""
     while True:
         m = _OPENER.search(b)
         if not m:
             return
         start = m.start()
-        d = re.sub(r"^<<-?[ \t]*", "", m.group()).replace('"', "").replace("'", "")
+        raw = re.sub(r"^<<-?[ \t]*", "", m.group())
+        d = raw.replace('"', "").replace("'", "")
+        quoted = raw != d
         nl = b.find("\n", start)
         if nl < 0:
-            yield b[:start] + " HEREDOC ", None
+            yield b[:start] + " HEREDOC ", None, quoted
             return
         tail = b[nl + 1:]
         e = re.search("(?:^|\n)[ \t]*" + d + "[ \t]*(?:\n|\\Z)", tail)
         if not e:
-            yield b[:start] + " HEREDOC ", None
+            yield b[:start] + " HEREDOC ", None, quoted
             return
         # awk keeps the last character of the match: the closing newline.
         b = b[:start] + " HEREDOC " + tail[e.end() - 1:]
-        yield b, tail[:e.start()]
+        yield b, tail[:e.start()], quoted
 
 
 def strip_heredocs(b):
     """Drop every heredoc body; the marker becomes the word HEREDOC."""
-    for b, _ in _heredocs(b):
+    for b, _, _ in _heredocs(b):
         pass
     return b
 
 
 def heredoc_bodies(b):
-    return [body for _, body in _heredocs(b) if body is not None]
+    return [body for body, _ in heredocs(b)]
+
+
+def heredocs(b):
+    """[(body, live)] per closed heredoc; live when the delimiter was unquoted
+    and the body holds a $ or a backtick the shell would expand."""
+    return [(body, not quoted and ("$" in body or "`" in body))
+            for _, body, quoted in _heredocs(b) if body is not None]
 
 
 class Scan:
