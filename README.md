@@ -138,6 +138,18 @@ anything else runs it, so a misconfiguration cannot open the gate.
 `no_checkout_home` and `no_foreign_worktree` are the reverse: each runs only
 when its setting is exactly `true`, so a misconfiguration leaves it off.
 
+### One setting per `no-git-footguns` rule
+
+`no_git_footguns=false` skips all five rules. To keep four, turn off one:
+
+| Setting | Rule it switches off |
+| --- | --- |
+| `no_git_footguns_blanket_staging` | `add -A`, `add .`, `commit -a` |
+| `no_git_footguns_stash` | `stash pop`, `stash clear`, a bare `stash drop` |
+| `no_git_footguns_force_push` | a bare force push; a force push to or delete of main |
+| `no_git_footguns_discard` | `reset --hard`, `checkout .`, `restore .`, `clean -f` |
+| `no_git_footguns_branch_delete` | `branch -D`, `branch --delete --force` |
+
 ### Allowing more for `no-rm-tree`
 
 Built in: the generated directories `node_modules`, `dist`, `coverage` and
