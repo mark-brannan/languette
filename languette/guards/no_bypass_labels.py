@@ -324,11 +324,18 @@ def _alias(f, s, g, b, act):
 
 
 def _alone(scans):
-    """Every segment is the gh, a shell running quoted text the scan already
-    holds (not built at run time), or a command that writes no file."""
+    """One segment is the gh, and every other is a shell running quoted text
+    the scan already holds (not built at run time) or a command that writes
+    no file."""
+    ghs = 0
     for s, nested in scans:
         for a, b in s.segments():
-            if a > b or sw.cmd_index(s, a, b, GH, nested) is not None:
+            if a > b:
+                continue
+            if sw.cmd_index(s, a, b, GH, nested) is not None:
+                ghs += 1                       # a second gh can download into the file
+                if ghs > 1:
+                    return False
                 continue
             c = sw.seg_cmd(s, a, b)
             w = s.w[c].rsplit("/", 1)[-1] if c is not None else None

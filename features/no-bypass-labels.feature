@@ -163,6 +163,8 @@ Feature: no-bypass-labels
         | sh -c 'echo churn-ok > {PROJ}/ready.json && gh api repos/o/r/issues/12/labels -F labels[]=@{PROJ}/ready.json' |
         | sh -c "$(cat /tmp/w.sh)"; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json                   |
         | pushd /tmp > {PROJ}/ready.json; gh api repos/o/r/issues/12/labels -F labels[]=@{PROJ}/ready.json       |
+        | gh api repos/o/r/contents/p.json -H 'Accept: application/vnd.github.raw' > {PROJ}/ready.json && gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json |
+        | gh release download v1 -p p.json -O {PROJ}/ready.json; gh api repos/o/r/issues/12/labels --input {PROJ}/ready.json |
 
     Scenario Outline: a file that is not a regular file is not read
       When the agent runs `gh api repos/o/r/issues/12/labels --input <path>`
