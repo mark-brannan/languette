@@ -23,3 +23,9 @@ interface is; this file says who decided it and why, one line each.
   repeated sentence and added a way for the command to run unasked: a slow
   pattern times the hook out, and a timed-out hook does not block.
 - Examples and fixtures use generic commands, not one project's.
+
+## License: Solace, 2026-10-04
+
+- languette stays unlicensed (all rights reserved), confirming #25. Not
+  revisited before 2026-11-04, unless someone outside asks to use or fork it
+  first.

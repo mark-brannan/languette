@@ -107,4 +107,4 @@ Fix the config or update the engine, then retry the commit." ;; *) exit 0 ;; esa
 
 deny "Blocked by prose-budget-commit: prose-budget --staged found:
 $out
-Fix the prose and retry the same commit. Do not ask the user; this is settled."
+Fix the prose and retry the same commit: this is a mechanical length check, not a judgment call that needs anyone's sign-off."
