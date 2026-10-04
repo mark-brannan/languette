@@ -28,19 +28,20 @@
 # (`-A`, `--all`, `.`, `*`, `:`) rather than by name also widens it to
 # `ls-files --others --exclude-standard`, since that can commit a
 # brand-new file no diff would show. Both run through whichever of
-# `git`/`yadm` the commit itself used, and both stage repo-wide --
-# `-a`/`add .` is not scoped to `$dir` -- so each path they report is
-# anchored to the repo root as an absolute path rather than read against
-# `$dir`, which would misplace anything outside it. A pathspec
-# word this guard cannot resolve (an unexpanded `~`, a literal `$VAR`, a
-# quoted path with spaces) denies rather than skips, same as an
-# unresolvable `cd`/`-C`; so does a `diff`/`ls-files` that itself fails. A
-# path starting with `-` is prefixed `./` before it reaches the engine, so
-# it can't be read as one of the engine's own options. Residual gap: an
-# `add`/`commit` pair that `cd`s between the two resolves both against the
-# commit's own directory, which is wrong if they really do run in
-# different places; a directory or glob pathspec is passed to `--file`
-# literally, which the engine silently drops rather than expands.
+# `git`/`yadm` the commit named (looked up fresh on PATH -- the commit's own
+# wrapper word is as attacker-controlled as the rest of the command, so this
+# guard reads from it only which CLI to use, never runs the word itself),
+# and both stage repo-wide -- `-a`/`add .` is not scoped to `$dir` -- so
+# each path they report is anchored to the repo root as an absolute path
+# rather than read against `$dir`, which would misplace anything outside
+# it. A pathspec word this guard cannot resolve (an unexpanded `~`, a
+# literal `$VAR`, a quoted path with spaces) denies rather than skips, same
+# as an unresolvable `cd`/`-C`; so does a `diff`/`ls-files` that itself
+# fails. A path starting with `-` is prefixed `./` before it reaches the
+# engine, so it can't be read as one of the engine's own options. Residual
+# gap: an `add`/`commit` pair that `cd`s between the two resolves both
+# against the commit's own directory, which is wrong if they really do run
+# in different places.
 #
 # Exit 1 is a finding and denies. Exit 2 is a bad budgets config (or an
 # engine too old for --staged/--file) and denies too, saying so: the repo
@@ -76,16 +77,19 @@ case $ENGINE in /*) : ;; */*) ENGINE=$cwd/$ENGINE ;; *) ENGINE=$(command -v "$EN
 [ -x "$ENGINE" ] || exit 0
 
 # Prints "COMMIT<TAB>cd-dir<TAB>-C-dir<TAB>all-flag<TAB>bad-pathspec<TAB>paths
-# <TAB>all-new<TAB>binary" for the first git/yadm commit found. paths is
+# <TAB>all-new<TAB>wrapper" for the first git/yadm commit found. paths is
 # \037-joined: every pathspec word on an `add` before it, plus any trailing
-# pathspec on the commit itself. all-flag is 1 when `-a`/`--all`/`-am` on
-# commit, or `add -u`/`--update`, means every unstaged tracked change is in
-# play, not just the named paths. all-new is 1 when an `add` staged by
-# pattern rather than by name (`-A`, `--all`, `.`, `*`, `:`) -- that also
-# picks up brand new, still-untracked files, which a tracked-only diff
-# cannot see. binary is the exact word that ran the commit (`git`, `yadm`,
-# or a path to either), so the fallback diffs the repo the commit actually
-# used.
+# pathspec on the commit itself; a directory, glob, or other pattern among
+# them widens all-flag/all-new (below) instead of being passed on as a
+# literal, doomed-to-miss --file argument. all-flag is 1 when `-a`/`--all`/
+# `-am` on commit, or `add -u`/`--update`, means every unstaged tracked
+# change is in play, not just the named paths. all-new is 1 when an `add`
+# staged by pattern rather than by name (`-A`, `--all`, `.`, `*`, `:`,
+# an unrecognized flag) -- that can also pick up a brand new, still-
+# untracked file, which a tracked-only diff cannot see. wrapper is the
+# word that ran the commit (`git`, `yadm`, or a path to either) -- read
+# only for *which* CLI it names, never executed itself, since it is as
+# attacker-controlled as the rest of the command.
 hit=$(printf '%s\n' "$cmd" | awk "$(cat "$LIB")"'
 BEGIN { SEP = sprintf("%c", 31) }
 { buf = buf $0 "\n" }
@@ -105,24 +109,40 @@ END {
 function join(base, step) { return (base == "" || step ~ /^\//) ? step : base "/" step }
 function isbad(idx) { return k[idx] == "q" || SW_live[idx] }
 function addpath(p) { PATHS[++PATHN] = p }
+# A directory (trailing /), a magic (`:`-led) or glob pathspec names more
+# than itself, so it widens the check rather than being added as a literal
+# --file argument the engine would just fail to find.
+function is_wide(p) { return p == "." || p == "*" || p == ":" || p ~ /[*?[]/ || p ~ /\/$/ || p ~ /^:/ }
+# an `add` pathspec can introduce brand-new untracked files; a `commit`
+# pathspec only ever narrows what is already tracked or staged, so it
+# widens to ALLFLAG (every unstaged tracked change) but never ALLNEW.
+function addwide_add(p) { if (is_wide(p)) { ALLFLAG = 1; ALLNEW = 1 } else addpath(p) }
+function addwide_commit(p) { if (is_wide(p)) ALLFLAG = 1; else addpath(p) }
 function collect_add(lo, hi,   i) {
   for (i = lo; i <= hi; i++) {
     if (w[i] == "--") continue
     if (w[i] ~ /^-/) {
-      if (w[i] ~ /^(-A|--all)$/) { ALLFLAG = 1; ALLNEW = 1 }
-      else if (w[i] ~ /^(-u|--update)$/) ALLFLAG = 1
+      if (w[i] ~ /^--(a|al|all)$/ || (w[i] ~ /^-[A-Za-z]+$/ && w[i] ~ /A/)) { ALLFLAG = 1; ALLNEW = 1 }
+      else if (w[i] ~ /^--(u|up|upd|upda|updat|update)$/ || (w[i] ~ /^-[A-Za-z]+$/ && w[i] ~ /u/)) ALLFLAG = 1
+      # A short cluster of only known scope-safe letters, or a known
+      # scope-safe long option, changes nothing about what gets staged.
+      # Anything else -- an option this guard does not recognize -- widens
+      # rather than silently keeping the narrower, named-paths-only check.
+      else if (w[i] ~ /^-[nvfpei]+$/) { }
+      else if (w[i] ~ /^--(dry-run|verbose|force|patch|edit|interactive|ignore-errors|ignore-removal|no-ignore-removal|renormalize|sparse)$/) { }
+      else if (w[i] ~ /^--chmod(=.*)?$/) { }
+      else { ALLFLAG = 1; ALLNEW = 1 }
       continue
     }
-    if (w[i] == "." || w[i] == "*" || w[i] == ":") { ALLFLAG = 1; ALLNEW = 1; continue }
     if (isbad(i)) { BAD = 1; continue }
-    addpath(w[i])
+    addwide_add(w[i])
   }
 }
 function commit_tail(lo, hi,   i) {
   i = lo
   while (i <= hi) {
     if (w[i] == "--") {
-      for (i++; i <= hi; i++) { if (isbad(i)) BAD = 1; else addpath(w[i]) }
+      for (i++; i <= hi; i++) { if (isbad(i)) BAD = 1; else addwide_commit(w[i]) }
       return
     }
     if (w[i] == "--all") { ALLFLAG = 1; i++; continue }
@@ -134,7 +154,7 @@ function commit_tail(lo, hi,   i) {
     }
     if (w[i] ~ /^-/) { i++; continue }
     if (isbad(i)) { BAD = 1; i++; continue }
-    addpath(w[i]); i++
+    addwide_commit(w[i]); i++
   }
 }
 function segment(lo, hi, nested,   g, i, j, dir, pj) {
@@ -168,7 +188,7 @@ allflag=$(printf '%s' "$hit" | cut -f4)
 badpaths=$(printf '%s' "$hit" | cut -f5)
 paths=$(printf '%s' "$hit" | cut -f6)
 allnew=$(printf '%s' "$hit" | cut -f7)
-binary=$(printf '%s' "$hit" | cut -f8)
+wrapper=$(printf '%s' "$hit" | cut -f8)
 dir=$cwd
 for step in "$cd_dir" "$c_dir"; do
   [ -n "$step" ] || continue
@@ -196,6 +216,15 @@ if [ "$allflag" = "1" ] || [ "$allnew" = "1" ]; then
   # the extra list is gathered repo-root-relative and then anchored to an
   # absolute path -- a bare relative one here would be read against $dir
   # below, misplacing anything outside it (languette#49 review).
+  #
+  # $wrapper is the commit's own wrapper word and may be attacker-controlled
+  # (`./evil-git commit ...`): only *which* CLI it names (git or yadm) is
+  # trusted, resolved fresh on PATH, never the word itself run.
+  case $wrapper in
+    */yadm|yadm) binary=$(command -v yadm 2>/dev/null) ;;
+    *) binary=$(command -v git 2>/dev/null) ;;
+  esac
+  [ -n "$binary" ] || exit 0
   reporoot=$(cd "$dir" 2>/dev/null && "$binary" rev-parse --show-toplevel 2>&1)
   rrc=$?
   [ "$rrc" -eq 0 ] \
