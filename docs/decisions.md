@@ -29,3 +29,11 @@ interface is; this file says who decided it and why, one line each.
 - languette stays unlicensed (all rights reserved), confirming #25. Not
   revisited before 2026-11-04, unless someone outside asks to use or fork it
   first.
+
+## New guards: Solace, 2026-10-04
+
+- `no-pipe-to-shell` (#16) gets an off-switch like every other guard, on by
+  default. The issue's "deny with no switch" is overruled.
+- `no-iac-destroy` (#17): a real destroy runs on the user's click, one click
+  per run, through `ask-first`'s mechanism. Probably configurable later per
+  rule as deny, warn or ask (pencil).
