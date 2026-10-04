@@ -83,6 +83,12 @@ Feature: prose-budget-commit
     When the agent runs `cd sub && git commit -m x`
     Then the guard denies, naming "sections.max_words"
 
+  Scenario: a bare-name PROSE_BUDGET is looked up on PATH, not under the project
+    Given the stub "prose-budget" is the engine, by bare name on PATH
+    And PROSE_BUDGET_FAIL is "1"
+    When the agent runs `git commit -m x`
+    Then the guard denies, naming "sections.max_words"
+
   @shell_only
   Scenario: with no engine on PROSE_BUDGET or PATH the guard is silent
     Given PROSE_BUDGET is unset

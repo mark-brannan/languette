@@ -46,8 +46,10 @@ cwd=$(printf '%s' "$input" | jq -r '.cwd // ""' 2>/dev/null)
 case $cwd in /*) : ;; *) cwd=$PWD ;; esac
 # Resolved against the commit's own cwd, before any `cd` below: a relative
 # $PROSE_BUDGET (e.g. ./bin/prose-budget) means relative to the project, not
-# to wherever this hook process happens to run from.
-case $ENGINE in /*) : ;; *) ENGINE=$cwd/$ENGINE ;; esac
+# to wherever this hook process happens to run from. A bare name (no `/`,
+# e.g. PROSE_BUDGET=prose-budget) is a command, looked up on PATH like the
+# unset-PROSE_BUDGET fallback above, not a path under the project.
+case $ENGINE in /*) : ;; */*) ENGINE=$cwd/$ENGINE ;; *) ENGINE=$(command -v "$ENGINE" 2>/dev/null) ;; esac
 [ -x "$ENGINE" ] || exit 0
 
 # Prints "COMMIT<TAB>cd-dir<TAB>-C-dir" for the first git/yadm commit found.

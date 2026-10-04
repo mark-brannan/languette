@@ -270,6 +270,12 @@ def _prose_budget_stub_relative(ctx):
     ctx.env["PROSE_BUDGET"] = "./prose-budget"
 
 
+@given('the stub "prose-budget" is the engine, by bare name on PATH')
+def _prose_budget_stub_bare(ctx):
+    ctx.stubs, ctx.stub_log = True, ctx.stub_log or ctx.mkdtemp()
+    ctx.env["PROSE_BUDGET"] = "prose-budget"
+
+
 @given(parsers.re(r'PATH holds only "(?P<tools>[^"]*)"(?P<gh> and the stub "gh")?'))
 def _bare_path(ctx, tools, gh):
     ctx.bare = ctx.mkdtemp()
