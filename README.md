@@ -43,34 +43,22 @@ Without the plugin system, see [Installing by hand](#installing-by-hand).
 
 Each guard denies one class of command:
 
-- [`no-rm-tree`](hooks/no-rm-tree.sh): a recursive `rm` or `find -delete`,
-  unless the target is a generated directory or a place the agent owns (an
-  agent once took a directory of the user's captures with `rm -rf examples`).
-- [`no-git-footguns`](hooks/no-git-footguns.sh): `git add -A`, `commit -a`,
-  `stash pop`, force-push, `reset --hard` and the other moves that throw work
-  away, often in a checkout another session shares.
+- [`no-rm-tree`](#allowing-more-for-no-rm-tree): a recursive `rm` or
+  `find -delete` outside a generated or agent-owned directory
+- [`no-git-footguns`](hooks/no-git-footguns.sh): `add -A`, `commit -a`,
+  `stash pop`, force-push, `reset --hard` and other moves that throw work away
 - [`no-delete-stacked-base`](hooks/no-delete-stacked-base.sh): deleting a
-  remote branch that an open PR is based on (GitHub silently closes the PR).
+  remote branch an open PR is based on (GitHub silently closes the PR)
 - [`issue-door`](hooks/issue-door.sh): a second GitHub issue create, transfer
-  or delete in the same human turn, or any inside a loop or `xargs` (an agent
-  once filed a batch of duplicate issues on a plan approved once, the batch
-  buried in it). One per turn: it opens on your prompt, the first write
-  spends it.
-- [`public-issue-guard`](hooks/public-issue-guard.sh): issue, PR, comment or
-  review text bound for a public GitHub repo that names a term from your
-  private-terms file (a boat's name, a hostname, an account id: once posted it
-  is in GitHub's history and every mirror). It reads flag values, heredocs,
-  `--body-file` contents and the GitHub MCP tools' fields, and denies the
-  `churn-ok` and `mixed-loops-ok` labels, which waive a CI gate and are a
-  human's to apply. Inert until you name the file; see
-  [Configuration](#configuration).
-- [`ask-first`](languette/guards/ask_first.py): a command the repo lists as
-  costly, until you approve that one run (an agent once ran a 46-minute,
-  all-core test sweep to check a small change, then started it again). See
-  [Ask first](#ask-first).
-- [`prose-budget-commit`](hooks/prose-budget-commit.sh): a `git commit`
-  whose staged prose runs over the repo's own word budgets, as counted by
-  [`prose-budget`](https://github.com/mark-brannan/claude), where installed.
+  or delete in one human turn, or any inside a loop
+- [`public-issue-guard`](#settings-for-public-issue-guard): a term from your
+  private list, posted to a public repo (off until you give it the list)
+- [`no-checkout-home`](hooks/no-checkout-home.sh): switching the branch
+  checked out in `$HOME`, when home is itself a worktree (opt-in)
+- [`ask-first`](#ask-first): a command the repo lists as costly, until you
+  approve that one run
+- [`prose-budget-commit`](hooks/prose-budget-commit.sh): a `git commit` whose
+  staged prose runs over the repo's word budgets
 
 ## The promise
 
@@ -132,23 +120,18 @@ meant. Spent approvals are kept beside the session transcript, in
 
 ## Configuration
 
-Every guard is on by default. Turn one off with
-`/plugin configure languette@languette`, or at install, by its name with
-underscores:
+Every guard is on by default except `no-checkout-home`, which is opt-in.
+Turn one off (or that one on) with `/plugin configure languette@languette`,
+or at install, by its name with underscores:
 
 ```
 claude plugin install languette@languette --config no_rm_tree=false
 ```
 
-`public-issue-guard` also takes `private_terms_file`, a text file of terms,
-one per line, matched case-insensitively as plain text (`#` for comments). Set
-it with `/plugin configure languette@languette`. Unset or empty, the guard
-allows everything; set but unreadable or without a term in it, it denies every
-post to a public repo and says why. Text bound for
-`mark-brannan/claude_prompts_scratch` is never scanned.
-
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
+`no_checkout_home` is the reverse: it runs only when its setting is exactly
+`true`, so a misconfiguration leaves it off.
 
 ### Allowing more for `no-rm-tree`
 
@@ -172,6 +155,15 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
   path with a slash), every Bash call carries a warning, and only a recursive
   `rm` or `find -delete` is denied. A typo can't stop unrelated work, and it
   can't open the gate either.
+
+### Settings for `public-issue-guard`
+
+| Setting | Holds | Example |
+|---|---|---|
+| `private_terms_file` | a text file of terms, one per line, matched case-insensitively | `~/.config/private-terms` |
+| `private_repos` | repos whose posts are never scanned, comma-separated | `you/notes,you/scratch` |
+
+Without a terms file the guard is off.
 
 <details>
 <summary>How Claude Code passes plugin settings to a hook (measured)</summary>
@@ -212,7 +204,8 @@ guard reads beyond the command, it declares:
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
 | `no-delete-stacked-base` | GitHub, through `gh` |
 | `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
-| `public-issue-guard` | the terms file named by `private_terms_file`, the files a command posts, and `git remote` for the checkout's origin |
+| `no-checkout-home` | `$HOME`, and what `git rev-parse --show-toplevel` resolves to |
+| `public-issue-guard` | the terms file, the files a post reads, and the checkout's `git remote` |
 | `prose-budget-commit` | the staged diff, through `prose-budget` |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes
