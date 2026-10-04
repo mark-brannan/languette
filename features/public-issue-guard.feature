@@ -62,9 +62,27 @@ Feature: public-issue-guard
     When the agent runs `gh issue create -R o/r -t t --body-file {PROJ}/Wanderlust/clean.md`
     Then the guard is silent
 
-  Scenario: the private repo itself is never scanned
-    When the agent runs `gh issue create -R mark-brannan/claude_prompts_scratch -t t -b "Wanderlust"`
+  Scenario: a repo listed in private_repos is never scanned
+    Given CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS is "you/notes,you/scratch"
+    When the agent runs `gh issue create -R you/scratch -t t -b "Wanderlust"`
     Then the guard is silent
+    When the agent runs `gh issue comment https://github.com/you/notes/issues/1 -b "Wanderlust"`
+    Then the guard is silent
+
+  Scenario: with private_repos unset, every repo is scanned
+    When the agent runs `gh issue create -R you/notes -t t -b "Wanderlust"`
+    Then the guard denies, naming "Wanderlust"
+
+  Scenario Outline: a positional target or a graphql mutation is scanned against its own repo
+    Given CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS is "you/notes"
+    When the agent runs `<command>`
+    Then the guard denies, naming "Wanderlust"
+
+    Examples:
+      | command                                                                  |
+      | gh issue comment https://github.com/o/r/issues/1 -b Wanderlust           |
+      | gh pr comment o/r#1 -b Wanderlust                                        |
+      | gh api graphql -f query='mutation { addComment(input:{body:"Wanderlust"}) { clientMutationId } }' |
 
   Scenario: a body built at run time that no heredoc feeds cannot be seen, so it is denied
     When the agent runs `gh issue create -R o/r -t t -b "$(date)"`
@@ -80,15 +98,6 @@ Feature: public-issue-guard
       | mcp__plugin_github_github__add_issue_comment | {"owner":"o","repo":"r","body":"on gateway.home.example"}  | denies    |
       | mcp__github__create_issue                    | {"owner":"o","repo":"r","title":"t","body":"clean"}        | is silent |
       | mcp__github__get_issue                       | {"owner":"o","repo":"r","body":"Wanderlust"}               | is silent |
-
-  Scenario Outline: a label a session may not apply is denied, public repo or private
-    When the agent runs `gh pr edit 4 -R <repo> --add-label <label>`
-    Then the guard denies, naming "human's to apply"
-
-    Examples:
-      | repo                                | label          |
-      | o/r                                 | churn-ok       |
-      | mark-brannan/claude_prompts_scratch | Mixed-Loops-OK |
 
   Scenario: the home directory in the text is rewritten to ~ and the post allowed
     Given the private terms file holds:

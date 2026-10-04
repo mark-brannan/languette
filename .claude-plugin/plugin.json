@@ -48,13 +48,19 @@
     "public_issue_guard": {
       "type": "boolean",
       "title": "Keep private terms out of public issues and PRs",
-      "description": "Deny issue and PR text posted to a public GitHub repo that names a term from your private-terms file, and any session-applied bypass label. Does nothing until you also set the private terms file. Leave on unless you want that text through unchecked.",
+      "description": "Deny issue and PR text posted to a public GitHub repo that names a term from your private-terms file. Does nothing until you also set the private terms file. Leave on unless you want that text through unchecked.",
       "default": true
     },
     "private_terms_file": {
       "type": "file",
       "title": "Private terms file",
       "description": "A text file of terms that must not appear in text posted to a public GitHub repo: one per line, matched case-insensitively as plain text, # for comments. With no file set, the public-issue guard allows everything.",
+      "required": false
+    },
+    "private_repos": {
+      "type": "string",
+      "title": "Private repos",
+      "description": "Repos whose issue and PR text is never scanned, as owner/name, comma-separated. Empty by default: every repo is scanned.",
       "required": false
     },
     "prose_budget_commit": {

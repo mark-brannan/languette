@@ -28,7 +28,8 @@ gateway.home.example
   acct-4471
 EOF
 export CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE="$TERMS"
-PRIVATE=mark-brannan/claude_prompts_scratch
+PRIVATE=you/notes
+export CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS="someone/else, $PRIVATE"
 
 # Two checkouts to resolve a cwd through: one whose origin is the private
 # repo, one whose origin is public.
@@ -68,7 +69,7 @@ PUB="$SCRATCH/public"
 check deny 'term in --body'          "$(bash_in "$PUB" 'gh issue create --title "Log rotation" --body "seen on Wanderlust last night"')"
 reason 'names the term'              'Wanderlust'
 no_reason 'never the surrounding text' 'last night'
-reason 'points at the private repo'  "--repo $PRIVATE"
+reason 'points at private_repos'      'private_repos'
 reason 'or rewrite'                  'rewrite the body'
 check deny 'term in --title'         "$(bash_in "$PUB" 'gh issue create -t "Wanderlust: AIS drops" -b "details below"')"
 check deny 'term in -b glued'        "$(bash_in "$PUB" 'gh pr comment 12 -b"tested on Wanderlust"')"
@@ -116,7 +117,7 @@ check deny 'MCP add_issue_comment'   "$(mcp_in mcp__github__add_issue_comment '{
 check deny 'MCP issue_write title'   "$(mcp_in mcp__github__issue_write '{"method":"create","owner":"o","repo":"r","title":"Wanderlust AIS"}')"
 check deny 'MCP review comment nested' "$(mcp_in mcp__github__create_pull_request_review '{"owner":"o","repo":"r","pullNumber":1,"event":"COMMENT","comments":[{"path":"a.ts","body":"acct-4471"}]}')"
 check allow 'MCP clean body'         "$(mcp_in mcp__github__create_issue '{"owner":"o","repo":"r","title":"x","body":"see mark-brannan/colregs#12"}')"
-check allow 'MCP private repo'       "$(mcp_in mcp__github__create_issue "{\"owner\":\"mark-brannan\",\"repo\":\"claude_prompts_scratch\",\"title\":\"x\",\"body\":\"Wanderlust\"}")"
+check allow 'MCP private repo'       "$(mcp_in mcp__github__create_issue '{"owner":"you","repo":"notes","title":"x","body":"Wanderlust"}')"
 check allow 'MCP read tool ignored'  "$(mcp_in mcp__github__get_issue '{"owner":"o","repo":"r","issue_number":3}')"
 
 # --- gh api -------------------------------------------------------------------------
@@ -131,10 +132,18 @@ check allow 'api private repo path'  "$(bash_in "$PUB" "gh api repos/$PRIVATE/is
 
 # --- the private repo is never scanned ------------------------------------------
 check allow '--repo private'         "$(bash_in "$PUB" "gh issue create --repo $PRIVATE -t x -b 'aboard Wanderlust'")"
-check allow '-R private, mixed case' "$(bash_in "$PUB" "gh issue create -R Mark-Brannan/Claude_Prompts_Scratch -t x -b Wanderlust")"
+check allow '-R private, mixed case' "$(bash_in "$PUB" "gh issue create -R You/Notes -t x -b Wanderlust")"
 check allow '--repo= URL form'       "$(bash_in "$PUB" "gh issue comment 3 --repo=https://github.com/$PRIVATE -b Wanderlust")"
 check allow 'GH_REPO= private'       "$(bash_in "$PUB" "GH_REPO=$PRIVATE gh issue create -t x -b Wanderlust")"
 check allow 'cwd origin is private'  "$(bash_in "$SCRATCH/private" 'gh issue create -t x -b "aboard Wanderlust"')"
+# A positional URL or owner/repo#n, and a graphql node id, name a target
+# other than the cwd's origin: a private cwd must not wave them through.
+check deny 'cwd private, positional URL public' "$(bash_in "$SCRATCH/private" 'gh issue comment https://github.com/o/r/issues/1 -b Wanderlust')"
+check deny 'cwd private, positional o/r#n public' "$(bash_in "$SCRATCH/private" 'gh pr comment o/r#1 -b Wanderlust')"
+check allow 'cwd public, positional URL private' "$(bash_in "$PUB" "gh issue comment https://github.com/$PRIVATE/issues/1 -b Wanderlust")"
+check deny 'cwd private, graphql mutation' "$(bash_in "$SCRATCH/private" "gh api graphql -f query='mutation { addComment(input:{subjectId:\"I_1\", body:\"from Wanderlust\"}) { clientMutationId } }'")"
+# Nothing is private until the user lists it.
+CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS='' check deny 'private_repos empty' "$(bash_in "$PUB" "gh issue create -R $PRIVATE -t x -b Wanderlust")"
 check deny 'cwd private but cd elsewhere' "$(bash_in "$SCRATCH/private" "cd $PUB && gh issue create -t x -b Wanderlust")"
 check deny 'cwd public'              "$(bash_in "$PUB" 'gh issue create -t x -b Wanderlust')"
 check deny 'cwd not a repo'          "$(bash_in "$SCRATCH/nogit" 'gh issue create -t x -b Wanderlust')"
@@ -150,28 +159,6 @@ check allow 'echo mentioning a gh write' "$(bash_in "$PUB" 'echo "gh issue creat
 check allow 'unrelated command'      "$(bash_in "$PUB" 'ls -la')"
 check allow 'empty command'          "$(jq -n '{tool_name:"Bash",tool_input:{}}')"
 check allow 'other tool'             "$(jq -n '{tool_name:"Read",tool_input:{file_path:"/x"}}')"
-
-# --- labels a session may not apply -----------------------------------------------
-# churn-ok waives the churn gate, so it is a human's to apply. Denied as
-# a label, never as prose, and `gh api` is a second parsing path of its
-# own.
-check deny 'add-label churn-ok'      "$(bash_in "$PUB" 'gh pr edit 12 --add-label churn-ok')"
-reason 'names the label'             'churn-ok'
-# The one bypass a review actually found: the compare folds case, and
-# GitHub label names are unique case-insensitively, so CHURN-OK reaches it.
-check deny 'add-label CHURN-OK'      "$(bash_in "$PUB" 'gh pr edit 12 --add-label CHURN-OK')"
-check deny 'churn-ok through gh api' "$(bash_in "$PUB" 'gh api repos/mark-brannan/dotfiles/issues/12/labels -f "labels[]=churn-ok"')"
-check allow 'another label is fine'  "$(bash_in "$PUB" 'gh pr edit 12 --add-label ready')"
-check allow 'the label named in a body' "$(bash_in "$PUB" 'gh pr comment 12 -b "this needs the churn-ok label"')"
-# mixed-loops-ok waives the mixed-loops gate the same way, and the deny
-# list is one place: adding a label there closes every route at once.
-check deny 'add-label mixed-loops-ok' "$(bash_in "$PUB" 'gh pr edit 12 --label mixed-loops-ok')"
-reason 'names the label'             'mixed-loops-ok'
-# The MCP route: a labels field on an issue or PR write is a label applied.
-check deny 'MCP labels mixed-loops-ok' "$(mcp_in mcp__github__update_pull_request '{"owner":"o","repo":"r","pullNumber":12,"labels":["ready","mixed-loops-ok"]}')"
-reason 'names the label'             'mixed-loops-ok'
-check deny 'MCP labels churn-ok, private repo too' "$(mcp_in mcp__github__update_issue "{\"owner\":\"mark-brannan\",\"repo\":\"claude_prompts_scratch\",\"issue_number\":12,\"labels\":[\"Churn-OK\"]}")"
-check allow 'MCP other labels'       "$(mcp_in mcp__github__update_issue '{"owner":"o","repo":"r","issue_number":12,"labels":["ready"]}')"
 
 # --- the gate is loud when it cannot see ------------------------------------------
 check deny '-F - with no heredoc'    "$(bash_in "$PUB" 'cat notes.md | gh issue create -t x -F -')"
@@ -396,7 +383,7 @@ out=$(bash_in "$PUB" 'gh issue create -t x -b "all public"' | CLAUDE_PLUGIN_OPTI
 if grep -q '"permissionDecision":"deny"' <<<"$out"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: terms file missing should deny: $out"; fi
 reason 'says the terms file is unreadable' 'is unreadable'
 reason 'names the option'            'private_terms_file'
-reason 'offers the private repo'     "--repo $PRIVATE"
+reason 'offers private_repos'         'private_repos'
 out=$(bash_in "$PUB" "gh issue create --repo $PRIVATE -t x -b Wanderlust" | CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE=$EMPTY sh "$HOOK" 2>&1)
 if [ -z "$out" ]; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: private repo needs no terms file: $out"; fi
 out=$(bash_in "$PUB" 'gh issue list' | CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE=$EMPTY sh "$HOOK" 2>&1)

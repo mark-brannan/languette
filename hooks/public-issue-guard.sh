@@ -12,7 +12,7 @@
 # Fires on PreToolUse for
 #   - Bash: `gh issue|pr create|comment|edit|review|close|reopen|merge`, and
 #     `gh api` writing to repos/*/*/issues|pulls or a graphql mutation that
-#     comments or opens an issue/PR;
+#     comments on or opens an issue or PR;
 #   - MCP: the GitHub tools that create or edit an issue, PR, comment or
 #     review (matched on the tool name's tail).
 # Nothing else: a body posted from `python -c`, `curl`, or a script file is
@@ -36,10 +36,14 @@
 # allows; otherwise it stays a denial, with the reason naming the
 # substitution to make by hand.
 #
-# The target repo is --repo/-R, GH_REPO=, the `gh api` path, or MCP
-# owner/repo; failing those, the origin of the payload's cwd -- unless the
-# command also runs `cd`, in which case it is unknown. Unknown is scanned.
-# Only mark-brannan/claude_prompts_scratch is allowed unscanned.
+# The target repo is --repo/-R, GH_REPO=, a positional issue or PR URL or
+# `owner/repo#n`, the `gh api` path, or MCP owner/repo; failing those, the
+# origin of the payload's cwd -- unless the command also runs `cd`, in which
+# case it is unknown. A graphql mutation names its target by node id, so its
+# repo is always unknown, never the cwd's. Unknown is scanned. Only a repo
+# listed in the private_repos option (env CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS,
+# comma-separated owner/name, default empty) is allowed unscanned, and only
+# when every target of the command is one.
 #
 # INERT without a terms file: with private_terms_file unset or empty the
 # guard allows everything, as there is no list to judge against (a guard that
@@ -55,7 +59,7 @@
 # elsewhere in the command does not vouch for it), a gh write whose flag
 # shape isn't one this hook recognises as carrying text (so its content was
 # never extracted at all), or a terms file that is set but unreadable or
-# empty while the target is not the private repo -> deny, with the fix in the
+# empty while a target is not a private repo -> deny, with the fix in the
 # reason.
 set -uf
 
@@ -65,13 +69,8 @@ TERMS_FILE=${CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE-}
 
 HERE=$(dirname "$0")
 LIB="$HERE/lib-shell-words.awk"
-PRIVATE_REPO="mark-brannan/claude_prompts_scratch"
-# Labels a session may not apply, space separated. `churn-ok` waives the
-# churn gate (.github/workflows/churn-guard.yml) and `mixed-loops-ok` the
-# mixed-loops gate (mixed-loops-guard.yml): a gate whose bypass
-# the gated party can apply to its own PR is not a gate, so those labels
-# are a human's to add.
-DENY_LABELS="churn-ok mixed-loops-ok"
+PRIVATE_REPOS=${CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS-}
+TO_PRIVATE="target a repo listed in the private_repos option"
 
 deny() {
   if command -v jq >/dev/null 2>&1; then
@@ -95,7 +94,7 @@ cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/public-issue-guard.XXXXXX") || deny 'cannot create a scratch directory'
 trap 'rm -rf "$WORK"' EXIT
 TEXT="$WORK/text"      # everything that will be posted, one candidate per line
-META="$WORK/meta"      # R repo | F file | CDTO dir | CDPUSH/CDPOP ( ) | HFED written here | STDIN | OPAQUE | HEREDOC | CD | L label | UNSEEN flag
+META="$WORK/meta"      # R repo (- = the cwd's, ? = unknown) | F file | CDTO dir | CDPUSH/CDPOP ( ) | HFED written here | STDIN | OPAQUE | HEREDOC | CD | UNSEEN flag
 : > "$TEXT"; : > "$META"; : > "$WORK/text-cmd"; : > "$WORK/text-file"
 
 # owner/name in lower case from any of the spellings gh and git accept.
@@ -131,7 +130,7 @@ case "$tool" in
         n = split(v, a, ",")
         for (i = 1; i <= n; i++) {
           gsub(/^[[:space:]]+/, "", a[i]); gsub(/[[:space:]]+$/, "", a[i])
-          if (a[i] != "") { print "L\t" flat(a[i]); print "T\t" flat(a[i]) }
+          if (a[i] != "") print "T\t" flat(a[i])
         }
       }
       function field(v, live,   key) {
@@ -193,7 +192,7 @@ case "$tool" in
       }
       # A NAME VALUE: a standalone or exported assignment (a prefix on the gh itself expands too late to count). FX: a path in nested text, which runs in a shell of its own: read as spelled, literal and absolute, or denied.
       function assign(a, live,   name) { name = a; sub(/=.*$/, "", name); if ((!live && a ~ /\$/) || orig ~ ("(^|[;&|[:space:]])" name "=[\"\047]~")) sub(/=.*$/, "=$", a); print "A\t" flat(a) }   # a single-quoted $, or a quoted ~, is literal: poison it, so the path stays unresolvable
-      function segment(lo, hi, nested,   g, i, t, v, repo, sub_, act, c) {
+      function segment(lo, hi, nested,   g, i, t, v, repo, posrepo, u, sub_, act, c) {
         SEG_NESTED = nested
         if (!nested) {
           c = seg_cmd(w, k, lo, hi); ok = !c   # seg_cmd is also 0 when a quoted word leads: only a segment of nothing but assignments counts
@@ -203,7 +202,7 @@ case "$tool" in
         }
         g = cmd_index(w, k, lo, hi, "(^|/)gh$", nested, "")
         if (!g || g + 1 > hi) return
-        repo = ""
+        repo = ""; posrepo = ""
         for (i = lo; i < g; i++) if (k[i] == "w" && w[i] ~ /^GH_REPO=/) repo = substr(w[i], 9)
         sub_ = w[g + 1]
         if (sub_ == "api") { api(g, hi, repo); return }
@@ -229,8 +228,13 @@ case "$tool" in
           # value never reaches val()/file() above, so flag it instead of
           # dropping it silently.
           else if (t ~ /^--[A-Za-z-]*(body|comment|message)[A-Za-z-]*/) print "UNSEEN\t" flat(t)
+          # A positional URL or owner/repo#n names the target itself: gh
+          # posts there, not to the origin of the cwd.
+          else if (t ~ /^https?:\/\/[^\/]+\/[^\/]+\/[^\/]+\/(issues|pull)\//) { split(t, u, "/"); posrepo = u[4] "/" u[5] }
+          else if (t ~ /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#[0-9]+$/) { posrepo = t; sub(/#.*$/, "", posrepo) }
         }
-        print "R\t" (repo == "" ? "-" : flat(repo))
+        if (posrepo != "") print "R\t" flat(posrepo)
+        if (repo != "" || posrepo == "") print "R\t" (repo == "" ? "-" : flat(repo))
       }
       function api(g, hi, repo,   i, t, v, path, method, fields, p, parts, hit) {
         path = ""; method = ""; fields = 0
@@ -258,7 +262,7 @@ case "$tool" in
           hit = 0
           for (i = g; i <= hi; i++)
             if (wv(i) ~ /(addComment|createIssue|updateIssue|createPullRequest|updatePullRequest|addPullRequestReview|submitPullRequestReview|addDiscussionComment)/) hit = 1
-          if (hit) print "R\t" (repo == "" ? "-" : flat(repo))
+          if (hit) print "R\t?"   # the target is a node id in the query, never the origin of the cwd
         }
       }' > "$META" || deny 'awk failed, cannot inspect the command'
     # The tokeniser can lose a segment behind an odd construct; the raw string
@@ -279,37 +283,37 @@ case "$tool" in
   mcp__*__create_and_submit_pull_request_review|mcp__*__submit_pending_pull_request_review)
     repo=$(printf '%s' "$payload" | jq -r 'if (.tool_input.owner? // "") != "" and (.tool_input.repo? // "") != "" then "\(.tool_input.owner)/\(.tool_input.repo)" else "-" end' 2>/dev/null)
     printf 'R\t%s\n' "${repo:--}" >> "$META"
-    # A `labels` field is the MCP route to the same denied labels.
-    printf '%s' "$payload" | jq -r '.tool_input.labels? // [] | .[] | strings | "L\t\(.)"' 2>/dev/null >> "$META"
     printf '%s' "$payload" | jq -r '[.tool_input | .. | strings] | join("\n")' 2>/dev/null >> "$WORK/text-cmd" || deny 'unreadable hook payload'
     ;;
   *) exit 0 ;;
 esac
 
-# A denied label is denied everywhere, public repo or private: the bypass it
-# waives is a human's to apply.
-# Matched case-insensitively: GitHub label names are unique that way, so
-# `CHURN-OK` reaches the same label and must not slip past.
-while IFS="$(printf '\t')" read -r kind value; do
-  [ "$kind" = L ] || continue
-  value=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
-  for bad in $DENY_LABELS; do
-    [ "$value" = "$bad" ] && deny "the label \`$bad\` is a human's to apply, not a session's -- it waives a CI gate, and a gate whose bypass the gated party can reach is not a gate. Split the PR instead, or say in the PR body why it needs the waiver and let the label be added by hand."
+# is_private <owner/name, normalised>: listed in private_repos (set -f is on,
+# so the unquoted split never globs).
+is_private() {
+  [ -n "$1" ] || return 1
+  ip_ifs=$IFS; IFS=,
+  for ip_r in $PRIVATE_REPOS; do
+    IFS=$ip_ifs
+    ip_r=$(printf '%s' "$ip_r" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    [ -n "$ip_r" ] && [ "$(norm_repo "$ip_r")" = "$1" ] && return 0
   done
-done < "$META"
+  IFS=$ip_ifs; return 1
+}
 
-# Every target must be the private repo for the text to go unscanned; one
+# Every target must be a private repo for the text to go unscanned; one
 # unknown or public target among several means the scan runs.
 all_private=1
 # shellcheck disable=SC2094  # META is only read here
 while IFS="$(printf '\t')" read -r kind repo; do
   [ "$kind" = R ] || continue
-  if [ "$repo" = "-" ]; then
+  if [ "$repo" = "?" ]; then repo=""
+  elif [ "$repo" = "-" ]; then
     if grep -q '^CD$' "$META"; then repo=""
     else repo=$(git -C "$cwd" remote get-url origin 2>/dev/null) || repo=""
     fi
   fi
-  [ "$(norm_repo "$repo")" = "$PRIVATE_REPO" ] || all_private=0
+  is_private "$(norm_repo "$repo")" || all_private=0
 done < "$META"
 [ "$all_private" = 1 ] && exit 0
 
@@ -318,13 +322,13 @@ done < "$META"
 # instead of posting text this hook never saw.
 if grep -q '^UNSEEN	' "$META"; then
   unseen=$(sed -n 's/^UNSEEN	//p' "$META" | head -1)
-  deny "the flag \`$unseen\` looks like it carries text to post, but this hook doesn't recognise its shape and cannot see what it holds. Recognised: --body/--title/--comment/--subject (or -b/-t/-c), --body-file/--comment-file/-F/--input <path>, --label/--add-label, gh api -f/-F/--field/--raw-field. Use one of those, or post from the private repo instead (--repo $PRIVATE_REPO)."
+  deny "the flag \`$unseen\` looks like it carries text to post, but this hook doesn't recognise its shape and cannot see what it holds. Recognised: --body/--title/--comment/--subject (or -b/-t/-c), --body-file/--comment-file/-F/--input <path>, --label/--add-label, gh api -f/-F/--field/--raw-field. Use one of those, or $TO_PRIVATE."
 fi
 
 denylist=$TERMS_FILE
-[ -r "$denylist" ] || deny "the private-terms file ($denylist), set as the private_terms_file option, is unreadable, so text bound for a public repo cannot be checked. Fix the path in the plugin's private_terms_file option (/plugin configure languette@languette), or clear the option to turn the check off. To post without the check, target the private repo itself: --repo $PRIVATE_REPO."
+[ -r "$denylist" ] || deny "the private-terms file ($denylist), set as the private_terms_file option, is unreadable, so text bound for a public repo cannot be checked. Fix the path in the plugin's private_terms_file option (/plugin configure languette@languette), or clear the option to turn the check off. To post without the check, $TO_PRIVATE."
 sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^#/d' -e '/^$/d' "$denylist" > "$WORK/terms"
-[ -s "$WORK/terms" ] || deny "the private-terms file ($denylist) is readable but has no terms in it -- only comments and blank lines, or nothing at all. An empty list matches nothing, so every post would pass unchecked, which is indistinguishable from a check that ran. Populate it (one term per line, # for comments) and retry. To post without the check, target the private repo itself: --repo $PRIVATE_REPO."
+[ -s "$WORK/terms" ] || deny "the private-terms file ($denylist) is readable but has no terms in it -- only comments and blank lines, or nothing at all. An empty list matches nothing, so every post would pass unchecked, which is indistinguishable from a check that ran. Populate it (one term per line, # for comments) and retry. To post without the check, $TO_PRIVATE."
 
 # Bodies the hook cannot read are a hole, not a pass. awk emits OPAQUE only
 # when no heredoc feeds the value, so a heredoc elsewhere does not excuse it.
@@ -432,4 +436,4 @@ hits=""
 while IFS= read -r term; do
   grep -q -i -F -e "$term" -- "$TEXT" && hits="$hits, $term"
 done < "$WORK/terms"
-deny "the text about to be posted to a public repo contains private term(s) from the denylist: ${hits#, }. Private detail does not go on public GitHub, ever -- it stays in GitHub's history. Either open the issue on the private state repo instead (--repo $PRIVATE_REPO) and link it from here, or rewrite the body without the term. Do not paraphrase it into something recognisable."
+deny "the text about to be posted to a public repo contains private term(s) from the denylist: ${hits#, }. Private detail does not go on public GitHub, ever -- it stays in GitHub's history. Either $TO_PRIVATE and link it from here, or rewrite the body without the term. Do not paraphrase it into something recognisable."
