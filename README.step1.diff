@@ -1,0 +1,101 @@
+--- README.pr28.md	2026-10-03 17:31:40.422969611 -0700
++++ README.step1.md	2026-10-03 17:37:01.575243442 -0700
+@@ -174,25 +174,30 @@
+ 
+ ## Strong guards
+ 
+-A guard is a function. It takes the command and the payload around it and
+-returns a verdict: deny with a reason, ask, a warning, or nothing. It runs
+-nothing, asks no model, and the same inputs give the same verdict every time.
+-What it reads besides the command is named in its header: the filesystem and
+-`LANGUETTE_RM_ALLOW` for `no-rm-tree`; the repo's list, the session
+-transcript and the approvals already spent for `ask-first`; GitHub for
+-`no-delete-stacked-base`; nothing for `no-git-footguns`. A guard
+-that cannot decide denies and says what it saw. A guard that crashes is a deny
+-naming the guard; the runner holds that rule once, so no guard has to.
+-
+-The guards share one scanner, `languette/scan.py`, which turns the command
+-into words and nested texts and resolves every ambiguity toward more words
+-reaching the guard, and one vocabulary for verdicts, `languette/verdict.py`.
+-A new guard is one module with a `check` function and its scenarios. It adds
+-no runner, no wrapper and no harness.
+-
+-The contract is written as scenarios, in Gherkin, under `features/`: a command
+-and its context in, a verdict out, in the words a person uses to state the
+-rule.
++A guard is a function: the command and its context in, a verdict out (allow,
++ask, deny with a reason, or a warning). It runs nothing and asks no model.
++Its header names everything it reads besides the command, and given the same
++command and the same inputs it returns the same verdict:
++
++| Guard | Also reads |
++|---|---|
++| `no-rm-tree` | the filesystem, `LANGUETTE_RM_ALLOW` |
++| `ask-first` | the repo's list, the session transcript, approvals already spent |
++| `no-delete-stacked-base` | open PRs on GitHub |
++| `no-git-footguns` | nothing |
++
++All guards share one scanner, which splits a command into words and the
++commands nested inside it (`sh -c`, `eval`, a pipe into a shell). Where the
++shell is ambiguous, the scanner errs toward showing the guard more, not less.
++A guard that cannot decide denies and says what it saw. The runner turns a
++crashing guard into a deny, and the hook entry turns a missing runner into
++one, so no guard handles either itself. A new guard is one module with a
++`check` function, plus its scenarios.
++
++Each guard's contract is a set of scenarios, in Gherkin: a command and its
++context in, a verdict out, written so a reviewer can read the rule and judge
++the code against it. Whether a scenario is written by hand or derived from a
++model of the guard is open.
+ 
+ ```gherkin
+ Scenario: a target the guard cannot resolve is denied on sight
+@@ -201,26 +206,28 @@
+   Then the guard denies, naming "variable or command substitution"
+ ```
+ 
+-Every scenario runs against every engine a guard has: the Python module
+-in-process, and the shell script by subprocess under each awk CI installs.
+-The engines must agree, and the table under the promise above is generated
+-from the scenarios tagged for it. Assertions are PyHamcrest matchers that
+-speak the promise, `denies`, `is_silent`, `warns_about`, so a failure prints
+-the guard's reason beside what was expected. Above the scenarios sit
+-properties, checked over generated commands: a guard fails closed on any
+-exception; a verdict on a text is never looser when that text is nested in
+-`sh -c`, `eval` or a pipe to a shell; adding a rule never turns a deny into an
+-allow, and an allowlist name turns a deny into an allow only for the targets
+-it names.
+-
+-The scenarios are the seam between the people who set the rules and the code
+-that enforces them. Whether a scenario is written by hand or derived from a
+-model of the guard is open. Either way it is what a reviewer reads, and the
+-code is judged against it.
+-
+-The hooks need only the standard library, and CI proves it with an import walk
+-over `languette/`. The tests need `pytest`, `pytest-bdd` and `PyHamcrest`;
+-the hooks do not.
++Every scenario runs against every engine a guard has (the Python module, and
++the shell script under each awk CI installs), and the engines must agree. The
++table under the promise is generated from the scenarios tagged for it.
++Assertions are PyHamcrest matchers named for the promise (`denies`,
++`is_silent`, `warns_about`), so a failure prints the guard's reason beside
++the expected one. Over the scenarios sit properties, checked against
++generated commands:
++
++- an exception is a deny;
++- nesting a command in `sh -c`, `eval` or a pipe into a shell never loosens
++  its verdict;
++- adding a rule never turns a deny into an allow;
++- an allowlist entry opens only what it names.
++
++The Python engine uses only the standard library; CI checks that with an
++import walk over `languette/`. The tests add `pytest`, `pytest-bdd` and
++`PyHamcrest`.
++
++> **Today:** the contract is JSON lines in `fixtures/`, run by
++> `fixtures/run.sh`, and the table under the promise is generated from
++> `fixtures/guards.jsonl`. The Gherkin scenarios, the matchers and the
++> properties are not written yet; three guards are still shell and awk.
+ 
+ ## Working on it
+ 
