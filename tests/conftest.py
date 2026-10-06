@@ -214,6 +214,13 @@ def _file(ctx, rel, docstring):
     f.write_text(docstring)
 
 
+@given(parsers.parse('the file "{rel}" is committed'))
+def _file_committed(ctx, rel):
+    subprocess.run(["git", "-C", str(ctx.proj), "add", "--", rel], check=True)
+    subprocess.run(["git", "-C", str(ctx.proj), "-c", "user.email=a@a", "-c", "user.name=a",
+                     "commit", "-q", "-m", "x", "--", rel], check=True)
+
+
 @given("the private terms file holds:")
 def _terms(ctx, docstring):
     f = Path(ctx.mkdtemp()) / "private-terms.txt"
@@ -504,24 +511,24 @@ def _rewrites(ctx, text):
     assert got == ctx.expand(text), f"rewritten to {got!r}, want {ctx.expand(text)!r}"
 
 
-@then(parsers.re(r'the stub "(?P<name>[a-z]+)" was called with "(?P<text>.*)"'))
+@then(parsers.re(r'the stub "(?P<name>[a-z-]+)" was called with "(?P<text>.*)"'))
 def _called_with(ctx, name, text):
     calls = ctx.stub_calls(name)
     assert any(text in c for c in calls), f"{name} was never called with {text!r}; calls: {calls}"
 
 
-@then(parsers.re(r'the stub "(?P<name>[a-z]+)" was not called with "(?P<text>.*)"'))
+@then(parsers.re(r'the stub "(?P<name>[a-z-]+)" was not called with "(?P<text>.*)"'))
 def _not_called_with(ctx, name, text):
     calls = ctx.stub_calls(name)
     assert not any(text in c for c in calls), f"{name} was called with {text!r}; calls: {calls}"
 
 
-@then(parsers.re(r'the stub "(?P<name>[a-z]+)" was not called'))
+@then(parsers.re(r'the stub "(?P<name>[a-z-]+)" was not called'))
 def _not_called(ctx, name):
     assert_that(ctx.stub_calls(name), equal_to([]))
 
 
-@then(parsers.re(r'the stub "(?P<name>[a-z]+)" was called (?P<n>\d+) times'))
+@then(parsers.re(r'the stub "(?P<name>[a-z-]+)" was called (?P<n>\d+) times'))
 def _called_n(ctx, name, n):
     assert_that(len(ctx.stub_calls(name)), equal_to(int(n)))
 
