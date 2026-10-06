@@ -1,0 +1,6 @@
+Revision history for #59:
+
+rev 2 (content) 2026-10-06 23:16 UTC
+rev 1 (initial) 2026-10-06 23:16 UTC
+
+<!-- mergify-revision-data: {"schema_version":1,"pull_number":59,"entries":[{"number":1,"change_type":"initial","old_sha":null,"new_sha":"979d1c69f0ead3a4baefbc1b00c4bcab9c925d95","timestamp_iso":"2026-10-06T23:16:49Z","reason":"","replay_sha":null,"compare_url":null},{"number":2,"change_type":"content","old_sha":"979d1c69f0ead3a4baefbc1b00c4bcab9c925d95","new_sha":"76e2310dea4c0e11f17b26b8a3c2585e8b8ccf3e","timestamp_iso":"2026-10-06T23:16:49Z","reason":"","replay_sha":null,"compare_url":"https://github.com/mark-brannan/languette/compare/979d1c69f0ead3a4baefbc1b00c4bcab9c925d95...76e2310dea4c0e11f17b26b8a3c2585e8b8ccf3e"}]} -->
