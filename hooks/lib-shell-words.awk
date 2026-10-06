@@ -48,7 +48,7 @@ function heredoc_bodies(b, bodies) {
 # start and length. awk has no lookbehind, so the character before the
 # opener rides in the match and is trimmed off.
 function sw_hd_open(s) {
-  if (!match(s, /(^|[^<])<<-?[ \t]*["'\\]?[A-Za-z_][A-Za-z0-9_"'\\]*/)) return 0
+  if (!match(s, /(^|[^<])<<-?[ \t]*([A-Za-z_]|'[^'\n]*'|"[^"\n]*"|\\.)([A-Za-z0-9_]|'[^'\n]*'|"[^"\n]*"|\\.)*/)) return 0
   SW_hs = RSTART; SW_hl = RLENGTH
   if (substr(s, SW_hs, 1) != "<") { SW_hs++; SW_hl-- }
   return 1
@@ -75,7 +75,7 @@ function sw_heredocs(b, bodies,   done, n, head, eol, seg, out, raw, nd, ds, dq,
     for (i = 1; i <= nd; i++) {
       body = ""
       if (open) {
-        endm = match(tail, "(^|\n)[ \t]*" ds[i] "[ \t]*(\n|$)")
+        endm = sw_hd_end(tail, ds[i])
         if (endm) {
           body = substr(tail, 1, endm - 1); tail = substr(tail, endm + RLENGTH)
           if (!dq[i]) subs = subs sw_hd_subs(body)
@@ -90,10 +90,30 @@ function sw_heredocs(b, bodies,   done, n, head, eol, seg, out, raw, nd, ds, dq,
   return n
 }
 
+# sw_hd_end(t, d): where heredoc text t closes on a line that is d, give or
+# take blanks and tabs, or 0 when none does. Like match(): the start of the
+# closing line, or of the newline before it, and RLENGTH runs past its own
+# newline. Compared as a string, so a delimiter like END-X or a.b is not a
+# regex.
+function sw_hd_end(t, d,   p, e, line) {
+  for (p = 1; ; p += e) {
+    e = index(substr(t, p), "\n")
+    line = e ? substr(t, p, e - 1) : substr(t, p)
+    sub(/^[ \t]+/, "", line); sub(/[ \t]+$/, "", line)
+    if (line == d) {
+      RLENGTH = (e ? e : length(substr(t, p))) + (p > 1)
+      return p > 1 ? p - 1 : 1
+    }
+    if (!e) return 0
+  }
+}
+
 # sw_hd_subs(s): the $(...) and `...` command substitutions in heredoc body s,
-# each after a newline. A backslash escapes the next character; one that
-# never closes runs to the end of the body.
-function sw_hd_subs(s,   L, i, j, c, out) {
+# each after a newline and with any quote it leaves open closed (sw_qclose),
+# so prose like `don't` cannot swallow the commands after the heredoc. A
+# backslash escapes the next character. A $(...) whose end sw_hd_close cannot
+# be sure of keeps the rest of the body.
+function sw_hd_subs(s,   L, i, j, c, out, t) {
   L = length(s); out = ""
   for (i = 1; i <= L; i++) {
     c = substr(s, i, 1)
@@ -104,55 +124,62 @@ function sw_hd_subs(s,   L, i, j, c, out) {
         if (c == "\\") { j++; continue }
         if (c == "`") break
       }
-      out = out "\n" substr(s, i, j - i + 1); i = j; continue
+      t = substr(s, i, j - i + 1); out = out "\n" t sw_qclose(t); i = j; continue
     }
     if (c == "$" && substr(s, i + 1, 1) == "(") {
       j = sw_hd_close(s, i + 2)
-      out = out "\n" substr(s, i, j - i + 1); i = j
+      t = substr(s, i, j - i + 1); out = out "\n" t sw_qclose(t); i = j
     }
   }
   return out
 }
 
 # sw_hd_close(s, j): index of the `)` closing a `$(` whose text starts at j,
-# or length(s) when none does. Quotes and backslashes inside are honoured, a
-# `#` starting a word comments to the end of its line, and between `case` and
-# `esac` a `)` ends a pattern, not the substitution.
-function sw_hd_close(s, j,   L, c, d, depth, cases, st, w) {
-  L = length(s); depth = 1; cases = 0; st = j
+# or length(s) when none does or the walk cannot be sure: a quote, backtick,
+# backslash, `#` or `case` before the `)` sends it to the end, because a
+# guard must not stake a bypass on out-guessing the shell's grammar.
+function sw_hd_close(s, j,   L, c, depth) {
+  L = length(s); depth = 1
   for (; j <= L; j++) {
     c = substr(s, j, 1)
-    if (c == "#" && (j == st || index(" \t\n;|&()", substr(s, j - 1, 1)))) {
-      d = index(substr(s, j), "\n")
-      if (!d) return L
-      j += d - 2; continue
-    }
-    w = substr(s, j, 4)
-    if ((w == "case" || w == "esac") && substr(s, j + 4, 1) !~ /[A-Za-z0-9_]/ \
-        && (j == st || substr(s, j - 1, 1) !~ /[A-Za-z0-9_]/)) {
-      if (w == "case") cases++
-      else if (cases) cases--
-      j += 3; continue
-    }
-    if (c == "\\") { j++; continue }
-    if (c == "'") {
-      d = index(substr(s, j + 1), "'")
-      if (!d) return L
-      j += d; continue
-    }
-    if (c == "\"") {
-      for (j++; j <= L; j++) {
-        c = substr(s, j, 1)
-        if (c == "\\") { j++; continue }
-        if (c == "\"") break
-      }
-      if (j > L) return L
-      continue
-    }
+    if (index("\"'`\\#", c)) return L
+    if (c == "c" && substr(s, j, 4) == "case" && substr(s, j + 4, 1) !~ /[A-Za-z0-9_]/ \
+        && substr(s, j - 1, 1) !~ /[A-Za-z0-9_]/) return L
     if (c == "(") depth++
-    else if (c == ")" && !cases) { depth--; if (!depth) return j }
+    else if (c == ")") { depth--; if (!depth) return j }
   }
   return L
+}
+
+# sw_qclose(t): the quote scan() would still hold open at the end of t ("'",
+# "\"" or ""), read by scan()'s own rules: a backslash escapes outside single
+# quotes, and a `#` that starts a word comments to the end of its line.
+function sw_qclose(t,   L, i, c, d) {
+  L = length(t)
+  for (i = 1; i <= L; i++) {
+    c = substr(t, i, 1)
+    if (c == "\\") { i++; continue }
+    if (c == "'") {
+      d = index(substr(t, i + 1), "'")
+      if (!d) return "'"
+      i += d; continue
+    }
+    if (c == "\"") {
+      for (i++; i <= L; i++) {
+        c = substr(t, i, 1)
+        if (c == "\\") { i++; continue }
+        if (c == "\"") break
+      }
+      if (i > L) return "\""
+      continue
+    }
+    if (c == "#" && (i == 1 || index(" \t\n;|&()`<>", substr(t, i - 1, 1)))) {
+      d = index(substr(t, i), "\n")
+      if (!d) return ""
+      i += d - 1
+    }
+  }
+  return ""
 }
 
 # scan(text, w, k, q): tokenise shell text into w[1..n]; returns n.

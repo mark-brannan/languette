@@ -11,7 +11,8 @@ segment is led by a shell, so `echo ... | sh` is executed text).
 
 import re
 
-_OPENER = re.compile(r"""(?<!<)<<-?[ \t]*["'\\]?[A-Za-z_][A-Za-z0-9_"'\\]*""")
+_DPART = r"""'[^'\n]*'|"[^"\n]*"|\\."""
+_OPENER = re.compile(r"(?<!<)<<-?[ \t]*(?:[A-Za-z_]|" + _DPART + r")(?:[A-Za-z0-9_]|" + _DPART + r")*")
 _ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _WS = re.compile(r"[ \t\n]")
 
@@ -23,49 +24,22 @@ SHELL = frozenset("sh bash zsh dash ksh ash eval source .".split())
 WRAP = frozenset("sudo env command exec time nice nohup timeout doas builtin "
                  "if then else elif while until do !".split())
 NESTED_CAP = 64
-_CASE = re.compile(r"(case|esac)(?![A-Za-z0-9_])")
-_WORDCH = re.compile(r"[A-Za-z0-9_]")
+_CASE = re.compile(r"(?<![A-Za-z0-9_])case(?![A-Za-z0-9_])")
 
 
 def _sub_end(s, j):
     """Index just past the `)` closing a `$(` whose text starts at j, or len(s)
-    when none does. Quotes and backslashes inside are honoured, a `#` starting
-    a word comments to the end of its line, and between `case` and `esac` a
-    `)` ends a pattern, not the substitution."""
-    L, depth, cases, start = len(s), 1, 0, j
+    when none does or the walk cannot be sure: a quote, backtick, backslash,
+    `#` or `case` before the `)` sends it to the end, because a guard must not
+    stake a bypass on out-guessing the shell's grammar."""
+    L, depth = len(s), 1
     while j < L:
         c = s[j]
-        if c == "#" and (j == start or s[j - 1] in " \t\n;|&()"):
-            e = s.find("\n", j)
-            if e < 0:
-                return L
-            j = e
-            continue
-        w = _CASE.match(s, j)
-        if w and (j == start or not _WORDCH.match(s[j - 1])):
-            cases += 1 if w.group() == "case" else -1 if cases else 0
-            j = w.end()
-            continue
-        if c == "\\":
-            j += 2
-            continue
-        if c == "'":
-            e = s.find("'", j + 1)
-            if e < 0:
-                return L
-            j = e + 1
-            continue
-        if c == '"':
-            j += 1
-            while j < L and s[j] != '"':
-                j += 2 if s[j] == "\\" else 1
-            if j >= L:
-                return L
-            j += 1
-            continue
+        if c in "\"'`\\#" or (c == "c" and _CASE.match(s, j)):
+            return L
         if c == "(":
             depth += 1
-        elif c == ")" and not cases:
+        elif c == ")":
             depth -= 1
             if not depth:
                 return j + 1
@@ -73,10 +47,44 @@ def _sub_end(s, j):
     return L
 
 
+def _qclose(t):
+    """The quote the scanner would still hold open at the end of t ("'", '"'
+    or ""), read by its own rules: a backslash escapes outside single quotes,
+    and a `#` that starts a word comments to the end of its line."""
+    L, i = len(t), 0
+    while i < L:
+        c = t[i]
+        if c == "\\":
+            i += 2
+            continue
+        if c == "'":
+            e = t.find("'", i + 1)
+            if e < 0:
+                return "'"
+            i = e + 1
+            continue
+        if c == '"':
+            i += 1
+            while i < L and t[i] != '"':
+                i += 2 if t[i] == "\\" else 1
+            if i >= L:
+                return '"'
+            i += 1
+            continue
+        if c == "#" and (i == 0 or t[i - 1] in " \t\n;|&()`<>"):
+            e = t.find("\n", i)
+            if e < 0:
+                return ""
+            i = e
+        i += 1
+    return ""
+
+
 def heredoc_subs(s):
     """The $(...) and `...` command substitutions in an unquoted heredoc's body,
-    each on a line of its own, for the scanner to read as commands. One that
-    never closes runs to the end of the body."""
+    each on a line of its own with any quote it leaves open closed (_qclose),
+    so prose like `don't` cannot swallow the commands after the heredoc. A
+    $(...) whose end _sub_end cannot be sure of keeps the rest of the body."""
     out, L, i = "", len(s), 0
     while i < L:
         c = s[i]
@@ -87,12 +95,14 @@ def heredoc_subs(s):
             j = i + 1
             while j < L and s[j] != "`":
                 j += 2 if s[j] == "\\" else 1
-            out += "\n" + s[i:j + 1]
+            t = s[i:j + 1]
+            out += "\n" + t + _qclose(t)
             i = j + 1
             continue
         if c == "$" and s[i + 1:i + 2] == "(":
             j = _sub_end(s, i + 2)
-            out += "\n" + s[i:j]
+            t = s[i:j]
+            out += "\n" + t + _qclose(t)
             i = j
             continue
         i += 1
@@ -128,7 +138,7 @@ def _heredocs(b):
         for d, quoted in delims:
             body = ""
             if closed:
-                e = re.search("(?:^|\n)[ \t]*" + d + "[ \t]*(?:\n|\\Z)", tail)
+                e = re.search("(?:^|\n)[ \t]*" + re.escape(d) + "[ \t]*(?:\n|\\Z)", tail)
                 if e:
                     body, tail = tail[:e.start()], tail[e.end():]
                     subs += "" if quoted else heredoc_subs(body)

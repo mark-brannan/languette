@@ -364,6 +364,35 @@ Feature: no-rm-tree
       """
     Then the guard denies, naming "rm -r examples"
 
+  Scenario: a ) inside nested quotes does not close a substitution in a heredoc body
+    When the agent runs:
+      """
+      cat <<EOF
+      $(echo "$(echo ")")" ; rm -rf examples)
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: an apostrophe kept from a heredoc body does not hide the commands after it
+    When the agent runs:
+      """
+      cat <<EOF
+      $(echo "it's") don't
+      EOF
+      rm -rf examples
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a quoted heredoc delimiter with a dash closes only on the whole word
+    When the agent runs:
+      """
+      cat <<'END-X'
+      END
+      rm -rf examples
+      END-X
+      """
+    Then the guard is silent
+
   Scenario: a comment is not run
     When the agent runs:
       """
