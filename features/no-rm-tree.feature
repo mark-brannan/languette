@@ -345,6 +345,25 @@ Feature: no-rm-tree
       """
     Then the guard denies, naming "rm -r examples"
 
+  Scenario: a case pattern's ) does not close a substitution in a heredoc body
+    When the agent runs:
+      """
+      cat <<EOF
+      $(case x in a) rm -rf examples;; esac)
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a ) in a comment does not close a substitution in a heredoc body
+    When the agent runs:
+      """
+      cat <<EOF
+      $(echo hi # )
+      rm -rf examples)
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
   Scenario: a comment is not run
     When the agent runs:
       """

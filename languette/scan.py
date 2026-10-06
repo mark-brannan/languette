@@ -23,14 +23,29 @@ SHELL = frozenset("sh bash zsh dash ksh ash eval source .".split())
 WRAP = frozenset("sudo env command exec time nice nohup timeout doas builtin "
                  "if then else elif while until do !".split())
 NESTED_CAP = 64
+_CASE = re.compile(r"(case|esac)(?![A-Za-z0-9_])")
+_WORDCH = re.compile(r"[A-Za-z0-9_]")
 
 
 def _sub_end(s, j):
     """Index just past the `)` closing a `$(` whose text starts at j, or len(s)
-    when none does. Quotes and backslashes inside are honoured."""
-    L, depth = len(s), 1
+    when none does. Quotes and backslashes inside are honoured, a `#` starting
+    a word comments to the end of its line, and between `case` and `esac` a
+    `)` ends a pattern, not the substitution."""
+    L, depth, cases, start = len(s), 1, 0, j
     while j < L:
         c = s[j]
+        if c == "#" and (j == start or s[j - 1] in " \t\n;|&()"):
+            e = s.find("\n", j)
+            if e < 0:
+                return L
+            j = e
+            continue
+        w = _CASE.match(s, j)
+        if w and (j == start or not _WORDCH.match(s[j - 1])):
+            cases += 1 if w.group() == "case" else -1 if cases else 0
+            j = w.end()
+            continue
         if c == "\\":
             j += 2
             continue
@@ -50,7 +65,7 @@ def _sub_end(s, j):
             continue
         if c == "(":
             depth += 1
-        elif c == ")":
+        elif c == ")" and not cases:
             depth -= 1
             if not depth:
                 return j + 1

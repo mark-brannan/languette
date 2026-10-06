@@ -115,11 +115,25 @@ function sw_hd_subs(s,   L, i, j, c, out) {
 }
 
 # sw_hd_close(s, j): index of the `)` closing a `$(` whose text starts at j,
-# or length(s) when none does. Quotes and backslashes inside are honoured.
-function sw_hd_close(s, j,   L, c, d, depth) {
-  L = length(s); depth = 1
+# or length(s) when none does. Quotes and backslashes inside are honoured, a
+# `#` starting a word comments to the end of its line, and between `case` and
+# `esac` a `)` ends a pattern, not the substitution.
+function sw_hd_close(s, j,   L, c, d, depth, cases, st, w) {
+  L = length(s); depth = 1; cases = 0; st = j
   for (; j <= L; j++) {
     c = substr(s, j, 1)
+    if (c == "#" && (j == st || index(" \t\n;|&()", substr(s, j - 1, 1)))) {
+      d = index(substr(s, j), "\n")
+      if (!d) return L
+      j += d - 2; continue
+    }
+    w = substr(s, j, 4)
+    if ((w == "case" || w == "esac") && substr(s, j + 4, 1) !~ /[A-Za-z0-9_]/ \
+        && (j == st || substr(s, j - 1, 1) !~ /[A-Za-z0-9_]/)) {
+      if (w == "case") cases++
+      else if (cases) cases--
+      j += 3; continue
+    }
     if (c == "\\") { j++; continue }
     if (c == "'") {
       d = index(substr(s, j + 1), "'")
@@ -136,7 +150,7 @@ function sw_hd_close(s, j,   L, c, d, depth) {
       continue
     }
     if (c == "(") depth++
-    else if (c == ")") { depth--; if (!depth) return j }
+    else if (c == ")" && !cases) { depth--; if (!depth) return j }
   }
   return L
 }
