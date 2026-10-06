@@ -1,54 +1,25 @@
 #!/bin/sh
 # PreToolUse Bash: before a `git commit`, runs the prose-budget engine
-# (mark-brannan/claude, bin/prose-budget) with --staged and denies the
-# commit on findings, so documentation bloat is caught at the moment it
-# is written rather than in CI. The engine is not bundled here: it is
-# found through $PROSE_BUDGET, else `prose-budget` on PATH. No engine, no
-# config in the target repo, or an engine crash is a no-op -- this guard
-# can only ever narrow what already passes through it.
+# (mark-brannan/claude, bin/prose-budget) and denies the commit on a
+# finding, so documentation bloat is caught as it is written, not in CI.
+# `--staged` checks the index; a commit that reaches past it (-a, a
+# pathspec, an `add` in the same command, -p, --pathspec-from-file) also
+# runs `--file` on what it would commit.
 #
-# Detection is structural via lib-shell-words.awk (read its header): a
-# commit mentioned in a commit message, a comment, or a heredoc body is
-# not a commit. `cd DIR && git commit` and `git -C DIR commit` run the
-# engine in DIR, denying rather than skipping the check if DIR cannot be
-# resolved (an unexpanded `~`, a literal `$VAR`). `git merge --continue`
-# counts too, since resolving a conflict finishes the merge; the engine's
-# own --staged mode already skips every check mid-merge.
+# The engine is found through $PROSE_BUDGET, else `prose-budget` on PATH.
+# No engine, no config in the target repo, or an engine crash is a no-op:
+# this guard only narrows what already passes through it. Exit 1 is a
+# finding and denies; exit 2 (bad budgets config, or an engine too old for
+# --staged/--file) denies and says so; any other exit is a no-op.
 #
-# Each `cd` and `-C` is folded onto the one before it, so `cd a && cd b`
-# and `git -C a -C b` both land in a/b.
+# Fail closed: anything the guard cannot resolve -- a `cd`/`-C` target, a
+# pathspec word, a directory pathspec, a failed `diff`/`ls-files`, a second
+# commit in a different directory -- denies rather than skips.
 #
-# `--staged` only sees what is already in the index at hook time, so
-# `git commit -a`/`--all`/`-am`, a pathspec commit (`git commit path/x`,
-# `git commit -m x -- path/x`), and a `git add path/x && git commit` in one
-# call are also run through `prose-budget --file` against the named paths
-# -- the working-tree content those commands actually commit, not the
-# index. `-a`/`--all` and `add -u`/`--update` widen that to every path
-# `diff --name-only` reports changed; an `add` that stages by pattern
-# (`-A`, `--all`, `.`, `*`, `:`) rather than by name also widens it to
-# `ls-files --others --exclude-standard`, since that can commit a
-# brand-new file no diff would show. Both run through whichever of
-# `git`/`yadm` the commit named (looked up fresh on PATH -- the commit's own
-# wrapper word is as attacker-controlled as the rest of the command, so this
-# guard reads from it only which CLI to use, never runs the word itself),
-# and both stage repo-wide -- `-a`/`add .` is not scoped to `$dir` -- so
-# each path they report is anchored to the repo root as an absolute path
-# rather than read against `$dir`, which would misplace anything outside
-# it. A pathspec word this guard cannot resolve (an unexpanded `~`, a
-# literal `$VAR`, a quoted path with spaces) denies rather than skips, same
-# as an unresolvable `cd`/`-C`; so does a `diff`/`ls-files` that itself
-# fails. A path starting with `-` is prefixed `./` before it reaches the
-# engine, so it can't be read as one of the engine's own options. A
-# pathspec that is a directory on disk also denies -- `--file` would just
-# silently drop it, leaving everything under it unchecked. An `add` that
-# ran in a different directory from the commit (a `cd` or `-C` between
-# them) widens the check rather than reading its paths against the wrong
-# one. A listed file whose name holds a newline denies: it cannot reach the
-# engine intact.
+# `yadm` is recognised as git's wrapper word only, the same as in the other
+# guards, and is never called unless the command named it.
 #
-# Exit 1 is a finding and denies. Exit 2 is a bad budgets config (or an
-# engine too old for --staged/--file) and denies too, saying so: the repo
-# asked for budgets and they cannot be checked. Any other exit is a no-op.
+# Every case is a scenario in features/prose-budget-commit.feature.
 set -uf
 
 HERE=$(dirname "$0")
@@ -80,19 +51,24 @@ case $ENGINE in /*) : ;; */*) ENGINE=$cwd/$ENGINE ;; *) ENGINE=$(command -v "$EN
 [ -x "$ENGINE" ] || exit 0
 
 # Prints "COMMIT<TAB>cd-dir<TAB>-C-dir<TAB>all-flag<TAB>bad-pathspec<TAB>paths
-# <TAB>all-new<TAB>wrapper" for the first git/yadm commit found. paths is
-# \037-joined: every pathspec word on an `add` before it, plus any trailing
-# pathspec on the commit itself; a directory, glob, or other pattern among
-# them widens all-flag/all-new (below) instead of being passed on as a
-# literal, doomed-to-miss --file argument. all-flag is 1 when `-a`/`--all`/
-# `-am` on commit, or `add -u`/`--update`, means every unstaged tracked
-# change is in play, not just the named paths. all-new is 1 when an `add`
-# staged by pattern rather than by name (`-A`, `--all`, `.`, `*`, `:`,
-# an unrecognized flag) -- that can also pick up a brand new, still-
+# <TAB>all-new<TAB>wrapper<TAB>multi" once, in END, for the git/yadm commits
+# found (cd-dir, -C-dir and wrapper are the first commit's). paths is
+# \037-joined: every pathspec word on an `add`, plus any trailing pathspec
+# on a commit; a directory, glob, or other pattern among them widens
+# all-flag/all-new (below) instead of being passed on as a literal,
+# doomed-to-miss --file argument. all-flag is 1 when `-a`/`--all`/`-am` or
+# `--pathspec-from-file` on commit, or `add -u`/`--update`, means every
+# unstaged tracked change is in play, not just the named paths. all-new is
+# 1 when an `add` staged by pattern rather than by name (`-A`, `--all`,
+# `.`, `*`, `:`, an unrecognized flag), or the commit staged interactively
+# (-p/--patch/--interactive) -- either can also pick up a brand new, still-
 # untracked file, which a tracked-only diff cannot see. wrapper is the
 # word that ran the commit (`git`, `yadm`, or a path to either) -- read
 # only for *which* CLI it names, never executed itself, since it is as
-# attacker-controlled as the rest of the command.
+# attacker-controlled as the rest of the command. A later commit in the
+# same context (same cumulative cd, same -C dir, same git-vs-yadm) merges
+# its tail into the same fields; one in a different context sets multi to
+# 1, which the shell denies: one check cannot serve two repositories.
 hit=$(printf '%s\n' "$cmd" | awk "$(cat "$LIB")"'
 BEGIN { SEP = sprintf("%c", 31) }
 { buf = buf $0 "\n" }
@@ -108,6 +84,10 @@ END {
       a0 = i + 1
     }
   }
+  if (!SEEN) exit
+  pj = ""
+  for (j = 1; j <= PATHN; j++) pj = pj (pj == "" ? "" : SEP) PATHS[j]
+  print "COMMIT\t" CCD "\t" CDIR "\t" (ALLFLAG ? 1 : 0) "\t" (BAD ? 1 : 0) "\t" pj "\t" (ALLNEW ? 1 : 0) "\t" CBIN "\t" (MULTI ? 1 : 0)
 }
 function join(base, step) { return (base == "" || step ~ /^\//) ? step : base "/" step }
 function isbad(idx) { return k[idx] == "q" || SW_live[idx] }
@@ -142,7 +122,7 @@ function collect_add(lo, hi,   i) {
     addwide_add(w[i])
   }
 }
-function commit_tail(lo, hi,   i, v) {
+function commit_tail(lo, hi,   i, v, c) {
   i = lo
   while (i <= hi) {
     if (w[i] == "--") {
@@ -150,14 +130,24 @@ function commit_tail(lo, hi,   i, v) {
       return
     }
     if (w[i] == "--all") { ALLFLAG = 1; i++; continue }
-    if (w[i] ~ /^(-m|--message|-F|--file|-C|--reuse-message|-c|--reedit-message|--fixup|--squash|--author|--date|--template|--pathspec-from-file)$/) { i += 2; continue }
+    # The pathspec file is never read: a commit that names one reaches
+    # past the index, and widening to every unstaged tracked change covers
+    # whatever it lists.
+    if (w[i] ~ /^--pathspec-from-file=/) { ALLFLAG = 1; i++; continue }
+    if (w[i] == "--pathspec-from-file") { ALLFLAG = 1; i += 2; continue }
+    # Interactive staging can pick hunks from any tracked change and add
+    # an untracked file, so it widens to both listings.
+    if (w[i] ~ /^(--patch|--interactive)$/) { ALLFLAG = 1; ALLNEW = 1; i++; continue }
+    if (w[i] ~ /^(-m|--message|-F|--file|-C|--reuse-message|-c|--reedit-message|--fixup|--squash|--author|--date|--template)$/) { i += 2; continue }
     if (w[i] ~ /^-[A-Za-z]+$/) {
       # A short-option cluster: the first letter that takes a value takes
       # the rest of the word, or the next word when it is the last letter
       # -- `-am msg` skips msg, but `-mfix` carries its own message and the
       # word after it is a pathspec.
       v = match(w[i], /[mFcCt]/)
-      if (substr(w[i], 2, (v ? v - 2 : length(w[i]))) ~ /a/) ALLFLAG = 1
+      c = substr(w[i], 2, (v ? v - 2 : length(w[i])))
+      if (c ~ /a/) ALLFLAG = 1
+      if (c ~ /p/) { ALLFLAG = 1; ALLNEW = 1 }
       i += (v && v == length(w[i])) ? 2 : 1
       continue
     }
@@ -188,15 +178,22 @@ function segment(lo, hi, nested,   g, i, j, dir, pj) {
   }
   if (i <= hi && w[i] == "commit") {
     commit_tail(i + 1, hi)
-    if (ADDSEEN && ADDCTX != (CD SUBSEP dir)) { ALLFLAG = 1; ALLNEW = 1 }
-    pj = ""
-    for (j = 1; j <= PATHN; j++) pj = pj (pj == "" ? "" : SEP) PATHS[j]
-    print "COMMIT\t" CD "\t" dir "\t" (ALLFLAG ? 1 : 0) "\t" (BAD ? 1 : 0) "\t" pj "\t" (ALLNEW ? 1 : 0) "\t" BIN
-    exit
+    commit_seen(CD, dir)
+    return
   }
   if (i <= hi && w[i] == "merge") {
-    for (j = i + 1; j <= hi; j++) if (w[j] == "--continue") { print "COMMIT\t" CD "\t" dir "\t0\t0\t\t0\t" BIN; exit }
+    for (j = i + 1; j <= hi; j++) if (w[j] == "--continue") { commit_seen(CD, dir); return }
   }
+}
+# Records a commit (or a merge --continue) in its context: cumulative cd,
+# own -C dir, and which CLI (git or yadm) ran it. The first commit's context
+# is the one reported; a later commit elsewhere sets MULTI.
+function commit_seen(cd, dir,   ctx) {
+  ctx = cd SUBSEP dir SUBSEP (BIN ~ /(^|\/)yadm$/ ? "yadm" : "git")
+  if (ADDSEEN && ADDCTX != (cd SUBSEP dir)) { ALLFLAG = 1; ALLNEW = 1 }
+  if (!SEEN) { SEEN = 1; CTX = ctx; CCD = cd; CDIR = dir; CBIN = BIN }
+  else if (ctx != CTX) MULTI = 1
+}
 }') || exit 0
 case $hit in COMMIT*) ;; *) exit 0 ;; esac
 
@@ -207,6 +204,8 @@ badpaths=$(printf '%s' "$hit" | cut -f5)
 paths=$(printf '%s' "$hit" | cut -f6)
 allnew=$(printf '%s' "$hit" | cut -f7)
 wrapper=$(printf '%s' "$hit" | cut -f8)
+multi=$(printf '%s' "$hit" | cut -f9)
+[ "$multi" = "1" ] && deny "Blocked by prose-budget-commit: this command commits in two different directories (or through both git and yadm), so the second commit's prose could not be checked against the right repository. Run the commits as separate commands."
 dir=$cwd
 for step in "$cd_dir" "$c_dir"; do
   [ -n "$step" ] || continue
