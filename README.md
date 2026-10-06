@@ -228,7 +228,7 @@ guard reads beyond the command, it declares:
 | `public-issue-guard` | the terms file, the files a post reads, and the checkout's `git remote` |
 | `no-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `no-foreign-worktree` | git, for where each path lands, and a record per session in `$TMPDIR` |
-| `prose-budget-commit` | the staged diff, through `prose-budget` |
+| `prose-budget-commit` | the staged diff and, for a commit that reaches past the index, the named working-tree files, through `prose-budget` |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes
 is a deny naming the guard; the runner holds that rule, so no guard has to.
