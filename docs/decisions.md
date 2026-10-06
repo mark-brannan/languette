@@ -45,7 +45,10 @@ interface is; this file says who decided it and why, one line each.
 
 ## Runtime dependencies: Solace, 2026-10-06
 
-- Languette drops `jq` and takes no runtime dependency beyond the shell
-  parser's narrow set: `prose-budget-commit` loses its engine in
-  mark-brannan/claude, and `no-checkout-home` replaces its yadm assumption
-  with an approach that works for any user.
+- Languette runs on python3 and its standard library plus the parser ladder
+  above, takes no other dependency, and depends on nothing in
+  mark-brannan/claude: `jq` goes, `prose-budget-commit` loses its engine
+  there, and `no-checkout-home` recognises the shape of a command that checks
+  out `$HOME` through git, yadm, chezmoi or another common dotfiles manager,
+  without needing that tool installed. `gh` is optional, for
+  `no-delete-stacked-base` only.
