@@ -36,3 +36,9 @@ interface is; this file says who decided it and why, one line each.
   proposition.
 - The engines cascade: a guard uses whichever the user has installed, the
   parser first and awk last.
+
+## Parser ladder: Solace, 2026-10-06
+
+- The cascade's order: a user-installed `shfmt` first, then a pip-installed
+  parser, and awk only when none of those is available.
+- Which pip parser, or both in turn (tree-sitter-bash, bashlex), is open (#4).
