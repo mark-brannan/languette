@@ -153,18 +153,20 @@ function sw_hd_close(s, j,   L, c, depth) {
 
 # sw_qclose(t): the quote scan() would still hold open at the end of t ("'",
 # "\"" or ""), read by scan()'s own rules: a backslash escapes outside single
-# quotes, and a `#` that starts a word comments to the end of its line.
-function sw_qclose(t,   L, i, c, d) {
-  L = length(t)
+# quotes, and a `#` comments to the end of its line only before a word has
+# begun, so `a\ #'` opens a quote and `a #'` does not.
+function sw_qclose(t,   L, i, c, d, have) {
+  L = length(t); have = 0
   for (i = 1; i <= L; i++) {
     c = substr(t, i, 1)
-    if (c == "\\") { i++; continue }
+    if (c == "\\") { i++; if (i <= L && substr(t, i, 1) != "\n") have = 1; continue }
     if (c == "'") {
-      d = index(substr(t, i + 1), "'")
+      have = 1; d = index(substr(t, i + 1), "'")
       if (!d) return "'"
       i += d; continue
     }
     if (c == "\"") {
+      have = 1
       for (i++; i <= L; i++) {
         c = substr(t, i, 1)
         if (c == "\\") { i++; continue }
@@ -173,11 +175,14 @@ function sw_qclose(t,   L, i, c, d) {
       if (i > L) return "\""
       continue
     }
-    if (c == "#" && (i == 1 || index(" \t\n;|&()`<>", substr(t, i - 1, 1)))) {
+    if (c == "#" && !have) {
       d = index(substr(t, i), "\n")
       if (!d) return ""
-      i += d - 1
+      i += d - 2; continue
     }
+    if (index(" \t\n;|&()`<>", c)) { have = 0; continue }
+    if ((c == "{" || c == "}") && !have) continue
+    have = 1
   }
   return ""
 }

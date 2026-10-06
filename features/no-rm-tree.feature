@@ -393,6 +393,39 @@ Feature: no-rm-tree
       """
     Then the guard is silent
 
+  Scenario: an escaped blank before # in a kept substitution does not hide the commands after it
+    When the agent runs:
+      """
+      cat <<EOF
+      $(echo a\ #'
+      ')
+      echo hi
+      EOF
+      rm -rf examples
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: an escaped ; before # in a kept backtick substitution does not hide the commands after it
+    When the agent runs:
+      """
+      cat <<EOF
+      `echo \;#'`
+      EOF
+      rm -rf examples
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: an escaped < before a second heredoc opener on a line
+    When the agent runs:
+      """
+      cat <<\<<< EOF
+      <
+      echo it's
+      EOF
+      rm -rf examples
+      """
+    Then the guard denies, naming "rm -r examples"
+
   Scenario: a comment is not run
     When the agent runs:
       """

@@ -50,32 +50,40 @@ def _sub_end(s, j):
 def _qclose(t):
     """The quote the scanner would still hold open at the end of t ("'", '"'
     or ""), read by its own rules: a backslash escapes outside single quotes,
-    and a `#` that starts a word comments to the end of its line."""
-    L, i = len(t), 0
+    and a `#` comments to the end of its line only before a word has begun,
+    so `a\\ #'` opens a quote and `a #'` does not."""
+    L, i, have = len(t), 0, False
     while i < L:
         c = t[i]
         if c == "\\":
+            if i + 1 < L and t[i + 1] != "\n":
+                have = True
             i += 2
             continue
         if c == "'":
-            e = t.find("'", i + 1)
+            have, e = True, t.find("'", i + 1)
             if e < 0:
                 return "'"
             i = e + 1
             continue
         if c == '"':
-            i += 1
+            have, i = True, i + 1
             while i < L and t[i] != '"':
                 i += 2 if t[i] == "\\" else 1
             if i >= L:
                 return '"'
             i += 1
             continue
-        if c == "#" and (i == 0 or t[i - 1] in " \t\n;|&()`<>"):
+        if c == "#" and not have:
             e = t.find("\n", i)
             if e < 0:
                 return ""
             i = e
+            continue
+        if c in " \t\n;|&()`<>":
+            have = False
+        elif c not in "{}" or have:
+            have = True
         i += 1
     return ""
 
@@ -133,7 +141,12 @@ def _heredocs(b):
             d = re.sub(r"""["'\\]""", "", raw)
             delims.append((d, d != raw))
             return " HEREDOC "
-        seg = _OPENER.sub(opener, seg)
+        out, m = "", _OPENER.search(seg)
+        while m:                            # the awk's per-line loop: each search
+            out += seg[:m.start()] + opener(m)  # starts afresh after the last opener
+            seg = seg[m.end():]
+            m = _OPENER.search(seg)
+        seg = out + seg
         subs, closed = "", nl >= 0
         for d, quoted in delims:
             body = ""
