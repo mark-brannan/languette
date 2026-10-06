@@ -230,6 +230,84 @@ Feature: prose-budget-commit
     When the agent runs `git commit -m x "a file.md"`
     Then the guard denies, naming "could not be resolved"
 
+  Scenario Outline: a `--pathspec-from-file` commit reaches past the index, so every unstaged tracked change is checked
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    And the file "README.md" is committed
+    And the file "README.md" holds:
+      """
+      y
+      """
+    And the file "list.txt" holds:
+      """
+      README.md
+      """
+    When the agent runs `<command>`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "--staged"
+    And the stub "prose-budget" was called with "--file "
+    And the stub "prose-budget" was called with "/README.md"
+
+    Examples:
+      | command                                          | note                |
+      | git commit -m x --pathspec-from-file=list.txt    | stuck to the option |
+      | git commit -m x --pathspec-from-file list.txt    | as the next word    |
+
+  Scenario Outline: an interactive commit can stage any hunk or a new file, so both listings are checked
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    And the file "README.md" is committed
+    And the file "README.md" holds:
+      """
+      y
+      """
+    And the file "NOTES.md" holds:
+      """
+      x
+      """
+    When the agent runs `<command>`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "--staged"
+    And the stub "prose-budget" was called with "/README.md"
+    And the stub "prose-budget" was called with "/NOTES.md"
+
+    Examples:
+      | command                         | note                      |
+      | git commit -p -m x              | -p                        |
+      | git commit --patch -m x         | --patch                   |
+      | git commit --interactive -m x   | --interactive             |
+      | git commit -pm x                | -p in a short cluster     |
+
+  Scenario Outline: a second commit in the same directory is checked too, not just the first
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    When the agent runs `<command>`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "--staged"
+    And the stub "prose-budget" was called with "--file README.md"
+
+    Examples:
+      | command                                                  | note                          |
+      | git commit -m a && git commit -m b README.md             | pathspec on the second commit |
+      | git commit -m a && git add README.md && git commit -m b  | an add after the first commit |
+      | git merge --continue && git commit -m b README.md        | after finishing a merge       |
+
+  Scenario Outline: a second commit in a different directory is denied, since one check cannot serve two repositories
+    When the agent runs `<command>`
+    Then the guard denies, naming "two different directories"
+
+    Examples:
+      | command                                      | note                 |
+      | git commit -m a && cd sub && git commit -m b | a cd between them    |
+      | git commit -m a && git -C sub commit -m b    | -C on the second     |
+      | git commit -m a && yadm commit -m b          | git, then yadm       |
+
   @shell_only
   Scenario: with no engine on PROSE_BUDGET or PATH the guard is silent
     Given PROSE_BUDGET is unset
