@@ -42,3 +42,10 @@ interface is; this file says who decided it and why, one line each.
 - The cascade's order: a user-installed `shfmt` first, then a pip-installed
   parser, and awk only when none of those is available.
 - Which pip parser, or both in turn (tree-sitter-bash, bashlex), is open (#4).
+
+## Runtime dependencies: Solace, 2026-10-06
+
+- Languette drops `jq` and takes no runtime dependency beyond the shell
+  parser's narrow set: `prose-budget-commit` loses its engine in
+  mark-brannan/claude, and `no-checkout-home` replaces its yadm assumption
+  with an approach that works for any user.
