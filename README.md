@@ -37,7 +37,7 @@ It needs:
   `guard-unparsable`);
 - `jq` and a POSIX `awk`, for the shell guards, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
-- `gh`, for `no-delete-stacked-base`.
+- `gh`, for `no-delete-stacked-base` and `guard-bypass-ruleset`.
 
 Without the plugin system, see [Installing by hand](#installing-by-hand).
 
@@ -54,6 +54,9 @@ Each guard denies one class of command:
   `stash pop`, force-push, `reset --hard` and other moves that throw work away
 - [`no-delete-stacked-base`](hooks/no-delete-stacked-base.sh): deleting a
   remote branch an open PR is based on (GitHub silently closes the PR)
+- [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push to
+  a branch GitHub says requires a pull request, or `gh pr merge --admin`; the
+  agent holds your credentials, so it holds your bypass
 - [`guard-github-issues`](hooks/guard-github-issues.sh): a second GitHub issue create, transfer
   or delete in one human turn, or any inside a loop
 - [`guard-private-terms`](#settings-for-guard-private-terms): a term from your
@@ -242,6 +245,7 @@ guard reads beyond the command, it declares:
 | `guard-bypass-hooks` | the transcript, and the approvals spent |
 | `guard-infra` | the transcript, the approvals spent |
 | `no-delete-stacked-base` | GitHub, through `gh` |
+| `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
 | `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `no-checkout-home` | `$HOME`, and what `git rev-parse --show-toplevel` resolves to |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |

@@ -41,6 +41,11 @@
           },
           {
             "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_RULESET-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-bypass-ruleset; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-bypass-ruleset and was not found on PATH. This is a gate and fails closed: install python3, or set guard_bypass_ruleset=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-bypass-ruleset) is missing from the plugin directory or crashed, so a push or merge around a pull-request rule could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for a push or merge around a branch's pull-request rule"
+          },
+          {
+            "type": "command",
             "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/prose-budget-commit.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"prose-budget-commit.sh is missing from the plugin directory or crashed, so staged prose could not be checked against the repo budgets. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking staged prose against the repo's budgets"
           },

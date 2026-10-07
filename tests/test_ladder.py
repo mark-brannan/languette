@@ -128,7 +128,7 @@ def feature_commands(files=None):
 
 
 @needs_shfmt
-def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens(monkeypatch):
+def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens_and_operators(monkeypatch):
     refused, differ = [], []
     for c in feature_commands():
         try:
@@ -140,7 +140,7 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens(monkeypatch
         monkeypatch.setattr(scan, "RUNGS", ("awk",))
         a = scan.Scan(c)
         monkeypatch.undo()
-        if s.rung != "shfmt" or (s.tokens(), s.live) != (a.tokens(), a.live):
+        if s.rung != "shfmt" or (s.tokens(), s.live, s.op) != (a.tokens(), a.live, a.op):
             differ.append(c)
     # guard-unparsable's deny rows are refused by design, and so is a heredoc
     # opener alone in an Examples cell, whose body is the scenario's next

@@ -310,6 +310,7 @@ class Scan:
     def _reset(self):
         self.w, self.k, self.q, self.live = [], [], [], []
         self.subs = []                     # bodies of $(...) and `...` inside double quotes
+        self.op = []                       # per word: a separator's operator text, else ""
         self.pipes = set()                 # the separators that are a | or |&
         self._cur, self._have, self._quoted, self._skip, self._livecur = "", False, False, False, False
 
@@ -415,14 +416,19 @@ class Scan:
                 self.w.append("$Q"); self.k.append("q"); self.q.append(self._cur)
             else:
                 self.w.append(self._cur); self.k.append("w"); self.q.append("")
-            self.live.append(self._livecur)
+            self.live.append(self._livecur); self.op.append("")
         self._cur, self._have, self._quoted, self._livecur = "", False, False, False
 
-    def _sep(self):
+    def _sep(self, op=""):
+        """A separator; `op` is the operator text that made it (`;`, `&&`, `|`, `)`, ...),
+        and consecutive operators pile up on one separator, so `op` reads `;}` for `; }`."""
         self._skip = False
-        if not self.w or self.k[-1] == ";":
+        if not self.w:
             return
-        self.w.append(";"); self.k.append(";"); self.q.append(""); self.live.append(False)
+        if self.k[-1] == ";":
+            self.op[-1] += op
+            return
+        self.w.append(";"); self.k.append(";"); self.q.append(""); self.live.append(False); self.op.append(op)
 
     def _lex(self, b):
         """The awk lexer over b, carrying the word in progress across calls."""
@@ -484,16 +490,17 @@ class Scan:
                 i += 1
                 continue
             if c in (";", "|", "&", "\n", "(", ")", "`"):
-                self._emit(); self._sep()
+                self._emit()
                 o = i
                 while at(i + 1) in (";", "|", "&"):
                     i += 1
+                self._sep(b[o:i + 1])
                 if b[o:i + 1] in ("|", "|&") and self.w:
                     self.pipes.add(len(self.w) - 1)
                 i += 1
                 continue
             if c in ("{", "}") and not self._have:
-                self._sep(); i += 1
+                self._sep(c); i += 1
                 continue
             if c == "$":
                 self._livecur = True
