@@ -100,7 +100,7 @@ def feature_commands():
             lines = m.group(1).split("\n")
             ind = min(len(x) - len(x.lstrip(" ")) for x in lines if x.strip())
             out.add("\n".join(x[ind:] for x in lines))
-        out |= {c.strip() for c in re.findall(r"^\s*\|\s*([^|]+?)\s*\|", t, re.M)}
+        out |= {c.strip().replace("\\|", "|") for c in re.findall(r"^\s*\|\s*((?:\\\||[^|])+?)\s*\|", t, re.M)}
     return sorted(c for c in out if not re.search(r"<[a-z]+>", c))   # Outline placeholders
 
 
@@ -119,7 +119,10 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens(monkeypatch
         monkeypatch.undo()
         if s.rung != "shfmt" or (s.tokens(), s.live) != (a.tokens(), a.live):
             differ.append(c)
-    # Two heredoc openers quoted in prose and a GraphQL query: never run as commands.
+    # parse-check's deny rows are refused by design. Otherwise, two heredoc
+    # openers quoted in prose and a GraphQL query: never run as commands.
+    by_design = (ROOT / "features/parse-check.feature").read_text()
+    refused = [c for c in refused if f"| {c} " not in by_design]
     assert refused == ["bash <<'EOF'", "mutation { addLabelsToLabelable(input:{labelableId:\"x\",labelIds:[\"y\"]}) "
                        "{ clientMutationId } }", "sh <<EOF"]
     assert differ == []
