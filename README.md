@@ -21,7 +21,7 @@ few words in it that can do damage. When it hears one, it tells the agent
 
 ## Install
 
-The guards run as `PreToolUse` hooks in Claude Code today (`issue-door` also
+The guards run as `PreToolUse` hooks in Claude Code today (`guard-github-issues` also
 runs on `UserPromptSubmit`, which opens its door); other agent hosts
 are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
@@ -33,7 +33,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 It needs:
 
 - `python3`, standard library only, for every `run.py` guard (`ask-first`,
-  `no-bypass-labels`, `no-iac-destroy`, `no-rm-tree`);
+  `no-bypass-labels`, `guard-infra`, `guard-recursive-delete`);
 - `jq` and a POSIX `awk`, for the shell guards, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
 - `gh`, for `no-delete-stacked-base`.
@@ -44,15 +44,15 @@ Without the plugin system, see [Installing by hand](#installing-by-hand).
 
 Each guard denies one class of command:
 
-- [`no-rm-tree`](#allowing-more-for-no-rm-tree): a recursive `rm` or
+- [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
 - [`no-git-footguns`](hooks/no-git-footguns.sh): `add -A`, `commit -a`,
   `stash pop`, force-push, `reset --hard` and other moves that throw work away
 - [`no-delete-stacked-base`](hooks/no-delete-stacked-base.sh): deleting a
   remote branch an open PR is based on (GitHub silently closes the PR)
-- [`issue-door`](hooks/issue-door.sh): a second GitHub issue create, transfer
+- [`guard-github-issues`](hooks/guard-github-issues.sh): a second GitHub issue create, transfer
   or delete in one human turn, or any inside a loop
-- [`public-issue-guard`](#settings-for-public-issue-guard): a term from your
+- [`guard-private-terms`](#settings-for-guard-private-terms): a term from your
   private list, posted to a public repo (off until you give it the list)
 - [`no-checkout-home`](hooks/no-checkout-home.sh): switching the branch
   checked out in `$HOME`, when home is itself a worktree (opt-in)
@@ -62,7 +62,7 @@ Each guard denies one class of command:
   applying a label that waives a CI gate, such as `churn-ok`
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
-- [`no-iac-destroy`](languette/guards/no_iac_destroy.py): `terraform destroy`, `kubectl delete` and
+- [`guard-infra`](languette/guards/guard_infra.py): `terraform destroy`, `kubectl delete` and
   other infrastructure destroys, until you approve that one run
 - [`prose-budget-commit`](hooks/prose-budget-commit.sh): a `git commit` whose
   staged prose runs over the repo's word budgets
@@ -139,7 +139,7 @@ Every guard is on by default except `no-checkout-home` and
 or at install, by its name with underscores:
 
 ```
-claude plugin install languette@languette --config no_rm_tree=false
+claude plugin install languette@languette --config guard_recursive_delete=false
 ```
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
@@ -159,7 +159,7 @@ when its setting is exactly `true`, so a misconfiguration leaves it off.
 | `no_git_footguns_discard` | `reset --hard`, `checkout .`, `restore .`, `clean -f` |
 | `no_git_footguns_branch_delete` | `branch -D`, `branch --delete --force` |
 
-### Allowing more for `no-rm-tree`
+### Allowing more for `guard-recursive-delete`
 
 Built in: the generated directories `node_modules`, `dist`, `coverage` and
 `.pio`, and the agent's own places, `/tmp`, `~/.local/state/claude-tmpdir`
@@ -182,7 +182,7 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
   `rm` or `find -delete` is denied. A typo can't stop unrelated work, and it
   can't open the gate either.
 
-### Settings for `public-issue-guard`
+### Settings for `guard-private-terms`
 
 | Setting | Holds | Example |
 |---|---|---|
@@ -229,13 +229,13 @@ guard reads beyond the command, it declares:
 | Guard | Reads |
 |---|---|
 | `no-git-footguns` | nothing: a pure function of the command |
-| `no-rm-tree` | the filesystem, and `LANGUETTE_RM_ALLOW` |
+| `guard-recursive-delete` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
-| `no-iac-destroy` | the transcript, the approvals spent |
+| `guard-infra` | the transcript, the approvals spent |
 | `no-delete-stacked-base` | GitHub, through `gh` |
-| `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
+| `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `no-checkout-home` | `$HOME`, and what `git rev-parse --show-toplevel` resolves to |
-| `public-issue-guard` | the terms file, the files a post reads, and the checkout's `git remote` |
+| `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
 | `no-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `no-foreign-worktree` | git, for where each path lands, and a record per session in `$TMPDIR` |
 | `prose-budget-commit` | the staged diff and, for a commit that reaches past the index, the named working-tree files, through `prose-budget` |
@@ -269,7 +269,7 @@ to Claude Code, and every command goes through. One entry:
 
 ```json
 {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command",
-  "command": "h=\"$HOME/languette/hooks/no-rm-tree.sh\"; { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"no-rm-tree.sh is missing or crashed. This is a gate and fails closed.\"}}'"}]}]}}
+  "command": "h=\"$HOME/languette/hooks/guard-recursive-delete.sh\"; { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"guard-recursive-delete.sh is missing or crashed. This is a gate and fails closed.\"}}'"}]}]}}
 ```
 
 ## Working on it

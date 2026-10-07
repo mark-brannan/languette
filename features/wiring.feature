@@ -29,13 +29,13 @@ Feature: wiring
     Examples:
       | guard                  | command                       | verdict   |
       | no-git-footguns        | git add -A                    | denies    |
-      | no-rm-tree             | rm -rf build                  | denies    |
+      | guard-recursive-delete             | rm -rf build                  | denies    |
       | no-delete-stacked-base | git push origin --delete "$b" | asks      |
       | ask-first              | npm run walk                  | denies    |
-      | no-iac-destroy         | terraform destroy             | denies    |
-      | issue-door             | gh issue create -t t -b b     | denies    |
+      | guard-infra         | terraform destroy             | denies    |
+      | guard-github-issues             | gh issue create -t t -b b     | denies    |
       | prose-budget-commit    | git commit -m x               | denies    |
-      | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | no-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
 
   Scenario: the hooks.json command for no-bypass-labels judges an MCP call
@@ -45,8 +45,8 @@ Feature: wiring
 
   # The prompt hook is the only thing that opens the door. Dropped or
   # mis-argumented in hooks.json, the PreToolUse hook would deny every create.
-  Scenario: the hooks.json prompt hook opens the door the hooks.json issue-door hook spends
-    Given the hook is the hooks.json command for "issue-door"
+  Scenario: the hooks.json prompt hook opens the door the hooks.json guard-github-issues hook spends
+    Given the hook is the hooks.json command for "guard-github-issues"
     When the human speaks, through the hooks.json prompt hook
     And the agent runs `gh issue create -t t -b b`
     Then the guard is silent
@@ -60,12 +60,12 @@ Feature: wiring
     Examples:
       | guard                  | command                       |
       | no-git-footguns        | git add -A                    |
-      | no-rm-tree             | rm -rf build                  |
+      | guard-recursive-delete             | rm -rf build                  |
       | no-delete-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
-      | no-iac-destroy         | terraform destroy             |
-      | issue-door             | gh issue create -t t -b b     |
-      | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust |
+      | guard-infra         | terraform destroy             |
+      | guard-github-issues             | gh issue create -t t -b b     |
+      | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
       | no-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
@@ -80,9 +80,9 @@ Feature: wiring
 
     Examples:
       | guard            | option           | command                           |
-      | no-rm-tree       | no_rm_tree       | rm -rf build                      |
+      | guard-recursive-delete       | guard_recursive_delete       | rm -rf build                      |
       | ask-first        | ask_first        | npm run walk                      |
-      | no-iac-destroy   | no_iac_destroy   | terraform destroy                 |
+      | guard-infra   | guard_infra   | terraform destroy                 |
       | no-bypass-labels | no_bypass_labels | gh pr edit 4 --add-label churn-ok |
 
   Scenario Outline: with python3 absent from PATH, the option set to false still skips the guard
@@ -94,9 +94,9 @@ Feature: wiring
 
     Examples:
       | guard            | option                                | command                           |
-      | no-rm-tree       | CLAUDE_PLUGIN_OPTION_NO_RM_TREE       | rm -rf build                      |
+      | guard-recursive-delete       | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE       | rm -rf build                      |
       | ask-first        | CLAUDE_PLUGIN_OPTION_ASK_FIRST        | npm run walk                      |
-      | no-iac-destroy   | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY   | terraform destroy                 |
+      | guard-infra   | CLAUDE_PLUGIN_OPTION_GUARD_INFRA   | terraform destroy                 |
       | no-bypass-labels | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
 
   Scenario Outline: a script that crashes is a deny
@@ -108,12 +108,12 @@ Feature: wiring
     Examples:
       | guard                  | command                       |
       | no-git-footguns        | git add -A                    |
-      | no-rm-tree             | rm -rf build                  |
+      | guard-recursive-delete             | rm -rf build                  |
       | no-delete-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
-      | no-iac-destroy         | terraform destroy             |
-      | issue-door             | gh issue create -t t -b b     |
-      | public-issue-guard     | gh issue comment 3 -R o/r -b Wanderlust |
+      | guard-infra         | terraform destroy             |
+      | guard-github-issues             | gh issue create -t t -b b     |
+      | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
       | no-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
@@ -126,12 +126,12 @@ Feature: wiring
     Examples:
       | guard                  | option                                      | command                       |
       | no-git-footguns        | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS        | git add -A                    |
-      | no-rm-tree             | CLAUDE_PLUGIN_OPTION_NO_RM_TREE             | rm -rf build                  |
+      | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | rm -rf build                  |
       | no-delete-stacked-base | CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE | git push origin --delete "$b" |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | npm run walk                  |
-      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | terraform destroy             |
-      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | gh issue create -t t -b b     |
-      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | gh issue comment 3 -R o/r -b Wanderlust |
+      | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | terraform destroy             |
+      | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | gh issue create -t t -b b     |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | gh issue comment 3 -R o/r -b Wanderlust |
       | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | git commit -m x               |
 
@@ -151,12 +151,12 @@ Feature: wiring
       | no-git-footguns        | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS        | no    | git add -A                    | denies  |
       | no-git-footguns        | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS        | true  | git add -A                    | denies  |
       | no-git-footguns        | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS        | 1     | git add -A                    | denies  |
-      | no-rm-tree             | CLAUDE_PLUGIN_OPTION_NO_RM_TREE             |       | rm -rf build                  | denies  |
-      | no-rm-tree             | CLAUDE_PLUGIN_OPTION_NO_RM_TREE             | 0     | rm -rf build                  | denies  |
-      | no-rm-tree             | CLAUDE_PLUGIN_OPTION_NO_RM_TREE             | False | rm -rf build                  | denies  |
-      | no-rm-tree             | CLAUDE_PLUGIN_OPTION_NO_RM_TREE             | no    | rm -rf build                  | denies  |
-      | no-rm-tree             | CLAUDE_PLUGIN_OPTION_NO_RM_TREE             | true  | rm -rf build                  | denies  |
-      | no-rm-tree             | CLAUDE_PLUGIN_OPTION_NO_RM_TREE             | 1     | rm -rf build                  | denies  |
+      | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             |       | rm -rf build                  | denies  |
+      | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | 0     | rm -rf build                  | denies  |
+      | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | False | rm -rf build                  | denies  |
+      | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | no    | rm -rf build                  | denies  |
+      | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | true  | rm -rf build                  | denies  |
+      | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | 1     | rm -rf build                  | denies  |
       | no-delete-stacked-base | CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE |       | git push origin --delete "$b" | asks    |
       | no-delete-stacked-base | CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE | 0     | git push origin --delete "$b" | asks    |
       | no-delete-stacked-base | CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE | False | git push origin --delete "$b" | asks    |
@@ -169,24 +169,24 @@ Feature: wiring
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | no    | npm run walk                  | denies  |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | true  | npm run walk                  | denies  |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | 1     | npm run walk                  | denies  |
-      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         |       | terraform destroy             | denies  |
-      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | 0     | terraform destroy             | denies  |
-      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | False | terraform destroy             | denies  |
-      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | no    | terraform destroy             | denies  |
-      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | true  | terraform destroy             | denies  |
-      | no-iac-destroy         | CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY         | 1     | terraform destroy             | denies  |
-      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             |       | gh issue create -t t -b b     | denies  |
-      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | 0     | gh issue create -t t -b b     | denies  |
-      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | False | gh issue create -t t -b b     | denies  |
-      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | no    | gh issue create -t t -b b     | denies  |
-      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | true  | gh issue create -t t -b b     | denies  |
-      | issue-door             | CLAUDE_PLUGIN_OPTION_ISSUE_DOOR             | 1     | gh issue create -t t -b b     | denies  |
-      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     |       | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | 0     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | False | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | public-issue-guard     | CLAUDE_PLUGIN_OPTION_PUBLIC_ISSUE_GUARD     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         |       | terraform destroy             | denies  |
+      | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | 0     | terraform destroy             | denies  |
+      | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | False | terraform destroy             | denies  |
+      | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | no    | terraform destroy             | denies  |
+      | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | true  | terraform destroy             | denies  |
+      | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | 1     | terraform destroy             | denies  |
+      | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             |       | gh issue create -t t -b b     | denies  |
+      | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | 0     | gh issue create -t t -b b     | denies  |
+      | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | False | gh issue create -t t -b b     | denies  |
+      | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | no    | gh issue create -t t -b b     | denies  |
+      | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | true  | gh issue create -t t -b b     | denies  |
+      | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | 1     | gh issue create -t t -b b     | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     |       | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 0     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | False | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | denies    |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | denies    |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | False | git commit -m x               | denies    |

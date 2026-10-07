@@ -76,7 +76,7 @@ Feature: parse-check
 
   @shfmt_only
   Scenario: a substitution in a heredoc with no closing line is denied before a guard reads it
-    # no-rm-tree's row: on the awk rung the guard names the rm instead.
+    # guard-recursive-delete's row: on the awk rung the guard names the rm instead.
     When the agent runs:
       """
       cat <<EOF
@@ -87,7 +87,7 @@ Feature: parse-check
   @shfmt_only
   Scenario: an escaped ; before # in a backtick substitution in a heredoc is denied
     # Stricter than bash, never seen: bash reads `echo \;#'` as echo ; and a
-    # comment, shfmt reads the ' as opening a quote. no-rm-tree's row: on the
+    # comment, shfmt reads the ' as opening a quote. guard-recursive-delete's row: on the
     # awk rung the guard names the rm instead.
     When the agent runs:
       """

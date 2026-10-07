@@ -112,7 +112,7 @@
 # message, an issue body or a card that names a worktree path passes.
 #
 # Scanning is shared with no-git-footguns.sh/no-checkout-home.sh/
-# no-rm-tree.sh: lib-shell-words.awk (read its header).
+# guard-recursive-delete.sh: lib-shell-words.awk (read its header).
 #
 # This is a GATE, so it fails closed: no jq, no awk, no sed, no git, no
 # library, unreadable payload -> deny.

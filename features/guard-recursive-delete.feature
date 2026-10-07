@@ -1,5 +1,5 @@
 @python @shell
-Feature: no-rm-tree
+Feature: guard-recursive-delete
   Recursive rm and find -delete are denied unless every target is a generated
   directory or the agent's own area. The working directory is {HOME}/project
   unless a scenario says otherwise.

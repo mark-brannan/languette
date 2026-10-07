@@ -251,7 +251,7 @@ def claim(payload, wants):
     parallel Bash calls, each with its own hook process) cannot both pass on
     one click. Raises OSError when the payload names no transcript, or the
     transcript or the spent file cannot be read or written. Shared with
-    no-iac-destroy: one click is one run, whichever guard asked."""
+    guard-infra: one click is one run, whichever guard asked."""
     tp = payload.get("transcript_path")
     if not isinstance(tp, str) or not tp:
         raise OSError("the payload has no transcript_path")

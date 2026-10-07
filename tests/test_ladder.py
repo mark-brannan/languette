@@ -35,7 +35,7 @@ def payload(command):
     return json.dumps({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": os.environ["HOME"]})
 
 
-def verdict(command, guard="no-rm-tree"):
+def verdict(command, guard="guard-recursive-delete"):
     out = run.respond(payload(command), {"HOME": os.environ["HOME"]}, only=guard)
     return json.loads(out)["hookSpecificOutput"] if out else None
 

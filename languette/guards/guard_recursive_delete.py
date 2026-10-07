@@ -1,4 +1,4 @@
-"""no-rm-tree: a port of hooks/no-rm-tree.sh, whose header is the spec.
+"""guard-recursive-delete: a port of hooks/guard-recursive-delete.sh, whose header is the spec.
 
 Blocks recursive `rm` and `find ... -delete` unless every target, resolved
 against the payload's cwd and then through the filesystem, is Claude's to
@@ -15,7 +15,7 @@ import re
 from languette import scan as sw
 from languette.verdict import Refuse, context, deny
 
-NAME = "no-rm-tree"
+NAME = "guard-recursive-delete"
 
 # Adding a name is a PR, not a judgment call in a session.
 #   node_modules   npm/yarn/pnpm install output, most JS repos
@@ -191,7 +191,7 @@ def check(payload, env=os.environ):
         cwd = os.getcwd()
     home = env.get("HOME", "")
     if not home.startswith("/"):
-        return deny("no-rm-tree: $HOME is not an absolute path, cannot resolve targets")
+        return deny("guard-recursive-delete: $HOME is not an absolute path, cannot resolve targets")
 
     home_p = _physical(home)
     extra_roots, extra_names, allow_err = [], [], None
@@ -210,9 +210,9 @@ def check(payload, env=os.environ):
     except Refuse as e:
         refused = str(e)
     if refused is None and not judge.targets:
-        return context("no-rm-tree: " + allow_msg) if allow_msg else None
+        return context("guard-recursive-delete: " + allow_msg) if allow_msg else None
     if allow_msg:
-        return deny("no-rm-tree: " + allow_msg)
+        return deny("guard-recursive-delete: " + allow_msg)
     if refused is not None:
         return deny(refused)
 
@@ -237,7 +237,7 @@ def check(payload, env=os.environ):
         if not allowed(abs_):
             return deny(
                 f"`{what}` is blocked: only the scratchpad, /tmp, agent worktrees and the generated "
-                "directories named in no-rm-tree.sh (node_modules, dist, coverage, .pio ...) may be removed "
+                "directories named in guard-recursive-delete.sh (node_modules, dist, coverage, .pio ...) may be removed "
                 f"recursively, and {abs_} is none of those. `git status --short {raw}` and `git clean -n {raw}` "
                 "show what is there; `git rm` tracked files by path, and hand anything untracked to the user "
                 "-- a directory they own can hold downloads and logs no session knows about.")
