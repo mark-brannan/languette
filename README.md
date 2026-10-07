@@ -43,10 +43,10 @@ Without the plugin system, see [Installing by hand](#installing-by-hand).
 
 ## The guards
 
-Each guard denies one class of command:
+Each guard checks for one kind of hazard:
 
 - [`guard-unparsable`](features/guard-unparsable.feature): a Bash command that
-  doesn't parse, denied whole with its line and column; the other guards skip it
+  doesn't parse; the other guards skip it
 - [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
 - [`guard-permissions`](features/guard-permissions.feature): recursive `chmod`,
