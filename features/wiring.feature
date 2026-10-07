@@ -67,6 +67,34 @@ Feature: wiring
       | no-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
+  # The run.py guards have no shell fallback, so with python3 absent they
+  # deny, but say why instead of blaming the plugin directory.
+  Scenario Outline: with python3 absent from PATH, a run.py guard denies and says python3 is required
+    Given the hook is the hooks.json command for "<guard>"
+    And PATH holds only "sh cat printf dirname"
+    When the agent runs `<command>`
+    Then the guard denies, naming "python3 is required for <guard>"
+    And the guard denies, naming "<option>=false"
+
+    Examples:
+      | guard            | option           | command                           |
+      | no-rm-tree       | no_rm_tree       | rm -rf build                      |
+      | ask-first        | ask_first        | npm run walk                      |
+      | no-bypass-labels | no_bypass_labels | gh pr edit 4 --add-label churn-ok |
+
+  Scenario Outline: with python3 absent from PATH, the option set to false still skips the guard
+    Given the hook is the hooks.json command for "<guard>"
+    And PATH holds only "sh cat printf dirname"
+    And <option> is "false"
+    When the agent runs `<command>`
+    Then the guard is silent
+
+    Examples:
+      | guard            | option                                | command                           |
+      | no-rm-tree       | CLAUDE_PLUGIN_OPTION_NO_RM_TREE       | rm -rf build                      |
+      | ask-first        | CLAUDE_PLUGIN_OPTION_ASK_FIRST        | npm run walk                      |
+      | no-bypass-labels | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
+
   Scenario Outline: a script that crashes is a deny
     Given the hook is the hooks.json command for "<guard>"
     And the plugin's script for "<guard>" crashes
