@@ -131,7 +131,8 @@ def test_with_no_bash_the_awk_rung_reads(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize("command", ["echo \"it's\" # don't", "cat <<'EOF'\ndon't\nEOF", "cat <<EOF\nit's $(date)\nEOF",
                                      "echo a\\'b", "printf '%s' \"a'b\"",
-                                     "echo $'it\\'s'", "echo \\$'a' b"])
+                                     "echo $'it\\'s'", "echo \\$'a' b",
+                                     "echo $$'a\\'", "echo $$$'a\\'b'"])
 def test_the_awk_rung_refuses_no_closed_quote(monkeypatch, command):
     monkeypatch.setattr(scan, "RUNGS", ("awk",))
     assert scan.parse(command) == ("awk", None)
