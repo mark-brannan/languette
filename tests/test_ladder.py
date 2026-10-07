@@ -19,7 +19,8 @@ needs_shfmt = pytest.mark.skipif(not REAL and not os.environ.get("CI"), reason="
 @pytest.fixture(autouse=True)
 def fresh():
     def clear():                               # a test may have patched one out
-        for f in (scan.shfmt, scan._shfmt_tree, scan._bash_n, scan._ts_parser, scan._tree_sitter):
+        for f in (scan.shfmt, scan._shfmt_tree, scan._bash_n, scan._ts_parser, scan._tree_sitter,
+                  scan._bashlex_mod, scan._bashlex):
             getattr(f, "cache_clear", lambda: None)()
     clear()
     yield
@@ -176,8 +177,58 @@ def test_a_crashing_tree_sitter_passes_the_text_down(monkeypatch):
     assert scan.parse("echo ok") == ("awk", None)
 
 
+def fake_bashlex(monkeypatch, raises):
+    """A bashlex module whose parse raises `raises` (an instance, or None to read)."""
+    import types
+    errors, tokenizer = types.SimpleNamespace(), types.SimpleNamespace()
+
+    class ParsingError(Exception):
+        def __init__(self, message, s, position):
+            super().__init__(message)
+            self.message, self.s, self.position = message, s, position
+    errors.ParsingError = ParsingError
+    tokenizer.MatchedPairError = type("MatchedPairError", (ParsingError,), {})
+
+    def parse(text):
+        if raises:
+            raise raises(errors, tokenizer, text)
+    monkeypatch.setattr(scan, "_bashlex_mod", lambda: types.SimpleNamespace(parse=parse, errors=errors,
+                                                                            tokenizer=tokenizer))
+    monkeypatch.setattr(scan, "_ts_parser", lambda: None)
+    monkeypatch.setattr(scan, "RUNGS", ("pip", "awk"))
+
+
+@pytest.mark.parametrize("raises, found", [
+    (lambda e, t, s: t.MatchedPairError("unexpected EOF while looking for matching \"'\"", s, 5),
+     "1:6: unexpected EOF while looking for matching \"'\""),
+    (lambda e, t, s: e.ParsingError("unexpected EOF", s, 20), "2:7: unexpected EOF"),
+])
+def test_bashlex_refuses_an_open_pair_or_an_early_end(monkeypatch, raises, found):
+    fake_bashlex(monkeypatch, raises)
+    with pytest.raises(scan.Unparseable) as e:
+        scan.check("if true; then\necho x")
+    assert (e.value.rung, str(e.value)) == ("bashlex", found)
+
+
+@pytest.mark.parametrize("raises", [
+    lambda e, t, s: e.ParsingError("unexpected token '-f'", s, 3),             # [[ -f x ]]
+    lambda e, t, s: e.ParsingError("here-document at line 0 delimited by end-of-file", s, 22),
+    lambda e, t, s: NotImplementedError("arithmetic expansion"),
+    lambda e, t, s: RuntimeError("boom"),
+])
+def test_bashlex_passes_down_what_it_cannot_say(monkeypatch, raises):
+    fake_bashlex(monkeypatch, raises)
+    assert scan.parse("[[ -f x ]] && echo y") == ("awk", None)
+
+
+def test_bashlex_reads_after_tree_sitter_is_missing(monkeypatch):
+    fake_bashlex(monkeypatch, None)
+    assert scan.parse("echo ok") == ("bashlex", True)
+
+
 def test_with_no_pip_parser_the_pip_rung_passes_the_text_down(monkeypatch):
     monkeypatch.setattr(scan, "_ts_parser", lambda: None)
+    monkeypatch.setattr(scan, "_bashlex_mod", lambda: None)
     monkeypatch.setattr(scan, "RUNGS", ("pip", "awk"))
     assert scan.parse("rm -rf x") == ("awk", None)
 

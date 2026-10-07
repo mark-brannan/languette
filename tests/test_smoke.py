@@ -36,8 +36,7 @@ ENVS = {
     "shfmt": (("shfmt", "bash"), None, "shfmt", None),
     "bash -n": (("bash",), None, "bash -n", None),
     "lexer only": ((), None, "(?:awk|lexer)", None),
-    "bashlex": ((), "LANGUETTE_SMOKE_BASHLEX_PY", "bashlex",
-                "the pip rung is an empty slot (#4): bashlex is installed and never asked"),
+    "bashlex": ((), "LANGUETTE_SMOKE_BASHLEX_PY", "bashlex", None),
     "tree-sitter-bash": ((), "LANGUETTE_SMOKE_TREESITTER_PY", "tree-sitter-bash", None),
 }
 

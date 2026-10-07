@@ -155,7 +155,7 @@ BASH_TIMEOUT = 2                               # seconds
 RUNGS = ("shfmt", "pip", "bash -n", "awk")     # tests narrow this to one rung
 # The pip rung's parsers, asked in turn. Which comes first is open (#4);
 # tree-sitter-bash first is an assumption.
-PIP = ("tree-sitter-bash",)
+PIP = ("tree-sitter-bash", "bashlex")
 
 
 class Unparseable(Exception):
@@ -240,6 +240,38 @@ def _tree_sitter(text):
     return tree
 
 
+@functools.lru_cache(maxsize=1)
+def _bashlex_mod():
+    try:
+        import bashlex
+        return bashlex
+    except Exception:  # noqa: BLE001 -- any failure to load is a missing rung
+        return None
+
+
+@functools.lru_cache(maxsize=256)
+def _bashlex(text):
+    """True when bashlex reads `text`, None when it is missing, crashed or
+    cannot say. It refuses only a quote or bracket left open, or an
+    unexpected end. Its other errors are as often gaps in its grammar as in
+    the command (`[[ ]]`, a quoted heredoc delimiter), so they pass the text
+    down, as an unsupported construct does."""
+    m = _bashlex_mod()
+    if m is None:
+        return None
+    try:
+        m.parse(text)
+        return True
+    except m.errors.ParsingError as e:
+        if not (isinstance(e, m.tokenizer.MatchedPairError) or e.message == "unexpected EOF"):
+            return None
+        pos = min(max(e.position, 0), len(text))
+        why = f"{text.count(chr(10), 0, pos) + 1}:{pos - text.rfind(chr(10), 0, pos)}: {e.message}"
+    except Exception:  # noqa: BLE001 -- NotImplementedError is an unsupported construct; the rest, a crash
+        return None
+    raise Unparseable(why)
+
+
 def _ts_error(root):
     """The first ERROR or MISSING node under root, in source order."""
     stack = [root]
@@ -289,7 +321,8 @@ def parse(text, words=False):
         if words and rung not in ("shfmt", "awk"):
             continue
         for name in PIP if rung == "pip" else (rung,):
-            read = {"shfmt": _shfmt_tree, "tree-sitter-bash": _tree_sitter, "bash -n": _bash_n, "awk": _awk}[name]
+            read = {"shfmt": _shfmt_tree, "tree-sitter-bash": _tree_sitter, "bashlex": _bashlex, "bash -n": _bash_n,
+                    "awk": _awk}[name]
             try:
                 tree = read(text)
             except Unparseable as e:
