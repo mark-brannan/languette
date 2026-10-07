@@ -117,6 +117,30 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|mcp__.*__(create_issue|issue_write|transfer_issue|delete_issue)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\" post; }; true",
+            "statusMessage": "Spending the issue door for this turn"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash|mcp__.*__(create_issue|issue_write|transfer_issue|delete_issue)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\" post; }; true",
+            "statusMessage": "Spending the issue door for this turn"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
