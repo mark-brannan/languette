@@ -119,7 +119,7 @@ def check(payload, env=None):
                     "unknown number of times, and each run needs its own approval. Fix what the blocking "
                     "hook reported, or run it once, on its own, after asking.")
     try:
-        approved, spent = claim(payload, {APPROVE_LABEL: runs})
+        approved, spent = yield from claim({APPROVE_LABEL: runs})
     except (OSError, ValueError) as e:
         return deny(f"{NAME}: cannot read the session transcript to look for the user's approval, or "
                     f"record it as spent ({e}), so `{cmd.strip()}` is denied. Fix what the blocking "

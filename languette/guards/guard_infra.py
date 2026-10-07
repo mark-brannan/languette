@@ -318,7 +318,7 @@ def check(payload, env=None):
                     "parallel or watch runs an unknown number of times, and each run needs its own "
                     "approval. Run it once, on its own, after looking at what it would remove.")
     try:
-        approved, spent = claim(payload, {RULES[r][0]: len(found[r]) for r in found})
+        approved, spent = yield from claim({RULES[r][0]: len(found[r]) for r in found})
     except (OSError, ValueError) as e:
         return deny(f"guard-infra: cannot read the session transcript to look for the user's approval, or "
                     f"record it as spent ({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
