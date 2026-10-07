@@ -85,3 +85,9 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 ### 20261007t193515z
 - bash -n sits below the pip slot and above awk on the parser ladder; the ruling names shfmt, pip, awk, and bash -n was not on it Undo: reorder scan.RUNGS ([#74](https://github.com/mark-brannan/languette/pull/74))
 - The awk rung refuses only a quote left open at the end, read by the lexer's own rules after heredoc bodies are stripped Undo: drop _awk's raise in scan.py ([#74](https://github.com/mark-brannan/languette/pull/74))
+
+### 20261007t193847z
+- A tree-sitter MISSING node is a refusal, like an ERROR node Undo: drop 'or n.is_missing' in scan._ts_error ([#75](https://github.com/mark-brannan/languette/pull/75))
+
+### 20261007t193848z
+- A tree-sitter crash or failed import passes the text down the ladder, as a crashed shfmt does Undo: raise in scan._tree_sitter's except ([#75](https://github.com/mark-brannan/languette/pull/75))
