@@ -50,3 +50,10 @@ interface is; this file says who decided it and why, one line each.
   `guard-infra`, `issue-door` `guard-github-issues`, `public-issue-guard`
   `guard-private-terms`; config keys follow, with underscores. The rest are
   renamed as reached.
+
+## Three concerns: Solace, 2026-10-07
+
+- Parse reads the command into parts. Guards are pure functions reporting
+  findings. Verdict turns findings and configuration into an action.
+- Guards needing enriched data: how is unruled; first try is
+  request-and-answer (#79).
