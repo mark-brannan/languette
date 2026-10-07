@@ -32,6 +32,7 @@ Feature: wiring
       | guard-recursive-delete             | rm -rf build                  | denies    |
       | no-delete-stacked-base | git push origin --delete "$b" | asks      |
       | ask-first              | npm run walk                  | denies    |
+      | no-skip-hooks | git push --no-verify | denies |
       | guard-infra         | terraform destroy             | denies    |
       | guard-github-issues             | gh issue create -t t -b b     | denies    |
       | prose-budget-commit    | git commit -m x               | denies    |
@@ -63,6 +64,7 @@ Feature: wiring
       | guard-recursive-delete             | rm -rf build                  |
       | no-delete-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
+      | no-skip-hooks | git push --no-verify |
       | guard-infra         | terraform destroy             |
       | guard-github-issues             | gh issue create -t t -b b     |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
@@ -82,6 +84,7 @@ Feature: wiring
       | guard            | option           | command                           |
       | guard-recursive-delete       | guard_recursive_delete       | rm -rf build                      |
       | ask-first        | ask_first        | npm run walk                      |
+      | no-skip-hooks | no_skip_hooks | git push --no-verify |
       | guard-infra   | guard_infra   | terraform destroy                 |
       | guard-bypass-labels | guard_bypass_labels | gh pr edit 4 --add-label churn-ok |
 
@@ -96,6 +99,7 @@ Feature: wiring
       | guard            | option                                | command                           |
       | guard-recursive-delete       | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE       | rm -rf build                      |
       | ask-first        | CLAUDE_PLUGIN_OPTION_ASK_FIRST        | npm run walk                      |
+      | no-skip-hooks | CLAUDE_PLUGIN_OPTION_NO_SKIP_HOOKS | git push --no-verify |
       | guard-infra   | CLAUDE_PLUGIN_OPTION_GUARD_INFRA   | terraform destroy                 |
       | guard-bypass-labels | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
 
@@ -111,6 +115,7 @@ Feature: wiring
       | guard-recursive-delete             | rm -rf build                  |
       | no-delete-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
+      | no-skip-hooks | git push --no-verify |
       | guard-infra         | terraform destroy             |
       | guard-github-issues             | gh issue create -t t -b b     |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
@@ -129,6 +134,7 @@ Feature: wiring
       | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | rm -rf build                  |
       | no-delete-stacked-base | CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE | git push origin --delete "$b" |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | npm run walk                  |
+      | no-skip-hooks | CLAUDE_PLUGIN_OPTION_NO_SKIP_HOOKS | git push --no-verify |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | terraform destroy             |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | gh issue create -t t -b b     |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | gh issue comment 3 -R o/r -b Wanderlust |
@@ -164,11 +170,17 @@ Feature: wiring
       | no-delete-stacked-base | CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE | true  | git push origin --delete "$b" | asks    |
       | no-delete-stacked-base | CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE | 1     | git push origin --delete "$b" | asks    |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              |       | npm run walk                  | denies  |
+      | no-skip-hooks | CLAUDE_PLUGIN_OPTION_NO_SKIP_HOOKS |  | git push --no-verify | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | 0     | npm run walk                  | denies  |
+      | no-skip-hooks | CLAUDE_PLUGIN_OPTION_NO_SKIP_HOOKS | 0 | git push --no-verify | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | False | npm run walk                  | denies  |
+      | no-skip-hooks | CLAUDE_PLUGIN_OPTION_NO_SKIP_HOOKS | False | git push --no-verify | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | no    | npm run walk                  | denies  |
+      | no-skip-hooks | CLAUDE_PLUGIN_OPTION_NO_SKIP_HOOKS | no | git push --no-verify | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | true  | npm run walk                  | denies  |
+      | no-skip-hooks | CLAUDE_PLUGIN_OPTION_NO_SKIP_HOOKS | true | git push --no-verify | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | 1     | npm run walk                  | denies  |
+      | no-skip-hooks | CLAUDE_PLUGIN_OPTION_NO_SKIP_HOOKS | 1 | git push --no-verify | denies |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         |       | terraform destroy             | denies  |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | 0     | terraform destroy             | denies  |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | False | terraform destroy             | denies  |

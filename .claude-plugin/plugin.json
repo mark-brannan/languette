@@ -75,6 +75,12 @@
       "description": "Deny a command the repo lists in .languette/ask-first.json until the user approves that one run through AskUserQuestion. Leave on unless you want those commands through unasked.",
       "default": true
     },
+    "no_skip_hooks": {
+      "type": "boolean",
+      "title": "Ask before skipping git hooks",
+      "description": "Deny git commit --no-verify, git commit -n and git push --no-verify until the user approves that one run through AskUserQuestion. Leave on unless you want agents to skip the repo's hooks unasked.",
+      "default": true
+    },
     "guard_infra": {
       "type": "boolean",
       "title": "Ask before destroying infrastructure",

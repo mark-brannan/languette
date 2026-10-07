@@ -33,7 +33,8 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 It needs:
 
 - `python3`, standard library only, for every `run.py` guard (`ask-first`,
-  `guard-bypass-labels`, `guard-infra`, `guard-recursive-delete`, `guard-unparsable`);
+  `no-skip-hooks`, `guard-bypass-labels`, `guard-infra`, `guard-recursive-delete`,
+  `guard-unparsable`);
 - `jq` and a POSIX `awk`, for the shell guards, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
 - `gh`, for `no-delete-stacked-base`.
@@ -65,6 +66,8 @@ Each guard denies one class of command:
   applying a label that waives a CI gate, such as `churn-ok`
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
+- [`no-skip-hooks`](languette/guards/no_skip_hooks.py): `commit --no-verify`, `commit -n` or
+  `push --no-verify`, until you approve that one run
 - [`guard-infra`](languette/guards/guard_infra.py): `terraform destroy`, `kubectl delete` and
   other infrastructure destroys, until you approve that one run
 - [`prose-budget-commit`](hooks/prose-budget-commit.sh): a `git commit` whose
@@ -236,6 +239,7 @@ guard reads beyond the command, it declares:
 | `guard-unparsable` | `shfmt`, else `bash -n`, which runs nothing |
 | `guard-recursive-delete` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
+| `no-skip-hooks` | the transcript, and the approvals spent |
 | `guard-infra` | the transcript, the approvals spent |
 | `no-delete-stacked-base` | GitHub, through `gh` |
 | `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
