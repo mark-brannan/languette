@@ -27,7 +27,7 @@ def refusal(command):
     try:
         rung, _ = scan.parse(command)
     except scan.Unparseable as e:
-        return f"shfmt: {e}"
+        return str(e)
     if rung == "shfmt":
         return None
     try:
