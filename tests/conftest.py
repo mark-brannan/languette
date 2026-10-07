@@ -6,7 +6,8 @@ rung and as "shfmt" on its shfmt rung (skipped without a shfmt new enough,
 except under CI); @shell runs hooks/<guard>.sh by subprocess (under
 $AWK_PATH's awk when set). @shell_only narrows a scenario to the shell,
 @shfmt_only to the shfmt rung. The feature's name is the guard's name, except
-parse-check, which runs every guard behind run.py's parse check.
+parse-check, which has its own guard. @python_only narrows a scenario to the
+awk rung (bash -n reads instead of shfmt).
 """
 
 import json
@@ -63,6 +64,8 @@ def pytest_generate_tests(metafunc):
     engines = [e for e in ENGINES if e in marks or (e == "shfmt" and "python" in marks)]
     if "shell_only" in marks:
         engines = ["shell"]
+    if "python_only" in marks:
+        engines = ["python"]
     if "shfmt_only" in marks:
         engines = ["shfmt"]
     if engines:
@@ -200,7 +203,7 @@ def ctx(engine):
 
 
 def pytest_bdd_before_scenario(request, feature, scenario):
-    request.getfixturevalue("ctx").guard = None if feature.name == "parse-check" else feature.name
+    request.getfixturevalue("ctx").guard = feature.name
 
 
 # --- Given ---------------------------------------------------------------

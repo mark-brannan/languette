@@ -42,9 +42,10 @@ def verdict(command, guard="no-rm-tree"):
 
 @needs_shfmt
 def test_a_command_shfmt_refuses_is_denied_not_read_by_awk():
-    v = verdict("echo 'unclosed")
+    v = verdict("echo 'unclosed", guard="parse-check")
     assert v["permissionDecision"] == "deny"
-    assert "shfmt cannot parse" in v["permissionDecisionReason"]
+    assert "shfmt: 1:6" in v["permissionDecisionReason"]
+    assert verdict("echo 'unclosed") is None       # the other guards skip it
 
 
 @needs_shfmt

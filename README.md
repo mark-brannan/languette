@@ -33,7 +33,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 It needs:
 
 - `python3`, standard library only, for every `run.py` guard (`ask-first`,
-  `no-bypass-labels`, `no-rm-tree`);
+  `no-bypass-labels`, `no-rm-tree`, `parse-check`);
 - `jq` and a POSIX `awk`, for the shell guards, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
 - `gh`, for `no-delete-stacked-base`.
@@ -44,6 +44,9 @@ Without the plugin system, see [Installing by hand](#installing-by-hand).
 
 Each guard denies one class of command:
 
+- [`parse-check`](features/parse-check.feature): a Bash command the shell
+  parser refuses (`shfmt`, else `bash -n`), denied whole with its line and
+  column; the other guards skip it
 - [`no-rm-tree`](#allowing-more-for-no-rm-tree): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
 - [`no-git-footguns`](hooks/no-git-footguns.sh): `add -A`, `commit -a`,
@@ -89,7 +92,8 @@ scenarios for a command run in `~/project`, and CI fails if the table drifts:
 | `./cleanup.sh` | allow | no rule; silent (known gap) |
 <!-- /fixtures-table -->
 
-With `shfmt` 3.6 or later on `PATH`, a command that doesn't parse is a deny.
+With `shfmt` 3.6 or later on `PATH` (else `bash -n`, which says less), the
+`parse-check` guard denies a command that doesn't parse.
 In a replay of 101,671 agent commands, about 1 in 3,000 didn't parse, and
 each [would have broken](features/parse-check.feature).
 Bash runs a broken command in part, the lines before the error or prose in
@@ -227,6 +231,7 @@ guard reads beyond the command, it declares:
 | Guard | Reads |
 |---|---|
 | `no-git-footguns` | nothing: a pure function of the command |
+| `parse-check` | `shfmt`, else `bash -n`, which runs nothing |
 | `no-rm-tree` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
 | `no-delete-stacked-base` | GitHub, through `gh` |

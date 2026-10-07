@@ -1,10 +1,10 @@
 @python
 Feature: parse-check
-  languette/run.py checks a Bash command once, before any guard runs: when
-  the parser ladder's top rung refuses the command itself, the hook denies
-  with the parser's line:col message. Every guard runs, so a silent row is
-  silent to all of them. The awk rung refuses nothing, so the deny rows run
-  on the shfmt rung only.
+  A Bash command the parser refuses is denied, whole, naming shfmt's line:col
+  and what it found, and saying nothing ran. The other guards skip such a
+  command rather than deny it again. Without shfmt, `bash -n` reads the
+  command instead. The awk rung refuses nothing, so the deny rows run on the
+  shfmt rung only.
 
   Rows marked "seen" are anonymized from a replay of 101,671 commands that
   agents ran (October 2026). 32 did not parse, about 1 in 3,000, and the awk
@@ -73,3 +73,8 @@ Feature: parse-check
       body, no closing line
       """
     Then the guard denies, naming "1:5: unclosed here-document"
+
+  @python_only
+  Scenario: without shfmt, bash -n denies a command it cannot read
+    When the agent runs `echo "unclosed`
+    Then the guard denies, naming "bash -n"
