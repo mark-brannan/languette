@@ -1,6 +1,6 @@
 {
   "name": "languette",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, and commands that destroy infrastructure.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, and commands that destroy infrastructure.",
   "author": {
     "name": "Mark Brannan"
   },
@@ -61,6 +61,36 @@
       "type": "boolean",
       "title": "Block recursive rm",
       "description": "Deny recursive rm and find -delete outside scratch areas and generated directories. Leave on unless you want recursive deletes through unchecked.",
+      "default": true
+    },
+    "guard_permissions": {
+      "type": "boolean",
+      "title": "Block recursive permission changes",
+      "description": "Deny recursive chmod, chown and chgrp, chmod 777 and find -exec chmod outside scratch areas. Leave on unless you want permission sweeps through unchecked.",
+      "default": true
+    },
+    "guard_pipe_to_shell": {
+      "type": "boolean",
+      "title": "Block piping a download into a shell",
+      "description": "Deny curl, wget or fetch output piped into sh, bash, python and other interpreters, or run through eval or a process substitution. The agent saves the file, reads it, then runs it. Leave on unless you want downloads run unread.",
+      "default": true
+    },
+    "guard_disk": {
+      "type": "boolean",
+      "title": "Block disk wipes",
+      "description": "Deny dd onto a device, mkfs, wipefs and shred outside scratch areas, and a redirect or tee onto a disk. Leave on unless you want these through unchecked.",
+      "default": true
+    },
+    "guard_host_availability": {
+      "type": "boolean",
+      "title": "Block shutdowns and the fork bomb",
+      "description": "Deny shutdown, reboot, halt, poweroff and the fork-bomb shape. Leave on unless you want an agent able to take the machine down.",
+      "default": true
+    },
+    "guard_scheduled_jobs": {
+      "type": "boolean",
+      "title": "Block deleting the crontab",
+      "description": "Deny crontab -r, which deletes the whole crontab with no undo. Leave on unless you want it through unchecked.",
       "default": true
     },
     "no_delete_stacked_base": {

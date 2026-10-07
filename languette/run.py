@@ -27,7 +27,9 @@ def _out(event, fields):
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
     from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_bypass_ruleset,
-                                  guard_infra, guard_recursive_delete, guard_unparsable)
+                                  guard_disk, guard_host_availability, guard_infra, guard_permissions,
+                                  guard_pipe_to_shell, guard_recursive_delete, guard_scheduled_jobs,
+                                  guard_unparsable)
     from languette.verdict import ask, context, deny
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
@@ -37,7 +39,9 @@ except Exception as e:  # noqa: BLE001
 # (hook event, tool name pattern, guards in the order they judge).
 GUARDS = (
     ("PreToolUse", re.compile(r"Bash\Z"), (guard_unparsable, guard_recursive_delete, ask_first, guard_bypass_hooks,
-                                           guard_infra, guard_bypass_labels, guard_bypass_ruleset)),
+                                           guard_infra, guard_bypass_labels, guard_bypass_ruleset,
+                                           guard_permissions, guard_pipe_to_shell, guard_disk,
+                                           guard_host_availability, guard_scheduled_jobs)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
 )
 

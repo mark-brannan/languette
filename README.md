@@ -50,6 +50,15 @@ Each guard denies one class of command:
   column; the other guards skip it
 - [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
+- [`guard-permissions`](features/guard-permissions.feature): recursive `chmod`,
+  `chown`, `chgrp` or `chmod 777` outside agent-owned or
+  `LANGUETTE_PERM_ALLOW` directories
+- [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`
+- [`guard-disk`](features/guard-disk.feature): `dd`, `mkfs`, `wipefs`,
+  `shred` onto disks
+- [`guard-host-availability`](features/guard-host-availability.feature):
+  shutdown, reboot, fork bomb
+- [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
 - [`no-git-footguns`](hooks/no-git-footguns.sh): `add -A`, `commit -a`,
   `stash pop`, force-push, `reset --hard` and other moves that throw work away
 - [`no-delete-stacked-base`](hooks/no-delete-stacked-base.sh): deleting a
