@@ -255,6 +255,11 @@ def _terms(ctx, docstring):
     ctx.env["CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE"] = str(f)
 
 
+@given("every guard judges the command")
+def _every_guard(ctx):
+    ctx.guard = None                           # as one process for the event, not --guard <feature's guard>
+
+
 @given("the transcript holds:")
 def _transcript(ctx, docstring):
     (ctx.proj / "t.jsonl").write_text(docstring + "\n")

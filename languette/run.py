@@ -9,8 +9,19 @@ a Bash command the parser refuses is a deny (guard-unparsable; the other guards
 skip it), and a guard that raises is a deny naming the guard. No guard
 matched, or none objected, is exit 0 with no output; a deny outranks an ask.
 Standard library only.
+
+The shape: a guard is a pure function of the payload and env. A fact it can't
+read from them (a git ref, GitHub's rules for a branch, a file, the clock, the
+user's approvals) it asks for: its check is then a generator that yields a
+languette.verdict.Need and gets the answer back, and returns its finding. This
+runner answers every Need through languette.world, the only module that does
+I/O, and throws world's exception into the guard when the fact can't be had. A
+finding may carry approvals to spend; they are spent after the verdict, and
+only when it is not a deny, so a command another guard denies costs no click.
+A guard whose check returns a finding directly needs no change.
 """
 
+import inspect
 import json
 import os
 import re
@@ -31,6 +42,7 @@ try:
                                   guard_pipe_to_shell, guard_recursive_delete, guard_scheduled_jobs,
                                   guard_unparsable)
     from languette.verdict import ask, context, deny
+    from languette.world import World
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
                                          "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"}))
@@ -44,6 +56,23 @@ GUARDS = (
                                            guard_host_availability, guard_scheduled_jobs)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
 )
+
+
+def _drive(r, world):
+    """A guard's finding: `r` itself, or what generator `r` returns once every Need it
+    yields is answered."""
+    if not inspect.isgenerator(r):
+        return r
+    answer, err = None, None
+    while True:
+        try:
+            need = r.throw(err) if err else r.send(answer)
+        except StopIteration as stop:
+            return stop.value
+        try:
+            answer, err = world.answer(need), None
+        except Exception as e:  # noqa: BLE001 -- the guard decides what a missing fact means
+            answer, err = None, e
 
 
 def respond(stdin_text, env, only=None):
@@ -73,14 +102,17 @@ def respond(stdin_text, env, only=None):
             unparsed = False
         if unparsed:
             guards = [g for g in guards if g is guard_unparsable]
-    reasons, asks, notes = [], [], []
+    world = World(env, payload)
+    reasons, asks, notes, wants = [], [], [], {}
     for g in guards:
         try:
-            r = g.check(payload, env)
+            r = _drive(g.check(payload, env), world)
         except Exception as e:  # noqa: BLE001
             r = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command")
         if not r:
             continue
+        for label, n in r.get("spend", {}).items():
+            wants[label] = wants.get(label, 0) + n
         if r.get("permissionDecision") == "deny":
             reasons.append(r["permissionDecisionReason"])
         if r.get("permissionDecision") == "ask":
@@ -89,6 +121,16 @@ def respond(stdin_text, env, only=None):
             notes.append(r["additionalContext"])
     if reasons:
         return _out(event, deny("\n\n".join(reasons)))
+    if wants:
+        # A click is one run: spent only now, when no guard denied, so a denied command keeps it.
+        try:
+            spent = world.spend(wants)
+        except (OSError, ValueError) as e:
+            return _out(event, deny(f"languette: cannot record the user's approval as spent ({e}), so the "
+                                    "command is denied. Ask the user to run it themselves."))
+        if not spent:
+            return _out(event, deny("languette: another command judged at the same time spent the approval "
+                                    f"this one needs ({', '.join(sorted(wants))}). Ask the user again."))
     if asks:
         return _out(event, ask("\n\n".join(asks)))
     if notes:

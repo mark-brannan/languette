@@ -34,17 +34,15 @@ approvals; one inside a loop or xargs is denied outright, since no count of
 approvals covers it.
 """
 
-import fcntl
 import json
 import os
 import re
 
 from languette import scan as sw
-from languette.verdict import Refuse, deny
+from languette.verdict import Need, Refuse, deny, spend
 
 NAME = "ask-first"
 CONFIG = ".languette/ask-first.json"
-SPENT = ".languette-ask"            # appended to the transcript path
 
 PM = frozenset("npm pnpm yarn bun".split())
 LAUNCH = frozenset("npx bunx pnpm yarn bun".split())
@@ -63,19 +61,19 @@ def _config(payload, env):
     then $CLAUDE_PROJECT_DIR's. Raises Refuse when cwd is unusable and the
     project dir gives no answer either: unknown is not the same as none."""
     cwd = payload.get("cwd")
-    if isinstance(cwd, str) and cwd.startswith("/") and os.path.isdir(cwd):
-        d = os.path.realpath(cwd)
+    if isinstance(cwd, str) and cwd.startswith("/") and (yield Need("path", "isdir", cwd)):
+        d = yield Need("path", "realpath", cwd)
         while True:
-            if os.path.lexists(os.path.join(d, CONFIG)):
+            if (yield Need("path", "lexists", os.path.join(d, CONFIG))):
                 return os.path.join(d, CONFIG)
-            if os.path.lexists(os.path.join(d, ".git")) or os.path.dirname(d) == d:
+            if (yield Need("path", "lexists", os.path.join(d, ".git"))) or os.path.dirname(d) == d:
                 break
             d = os.path.dirname(d)
         cwd = None
     else:
         cwd = cwd or "(none)"
     proj = env.get("CLAUDE_PROJECT_DIR")
-    if proj and os.path.lexists(os.path.join(proj, CONFIG)):
+    if proj and (yield Need("path", "lexists", os.path.join(proj, CONFIG))):
         return os.path.join(proj, CONFIG)
     if cwd:
         raise Refuse(f"the payload's cwd {cwd!r} is not a directory, so the repo's list cannot be found")
@@ -90,8 +88,7 @@ def _strs(v, what):
 
 def _load(path):
     try:
-        with open(path, encoding="utf-8") as f:
-            cfg = json.load(f)
+        cfg = json.loads((yield Need("read", path)))
     except ValueError as e:
         raise Refuse(f"not JSON ({e})")
     except OSError as e:
@@ -189,82 +186,17 @@ def _matches(entry, text):
     return n, loop
 
 
-def _text(content):
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return "\n".join(_text(c.get("text") if isinstance(c, dict) else c) for c in content)
-    return ""
-
-
-def _questions(inp):
-    qs = inp.get("questions") if isinstance(inp, dict) else None
-    return [q["question"] for q in qs or () if isinstance(q, dict) and isinstance(q.get("question"), str)]
-
-
-def _said(rec, c, questions, label):
-    """Did the user answer one of `questions` with exactly `label`? Only the
-    answer side counts: the question is the agent's text and may quote the
-    label. Claude Code records the answers structured beside the result; the
-    result text, `"<question>"="<answer>"` pairs, is read only for a
-    one-question ask, where no question can embed another's pair."""
-    tur = rec.get("toolUseResult")
-    if isinstance(tur, dict) and isinstance(tur.get("answers"), dict):
-        return any(tur["answers"].get(q) == label for q in questions)
-    if len(questions) != 1:
-        return False
-    return re.search(r'(?:^|: )' + re.escape(f'"{questions[0]}"="{label}"') + r'(?:\.|$)',
-                     _text(c.get("content")), re.M) is not None
-
-
-def _approvals(transcript, label):
-    """tool_use ids of AskUserQuestion calls that the user answered with label."""
-    asks, yes = {}, []
-    with open(transcript, encoding="utf-8") as f:
-        for line in f:
-            try:
-                rec = json.loads(line)
-            except ValueError:
-                continue
-            msg = rec.get("message") if isinstance(rec, dict) else None
-            content = msg.get("content") if isinstance(msg, dict) else None
-            if not isinstance(content, list):
-                continue
-            for c in content:
-                if not isinstance(c, dict):
-                    continue
-                if c.get("type") == "tool_use" and c.get("name") == "AskUserQuestion":
-                    asks[c.get("id")] = _questions(c.get("input"))
-                elif c.get("type") == "tool_result" and c.get("tool_use_id") in asks and not c.get("is_error"):
-                    if _said(rec, c, asks[c["tool_use_id"]], label):
-                        yes.append(c["tool_use_id"])
-    return yes
-
-
-def claim(payload, wants):
-    """Spend one approval per run, atomically. `wants` is {approve_label:
-    runs}. Returns ({label: unspent tool_use ids}, spent): when every label
-    has at least its runs' worth of unspent approvals they are all recorded
-    as spent and `spent` is True; otherwise nothing is spent and the caller
-    says what is missing. Read, check and record happen under an exclusive
-    lock on the spent file, so two hooks judging at once (Claude Code runs
-    parallel Bash calls, each with its own hook process) cannot both pass on
-    one click. Raises OSError when the payload names no transcript, or the
-    transcript or the spent file cannot be read or written. Shared with
-    guard-infra: one click is one run, whichever guard asked."""
-    tp = payload.get("transcript_path")
-    if not isinstance(tp, str) or not tp:
-        raise OSError("the payload has no transcript_path")
-    yes = {label: _approvals(tp, label) for label in wants}     # the transcript only grows
-    with open(tp + SPENT, "a+", encoding="utf-8") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
-        f.seek(0)
-        spent = {x.strip() for x in f if x.strip()}
-        approved = {label: [i for i in ids if i not in spent] for label, ids in yes.items()}
-        if any(len(approved[label]) < n for label, n in wants.items()):
-            return approved, False
-        f.writelines(i + "\n" for label, n in wants.items() for i in approved[label][:n])
-        return approved, True
+def claim(wants):
+    """Ask for the user's unspent approvals; `wants` is {approve_label: runs}.
+    Use as `approved, enough = yield from claim(wants)`: approved is {label:
+    unspent tool_use ids}, enough is whether every label has its runs' worth.
+    Nothing is spent here: return spend(wants) and the runner spends them once
+    the verdict is in, atomically, under the spent file's lock (languette.world).
+    The world's OSError or ValueError, for a payload with no transcript or a
+    transcript that can't be read, is raised from here. Shared with guard-infra
+    and guard-bypass-hooks: one click is one run, whichever guard asked."""
+    approved = yield Need("approvals", tuple(wants))
+    return approved, all(len(approved[label]) >= n for label, n in wants.items())
 
 
 def check(payload, env=os.environ):
@@ -272,13 +204,13 @@ def check(payload, env=os.environ):
     if not isinstance(cmd, str) or not cmd.strip():
         return None
     try:
-        path = _config(payload, env)
+        path = yield from _config(payload, env)
     except Refuse as e:
         return deny(f"ask-first: {e}. A gate that cannot look fails closed: retry from the project directory.")
     if not path:
         return None
     try:
-        commands = _load(path)
+        commands = yield from _load(path)
     except Refuse as e:
         return deny(f"ask-first: {path} is invalid: {e}. Every Bash command is denied until it is fixed, "
                      "because the guard cannot tell which commands the repo meant to cover. Fix it with "
@@ -300,13 +232,14 @@ def check(payload, env=os.environ):
                      "parallel or watch runs an unknown number of times, and each run needs its own "
                      "approval. Run it once, on its own.")
 
+    wants = {c["approve_label"]: runs[c["id"]] for c in hits}
     try:
-        approved, spent = claim(payload, {c["approve_label"]: runs[c["id"]] for c in hits})
+        approved, enough = yield from claim(wants)
     except (OSError, ValueError) as e:
         return deny(f"ask-first: cannot read the session transcript to look for the user's approval, or "
                      f"record it as spent ({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
-    if spent:
-        return None
+    if enough:
+        return spend(wants)
     parts = []
     for c in hits:
         have = len(approved[c["approve_label"]])
