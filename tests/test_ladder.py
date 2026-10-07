@@ -89,11 +89,11 @@ def test_the_pip_rung_is_an_empty_slot(monkeypatch):
     assert scan.Scan("rm -rf x").rung == "awk"
 
 
-def feature_commands():
+def feature_commands(files=None):
     """Every command a scenario names: backticked, in a docstring, or in an
     Examples table's first column."""
     out = set()
-    for f in sorted((ROOT / "features").glob("*.feature")):
+    for f in files or sorted((ROOT / "features").glob("*.feature")):
         t = f.read_text()
         out |= set(re.findall(r"`([^`\n]+)`", t))
         for m in re.finditer(r'"""\n(.*?)\n\s*"""', t, re.S):
@@ -121,8 +121,8 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens(monkeypatch
             differ.append(c)
     # parse-check's deny rows are refused by design. Otherwise, two heredoc
     # openers quoted in prose and a GraphQL query: never run as commands.
-    by_design = (ROOT / "features/parse-check.feature").read_text()
-    refused = [c for c in refused if f"| {c} " not in by_design]
+    by_design = set(feature_commands([ROOT / "features/parse-check.feature"]))
+    refused = [c for c in refused if c not in by_design]
     assert refused == ["bash <<'EOF'", "mutation { addLabelsToLabelable(input:{labelableId:\"x\",labelIds:[\"y\"]}) "
                        "{ clientMutationId } }", "sh <<EOF"]
     assert differ == []
