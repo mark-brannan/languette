@@ -8,7 +8,9 @@ $AWK_PATH's awk when set). @shell_only narrows a scenario to the shell,
 @shfmt_only to the shfmt rung; @no_shfmt drops the shfmt rung, for a row its
 parse check denies before any guard reads it. The feature's name is the guard's name, except
 guard-unparsable, which has its own guard. @python_only narrows a scenario to the
-awk rung (bash -n reads instead of shfmt).
+awk rung (bash -n reads instead of shfmt). With LANGUETTE_SHFMT=absent, the
+host has no shfmt: the "python" engine runs the whole ladder unpinned, so the
+fall to the awk rung is the ladder's own, and the "shfmt" engine skips.
 """
 
 import json
@@ -84,6 +86,12 @@ def engine():
 def rungs(engine, monkeypatch):
     """Pin the parser ladder to the engine's one rung."""
     if engine not in IN_PROCESS:
+        return
+    if os.environ.get("LANGUETTE_SHFMT") == "absent":
+        if scan.shfmt():
+            pytest.fail(f"LANGUETTE_SHFMT=absent, but {scan.shfmt()} is on PATH")
+        if engine == "shfmt":
+            pytest.skip("LANGUETTE_SHFMT=absent")
         return
     if engine == "shfmt" and not scan.shfmt():
         if os.environ.get("CI"):

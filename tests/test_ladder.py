@@ -13,7 +13,8 @@ from languette import run, scan
 
 ROOT = Path(__file__).resolve().parent.parent
 REAL = scan.shfmt()
-needs_shfmt = pytest.mark.skipif(not REAL and not os.environ.get("CI"), reason="no shfmt new enough on PATH")
+ABSENT = os.environ.get("LANGUETTE_SHFMT") == "absent"     # the CI leg with no shfmt on the host
+needs_shfmt = pytest.mark.skipif(ABSENT or (not REAL and not os.environ.get("CI")), reason="no shfmt new enough on PATH")
 
 
 @pytest.fixture(autouse=True)
