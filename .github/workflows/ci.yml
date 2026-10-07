@@ -61,11 +61,44 @@ jobs:
           set -euo pipefail
           d=$(mktemp -d)
           ln -s "$(command -v "$IMPL")" "$d/awk"
-          AWK_PATH=$d python -m pytest -q
+          # test_smoke.py builds its own PATHs and venvs: the smoke job runs it.
+          AWK_PATH=$d python -m pytest -q --ignore=tests/test_smoke.py
           # guard-private-terms's own bash suite, under the same awk.
           AWK_PATH=$d bash hooks/guard-private-terms.test.sh
           # guard-worktrees's own bash suite (~10 s, a fixture repo with worktrees), under the same awk.
           AWK_PATH=$d bash hooks/guard-worktrees.test.sh
+
+  # The parser ladder's promise end to end: guard-unparsable's hooks.json
+  # command under PATHs holding only shfmt, only bash, only python3, or a
+  # venv's python3 with a pip parser. Red rows are strict xfails.
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Install shfmt
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q shfmt
+      - run: pip install -r requirements-dev.txt
+      - name: Smoke test under each parser
+        run: |
+          set -euo pipefail
+          # Pinned: a row flips when its rung lands, never when upstream releases.
+          v=$(mktemp -d)
+          python -m venv "$v/bashlex" && "$v/bashlex/bin/pip" install -q bashlex==0.18
+          python -m venv "$v/ts" && "$v/ts/bin/pip" install -q tree-sitter==0.26.0 tree-sitter-bash==0.25.1
+          LANGUETTE_SMOKE_BASHLEX_PY=$v/bashlex/bin/python \
+          LANGUETTE_SMOKE_TREESITTER_PY=$v/ts/bin/python \
+            python -m pytest -q -rxX tests/test_smoke.py
 
   shellcheck:
     runs-on: ubuntu-latest
@@ -86,7 +119,7 @@ jobs:
     uses: mark-brannan/.github/.github/workflows/prose-budget.yml@main
 
   ci-gate:
-    needs: [nonempty, tests, shellcheck, prose-budget]
+    needs: [nonempty, tests, smoke, shellcheck, prose-budget]
     if: always()
     permissions: {}
     uses: mark-brannan/.github/.github/workflows/ci-gate.yml@main
