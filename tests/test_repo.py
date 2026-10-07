@@ -16,7 +16,7 @@ from conftest import hooks_json_commands, hooks_json_prompt_command
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"no-git-footguns", "guard-recursive-delete", "no-delete-stacked-base", "ask-first", "guard-github-issues",
           "guard-private-terms", "prose-budget-commit", "no-checkout-home", "no-foreign-worktree",
-          "no-bypass-labels", "parse-check", "guard-infra"}
+          "guard-bypass-labels", "guard-unparsable", "guard-infra"}
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"no_checkout_home", "no_foreign_worktree"}
 # Options that are not a guard's on/off toggle: name -> type.
@@ -232,19 +232,19 @@ def test_the_guard_private_terms_matcher_leaves_other_tools_alone(tool):
     assert_that(re.fullmatch(_guard_private_terms_matcher(), tool), is_(None))
 
 
-def _no_bypass_labels_matcher():
+def _guard_bypass_labels_matcher():
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard no-bypass-labels" in h["command"] for h in e["hooks"])]
+    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard guard-bypass-labels" in h["command"] for h in e["hooks"])]
     return e["matcher"]
 
 
 # Any MCP tool may carry a labels field; the guard itself tells writes from reads.
 @pytest.mark.parametrize("tool", ["Bash", "mcp__github__update_issue", "mcp__plugin_github_github__issue_write",
                                   "mcp__gitea__edit_issue"])
-def test_the_no_bypass_labels_matcher_covers_the_tool(tool):
-    assert_that(re.fullmatch(_no_bypass_labels_matcher(), tool), is_not(None))
+def test_the_guard_bypass_labels_matcher_covers_the_tool(tool):
+    assert_that(re.fullmatch(_guard_bypass_labels_matcher(), tool), is_not(None))
 
 
 @pytest.mark.parametrize("tool", ["Read", "Write", "Edit"])
-def test_the_no_bypass_labels_matcher_leaves_other_tools_alone(tool):
-    assert_that(re.fullmatch(_no_bypass_labels_matcher(), tool), is_(None))
+def test_the_guard_bypass_labels_matcher_leaves_other_tools_alone(tool):
+    assert_that(re.fullmatch(_guard_bypass_labels_matcher(), tool), is_(None))

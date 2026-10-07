@@ -42,29 +42,29 @@ def verdict(command, guard="guard-recursive-delete"):
 
 @needs_shfmt
 def test_a_command_shfmt_refuses_is_denied_not_read_by_awk():
-    v = verdict("echo 'unclosed", guard="parse-check")
+    v = verdict("echo 'unclosed", guard="guard-unparsable")
     assert v["permissionDecision"] == "deny"
     assert "shfmt: 1:6" in v["permissionDecisionReason"]
     assert verdict("echo 'unclosed") is None       # the other guards skip it
 
 
 @needs_shfmt
-def test_with_parse_check_off_the_other_guards_read_an_unparseable_command():
+def test_with_guard_unparsable_off_the_other_guards_read_an_unparseable_command():
     command = "rm -rf / 'unclosed"
     env = {"HOME": os.environ["HOME"]}
     assert run.respond(payload(command), env, only="guard-recursive-delete") == ""
-    v = json.loads(run.respond(payload(command), {**env, "CLAUDE_PLUGIN_OPTION_PARSE_CHECK": "false"},
+    v = json.loads(run.respond(payload(command), {**env, "CLAUDE_PLUGIN_OPTION_GUARD_UNPARSABLE": "false"},
                                only="guard-recursive-delete"))["hookSpecificOutput"]
     assert v["permissionDecision"] == "deny"
 
 
 @pytest.mark.parametrize("option", [None, "false"])
-@pytest.mark.parametrize("guard", ["parse-check", "guard-recursive-delete"])
+@pytest.mark.parametrize("guard", ["guard-unparsable", "guard-recursive-delete"])
 def test_a_parser_crash_is_a_deny(monkeypatch, guard, option):
     def boom(text):
         raise RuntimeError("boom")
     monkeypatch.setattr(scan, "parse", boom)
-    env = {"HOME": os.environ["HOME"], **({"CLAUDE_PLUGIN_OPTION_PARSE_CHECK": option} if option else {})}
+    env = {"HOME": os.environ["HOME"], **({"CLAUDE_PLUGIN_OPTION_GUARD_UNPARSABLE": option} if option else {})}
     out = run.respond(payload("echo hi"), env, only=guard)
     v = json.loads(out)["hookSpecificOutput"]
     assert v["permissionDecision"] == "deny" and "crashed" in v["permissionDecisionReason"]
@@ -142,10 +142,10 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens(monkeypatch
         monkeypatch.undo()
         if s.rung != "shfmt" or (s.tokens(), s.live) != (a.tokens(), a.live):
             differ.append(c)
-    # parse-check's deny rows are refused by design, and so is a heredoc
+    # guard-unparsable's deny rows are refused by design, and so is a heredoc
     # opener alone in an Examples cell, whose body is the scenario's next
     # lines. Otherwise, a GraphQL query: never run as a command.
-    by_design = set(feature_commands([ROOT / "features/parse-check.feature"]))
+    by_design = set(feature_commands([ROOT / "features/guard-unparsable.feature"]))
     refused = [c for c in refused if c not in by_design and not re.fullmatch(r"[^\n]*<<'?EOF'?[^\n]*", c)]
     assert refused == ["mutation { addLabelsToLabelable(input:{labelableId:\"x\",labelIds:[\"y\"]}) "
                        "{ clientMutationId } }"]

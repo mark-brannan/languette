@@ -5,7 +5,7 @@ registered for its hook event and tool, print one decision.
 
 --guard restricts the run to one guard (the hooks.json wiring runs each
 Python guard alone this way). Fails closed: an unreadable payload is a deny,
-a Bash command the parser refuses is a deny (parse-check; the other guards
+a Bash command the parser refuses is a deny (guard-unparsable; the other guards
 skip it), and a guard that raises is a deny naming the guard. No guard
 matched, or none objected, is exit 0 with no output. Standard library only.
 """
@@ -25,7 +25,7 @@ def _out(event, fields):
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
-    from languette.guards import ask_first, no_bypass_labels, guard_infra, guard_recursive_delete, parse_check
+    from languette.guards import ask_first, guard_bypass_labels, guard_infra, guard_recursive_delete, guard_unparsable
     from languette.verdict import context, deny
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
@@ -34,8 +34,8 @@ except Exception as e:  # noqa: BLE001
 
 # (hook event, tool name pattern, guards in the order they judge).
 GUARDS = (
-    ("PreToolUse", re.compile(r"Bash\Z"), (parse_check, guard_recursive_delete, ask_first, guard_infra, no_bypass_labels)),
-    ("PreToolUse", re.compile(r"mcp__.+"), (no_bypass_labels,)),
+    ("PreToolUse", re.compile(r"Bash\Z"), (guard_unparsable, guard_recursive_delete, ask_first, guard_infra, guard_bypass_labels)),
+    ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
 )
 
 
@@ -56,16 +56,16 @@ def respond(stdin_text, env, only=None):
               for g in gs if only in (None, g.NAME)]
     ti = payload.get("tool_input")
     command = ti.get("command") if tool == "Bash" and isinstance(ti, dict) else None
-    if guards and isinstance(command, str) and env.get("CLAUDE_PLUGIN_OPTION_PARSE_CHECK") != "false":
-        # A command that does not parse is parse-check's to deny; the others
-        # would only read it again through a weaker parser. With parse-check
+    if guards and isinstance(command, str) and env.get("CLAUDE_PLUGIN_OPTION_GUARD_UNPARSABLE") != "false":
+        # A command that does not parse is guard-unparsable's to deny; the others
+        # would only read it again through a weaker parser. With guard-unparsable
         # off, nothing would deny it, so the others read it on the awk rung.
         try:
-            unparsed = parse_check.refusal(command)
-        except Exception:  # noqa: BLE001 -- parse-check's own run reports the crash
+            unparsed = guard_unparsable.refusal(command)
+        except Exception:  # noqa: BLE001 -- guard-unparsable's own run reports the crash
             unparsed = False
         if unparsed:
-            guards = [g for g in guards if g is parse_check]
+            guards = [g for g in guards if g is guard_unparsable]
     reasons, notes = [], []
     for g in guards:
         try:

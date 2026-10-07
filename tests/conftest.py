@@ -7,7 +7,7 @@ except under CI); @shell runs hooks/<guard>.sh by subprocess (under
 $AWK_PATH's awk when set). @shell_only narrows a scenario to the shell,
 @shfmt_only to the shfmt rung; @no_shfmt drops the shfmt rung, for a row its
 parse check denies before any guard reads it. The feature's name is the guard's name, except
-parse-check, which has its own guard. @python_only narrows a scenario to the
+guard-unparsable, which has its own guard. @python_only narrows a scenario to the
 awk rung (bash -n reads instead of shfmt).
 """
 
@@ -206,7 +206,7 @@ def ctx(engine):
 
 
 def pytest_bdd_before_scenario(request, feature, scenario):
-    request.getfixturevalue("ctx").guard = None if feature.name == "parse-check" else feature.name
+    request.getfixturevalue("ctx").guard = None if feature.name == "guard-unparsable" else feature.name
 
 
 # --- Given ---------------------------------------------------------------

@@ -43,10 +43,10 @@ interface is; this file says who decided it and why, one line each.
 
 ## Guard names: Solace, 2026-10-07
 
-- Every guard is named `guard-<concept>`, the concept being the asset or
-  scenario it guards against. The `no-` prefix and the word "footguns" are
-  retired. One guard per concept, with a setting per scenario inside it.
-- `no-rm-tree` is `guard-recursive-delete`, `no-iac-destroy` is
-  `guard-infra`, `issue-door` is `guard-github-issues` and
-  `public-issue-guard` is `guard-private-terms`. Their config keys follow,
-  with underscores. The rest are named as they are reached.
+- Every guard is named `guard-<concept>`, the asset or scenario it guards
+  against; no `no-` prefix, no "footguns". One guard per concept, a setting
+  per scenario inside it.
+- `no-rm-tree` is `guard-recursive-delete`, `no-iac-destroy`
+  `guard-infra`, `issue-door` `guard-github-issues`, `public-issue-guard`
+  `guard-private-terms`; config keys follow, with underscores. The rest are
+  renamed as reached.

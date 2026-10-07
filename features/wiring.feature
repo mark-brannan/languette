@@ -5,7 +5,7 @@ Feature: wiring
   A plain `sh missing.sh` exits 127, which Claude Code reads as a
   non-blocking error, so a missing or crashing script has to come out as a
   deny. ask-first judges only in a project that lists the command.
-  no-bypass-labels judges an MCP tool's labels field as well as Bash.
+  guard-bypass-labels judges an MCP tool's labels field as well as Bash.
 
   Background:
     Given a project directory
@@ -36,10 +36,10 @@ Feature: wiring
       | guard-github-issues             | gh issue create -t t -b b     | denies    |
       | prose-budget-commit    | git commit -m x               | denies    |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | no-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
+      | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
 
-  Scenario: the hooks.json command for no-bypass-labels judges an MCP call
-    Given the hook is the hooks.json command for "no-bypass-labels"
+  Scenario: the hooks.json command for guard-bypass-labels judges an MCP call
+    Given the hook is the hooks.json command for "guard-bypass-labels"
     When the agent calls MCP tool "mcp__github__update_issue" with input `{"owner":"o","repo":"r","issue_number":3,"labels":["churn-ok"]}`
     Then the guard denies
 
@@ -66,7 +66,7 @@ Feature: wiring
       | guard-infra         | terraform destroy             |
       | guard-github-issues             | gh issue create -t t -b b     |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
-      | no-bypass-labels       | gh pr edit 4 --add-label churn-ok |
+      | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
   # The run.py guards have no shell fallback, so with python3 absent they
@@ -83,7 +83,7 @@ Feature: wiring
       | guard-recursive-delete       | guard_recursive_delete       | rm -rf build                      |
       | ask-first        | ask_first        | npm run walk                      |
       | guard-infra   | guard_infra   | terraform destroy                 |
-      | no-bypass-labels | no_bypass_labels | gh pr edit 4 --add-label churn-ok |
+      | guard-bypass-labels | guard_bypass_labels | gh pr edit 4 --add-label churn-ok |
 
   Scenario Outline: with python3 absent from PATH, the option set to false still skips the guard
     Given the hook is the hooks.json command for "<guard>"
@@ -97,7 +97,7 @@ Feature: wiring
       | guard-recursive-delete       | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE       | rm -rf build                      |
       | ask-first        | CLAUDE_PLUGIN_OPTION_ASK_FIRST        | npm run walk                      |
       | guard-infra   | CLAUDE_PLUGIN_OPTION_GUARD_INFRA   | terraform destroy                 |
-      | no-bypass-labels | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
+      | guard-bypass-labels | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
 
   Scenario Outline: a script that crashes is a deny
     Given the hook is the hooks.json command for "<guard>"
@@ -114,7 +114,7 @@ Feature: wiring
       | guard-infra         | terraform destroy             |
       | guard-github-issues             | gh issue create -t t -b b     |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
-      | no-bypass-labels       | gh pr edit 4 --add-label churn-ok |
+      | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
   Scenario Outline: the option set to false skips the guard
@@ -132,7 +132,7 @@ Feature: wiring
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | terraform destroy             |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | gh issue create -t t -b b     |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | gh issue comment 3 -R o/r -b Wanderlust |
-      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | gh pr edit 4 --add-label churn-ok |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | git commit -m x               |
 
   # Only the exact word false skips: unset, empty or anything else runs the
@@ -193,12 +193,12 @@ Feature: wiring
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | no    | git commit -m x               | denies    |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | true  | git commit -m x               | denies    |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 1     | git commit -m x               | denies    |
-      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       |       | gh pr edit 4 --add-label churn-ok | denies  |
-      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | 0     | gh pr edit 4 --add-label churn-ok | denies  |
-      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | False | gh pr edit 4 --add-label churn-ok | denies  |
-      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | no    | gh pr edit 4 --add-label churn-ok | denies  |
-      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | true  | gh pr edit 4 --add-label churn-ok | denies  |
-      | no-bypass-labels       | CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS       | 1     | gh pr edit 4 --add-label churn-ok | denies  |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       |       | gh pr edit 4 --add-label churn-ok | denies  |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | 0     | gh pr edit 4 --add-label churn-ok | denies  |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | False | gh pr edit 4 --add-label churn-ok | denies  |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | no    | gh pr edit 4 --add-label churn-ok | denies  |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | true  | gh pr edit 4 --add-label churn-ok | denies  |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | 1     | gh pr edit 4 --add-label churn-ok | denies  |
 
   # no-checkout-home is opt-in, the reverse of the guards above: it runs only
   # when its option is exactly "true", so a misconfiguration leaves it off.

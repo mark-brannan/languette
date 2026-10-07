@@ -51,7 +51,7 @@
       "description": "Deny git branch -D and --delete --force. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
       "default": true
     },
-    "parse_check": {
+    "guard_unparsable": {
       "type": "boolean",
       "title": "Deny a command that does not parse",
       "description": "Deny a Bash command the shell parser refuses, with its line and column, before any of it runs. Turned off, the other guards read such a command through a weaker parser instead.",
@@ -105,7 +105,7 @@
       "description": "Repos whose issue and PR text is never scanned, as owner/name, comma-separated. Empty by default: every repo is scanned.",
       "required": false
     },
-    "no_bypass_labels": {
+    "guard_bypass_labels": {
       "type": "boolean",
       "title": "Keep CI-gate bypass labels for humans",
       "description": "Deny a session applying a label that waives a CI gate (bypass_labels) to an issue or PR, through gh, gh api or an MCP tool, in any repo. Leave on unless you want sessions to waive their own gates.",

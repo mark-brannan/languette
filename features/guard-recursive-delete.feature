@@ -322,7 +322,7 @@ Feature: guard-recursive-delete
       """
     Then the guard is silent
 
-  # On the shfmt rung run.py's parse check denies it first (parse-check).
+  # On the shfmt rung run.py's parse check denies it first (guard-unparsable).
   @no_shfmt
   Scenario: a heredoc that never closes is read as commands
     When the agent runs:
@@ -422,7 +422,7 @@ Feature: guard-recursive-delete
       """
     Then the guard denies, naming "rm -r examples"
 
-  # On the shfmt rung run.py's parse check denies it first (parse-check).
+  # On the shfmt rung run.py's parse check denies it first (guard-unparsable).
   @no_shfmt
   Scenario: an escaped ; before # in a kept backtick substitution does not hide the commands after it
     When the agent runs:
