@@ -156,6 +156,30 @@ def test_languette_imports_only_the_standard_library():
     assert_that(bad, empty())
 
 
+def _generators(tree):
+    return {f.name for f in tree.body if isinstance(f, ast.FunctionDef)
+            and any(isinstance(n, (ast.Yield, ast.YieldFrom)) for n in ast.walk(f))}
+
+
+def test_every_call_to_a_guard_generator_is_a_yield_from():
+    # A call without it hands the caller a generator object, truthy, in place of the
+    # answer, and nothing else fails: the ports' likeliest bug (#79).
+    files = sorted((ROOT / "languette" / "guards").glob("*.py"))
+    trees = {f.stem: ast.parse(f.read_text()) for f in files}
+    gens = {m: _generators(t) for m, t in trees.items()}
+    bad = []
+    for m, tree in trees.items():
+        mine = set(gens[m])
+        for node in tree.body:
+            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("languette.guards."):
+                mine |= {a.asname or a.name for a in node.names if a.name in gens.get(node.module.rsplit(".", 1)[1], ())}
+        wrapped = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.YieldFrom)}
+        bad += [f"{m}.py:{n.lineno}: {n.func.id}(...)" for n in ast.walk(tree)
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in mine
+                and id(n) not in wrapped]
+    assert_that(bad, empty())
+
+
 def test_the_readme_table_is_the_scenarios_table():
     # Regenerate with: python3 tests/readme_table.py
     assert_that(readme_table.in_readme(), equal_to(readme_table.table()))
