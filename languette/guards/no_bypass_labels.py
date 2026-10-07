@@ -391,7 +391,7 @@ def _bash(f, cmd, cwd, env, depth=0, alone=True):
     for a, b in top.segments():
         for j in range(a, b + 1):
             if top.k[j] == "w" and top.w[j] == "HEREDOC":
-                shell = top.shellseg or any(top.k[i] == "w" and top.w[i] in sw.SHELL for i in range(a, b + 1))
+                shell = any(top.k[i] == "w" and top.w[i] in sw.SHELL for i in range(a, b + 1))
                 if shell and k < len(bodies) and depth < DEPTH:
                     if bodies[k][1]:
                         f.unseen.append("the heredoc fed to a shell is built at run time (an unquoted delimiter and a $ or backtick)")
