@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for no-foreign-worktree.sh. Run: bash hooks/no-foreign-worktree.test.sh
+# Tests for guard-worktrees-foreign.sh. Run: bash hooks/guard-worktrees.test.sh
 # Set AWK_PATH to a directory whose `awk` is another implementation (mawk,
 # nawk, busybox) to check portability; CI runs it under Ubuntu's mawk.
 #
@@ -9,7 +9,7 @@
 # sibling worktree that exists today would rot the moment it is archived.
 set -uo pipefail
 
-HOOK="$(cd "$(dirname "$0")" && pwd)/no-foreign-worktree.sh"
+HOOK="$(cd "$(dirname "$0")" && pwd)/guard-worktrees-foreign.sh"
 [ -n "${AWK_PATH:-}" ] && PATH="$AWK_PATH:$PATH"
 
 TMP=$(mktemp -d)
@@ -225,7 +225,7 @@ sc allow 'S3 leaves and comes back to it'                "cd $NEW3" "$S3" "$CLON
 sc allow 'S3 still owns where it started'                "git -C $MINE status" "$S3" "$CLONE"
 # The record carries the .git inode: a worktree re-created at a recorded
 # path is not inherited. Simulated by corrupting the recorded inode.
-S3REC="$TMPDIR/languette-no-foreign-worktree.$S3"
+S3REC="$TMPDIR/languette-guard-worktrees.$S3"
 awk -F'\t' -v p="$NEW3" 'BEGIN { OFS = FS } $1 == p { $2 = 1 } { print }' "$S3REC" > "$S3REC.new" && mv "$S3REC.new" "$S3REC"
 sc deny  'S3 record with a stale inode is not own'       "git -C $NEW3 status" "$S3" "$CLONE"
 # A sibling that already existed is not recorded by a cd that names it.
@@ -259,7 +259,7 @@ sc deny  'S6 subagent does not inherit the parent one'   "git -C $MINE status" "
 # A record that is a symlink is ignored (a shared /tmp could plant one).
 S7=11111111-0000-4000-8000-000000000007
 printf '%s\t%s\n' "$THEIRS" "$(ls -di "$THEIRS/.git" | awk '{print $1}')" > "$TMP/planted"
-ln -s "$TMP/planted" "$TMPDIR/languette-no-foreign-worktree.$S7"
+ln -s "$TMP/planted" "$TMPDIR/languette-guard-worktrees.$S7"
 sc deny  'a symlinked record grants nothing'             "git -C $THEIRS status" "$S7" "$MINE"
 
 # --- a cd target is checked whatever its spelling (dotfiles#455) ----------
@@ -478,5 +478,5 @@ else
 fi
 rm -rf "$no_git_dir"
 
-printf '%s\n' "no-foreign-worktree: $pass passed, $fail failed"
+printf '%s\n' "guard-worktrees: $pass passed, $fail failed"
 [ "$fail" -eq 0 ] || exit 1

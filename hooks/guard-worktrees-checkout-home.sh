@@ -3,7 +3,7 @@
 # checked out in $HOME.
 #
 # Opt-in: hooks.json runs this only when the plugin option
-# `no_checkout_home` is true. For a $HOME that is itself a worktree (a yadm
+# `guard_worktrees` is true. For a $HOME that is itself a worktree (a yadm
 # or bare-repo setup), a session that checks its branch out there
 # leaves it checked out for every shell and session on the machine until
 # someone checks the old branch back out. Branch work belongs in a worktree.
@@ -25,7 +25,7 @@
 # it denies unconditionally. `checkout`'s file-restore forms (`checkout --
 # <file>`, `checkout <ref> -- <file>`) stay allowed; `-b`/`-B` counts as a
 # branch switch. `checkout .` is denied too (also caught by
-# no-git-footguns.sh): it is no pathspec-restore this guard can single out.
+# guard-git-work-loss.sh): it is no pathspec-restore this guard can single out.
 #
 # Scanning is shared with the other guards: lib-shell-words.awk (read its
 # header). Heredoc bodies are dropped; quotes are removed and escapes
@@ -56,15 +56,15 @@ json_str() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | awk 'BEGIN{ORS="\
 deny() { printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\n' "$(json_str "$1")"; exit 0; }
 # $1 is the command that hit: yadm or git, named in the worktree advice.
 deny_generic() {
-  deny "no-checkout-home: \`checkout\`/\`switch\` in \$HOME switches the branch every shell and session on this machine sees until someone checks the old branch back out. Use a worktree instead:
+  deny "guard-worktrees: \`checkout\`/\`switch\` in \$HOME switches the branch every shell and session on this machine sees until someone checks the old branch back out. Use a worktree instead:
   $1 worktree add -b <branch> <path> main
 then cd into it and work there."
 }
-command -v jq  >/dev/null 2>&1 || deny "no-checkout-home: jq is missing, so the command can't be inspected."
-command -v awk >/dev/null 2>&1 || deny "no-checkout-home: awk is missing, so the command can't be inspected."
-[ -r "$LIB" ] || deny "no-checkout-home: $LIB missing, so the command can't be inspected."
-payload=$(cat) || deny "no-checkout-home: could not read the hook payload."
-cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null) || deny "no-checkout-home: unreadable hook payload."
+command -v jq  >/dev/null 2>&1 || deny "guard-worktrees: jq is missing, so the command can't be inspected."
+command -v awk >/dev/null 2>&1 || deny "guard-worktrees: awk is missing, so the command can't be inspected."
+[ -r "$LIB" ] || deny "guard-worktrees: $LIB missing, so the command can't be inspected."
+payload=$(cat) || deny "guard-worktrees: could not read the hook payload."
+cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null) || deny "guard-worktrees: unreadable hook payload."
 [ -n "$cmd" ] || exit 0
 
 payload_cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
@@ -202,7 +202,7 @@ END {
       a = i + 1
     }
   }
-}') || deny "no-checkout-home: awk failed, cannot inspect the command"
+}') || deny "guard-worktrees: awk failed, cannot inspect the command"
 
 [ -n "$out" ] || exit 0
 nl='
@@ -232,7 +232,7 @@ B
 }
 
 judge() {
-  [ -n "$home" ] || deny "no-checkout-home: \$HOME does not resolve, so a git checkout/switch can't be checked against it."
+  [ -n "$home" ] || deny "guard-worktrees: \$HOME does not resolve, so a git checkout/switch can't be checked against it."
   bases=$cands blind=$lost
   pinned=0
   for line in $env_targets$seg; do
@@ -260,7 +260,7 @@ R
   # -C, --git-dir or --work-tree pin where the command resolves, so the
   # directories only matter when none of the latter two is present.
   [ "$pinned" = 1 ] && return 0
-  [ "$blind" = 0 ] || deny "no-checkout-home: can't tell which directory this git checkout/switch runs in (a cd, -C or session cwd that doesn't resolve), so it can't be checked against \$HOME. Use an absolute path with git -C."
+  [ "$blind" = 0 ] || deny "guard-worktrees: can't tell which directory this git checkout/switch runs in (a cd, -C or session cwd that doesn't resolve), so it can't be checked against \$HOME. Use an absolute path with git -C."
   while IFS= read -r d; do
     [ -n "$d" ] && git_targets_home "$d" && deny_generic git
   done <<D

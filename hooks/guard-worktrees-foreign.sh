@@ -71,7 +71,7 @@
 # and the session's own linked worktree was foreign, the `cd` back denied,
 # its uncommitted work stranded. So each session (and each subagent, keyed
 # on the payload's `agent_id`) keeps a record of its own linked toplevels in
-# `${TMPDIR:-/tmp}/languette-no-foreign-worktree.<session>[.<agent>]`, a
+# `${TMPDIR:-/tmp}/languette-guard-worktrees.<session>[.<agent>]`, a
 # per-session file. It is named apart from the claude plugin's own copy of
 # this hook (`claude-no-foreign-worktree.*`): the arrival a call leaves is
 # consumed exactly once, so with one shared file whichever copy ran first
@@ -111,7 +111,7 @@
 # string for a nested scan when its segment could execute it -- so a commit
 # message, an issue body or a card that names a worktree path passes.
 #
-# Scanning is shared with no-git-footguns.sh/no-checkout-home.sh/
+# Scanning is shared with guard-git-work-loss.sh/guard-worktrees-checkout-home.sh/
 # guard-recursive-delete.sh: lib-shell-words.awk (read its header).
 #
 # This is a GATE, so it fails closed: no jq, no awk, no sed, no git, no
@@ -134,7 +134,7 @@ deny() { jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",pe
 # through jq, which is what may be missing.
 # printf is a shell builtin, so this one always emits valid JSON. Keep the
 # message free of double quotes, backslashes and newlines.
-deny_literal() { printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"no-foreign-worktree: %s This is a gate and fails closed."}}\n' "$1"; exit 0; }
+deny_literal() { printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"guard-worktrees: %s This is a gate and fails closed."}}\n' "$1"; exit 0; }
 
 # recipe <dir> -- one command giving this session its own worktree of <dir>'s
 # repo under its scratchpad (own by the session-id rule, any repo, survives a
@@ -212,17 +212,17 @@ deny_path() {
   case "$claim_state" in
     live)
       who=$(printf '%s' "$claim_live" | awk -F'\t' '{ printf "session `%s` on `%s`, claimed %s ago", $2, $3, $4 }')
-      deny "no-foreign-worktree: \`$word\` is inside $ft, a git worktree this session does not own. ${who:+$who -- }another session is live in there (claim-stamp.sh); it may be archived out from under you mid-turn if you reach in (an agent once lost a worktree that way).
+      deny "guard-worktrees: \`$word\` is inside $ft, a git worktree this session does not own. ${who:+$who -- }another session is live in there (claim-stamp.sh); it may be archived out from under you mid-turn if you reach in (an agent once lost a worktree that way).
 To read that branch, stay here: \`git log/diff/show $branch\`, \`git show $branch:<path>\` -- worktrees of a repo share objects and refs.
 Report it and stop. Do not take the worktree away from them."
       ;;
     stale)
-      deny "no-foreign-worktree: \`$word\` is inside $ft, a git worktree this session does not own. claim-stamp.sh finds no live claim on \`$branch\` -- the session that held this worktree looks dead, not merely between turns.
+      deny "guard-worktrees: \`$word\` is inside $ft, a git worktree this session does not own. claim-stamp.sh finds no live claim on \`$branch\` -- the session that held this worktree looks dead, not merely between turns.
 That does not make it yours to clear: reaching in and archiving it out from under an owner who turns out to still be there is how an agent once lost a worktree. Report this to the user with the cleanup command: \`git worktree remove $ft\` (run from a worktree other than this one) -- git itself refuses if anything uncommitted is left inside, and the branch survives the removal either way, so nothing is lost if the stale read was wrong.
 To read that branch meanwhile, stay here: \`git log/diff/show $branch\`, \`git show $branch:<path>\`."
       ;;
     *)
-      deny "no-foreign-worktree: \`$word\` is inside $ft, a git worktree this session does not own. A hand-off carries a branch, an issue and a PR -- never a directory; another session may still be running in there, and it may be archived out from under you mid-turn (an agent once lost a worktree that way).
+      deny "guard-worktrees: \`$word\` is inside $ft, a git worktree this session does not own. A hand-off carries a branch, an issue and a PR -- never a directory; another session may still be running in there, and it may be archived out from under you mid-turn (an agent once lost a worktree that way).
 To read that branch, stay here: \`git log/diff/show <branch>\`, \`git show <branch>:<path>\` -- worktrees of a repo share objects and refs.
 To work on it, take your own worktree, one command, from anywhere: \`$(recipe "$ft")\`, then \`git merge --ff-only ${branch:-<branch>}\` inside it. If --ff-only fails, the histories have diverged: report that and stop.
 If you made this worktree yourself in an earlier call, that is why: a worktree is yours only when the command that creates it also \`cd\`s into it, or it lives under your scratchpad. The recipe above does both.
@@ -259,7 +259,7 @@ rec=""
 if [ -n "$session_id" ]; then
   tag=$(printf '%s' "$session_id" | tr -c 'A-Za-z0-9_-' '_')
   [ -n "$agent_id" ] && tag="$tag.$(printf '%s' "$agent_id" | tr -c 'A-Za-z0-9_-' '_')"
-  [ -n "$tag" ] && rec="${TMPDIR:-/tmp}/languette-no-foreign-worktree.$tag"
+  [ -n "$tag" ] && rec="${TMPDIR:-/tmp}/languette-guard-worktrees.$tag"
 fi
 
 # mine <file> -- a regular file owned by this user, not a symlink. Anything
@@ -341,7 +341,7 @@ case "$tool" in
       [ -n "$rec" ] && write_new "$rec.arrive" enter
       exit 0
     fi
-    deny "no-foreign-worktree: EnterWorktree(path=...) enters a worktree that already exists, with no check on whose it is -- the tool only requires that the path appear in \`git worktree list\`. That is how an agent once lost a worktree mid-turn: the session that owned it was archived and the directory went away underneath the session that had attached to it.
+    deny "guard-worktrees: EnterWorktree(path=...) enters a worktree that already exists, with no check on whose it is -- the tool only requires that the path appear in \`git worktree list\`. That is how an agent once lost a worktree mid-turn: the session that owned it was archived and the directory went away underneath the session that had attached to it.
 Take your own instead, one command, from anywhere: \`$(recipe "$p")\`, then \`git merge --ff-only <branch>\` inside it to bring the branch you are resuming into your own directory. If --ff-only fails, the histories have diverged: report that and stop.
 Nothing needs the other directory -- worktrees of a repo share objects and refs, so \`git log/diff/show <branch>\` and \`git show <branch>:<path>\` read it from here."
     ;;
@@ -381,7 +381,7 @@ resolve_dir() {
   # `nope/..` lexically and lands wherever the rest says, which the walk up
   # cannot see. Unresolvable, so denied.
   case "/$rd_rest/" in
-    */../*) deny "no-foreign-worktree: \`$raw\` has a \`..\` after a directory that does not exist, so where it lands cannot be resolved. Spell the path without \`..\`." ;;
+    */../*) deny "guard-worktrees: \`$raw\` has a \`..\` after a directory that does not exist, so where it lands cannot be resolved. Spell the path without \`..\`." ;;
   esac
   rd_dir=$(cd "$r" 2>/dev/null && pwd -P)
 }
@@ -480,7 +480,7 @@ END {
       a = i + 1
     }
   }
-}') || deny "no-foreign-worktree: awk failed, cannot inspect the command"
+}') || deny "guard-worktrees: awk failed, cannot inspect the command"
 
 [ -n "$words" ] || exit 0
 

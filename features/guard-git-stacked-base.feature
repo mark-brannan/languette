@@ -1,5 +1,5 @@
 @shell
-Feature: no-delete-stacked-base
+Feature: guard-git-stacked-base
   Deleting a remote branch an open PR uses is denied. gh and timeout are
   stubs throughout, so no scenario reaches the network: the stub lists three
   open PRs, #1 stacked on claude/base-branch (the head of #2), and #3 headed

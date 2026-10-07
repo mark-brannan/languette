@@ -50,7 +50,7 @@
 # arriving through a variable (`rm $OPTS x`), `rmdir`, `rsync --delete`,
 # deletion from inside python/node one-liners.
 #
-# Scanning is shared with no-git-footguns.sh: lib-shell-words.awk (read its
+# Scanning is shared with guard-git-work-loss.sh: lib-shell-words.awk (read its
 # header). Heredoc bodies are dropped; quotes are removed and escapes
 # applied, so `r\m`, `\rm` and 'rm' are all rm; redirections vanish; the
 # text is split on shell separators, and rm counts as the command wherever

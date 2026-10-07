@@ -18,10 +18,10 @@
 #   branch -D         throws away unmerged work; -d refuses, use that.
 #
 # Each rule has its own switch, read here from the environment: the plugin
-# options no_git_footguns_blanket_staging, _stash, _force_push, _discard and
-# _branch_delete (env CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_<NAME>). A rule is
+# options guard_git_work_loss_blanket_staging, _stash, _force_push, _discard and
+# _branch_delete (env CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_<NAME>). A rule is
 # skipped only when its option is exactly `false`. The whole-guard option
-# no_git_footguns=false is read by hooks.json and skips all five.
+# guard_git_work_loss=false is read by hooks.json and skips all five.
 #
 # `yadm` (a git wrapper for managing dotfiles) is treated as `git`.
 #
@@ -47,15 +47,15 @@ deny() {
   if command -v jq >/dev/null 2>&1; then
     jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
   else
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"no-git-footguns: jq missing, cannot inspect the command"}}\n'
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"guard-git-work-loss: jq missing, cannot inspect the command"}}\n'
   fi
   exit 0
 }
 
-command -v jq  >/dev/null 2>&1 || deny 'no-git-footguns: jq missing, cannot inspect the command'
-command -v awk >/dev/null 2>&1 || deny 'no-git-footguns: awk missing, cannot inspect the command'
-[ -r "$LIB" ] || deny "no-git-footguns: $LIB missing, cannot inspect the command"
-cmd=$(jq -r '.tool_input.command // empty' 2>/dev/null) || deny 'no-git-footguns: unreadable hook payload'
+command -v jq  >/dev/null 2>&1 || deny 'guard-git-work-loss: jq missing, cannot inspect the command'
+command -v awk >/dev/null 2>&1 || deny 'guard-git-work-loss: awk missing, cannot inspect the command'
+[ -r "$LIB" ] || deny "guard-git-work-loss: $LIB missing, cannot inspect the command"
+cmd=$(jq -r '.tool_input.command // empty' 2>/dev/null) || deny 'guard-git-work-loss: unreadable hook payload'
 [ -n "$cmd" ] || exit 0
 
 reason=$(printf '%s\n' "$cmd" | awk "$(cat "$LIB")"'
@@ -66,9 +66,9 @@ function dst(t,  i) { sub(/^\+/, "", t); i = index(t, ":"); if (i) t = substr(t,
 function ismain(t) { return t ~ /^(refs\/heads\/)?(main|master)$/ }
 function whole(t) { return t ~ /^(\.|\.\/|\.\/\*|:\/|:\/\.|\*)$/ }
 function fail(r) { print r; exit }
-# Per-rule switch: CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_<RULE> exactly "false"
+# Per-rule switch: CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_<RULE> exactly "false"
 # turns that rule off. Unset, empty or anything else leaves it on.
-function off(rule) { return ENVIRON["CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_" rule] == "false" }
+function off(rule) { return ENVIRON["CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_" rule] == "false" }
 function rule_of(s) {
   if (s == "add" || s == "commit") return "BLANKET_STAGING"
   if (s == "stash") return "STASH"
@@ -189,7 +189,7 @@ function segment(lo, hi, nested,   r_, g, i, na, sub_, a, paths, upd, op, refs, 
                "for a reversible move: `git revert`, a new branch off the good commit, `git stash`, " \
                "`git reset --soft`/`--mixed`.")
     }
-}') || deny 'no-git-footguns: awk failed, cannot inspect the command'
+}') || deny 'guard-git-work-loss: awk failed, cannot inspect the command'
 
 [ -n "$reason" ] && deny "$reason"
 exit 0

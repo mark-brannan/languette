@@ -64,8 +64,8 @@ jobs:
           AWK_PATH=$d python -m pytest -q
           # guard-private-terms's own bash suite, under the same awk.
           AWK_PATH=$d bash hooks/guard-private-terms.test.sh
-          # no-foreign-worktree's own bash suite (~10 s, a fixture repo with worktrees), under the same awk.
-          AWK_PATH=$d bash hooks/no-foreign-worktree.test.sh
+          # guard-worktrees's own bash suite (~10 s, a fixture repo with worktrees), under the same awk.
+          AWK_PATH=$d bash hooks/guard-worktrees.test.sh
 
   shellcheck:
     runs-on: ubuntu-latest

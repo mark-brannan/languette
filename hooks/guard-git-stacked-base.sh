@@ -44,7 +44,7 @@
 #   command unparseable  -> DENY. Inspection failing is not the same as
 #   (no jq/awk/library)     inspection coming back empty.
 #
-# Scanning is shared with no-git-footguns.sh/no-checkout-home.sh:
+# Scanning is shared with guard-git-work-loss.sh/guard-worktrees-checkout-home.sh:
 # lib-shell-words.awk (read its header). That is what makes the trigger
 # survive a quoted argument, an absolute-path invocation, a nested
 # `sh -c '...'`, and a trailing shell comment.
@@ -67,18 +67,18 @@ decide() {
   if command -v jq >/dev/null 2>&1; then
     jq -cn --arg d "$1" --arg r "$2" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:$d,permissionDecisionReason:$r}}'
   else
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"no-delete-stacked-base: jq is missing, so the command cannot be inspected."}}\n'
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"guard-git-stacked-base: jq is missing, so the command cannot be inspected."}}\n'
   fi
   exit 0
 }
 deny() { decide deny "$1"; }
 ask()  { decide ask  "$1"; }
 
-command -v jq  >/dev/null 2>&1 || deny "no-delete-stacked-base: jq is missing, so the command can't be inspected."
-command -v awk >/dev/null 2>&1 || deny "no-delete-stacked-base: awk is missing, so the command can't be inspected."
-[ -r "$LIB" ] || deny "no-delete-stacked-base: $LIB missing, so the command can't be inspected."
-payload=$(cat) || deny "no-delete-stacked-base: could not read the hook payload."
-cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null) || deny "no-delete-stacked-base: unreadable hook payload."
+command -v jq  >/dev/null 2>&1 || deny "guard-git-stacked-base: jq is missing, so the command can't be inspected."
+command -v awk >/dev/null 2>&1 || deny "guard-git-stacked-base: awk is missing, so the command can't be inspected."
+[ -r "$LIB" ] || deny "guard-git-stacked-base: $LIB missing, so the command can't be inspected."
+payload=$(cat) || deny "guard-git-stacked-base: could not read the hook payload."
+cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null) || deny "guard-git-stacked-base: unreadable hook payload."
 [ -n "$cmd" ] || exit 0
 
 # Cheap pre-filter: every spelling this hook cares about contains one of
@@ -180,7 +180,7 @@ END {
       a = i + 1
     }
   }
-}') || deny "no-delete-stacked-base: awk failed, cannot inspect the command"
+}') || deny "guard-git-stacked-base: awk failed, cannot inspect the command"
 
 [ -n "$branches" ] || exit 0
 
@@ -191,15 +191,15 @@ advice() {
 }
 
 if printf '%s\n' "$branches" | grep -q ' ?$'; then
-  ask "no-delete-stacked-base: this deletes a remote branch named by a variable or a glob, so the branch can't be resolved and checked for open PRs stacked on it. Confirm no open PR names it as base or head:
+  ask "guard-git-stacked-base: this deletes a remote branch named by a variable or a glob, so the branch can't be resolved and checked for open PRs stacked on it. Confirm no open PR names it as base or head:
   gh pr list --state open --json number,baseRefName,headRefName"
 fi
 if printf '%s\n' "$branches" | grep -q '^? '; then
-  ask "no-delete-stacked-base: this deletes a remote branch in a repository other than the current directory's (\`git -C\`, \`--git-dir\`, \`GIT_DIR=\`), so its open PRs can't be checked from here. Confirm none names the branch as base or head:
+  ask "guard-git-stacked-base: this deletes a remote branch in a repository other than the current directory's (\`git -C\`, \`--git-dir\`, \`GIT_DIR=\`), so its open PRs can't be checked from here. Confirm none names the branch as base or head:
   gh -R <owner>/<repo> pr list --state open --json number,baseRefName,headRefName"
 fi
 
-command -v gh >/dev/null 2>&1 || ask "no-delete-stacked-base: this deletes a remote branch, but \`gh\` is not installed, so open PRs based on it can't be checked. Deleting a branch an open PR points at closes that PR silently."
+command -v gh >/dev/null 2>&1 || ask "guard-git-stacked-base: this deletes a remote branch, but \`gh\` is not installed, so open PRs based on it can't be checked. Deleting a branch an open PR points at closes that PR silently."
 
 # Bound every gh call (see the header). GNU coreutils names it `timeout`;
 # Homebrew's coreutils installs it as `gtimeout`.
@@ -207,7 +207,7 @@ TIMEOUT=""
 for t in timeout gtimeout; do
   if command -v "$t" >/dev/null 2>&1; then TIMEOUT=$t; break; fi
 done
-[ -n "$TIMEOUT" ] || ask "no-delete-stacked-base: this deletes a remote branch, but neither \`timeout\` nor \`gtimeout\` is installed (macOS: \`brew install coreutils\`), so the open-PR list can't be read without risking a hang. Deleting a branch an open PR points at closes that PR silently. Confirm by hand first:
+[ -n "$TIMEOUT" ] || ask "guard-git-stacked-base: this deletes a remote branch, but neither \`timeout\` nor \`gtimeout\` is installed (macOS: \`brew install coreutils\`), so the open-PR list can't be read without risking a hang. Deleting a branch an open PR points at closes that PR silently. Confirm by hand first:
   gh pr list --state open --json number,baseRefName,headRefName"
 
 # Server-side filter per branch, so the answer does not depend on how many
@@ -217,7 +217,7 @@ pr_list() {  # pr_list <repo|-> <--base|--head> <branch>
   (cd "$payload_cwd" 2>/dev/null && "$TIMEOUT" 20 gh pr list --state open "$@" --json number,title,baseRefName,headRefName 2>/dev/null)
 }
 unreadable() {
-  ask "no-delete-stacked-base: this deletes remote branch \`$1\`, but the open-PR list could not be read (no auth, no network, a 20s timeout, or not a GitHub repo), so PRs stacked on it can't be checked. Confirm by hand first:
+  ask "guard-git-stacked-base: this deletes remote branch \`$1\`, but the open-PR list could not be read (no auth, no network, a 20s timeout, or not a GitHub repo), so PRs stacked on it can't be checked. Confirm by hand first:
   gh pr list --state open --json number,baseRefName,headRefName"
 }
 
@@ -230,9 +230,9 @@ while read -r repo b; do
   out=$(pr_list "$repo" --base "$b") || out=""
   [ -n "$out" ] || unreadable "$b"
   based=$(printf '%s' "$out" | jq -r --arg b "$b" '.[] | select(.baseRefName == $b) | "#\(.number) \(.title)"' 2>/dev/null) \
-    || ask "no-delete-stacked-base: deleting remote branch \`$b\`, but the open-PR list could not be parsed, so PRs stacked on it can't be checked."
+    || ask "guard-git-stacked-base: deleting remote branch \`$b\`, but the open-PR list could not be parsed, so PRs stacked on it can't be checked."
   if [ -n "$based" ]; then
-    deny "no-delete-stacked-base: \`$b\` is the base branch of open PR(s):
+    deny "guard-git-stacked-base: \`$b\` is the base branch of open PR(s):
 $based
 Deleting it closes every one of them -- GitHub does not retarget a PR whose base is deleted outside a merge, and each has to be reopened and retargeted by hand.
 
@@ -243,7 +243,7 @@ $(advice "$b")"
   [ -n "$out" ] || unreadable "$b"
   head=$(printf '%s' "$out" | jq -r --arg b "$b" '.[] | select(.headRefName == $b) | "#\(.number) \(.title)"' 2>/dev/null)
   if [ -n "$head" ]; then
-    deny "no-delete-stacked-base: \`$b\` is the head branch of open PR(s):
+    deny "guard-git-stacked-base: \`$b\` is the head branch of open PR(s):
 $head
 Deleting it closes them and throws the work away. Merge or close the PR first; \`gh pr merge --delete-branch\` deletes the branch the safe way."
   fi

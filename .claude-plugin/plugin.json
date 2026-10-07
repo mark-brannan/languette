@@ -15,40 +15,40 @@
     "pretooluse"
   ],
   "userConfig": {
-    "no_git_footguns": {
+    "guard_git_work_loss": {
       "type": "boolean",
-      "title": "Block git footguns",
+      "title": "Guard git work loss",
       "description": "Deny blanket staging (git add -A), stash pop/drop, force pushes, discarding checkouts and git branch -D. Leave on unless you want these git commands through unchecked.",
       "default": true
     },
-    "no_git_footguns_blanket_staging": {
+    "guard_git_work_loss_blanket_staging": {
       "type": "boolean",
       "title": "Block blanket staging",
-      "description": "Deny git add -A, git add . and git commit -a. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
+      "description": "Deny git add -A, git add . and git commit -a. Leave on unless you want this git command through unchecked. Has no effect while guard_git_work_loss is false.",
       "default": true
     },
-    "no_git_footguns_stash": {
+    "guard_git_work_loss_stash": {
       "type": "boolean",
       "title": "Block stash pop, drop and clear",
-      "description": "Deny git stash pop, clear and a bare drop. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
+      "description": "Deny git stash pop, clear and a bare drop. Leave on unless you want this git command through unchecked. Has no effect while guard_git_work_loss is false.",
       "default": true
     },
-    "no_git_footguns_force_push": {
+    "guard_git_work_loss_force_push": {
       "type": "boolean",
       "title": "Block force pushes",
-      "description": "Deny bare force pushes, and force pushes or deletes of main. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
+      "description": "Deny bare force pushes, and force pushes or deletes of main. Leave on unless you want this git command through unchecked. Has no effect while guard_git_work_loss is false.",
       "default": true
     },
-    "no_git_footguns_discard": {
+    "guard_git_work_loss_discard": {
       "type": "boolean",
       "title": "Block discarding uncommitted work",
-      "description": "Deny git reset --hard, git checkout . or git restore . and git clean -f. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
+      "description": "Deny git reset --hard, git checkout . or git restore . and git clean -f. Leave on unless you want this git command through unchecked. Has no effect while guard_git_work_loss is false.",
       "default": true
     },
-    "no_git_footguns_branch_delete": {
+    "guard_git_work_loss_branch_delete": {
       "type": "boolean",
       "title": "Block git branch -D",
-      "description": "Deny git branch -D and --delete --force. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
+      "description": "Deny git branch -D and --delete --force. Leave on unless you want this git command through unchecked. Has no effect while guard_git_work_loss is false.",
       "default": true
     },
     "guard_unparsable": {
@@ -93,7 +93,7 @@
       "description": "Deny crontab -r, which deletes the whole crontab with no undo. Leave on unless you want it through unchecked.",
       "default": true
     },
-    "no_delete_stacked_base": {
+    "guard_git_stacked_base": {
       "type": "boolean",
       "title": "Block deleting a stacked base branch",
       "description": "Deny deleting a remote branch that an open pull request is based on or headed from. Leave on unless you want remote branch deletions through unchecked.",
@@ -166,17 +166,23 @@
       "description": "Deny a git commit when mark-brannan/claude's prose-budget engine finds the staged diff over a repo's own budgets. A no-op where that engine isn't installed or the repo has no budgets config. Leave on unless you want staged prose through unchecked.",
       "default": true
     },
-    "no_checkout_home": {
+    "guard_worktrees": {
       "type": "boolean",
-      "title": "Block switching the branch checked out in $HOME",
-      "description": "Opt-in, off by default. Deny git or yadm checkout and switch that would change the branch checked out in your home directory, for a $HOME that is itself a worktree (yadm, a bare-repo setup). Turn on only if $HOME is a git worktree.",
+      "title": "Guard worktrees: no branch switch in $HOME, no reach into another session's worktree",
+      "description": "Opt-in, off by default. Two controls. Deny git or yadm checkout and switch that would change the branch checked out in your home directory, for a $HOME that is itself a worktree (yadm, a bare-repo setup); deny any command or file edit that reaches into a linked git worktree other than the session's own, and EnterWorktree(path=...). Turn on if $HOME is a worktree or you run several sessions against one repo.",
       "default": false
     },
-    "no_foreign_worktree": {
+    "guard_worktrees_checkout_home": {
       "type": "boolean",
-      "title": "Block reaching into another session's git worktree",
-      "description": "Opt-in, off by default. Deny any command or file edit that reaches into a linked git worktree other than the session's own, and EnterWorktree(path=...). Turn on if you run several sessions against one repo, each in its own worktree.",
-      "default": false
+      "title": "Guard worktrees: control for a branch switch in $HOME",
+      "description": "On by default; applies only when guard_worktrees is on. Set false to keep only the other control.",
+      "default": true
+    },
+    "guard_worktrees_foreign": {
+      "type": "boolean",
+      "title": "Guard worktrees: control for a reach into another session's worktree",
+      "description": "On by default; applies only when guard_worktrees is on. Set false to keep only the other control.",
+      "default": true
     }
   }
 }

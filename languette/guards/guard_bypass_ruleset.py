@@ -24,7 +24,7 @@ and master beside it: that HEAD is a local ref the agent can move, so it may
 add a branch to watch, never take one away. A `cd` the shell may undo before
 the push (in a subshell, a group or a pipeline, or followed by `||`) and a
 `popd` leave the directory unknown, so the guard asks. Not watched: pushes to
-any other branch, tags and deletions (no-git-footguns and no-delete-stacked-base
+any other branch, tags and deletions (guard-git-work-loss and guard-git-stacked-base
 judge those), remotes off github.com or behind an ssh host alias, `gh api`
 writes to a ref or a merge endpoint, an alias from the user's own gitconfig
 or `gh alias`, and `push.default=matching` (a bare `git push origin` pushing
