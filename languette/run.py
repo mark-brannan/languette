@@ -25,7 +25,8 @@ def _out(event, fields):
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
-    from languette.guards import ask_first, guard_bypass_labels, guard_infra, guard_recursive_delete, guard_unparsable
+    from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_infra,
+                                  guard_recursive_delete, guard_unparsable)
     from languette.verdict import context, deny
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
@@ -34,7 +35,8 @@ except Exception as e:  # noqa: BLE001
 
 # (hook event, tool name pattern, guards in the order they judge).
 GUARDS = (
-    ("PreToolUse", re.compile(r"Bash\Z"), (guard_unparsable, guard_recursive_delete, ask_first, guard_infra, guard_bypass_labels)),
+    ("PreToolUse", re.compile(r"Bash\Z"), (guard_unparsable, guard_recursive_delete, ask_first, guard_bypass_hooks,
+                                           guard_infra, guard_bypass_labels)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
 )
 
