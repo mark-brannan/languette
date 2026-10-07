@@ -88,3 +88,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 ### 20261007t223657z
 - A tool result the click parser does not recognise as a refusal counts as a call that ran, so its click stays spent; only a declined prompt, a hook error, the classifier or a languette guard's deny gives it back. Undo: widen the refusal pattern in languette/world.py, or treat every error other than 'Exit code N' as never ran ([#81](https://github.com/mark-brannan/languette/pull/81))
 - A payload without tool_use_id spends its click for good, as before this PR, rather than matching the call by its command in the transcript. Undo: find the call as the latest unanswered Bash tool_use whose command matches the payload's ([#81](https://github.com/mark-brannan/languette/pull/81))
+
+### 20261007t232027z
+- Smoke job pins bashlex 0.18, tree-sitter 0.26.0, tree-sitter-bash 0.25.1, the versions measured green Undo: drop the ==version pins in ci.yml's smoke job ([#73](https://github.com/mark-brannan/languette/pull/73))
