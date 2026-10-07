@@ -3,7 +3,14 @@
 # one call, never one in a loop. An issue number is an identifier things link
 # to where no agent can see, so minting or moving one is a one-way door
 # (Solace, 2026-09-30). `guard-github-issues.sh prompt` on UserPromptSubmit opens the
-# door; the next identifier write spends it.
+# door; the next identifier write that runs spends it.
+#
+# Checked before the call, spent after it: PreToolUse only asks whether the
+# door is open, and `guard-github-issues.sh post`, on PostToolUse and
+# PostToolUseFailure, spends it once the call has run. Each guard is its own
+# hook process and cannot see the others' verdicts, so a spend at PreToolUse
+# shut the door on a create another guard denied, and the retry found it
+# shut with nothing posted. A call that never ran never spends.
 #
 # Counts as an identifier write: `gh issue create|new|transfer|delete`; `gh
 # api` POST to repos/o/r/issues; a graphql createIssue, transferIssue or
@@ -25,6 +32,7 @@ LIB="$(dirname "$0")/lib-shell-words.awk"
 p=$(cat)
 deny() { jq -cn --arg r "guard-github-issues: $1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'; exit 0; }
 if ! command -v jq >/dev/null 2>&1 || ! command -v awk >/dev/null 2>&1 || [ ! -r "$LIB" ]; then
+  [ "${1:-}" = post ] && exit 0
   case $p in *[Ii]ssue*) printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"guard-github-issues: jq, awk or lib-shell-words.awk is missing, so this call could not be checked"}}' ;; esac
   exit 0
 fi
@@ -32,6 +40,9 @@ door="${TMPDIR:-/tmp}/languette-guard-github-issues.$(printf '%s' "$p" | jq -r '
 # Replace, never follow: a symlink pre-planted at the door path must not be
 # truncated through. rm drops the link itself; noclobber refuses to open one.
 [ "${1:-}" = prompt ] && { rm -f "$door"; (set -C; : > "$door") 2>/dev/null; exit 0; }
+# After the call, a deny has nothing left to refuse: an unreadable call fails
+# closed by spending the door instead.
+[ "${1:-}" = post ] && deny() { rm -f "$door"; exit 0; }
 
 loop=0
 case $(printf '%s' "$p" | jq -r '.tool_name // ""') in
@@ -114,6 +125,9 @@ case $(printf '%s' "$p" | jq -r '.tool_name // ""') in
   *) n=0 ;;
 esac
 [ "$n" -gt 0 ] || exit 0
+# The call ran (or tried to): spend the door whatever the verdict was, so a
+# failed create cannot be followed by a second in the same turn.
+[ "${1:-}" = post ] && { rm -f "$door"; exit 0; }
 [ "$n" -gt 1 ] && deny "$n issue creates, transfers or deletes in one call. One per human turn, never a batch."
 [ "$loop" = 1 ] && deny "an issue create, transfer or delete inside a loop. One per human turn, never a batch."
-rm "$door" 2>/dev/null || deny "the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or the human has not spoken since. Show the human the draft and wait for their yes."
+[ -e "$door" ] || [ -L "$door" ] || deny "the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or the human has not spoken since. Show the human the draft and wait for their yes."

@@ -462,8 +462,25 @@ def hooks_json_prompt_command():
 # --- When ----------------------------------------------------------------
 
 # Greedy to the last backtick, so a command may hold backticks of its own.
+def _ran(ctx):
+    """Claude Code fires PostToolUse only for a call that ran: when this guard
+    let it through, spend the door as the post hook would. The verdict the
+    scenario judges stays the PreToolUse one."""
+    if ctx.guard != "guard-github-issues" or ctx.hook or ctx.verdict.decision == "deny":
+        return
+    pre, ctx.arg = ctx.verdict, "post"
+    ctx.run(ctx.stdin)
+    ctx.arg, ctx.verdict = None, pre
+
+
 @when(parsers.re(r"the agent runs `(?P<command>.*)`", flags=re.S))
 def _runs(ctx, command):
+    ctx.run(ctx.payload(command))
+    _ran(ctx)
+
+
+@when(parsers.re(r"another guard denies `(?P<command>.*)`", flags=re.S))
+def _denied_elsewhere(ctx, command):
     ctx.run(ctx.payload(command))
 
 
@@ -519,6 +536,7 @@ def _open_door_via_hooks_json(ctx):
 @when(parsers.re(r'the agent calls MCP tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
 def _mcp_call(ctx, tool, inp):
     ctx.run(json.dumps({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)}))
+    _ran(ctx)
 
 
 @when(parsers.re(r'the agent calls tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))

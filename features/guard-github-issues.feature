@@ -2,7 +2,7 @@
 Feature: guard-github-issues
   One GitHub issue create, transfer or delete per human turn. The human's
   own turn is the door: it opens on UserPromptSubmit and the first identifier
-  write of that turn spends it. The door is named apart from the claude
+  write of that turn to run spends it. The door is named apart from the claude
   plugin's own copy of this hook, so the two never spend each other's.
 
   Scenario Outline: never an identifier write, door shut or not
@@ -130,6 +130,19 @@ Feature: guard-github-issues
     And the agent runs `for t in a b c; do gh issue create -t "$t" -b x; done`
     And the agent runs `gh issue create -t one -b b`
     Then the guard is silent
+
+  Scenario: a write another guard denies never ran, so it does not spend the door
+    When the human speaks, opening the door
+    And another guard denies `gh issue create --title t --body-file /nonexistent`
+    And the agent runs `gh issue create -t t -b b`
+    Then the guard is silent
+
+  Scenario: the write that ran spends the door, whatever another guard said first
+    When the human speaks, opening the door
+    And another guard denies `gh issue create --title t --body-file /nonexistent`
+    And the agent runs `gh issue create -t t -b b`
+    And the agent runs `gh issue create -t u -b c`
+    Then the guard denies
 
   Scenario: another session's turn does not open this one's door
     Given the session is "s2"
