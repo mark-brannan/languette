@@ -78,7 +78,7 @@
     "guard_bypass_hooks": {
       "type": "boolean",
       "title": "Ask before skipping git hooks",
-      "description": "Deny git commit --no-verify, git commit -n and git push --no-verify until the user approves that one run through AskUserQuestion. Leave on unless you want agents to skip the repo's hooks unasked.",
+      "description": "Deny --no-verify on git commit, push, merge, pull, rebase and am, -n on commit and am, and git -c core.hooksPath= until the user approves that one run through AskUserQuestion. Leave on unless you want agents to skip the repo's hooks unasked.",
       "default": true
     },
     "guard_infra": {

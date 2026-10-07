@@ -66,8 +66,8 @@ Each guard denies one class of command:
   applying a label that waives a CI gate, such as `churn-ok`
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
-- [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `commit --no-verify`, `commit -n` or
-  `push --no-verify`, until you approve that one run
+- [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
+  merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
 - [`guard-infra`](languette/guards/guard_infra.py): `terraform destroy`, `kubectl delete` and
   other infrastructure destroys, until you approve that one run
 - [`prose-budget-commit`](hooks/prose-budget-commit.sh): a `git commit` whose

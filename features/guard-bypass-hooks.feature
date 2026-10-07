@@ -2,10 +2,12 @@
 Feature: guard-bypass-hooks
   A git hook that blocks a commit or push is telling the agent something, and
   skipping the repo's hooks is the user's call, never the agent's. So
-  `git commit --no-verify`, `git commit -n` and `git push --no-verify` are
-  denied, and run only after the user answered an AskUserQuestion with the
-  label "Skip hooks once". One answer allows one run. On push, -n is
-  --dry-run, not a way to skip hooks, and passes. yadm counts as git. Each
+  --no-verify on commit, push, merge, pull, rebase and am, -n on commit and
+  am, and `git -c core.hooksPath=...` are denied, and run only after the user
+  answered an AskUserQuestion with the label "Skip hooks once". One answer
+  allows one run. On push -n is --dry-run, and on merge, pull and rebase it is
+  --no-stat; those pass. yadm counts as git. A git alias, and core.hooksPath
+  set by `git config`, are not seen. Each
   scenario runs in a fresh git repo with CLAUDE_PROJECT_DIR set to it and an
   empty transcript, unless it says otherwise.
 
@@ -54,6 +56,26 @@ Feature: guard-bypass-hooks
       | git add f && git commit -n -m x              | later in a chain                      |
       | cd /tmp; git push --no-verify                | later in a ; chain                    |
       | echo git push --no-verify \| sh              | echo into a shell                     |
+      | git merge --no-verify feature                | merge                                 |
+      | git merge feature --no-verify                | merge, flag last                      |
+      | git merge -m x --no-verify feature           | merge, after a message                |
+      | git pull --no-verify                         | pull merges                           |
+      | git pull --rebase origin main --no-verify    | pull, flag last                       |
+      | git rebase --no-verify main                  | rebase                                |
+      | git rebase -i --onto main --no-verify topic  | rebase, after a value option          |
+      | git am --no-verify fix.patch                 | am                                    |
+      | git am -n fix.patch                          | -n is --no-verify on am               |
+      | git am -3n fix.patch                         | -n in a cluster on am                 |
+      | git -c core.hooksPath=/dev/null commit -m x  | hooks moved away                      |
+      | git -c core.hooksPath= push                  | hooks path emptied                    |
+      | git -c CORE.HOOKSPATH=x push                 | config keys ignore case               |
+      | git -c core.hooksPath status                 | a bare key sets it to true            |
+      | git -c user.name=x -c core.hooksPath=h merge t | the second -c                       |
+      | git -C /tmp/r -c core.hooksPath=h commit -m x | after -C                             |
+      | git --config-env=core.hooksPath=HP commit -m x | --config-env, attached              |
+      | git --config-env core.hooksPath=HP push      | --config-env, separate                |
+      | yadm -c core.hooksPath=x commit -m x         | yadm is git                           |
+      | sh -c 'git -c core.hooksPath=/dev/null push' | sh -c nests                           |
 
   Scenario Outline: other git commands, and text that merely names the flag, are not skipping hooks
     When the agent runs `<command>`
@@ -82,6 +104,18 @@ Feature: guard-bypass-hooks
       | cat hooks/pre-push                                  | cat reads a hook                    |
       | sh -c 'git commit -m "no --no-verify here"'         | a message inside sh -c              |
       | npm run lint --no-verify                            | not git                             |
+      | git merge -n feature                                | -n is --no-stat on merge            |
+      | git pull -n                                         | -n is --no-stat on pull             |
+      | git rebase -n main                                  | -n is --no-stat on rebase           |
+      | git merge --no-verify-signatures feature            | a different flag                    |
+      | git merge -m --no-verify feature                    | a message that is the flag          |
+      | git rebase --exec --no-verify main                  | the --exec value                    |
+      | git cherry-pick -n abc123                           | -n is --no-commit                   |
+      | git -c core.editor=vim commit -m x                  | another config key                  |
+      | git -c core.hooksPathology=1 commit -m x            | a longer key                        |
+      | git --config-env=core.editor=ED commit -m x         | --config-env, another key           |
+      | git commit -m "git -c core.hooksPath=x push"        | a message that names it             |
+      | echo -c core.hooksPath=x                            | not git                             |
 
   Scenario: a heredoc commit message that names the flag is text
     When the agent runs:
