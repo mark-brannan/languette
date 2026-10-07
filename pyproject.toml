@@ -7,5 +7,6 @@ markers = [
   "shell: run the scenario against hooks/<guard>.sh",
   "shell_only: run the scenario against the shell engine only",
   "shfmt_only: run the scenario against the shfmt rung only",
+  "no_shfmt: run the scenario on every engine but the shfmt rung, whose parse check denies it first",
   "table: the scenario's examples are the README's table",
 ]

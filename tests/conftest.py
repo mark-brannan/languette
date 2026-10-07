@@ -5,7 +5,8 @@ languette/ in-process twice, as the "python" engine on the parser ladder's awk
 rung and as "shfmt" on its shfmt rung (skipped without a shfmt new enough,
 except under CI); @shell runs hooks/<guard>.sh by subprocess (under
 $AWK_PATH's awk when set). @shell_only narrows a scenario to the shell,
-@shfmt_only to the shfmt rung. The feature's name is the guard's name, except
+@shfmt_only to the shfmt rung; @no_shfmt drops the shfmt rung, for a row its
+parse check denies before any guard reads it. The feature's name is the guard's name, except
 parse-check, which runs every guard behind run.py's parse check.
 """
 
@@ -65,6 +66,8 @@ def pytest_generate_tests(metafunc):
         engines = ["shell"]
     if "shfmt_only" in marks:
         engines = ["shfmt"]
+    if "no_shfmt" in marks:
+        engines = [e for e in engines if e != "shfmt"]
     if engines:
         metafunc.parametrize("engine", engines)
 

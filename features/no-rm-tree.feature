@@ -322,6 +322,8 @@ Feature: no-rm-tree
       """
     Then the guard is silent
 
+  # On the shfmt rung run.py's parse check denies it first (parse-check).
+  @no_shfmt
   Scenario: a heredoc that never closes is read as commands
     When the agent runs:
       """
@@ -420,6 +422,8 @@ Feature: no-rm-tree
       """
     Then the guard denies, naming "rm -r examples"
 
+  # On the shfmt rung run.py's parse check denies it first (parse-check).
+  @no_shfmt
   Scenario: an escaped ; before # in a kept backtick substitution does not hide the commands after it
     When the agent runs:
       """
