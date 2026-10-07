@@ -518,8 +518,9 @@ def texts_of(text, prose=PROSE):
     skipped only when it is led by a prose consumer, holds no executor, and no
     segment of its text is a shell. A command substitution inside double
     quotes runs whoever leads the segment, so its body is queued alone,
-    heredocs stripped, even where the words around it are prose. `prose` widens the consumer set for a
-    guard whose command names also appear as arguments (pkill -f). Capped so a pathological command cannot spin."""
+    heredocs stripped, even where the words around it are prose. `prose`
+    widens the consumer set for a guard whose command names also appear as
+    arguments (pkill -f). Capped so a pathological command cannot spin."""
     out = [(text, False)]
     x = 0
     while x < len(out) and len(out) < NESTED_CAP:
