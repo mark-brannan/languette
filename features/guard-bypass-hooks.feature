@@ -1,5 +1,5 @@
 @python
-Feature: no-skip-hooks
+Feature: guard-bypass-hooks
   A git hook that blocks a commit or push is telling the agent something, and
   skipping the repo's hooks is the user's call, never the agent's. So
   `git commit --no-verify`, `git commit -n` and `git push --no-verify` are

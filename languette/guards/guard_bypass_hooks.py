@@ -1,4 +1,4 @@
-"""no-skip-hooks: `git commit --no-verify`, `git commit -n` and `git push
+"""guard-bypass-hooks: `git commit --no-verify`, `git commit -n` and `git push
 --no-verify` run only after the user said yes to that one run, through
 AskUserQuestion; with no approval they are denied.
 
@@ -23,7 +23,7 @@ from languette import scan as sw
 from languette.guards.ask_first import LOOP, claim
 from languette.verdict import deny
 
-NAME = "no-skip-hooks"
+NAME = "guard-bypass-hooks"
 APPROVE_LABEL = "Skip hooks once"
 
 GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
