@@ -5,8 +5,9 @@ registered for its hook event and tool, print one decision.
 
 --guard restricts the run to one guard (the hooks.json wiring runs each
 Python guard alone this way). Fails closed: an unreadable payload is a deny,
-and a guard that raises is a deny naming the guard. No guard matched, or none
-objected, is exit 0 with no output. Standard library only.
+a Bash command the parser refuses is a deny (languette/scan.py, the parser
+ladder), and a guard that raises is a deny naming the guard. No guard
+matched, or none objected, is exit 0 with no output. Standard library only.
 """
 
 import json
@@ -24,6 +25,7 @@ def _out(event, fields):
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
+    from languette import scan
     from languette.guards import ask_first, no_bypass_labels, no_iac_destroy, no_rm_tree
     from languette.verdict import context, deny
 except Exception as e:  # noqa: BLE001
@@ -53,6 +55,16 @@ def respond(stdin_text, env, only=None):
     tool = payload.get("tool_name")
     guards = [g for ev, rx, gs in GUARDS if ev == event and isinstance(tool, str) and rx.match(tool)
               for g in gs if only in (None, g.NAME)]
+    ti = payload.get("tool_input")
+    command = ti.get("command") if tool == "Bash" and isinstance(ti, dict) else None
+    if guards and isinstance(command, str):
+        try:
+            scan.check(command)
+        except scan.Unparseable as e:
+            return _out(event, deny(f"languette: shfmt cannot parse this command ({e}). "
+                                    "Bad input is a deny; fix the syntax and run it again"))
+        except Exception as e:  # noqa: BLE001
+            return _out(event, deny(f"languette: the parser crashed ({type(e).__name__}: {e})"))
     reasons, notes = [], []
     for g in guards:
         try:

@@ -387,11 +387,15 @@ def _bash(f, cmd, cwd, env, depth=0, alone=True):
                 _gh(f, s, g, b, ctx)
     # A heredoc fed to a shell (`sh <<EOF`, `cat <<EOF | sh`) is a command of
     # its own; fed to anything else it is text.
+    # Its pipeline is its own segment and every segment piped on from it.
     top, k = scans[0][0], 0
     for a, b in top.segments():
+        e = b
+        while e + 1 in top.pipes:
+            e = next(y for x, y in top.segments() if x == e + 2)
         for j in range(a, b + 1):
             if top.k[j] == "w" and top.w[j] == "HEREDOC":
-                shell = top.shellseg or any(top.k[i] == "w" and top.w[i] in sw.SHELL for i in range(a, b + 1))
+                shell = any(top.k[i] == "w" and top.w[i] in sw.SHELL for i in range(a, e + 1))
                 if shell and k < len(bodies) and depth < DEPTH:
                     if bodies[k][1]:
                         f.unseen.append("the heredoc fed to a shell is built at run time (an unquoted delimiter and a $ or backtick)")

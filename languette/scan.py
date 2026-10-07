@@ -7,9 +7,19 @@ Indices are 0-based. A Scan holds parallel lists: w (word text), k ("w", "q"
 or ";"), q (raw text of a quoted word holding whitespace, else ""), live (the
 word carried a $ or backtick the shell would act on), and shellseg (some
 segment is led by a shell, so `echo ... | sh` is executed text).
+
+The parser ladder (docs/decisions.md, "Parser ladder") picks who reads the
+text: a user-installed shfmt when it is on PATH and new enough, then a pip
+parser (a slot, unruled: #4), then the awk port below. A real parser decides
+where words and quotes begin and end; the awk lexer still shapes each piece,
+so the tokens are the same contract whichever rung read them.
 """
 
+import functools
+import json
 import re
+import shutil
+import subprocess
 
 _DPART = r"""'[^'\n]*'|"[^"\n]*"|\\."""
 _OPENER = re.compile(r"(?<!<)<<-?[ \t]*(?:[A-Za-z_]|" + _DPART + r")(?:[A-Za-z0-9_]|" + _DPART + r")*")
@@ -116,6 +126,98 @@ def heredoc_subs(s):
         i += 1
     return out
 
+# --- the parser ladder ---------------------------------------------------
+
+# 3.6.0 has `--to-json` in the shape mvdan/sh#900 gave it; Ubuntu jammy's
+# 3.4.3 has only `-tojson`, in the older shape.
+SHFMT_MIN = (3, 6, 0)
+SHFMT_TIMEOUT = 2                              # seconds; a parse measures ~6 ms
+RUNGS = ("shfmt", "pip", "awk")                # tests narrow this to one rung
+
+
+class Unparseable(Exception):
+    """The parser read the command and refused it. Bad input is a deny, never a
+    reason to try a weaker parser."""
+
+
+@functools.lru_cache(maxsize=1)
+def shfmt():
+    """Path of a usable shfmt, or None: missing, too old, or no version."""
+    path = shutil.which("shfmt")
+    if not path:
+        return None
+    try:
+        r = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=SHFMT_TIMEOUT)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.search(r"(\d+)\.(\d+)\.(\d+)", r.stdout)
+    return path if r.returncode == 0 and m and tuple(map(int, m.groups())) >= SHFMT_MIN else None
+
+
+@functools.lru_cache(maxsize=256)
+def _shfmt_tree(text):
+    """shfmt's AST of `text`, or None when shfmt is missing or crashed. Raises
+    Unparseable when shfmt reports a syntax error (exit 1, "line:col: why")."""
+    path = shfmt()
+    if not path:
+        return None
+    try:
+        r = subprocess.run([path, "--to-json", "-ln=bash"], input=text.encode("utf-8", "surrogatepass"),
+                           capture_output=True, timeout=SHFMT_TIMEOUT)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    err = r.stderr.decode("utf-8", "replace").strip()
+    if r.returncode == 1 and re.match(r"(?:<standard input>:)?\d+:\d+: ", err):
+        raise Unparseable(err.splitlines()[0])
+    if r.returncode:
+        return None
+    try:
+        tree = json.loads(r.stdout)
+    except ValueError:
+        return None
+    return tree if isinstance(tree, dict) and tree.get("Type") == "File" else None
+
+
+_pip_tree = None                               # rung two: a pip-installed parser, unruled (#4)
+
+
+def parse(text):
+    """(rung, tree) from the first rung on hand; the awk rung's tree is None.
+    Raises Unparseable when a parser refuses the text."""
+    for rung in RUNGS:
+        if rung == "awk":
+            return rung, None
+        read = {"shfmt": _shfmt_tree, "pip": _pip_tree}[rung]
+        tree = read(text) if read else None
+        if tree is not None:
+            return rung, tree
+    raise RuntimeError(f"no parser rung read the text (rungs: {', '.join(RUNGS)})")
+
+
+def check(command):
+    """Raise Unparseable when the top rung refuses the command itself."""
+    parse(command)
+
+
+def _off(node, key="Pos"):
+    return node[key]["Offset"]
+
+
+def _words(node, out):
+    """Every Word under node, not descending into one: shfmt's typed JSON
+    writes no Type on a Word, since its field is never an interface. A
+    heredoc body is left to the awk lexer, as the awk rung reads it."""
+    if isinstance(node, dict):
+        if "Parts" in node and node.get("Type", "Word") == "Word":
+            out.append(node)
+            return
+        for key, v in node.items():
+            if key != "Hdoc":
+                _words(v, out)
+    elif isinstance(node, list):
+        for v in node:
+            _words(v, out)
+
 
 def _heredocs(b):
     """(stripped, [(body, quoted)]) -- the awk's sw_heredocs walk. Every opener
@@ -181,12 +283,82 @@ def heredocs(b):
 
 class Scan:
     def __init__(self, text):
-        self.w, self.k, self.q, self.live = [], [], [], []
-        self._cur, self._have, self._quoted, self._skip, self._livecur = "", False, False, False, False
-        self._run(text)
+        """Read by the first rung on hand. The command itself is checked once,
+        by check(); a text that only might be shell -- a nested string, the
+        text with heredocs stripped -- falls to the awk rung when shfmt
+        refuses it or its tree cannot be mapped."""
+        try:
+            self.rung, tree = parse(text)
+        except Unparseable:
+            self.rung, tree = "awk", None
+        self._reset()
+        if tree is not None:
+            try:
+                src = text.encode("utf-8", "surrogatepass")
+                self._region(src, tree, 0, len(src))
+                self._emit()
+            except Exception:  # noqa: BLE001 -- a mapping bug is a crashed rung
+                self.rung, tree = "awk", None
+                self._reset()
+        if tree is None:
+            self._lex(text)
+            self._emit()
         del self._cur, self._have, self._quoted, self._skip, self._livecur
         self.shellseg = any(c is not None and self.w[c] in SHELL
                             for a, b in self.segments() for c in [seg_cmd(self, a, b)])
+
+    def _reset(self):
+        self.w, self.k, self.q, self.live = [], [], [], []
+        self.pipes = set()                 # the separators that are a | or |&
+        self._cur, self._have, self._quoted, self._skip, self._livecur = "", False, False, False, False
+
+    def _region(self, src, node, a, b):
+        """Bytes a..b of src, whose Words are node's: each Word through its
+        parts, the text between them through the awk lexer."""
+        ws = []
+        _words(node, ws)
+        at = a
+        for w in sorted(ws, key=_off):
+            s, e = _off(w), _off(w, "End")
+            if s < at or e > b:
+                raise ValueError(f"word at {s}..{e} outside {at}..{b}")
+            self._lex(src[at:s].decode("utf-8", "surrogatepass"))
+            self._word(src, w)
+            at = e
+        self._lex(src[at:b].decode("utf-8", "surrogatepass"))
+
+    def _word(self, src, w):
+        dec = lambda a, b: src[a:b].decode("utf-8", "surrogatepass")
+        at = _off(w)
+        for p in w["Parts"]:
+            s, e, t = _off(p), _off(p, "End"), p.get("Type")
+            self._lex(dec(at, s))
+            if t == "Lit":
+                self._lex(dec(s, e))
+            elif t in ("SglQuoted", "DblQuoted"):
+                if p.get("Dollar"):                # $'...' and $"..."
+                    self._cur += "$"; self._livecur = True; s += 1
+                self._quoted = self._have = True
+                if t == "SglQuoted":
+                    self._cur += dec(s + 1, e - 1)
+                else:
+                    self._dq(dec(s + 1, e - 1))
+            else:                                  # $(...), ${...}, $((...)) and the rest
+                self._region(src, p, s, e)
+            at = e
+        self._lex(dec(at, _off(w, "End")))
+
+    def _dq(self, body):
+        r"""A double-quoted body: \" \\ \$ \` escape; the rest literal."""
+        i = 0
+        while i < len(body):
+            d = body[i]
+            if d == "\\" and body[i + 1:i + 2] in ('"', "\\", "$", "`"):
+                i += 1; d = body[i]
+            elif d in ("$", "`"):
+                self._livecur = True
+            self._cur += d
+            i += 1
 
     def __len__(self):
         return len(self.w)
@@ -225,7 +397,8 @@ class Scan:
             return
         self.w.append(";"); self.k.append(";"); self.q.append(""); self.live.append(False)
 
-    def _run(self, b):
+    def _lex(self, b):
+        """The awk lexer over b, carrying the word in progress across calls."""
         L = len(b)
         at = lambda j: b[j] if j < L else ""
         i = 0
@@ -247,20 +420,13 @@ class Scan:
                 self._cur += b[i + 1:e]
                 i = e + 1
                 continue
-            if c == '"':                           # \" \\ \$ \` escape; the rest literal
+            if c == '"':                           # to the next unescaped "
                 self._quoted = self._have = True
-                i += 1
-                while i < L:
-                    d = b[i]
-                    if d == '"':
-                        break
-                    if d == "\\" and at(i + 1) in ('"', "\\", "$", "`"):
-                        i += 1; d = b[i]
-                    elif d in ("$", "`"):
-                        self._livecur = True
-                    self._cur += d
-                    i += 1
-                i += 1
+                e = i + 1
+                while e < L and b[e] != '"':
+                    e += 2 if b[e] == "\\" and at(e + 1) in ('"', "\\", "$", "`") else 1
+                self._dq(b[i + 1:e])
+                i = e + 1
                 continue
             if c == "#" and not self._have:        # comment to end of line
                 e = b.find("\n", i)
@@ -292,8 +458,11 @@ class Scan:
                 continue
             if c in (";", "|", "&", "\n", "(", ")", "`"):
                 self._emit(); self._sep()
+                o = i
                 while at(i + 1) in (";", "|", "&"):
                     i += 1
+                if b[o:i + 1] in ("|", "|&") and self.w:
+                    self.pipes.add(len(self.w) - 1)
                 i += 1
                 continue
             if c in ("{", "}") and not self._have:
@@ -303,7 +472,6 @@ class Scan:
                 self._livecur = True
             self._cur += c; self._have = True
             i += 1
-        self._emit()
 
 
 def seg_cmd(s, a, b):
