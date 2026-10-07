@@ -16,6 +16,7 @@ under CI.
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -79,7 +80,7 @@ def make_path(tmp_path, tools, python):
     d = tmp_path / "bin"
     d.mkdir()
     wrapper = d / "python3"
-    wrapper.write_text(f'#!/bin/sh\nexec "{python}" "$@"\n')
+    wrapper.write_text(f'#!/bin/sh\nexec {shlex.quote(str(python))} "$@"\n')
     wrapper.chmod(0o755)
     for t in tools:
         src = scan.shfmt() if t == "shfmt" else shutil.which(t)
