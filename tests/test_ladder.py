@@ -49,6 +49,16 @@ def test_a_command_shfmt_refuses_is_denied_not_read_by_awk():
 
 
 @needs_shfmt
+def test_with_parse_check_off_the_other_guards_read_an_unparseable_command():
+    command = "rm -rf / 'unclosed"
+    env = {"HOME": os.environ["HOME"]}
+    assert run.respond(payload(command), env, only="no-rm-tree") == ""
+    v = json.loads(run.respond(payload(command), {**env, "CLAUDE_PLUGIN_OPTION_PARSE_CHECK": "false"},
+                               only="no-rm-tree"))["hookSpecificOutput"]
+    assert v["permissionDecision"] == "deny"
+
+
+@needs_shfmt
 def test_nested_text_shfmt_refuses_is_read_by_awk():
     # The quoted string may be Python, not shell: no deny for that.
     assert verdict('python3 -c "print(1)"') is None

@@ -56,9 +56,10 @@ def respond(stdin_text, env, only=None):
               for g in gs if only in (None, g.NAME)]
     ti = payload.get("tool_input")
     command = ti.get("command") if tool == "Bash" and isinstance(ti, dict) else None
-    if guards and isinstance(command, str):
+    if guards and isinstance(command, str) and env.get("CLAUDE_PLUGIN_OPTION_PARSE_CHECK") != "false":
         # A command that does not parse is parse-check's to deny; the others
-        # would only read it again through a weaker parser.
+        # would only read it again through a weaker parser. With parse-check
+        # off, nothing would deny it, so the others read it on the awk rung.
         try:
             unparsed = parse_check.refusal(command)
         except Exception:  # noqa: BLE001 -- parse-check's own run reports the crash
