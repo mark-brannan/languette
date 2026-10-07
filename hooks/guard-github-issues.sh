@@ -138,16 +138,22 @@ esac
 shut="the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or the human has not spoken since. Show the human the draft and wait for their yes."
 id=$(printf '%s' "$p" | jq -r '.tool_use_id // ""' | tr -cd 'A-Za-z0-9_-')
 # claim <file>: rename it to a name of this process's own (atomic: one
-# racer wins), stamp this call's id in it, and make it the claim.
-claim() { mine="$door.claim.$$"; mv "$1" "$mine" 2>/dev/null || return 1; printf '%s' "$id" > "$mine"; mv "$mine" "$held"; }
+# racer wins), then drop what was won and stamp this call's id in a file
+# made fresh: never opened through an existing path, so a link planted at
+# the door or the claim is removed, not written through.
+claim() {
+  mine="$door.claim.$$"; mv "$1" "$mine" 2>/dev/null || return 1
+  rm -f "$mine" "$held"; (set -C; printf '%s' "$id" > "$mine") 2>/dev/null && mv "$mine" "$held"
+}
 if [ -e "$door" ] || [ -L "$door" ]; then
   claim "$door" || deny "an issue create, transfer or delete is already in flight this turn. $shut"
 elif [ -f "$held" ]; then
-  # The claimant ran if it was spent; still holding with a result in the
-  # transcript means it never ran. No result yet: in flight, or unknowable.
+  # The claimant ran if it was spent; still holding with an error result in
+  # the transcript means it was refused and never ran. No result yet: in
+  # flight. A result that is not an error ran, whatever its post hook did.
   was=$(cat "$held" 2>/dev/null)
   t=$(printf '%s' "$p" | jq -r '.transcript_path // ""')
-  [ -n "$was" ] && [ -r "$t" ] && grep -Eq "\"tool_use_id\": ?\"$was\"" "$t" || deny "$shut"
+  [ -n "$was" ] && [ -r "$t" ] && grep -E "\"tool_use_id\": ?\"$was\"" "$t" | grep -Eq '"is_error": ?true' || deny "$shut"
   claim "$held" || deny "$shut"
 else
   deny "$shut"

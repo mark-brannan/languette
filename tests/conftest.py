@@ -494,6 +494,16 @@ def _denied_elsewhere(ctx, command):
     _record_result(ctx, "guard-private-terms: denied")
 
 
+@when("that call ran, but its post hook never did")
+def _ran_unspent(ctx):
+    _record_result(ctx, "https://github.com/o/r/issues/9", is_error=False)
+
+
+@then(parsers.parse('"{target}" still holds "{content}"'))
+def _still_holds(ctx, target, content):
+    assert Path(ctx.expand(target)).read_text() == content
+
+
 @when(parsers.re(r"the agent starts `(?P<command>.*)`", flags=re.S))
 def _starts(ctx, command):
     # PreToolUse ran and the call is still running: no result, no PostToolUse.
@@ -515,10 +525,10 @@ def _rerun(ctx):
     ctx.run(json.dumps(p))
 
 
-def _record_result(ctx, content, **extra):
+def _record_result(ctx, content, is_error=True, **extra):
     call = json.loads(ctx.stdin)["tool_use_id"]
     rec = {"type": "user", "message": {"role": "user", "content": [
-        {"type": "tool_result", "tool_use_id": call, "content": content, "is_error": True}]}, **extra}
+        {"type": "tool_result", "tool_use_id": call, "content": content, "is_error": is_error}]}, **extra}
     with (ctx.proj / "t.jsonl").open("a") as f:
         f.write(json.dumps(rec) + "\n")
 

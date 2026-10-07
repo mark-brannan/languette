@@ -150,6 +150,19 @@ Feature: guard-github-issues
     And the agent runs `gh issue create -t u -b c`
     Then the guard denies
 
+  Scenario: a write that ran keeps the door spent even if its post hook never did
+    When the human speaks, opening the door
+    And the agent starts `gh issue create -t t -b b`
+    And that call ran, but its post hook never did
+    And the agent runs `gh issue create -t u -b c`
+    Then the guard denies
+
+  Scenario: a claim planted as a link is removed, not written through
+    Given the door file is a symlink to "{TMP}/victim"
+    When the agent runs `gh issue create -t t -b b`
+    Then the guard is silent
+    And "{TMP}/victim" still holds "keep"
+
   Scenario: another session's turn does not open this one's door
     Given the session is "s2"
     When the human speaks, opening the door
