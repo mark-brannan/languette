@@ -4,9 +4,25 @@
 # hook's own select is what is under test). #1 is stacked on
 # claude/base-branch, the head of #2; claude/lonely heads #3 and bases nothing.
 # GH_FAIL makes it fail; GH_TAB puts a tab in a title, which the decision
-# JSON must survive.
+# JSON must survive. For `api .../rules/branches/<b>` it answers GH_RULES: a
+# pull_request rule when unset, "none" an empty list, "upgrade" the 403 a
+# free private repo gets. For `api .../protection`, GH_PROTECTION "reviews"
+# is protection with required reviews; unset is 404 "Branch not protected".
 printf '%s\n' "$*" >> "${LANGUETTE_STUB_LOG:?}/gh"
 [ -n "${GH_FAIL:-}" ] && exit 1
+upgrade='{"message":"Upgrade to GitHub Pro or make this repository public to enable this feature.","status":"403"}'
+case "$*" in
+  api*/rules/branches/*)
+    case "${GH_RULES:-pr}" in
+      none) echo '[]' ;;
+      upgrade) echo "$upgrade"; exit 1 ;;
+      *) echo '[{"type":"deletion"},{"type":"pull_request","parameters":{}}]' ;;
+    esac
+    exit 0 ;;
+  api*/protection)
+    [ "${GH_PROTECTION:-}" = reviews ] && { echo '{"required_pull_request_reviews":{"required_approving_review_count":1}}'; exit 0; }
+    echo '{"message":"Branch not protected","status":"404"}'; exit 1 ;;
+esac
 t="stacked change"; [ -n "${GH_TAB:-}" ] && t="stacked\\tchange"
 cat <<JSON
 [

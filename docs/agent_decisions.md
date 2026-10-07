@@ -35,6 +35,17 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - MCP read-tool detection stays a denylist of write words after the read verb, widened (modify, change, tag, attach, delete, ...), rather than an allowlist of read-tool names Undo: an allowlist of whole read-tool names instead ([#41](https://github.com/mark-brannan/languette/pull/41))
 - true, : and cd may share a call with a file-reading gh even with a redirect, since they can only truncate the file; pushd and popd may not, since they print the stack Undo: refuse any redirect in the call instead ([#41](https://github.com/mark-brannan/languette/pull/41))
 
+### 20261007t041411z
+- no-ruleset-bypass denies a push to a PR-only default branch rather than asking; the user's bypass stays in their own terminal Undo: deny( -> ask( in _judge ([#64](https://github.com/mark-brannan/languette/pull/64))
+- no-ruleset-bypass also denies gh pr merge --admin, the same bypass through another door Undo: drop _admin_merge ([#64](https://github.com/mark-brannan/languette/pull/64))
+- no-ruleset-bypass asks GitHub only for the remote's default branch, so feature pushes stay offline Undo: hits = dsts in _judge ([#64](https://github.com/mark-brannan/languette/pull/64))
+- no-ruleset-bypass reads GitHub's 403 'upgrade to Pro' as no rules, so free private repos push freely Undo: drop the upgrade branch in _requires_pr ([#64](https://github.com/mark-brannan/languette/pull/64))
+### 20261004t192604z
+- no-iac-destroy is one toggle (no_iac_destroy) covering the destroys and the unattended applies (apply -auto-approve, pulumi up --yes, cdk deploy --require-approval never) alike Undo: split the three apply rules behind their own option in hooks.json and plugin.json ([#54](https://github.com/mark-brannan/languette/pull/54))
+
+### 20261007t063804z
+- no-ruleset-bypass watches main and master beside the remote's HEAD, since that HEAD is a local ref the agent can move Undo: defaults = [the remote HEAD's branch] alone in _judge ([#64](https://github.com/mark-brannan/languette/pull/64))
+- no-ruleset-bypass asks after a cd the shell may undo before the push (subshell, group, pipe, ||) or a popd, rather than trusting the cd Undo: drop _UNDOES_CD and the popd clause in _walk ([#64](https://github.com/mark-brannan/languette/pull/64))
 ### 20261007t011723z
 - A text that only might be shell (a nested string, the heredoc-stripped text) that shfmt refuses is read by the awk rung; only the command itself is denied Undo: make Scan raise Unparseable for every text ([#62](https://github.com/mark-brannan/languette/pull/62))
 - The shfmt rung keeps the token contract by running the awk lexer over the AST's pieces; the four awk-shaped rows are not re-baselined Undo: map the AST directly and re-baseline those rows ([#62](https://github.com/mark-brannan/languette/pull/62))

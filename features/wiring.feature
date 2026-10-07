@@ -38,6 +38,7 @@ Feature: wiring
       | prose-budget-commit    | git commit -m x               | denies    |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
+      | guard-bypass-ruleset      | git push origin HEAD:$b       | asks      |
 
   Scenario: the hooks.json command for guard-bypass-labels judges an MCP call
     Given the hook is the hooks.json command for "guard-bypass-labels"

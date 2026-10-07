@@ -7,7 +7,8 @@ registered for its hook event and tool, print one decision.
 Python guard alone this way). Fails closed: an unreadable payload is a deny,
 a Bash command the parser refuses is a deny (guard-unparsable; the other guards
 skip it), and a guard that raises is a deny naming the guard. No guard
-matched, or none objected, is exit 0 with no output. Standard library only.
+matched, or none objected, is exit 0 with no output; a deny outranks an ask.
+Standard library only.
 """
 
 import json
@@ -25,9 +26,9 @@ def _out(event, fields):
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
-    from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_infra,
-                                  guard_recursive_delete, guard_unparsable)
-    from languette.verdict import context, deny
+    from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_bypass_ruleset,
+                                  guard_infra, guard_recursive_delete, guard_unparsable)
+    from languette.verdict import ask, context, deny
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
                                          "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"}))
@@ -36,7 +37,7 @@ except Exception as e:  # noqa: BLE001
 # (hook event, tool name pattern, guards in the order they judge).
 GUARDS = (
     ("PreToolUse", re.compile(r"Bash\Z"), (guard_unparsable, guard_recursive_delete, ask_first, guard_bypass_hooks,
-                                           guard_infra, guard_bypass_labels)),
+                                           guard_infra, guard_bypass_labels, guard_bypass_ruleset)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
 )
 
@@ -68,7 +69,7 @@ def respond(stdin_text, env, only=None):
             unparsed = False
         if unparsed:
             guards = [g for g in guards if g is guard_unparsable]
-    reasons, notes = [], []
+    reasons, asks, notes = [], [], []
     for g in guards:
         try:
             r = g.check(payload, env)
@@ -78,10 +79,14 @@ def respond(stdin_text, env, only=None):
             continue
         if r.get("permissionDecision") == "deny":
             reasons.append(r["permissionDecisionReason"])
+        if r.get("permissionDecision") == "ask":
+            asks.append(r["permissionDecisionReason"])
         if r.get("additionalContext"):
             notes.append(r["additionalContext"])
     if reasons:
         return _out(event, deny("\n\n".join(reasons)))
+    if asks:
+        return _out(event, ask("\n\n".join(asks)))
     if notes:
         return _out(event, context("\n\n".join(notes)))
     return ""

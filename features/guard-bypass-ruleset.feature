@@ -1,0 +1,164 @@
+@python
+Feature: guard-bypass-ruleset
+  An agent runs on the user's credentials, so it can use the user's bypass
+  of a branch's rules. A push that lands on the default branch, when GitHub
+  says that branch requires a pull request, is denied, and so is
+  `gh pr merge --admin`. When GitHub can't answer, the guard asks. gh is a
+  stub throughout: unless told otherwise it answers that main on o/r has a
+  pull_request rule. The clone's origin is github.com/o/r and its
+  origin/HEAD is main; the checked-out branch tracks its own name.
+
+  Background:
+    Given the stub "gh" is first on PATH, for a Python guard
+    And a clone of "https://github.com/o/r.git" at "{TMP}/r" on branch "claude/topic"
+    And the working directory is "{TMP}/r"
+
+  Scenario Outline: a push that lands on a PR-only main is denied
+    When the agent runs `<command>`
+    Then the guard denies, naming "requires a pull request"
+
+    Examples:
+      | command                                       | note                               |
+      | git push origin main                          | by name                            |
+      | git push origin HEAD:main                     | a refspec                          |
+      | git push origin claude/topic:refs/heads/main  | a qualified destination            |
+      | git push -u origin +HEAD:main                 | a forced refspec                   |
+      | git push --all origin                         | every branch, main among them      |
+      | git push git@github.com:o/r.git main          | a URL in place of the remote       |
+      | cd {TMP}/r && git push origin main            | after a cd                         |
+      | git -C {TMP}/r push origin main               | through -C                         |
+      | sh -c 'git push origin main'                  | nested in sh -c                    |
+      | echo ok; git push origin --no-verify main     | after a separator, with a flag     |
+      | git pu''sh origin main                        | a subcommand split by quotes       |
+      | git pu"sh" origin main                        | a subcommand split by double quotes |
+      | git push --al origin                          | an abbreviated --all               |
+      | git push --mir origin                         | an abbreviated --mirror            |
+      | git push --branch origin                      | an abbreviated --branches          |
+      | git push -on origin main                      | -o with an attached value that holds an n |
+      | git push origin main && git push origin "$x"  | a clear push, then an unreadable one |
+      | git push -n --no-dry-run origin main          | the last of -n and --no-dry-run wins |
+      | git push https://GitHub.com/o/r main          | the host in another case           |
+      | git push ssh://git@github.com:22/o/r.git main | a URL with a port                  |
+      | (cd {TMP}/r && git push origin main)          | a cd inside the push's own subshell |
+
+  Scenario Outline: main and master are watched even after the agent moves the remote's HEAD
+    Given the remote HEAD of "{TMP}/r" points at "zzz"
+    When the agent runs `<command>`
+    Then the guard denies, naming "requires a pull request"
+
+    Examples:
+      | command               |
+      | git push origin main  |
+      | git push --all origin |
+
+  Scenario: an admin merge is denied without asking GitHub
+    When the agent runs `gh pr merge 5 --squash --admin`
+    Then the guard denies, naming "--admin"
+    And the stub "gh" was not called
+
+  Scenario: an admin merge is denied even when a later push can't be read
+    When the agent runs `gh pr merge 5 --admin; git push origin "$b"`
+    Then the guard denies, naming "--admin"
+
+  Scenario Outline: what lands elsewhere, or not at all, is not this guard's
+    When the agent runs `<command>`
+    Then the guard is silent
+
+    Examples:
+      | command                                   | note                                      |
+      | git push origin claude/topic              | a branch                                  |
+      | git push -u origin HEAD                   | HEAD is the branch                        |
+      | git push                                  | the branch's own push destination         |
+      | git push origin v1:refs/tags/v1           | a tag                                     |
+      | git push --tags origin                    | tags only                                 |
+      | git push --dry-run origin main            | a dry run pushes nothing                  |
+      | git push -n origin main                   | the short dry run                         |
+      | git push origin --delete claude/topic     | a deletion, other guards' to judge        |
+      | git push git@gitlab.com:o/r.git main      | not on github.com                         |
+      | echo git push origin main                 | text, not a push                          |
+      | gh pr merge 5 --squash --auto             | a merge that waits for the rules          |
+
+  Scenario Outline: on main itself, the branch's own push lands on main
+    Given a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
+    And the working directory is "{TMP}/m"
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | command                |
+      | git push               |
+      | git push origin HEAD   |
+      | git push origin        |
+
+  Scenario Outline: an admin merge through a run-time subcommand is denied
+    When the agent runs `<command>`
+    Then the guard denies, naming "--admin"
+
+    Examples:
+      | command                      |
+      | gh pr $m 5 --admin           |
+      | p=pr; gh $p merge 5 --admin  |
+
+  Scenario: an admin merge with a split flag is denied
+    When the agent runs `gh pr merge 5 --adm''in`
+    Then the guard denies, naming "--admin"
+
+  Scenario: a remote URL that climbs out of the slug is not a repository
+    When the agent runs `git push https://github.com/../x main`
+    Then the guard is silent
+
+  Scenario Outline: GitHub's answer decides
+    Given GH_RULES is "<rules>"
+    And GH_PROTECTION is "<protection>"
+    When the agent runs `git push origin main`
+    Then the guard <verdict>
+
+    Examples:
+      | rules   | protection | verdict   | note                                            |
+      | pr      |            | denies    | a ruleset with a pull_request rule              |
+      | none    | reviews    | denies    | classic protection with required reviews        |
+      | none    |            | is silent | no rule requires a pull request                 |
+      | upgrade |            | is silent | a free private repo can carry no rules          |
+
+  Scenario: GitHub not answering asks the user
+    Given GH_FAIL is "1"
+    When the agent runs `git push origin main`
+    Then the guard asks
+
+  Scenario Outline: a destination the hook can't read asks
+    When the agent runs `<command>`
+    Then the guard asks
+
+    Examples:
+      | command                           | note                                  |
+      | git push origin "$b"              | a variable refspec                    |
+      | git push origin HEAD:$target      | a variable destination                |
+      | GIT_DIR=/x git push origin main   | another repository, unfound           |
+      | p=push; git $p origin main        | a subcommand built at run time        |
+      | git push "$BASE/repo" main        | a remote built at run time            |
+      | git -c alias.p=push p origin main | an alias that makes a push            |
+      | git -calias.p=push p origin main  | the same, -c attached                 |
+      | git --config-env=alias.p=V p origin main | the same, --config-env attached |
+      | git -c url.https://github.com/o/r.insteadOf=foo push foo main | a URL rewrite |
+      | gh pr merge 5 "$flags"            | a flag built at run time              |
+      | gh $p merge 5                     | a gh subcommand built at run time     |
+      | export GIT_DIR=/x; git push origin main | another repository, exported       |
+
+  Scenario Outline: a cd the shell may undo before the push asks
+    Given a clone of "https://gitlab.com/o/r.git" at "{TMP}/g" on branch "main"
+    When the agent runs `<command>`
+    Then the guard asks
+
+    Examples:
+      | command                                   | note                              |
+      | (cd {TMP}/g && true); git push origin main | a subshell                       |
+      | { cd {TMP}/g; }; git push origin main     | a group                           |
+      | cd {TMP}/g \| cat; git push origin main   | a pipeline runs the cd in a subshell |
+      | cd {TMP}/g \|\| exit 1; git push origin main | the cd may have failed        |
+      | pushd {TMP}/g; popd; git push origin main | a popd                            |
+
+  Scenario: the answer is cached
+    When the agent runs `git push origin main`
+    And the agent runs it again
+    Then the guard denies
+    And the stub "gh" was called 1 times

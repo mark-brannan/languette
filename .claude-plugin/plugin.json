@@ -69,6 +69,12 @@
       "description": "Deny deleting a remote branch that an open pull request is based on or headed from. Leave on unless you want remote branch deletions through unchecked.",
       "default": true
     },
+    "guard_bypass_ruleset": {
+      "type": "boolean",
+      "title": "Block pushes and merges around a pull-request rule",
+      "description": "Deny a push to the default branch when GitHub says it requires a pull request, and gh pr merge --admin; ask when GitHub can't say. Leave on unless you want an agent able to use your ruleset bypass.",
+      "default": true
+    },
     "ask_first": {
       "type": "boolean",
       "title": "Ask before costly commands",

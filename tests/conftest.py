@@ -35,7 +35,7 @@ IN_PROCESS = {"python": ("awk",), "shfmt": ("shfmt",)}   # engine -> scan.RUNGS
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
          "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH",
-         "CLAUDE_CODE_TMPDIR", "CLAIM_STAMP_BIN")
+         "CLAUDE_CODE_TMPDIR", "CLAIM_STAMP_BIN", "GH_RULES", "GH_PROTECTION", "XDG_CACHE_HOME")
 
 
 _REAL_HOME = os.environ.get("HOME")
@@ -105,7 +105,7 @@ class Ctx:
         self.engine, self.guard = engine, None
         self.cwd = "{HOME}/project"
         self.env = {}                          # name -> value, or None for unset
-        self.proj = self.tmp = self.stub_log = self.bare = None
+        self.proj = self.tmp = self.stub_log = self.bare = self.cache = None
         self.project_env = True
         self.stubs = False
         self.hook = None                       # a hooks.json command, for wiring
@@ -156,6 +156,9 @@ class Ctx:
         env = {k: self.expand(v) for k, v in self.env.items() if v is not None}
         if self.proj and self.project_env and "CLAUDE_PROJECT_DIR" not in self.env:
             env["CLAUDE_PROJECT_DIR"] = str(self.proj)
+        if "XDG_CACHE_HOME" not in self.env:
+            self.cache = self.cache or self.mkdtemp()
+            env["XDG_CACHE_HOME"] = self.cache
         return env
 
     def run(self, stdin):
@@ -342,6 +345,39 @@ def _door_replaced(ctx, target, content):
 @given('the stubs "gh" and "timeout" are first on PATH')
 def _stubs(ctx):
     ctx.stubs, ctx.stub_log = True, ctx.mkdtemp()
+
+
+@given('the stub "gh" is first on PATH, for a Python guard')
+def _gh_stub_python(ctx):
+    # The Python engine's guards get only the scenario's env, so PATH and the
+    # stub log travel there rather than through the shell engine's subprocess.
+    ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
+    ctx.env["PATH"] = str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
+    ctx.env["LANGUETTE_STUB_LOG"] = ctx.stub_log
+
+
+@given(parsers.parse('a clone of "{url}" at "{path}" on branch "{branch}"'))
+def _clone(ctx, url, path, branch):
+    d = ctx.expand(path)
+    git = ["git", "-C", d, "-c", "user.email=t@e", "-c", "user.name=t"]
+    subprocess.run(["git", "init", "-q", "-b", "main", d], check=True)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "init"], check=True)
+    subprocess.run([*git, "remote", "add", "origin", url], check=True)
+    if branch != "main":
+        subprocess.run([*git, "checkout", "-q", "-b", branch], check=True)
+    for b in {"main", branch}:
+        subprocess.run([*git, "update-ref", f"refs/remotes/origin/{b}", "HEAD"], check=True)
+        subprocess.run([*git, "config", f"branch.{b}.remote", "origin"], check=True)
+        subprocess.run([*git, "config", f"branch.{b}.merge", f"refs/heads/{b}"], check=True)
+    subprocess.run([*git, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"], check=True)
+
+
+@given(parsers.parse('the remote HEAD of "{path}" points at "{branch}"'))
+def _remote_head(ctx, path, branch):
+    d = ctx.expand(path)
+    subprocess.run(["git", "-C", d, "update-ref", f"refs/remotes/origin/{branch}", "HEAD"], check=True)
+    subprocess.run(["git", "-C", d, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{branch}"],
+                   check=True)
 
 
 @given('the stub "prose-budget" is the engine')
