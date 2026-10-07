@@ -64,7 +64,7 @@ def test_with_guard_unparsable_off_the_other_guards_read_an_unparseable_command(
 @pytest.mark.parametrize("option", [None, "false"])
 @pytest.mark.parametrize("guard", ["guard-unparsable", "guard-recursive-delete"])
 def test_a_parser_crash_is_a_deny(monkeypatch, guard, option):
-    def boom(text):
+    def boom(text, words=False):
         raise RuntimeError("boom")
     monkeypatch.setattr(scan, "parse", boom)
     env = {"HOME": os.environ["HOME"], **({"CLAUDE_PLUGIN_OPTION_GUARD_UNPARSABLE": option} if option else {})}
@@ -115,7 +115,9 @@ def test_without_shfmt_bash_n_refuses_and_its_tree_is_not_mapped(monkeypatch):
     v = verdict('echo "unclosed', guard="guard-unparsable")
     assert v["permissionDecision"] == "deny" and "(bash -n: " in v["permissionDecisionReason"]
     assert scan.parse("rm -rf x") == ("bash -n", True)
-    assert scan.Scan("rm -rf x").rung == "awk"
+    calls = []
+    monkeypatch.setattr(scan, "_bash_n", lambda text: calls.append(text))
+    assert scan.Scan("rm -rf x").rung == "awk" and not calls    # Scan never asks a rung it cannot map
 
 
 def test_with_no_bash_the_awk_rung_reads(monkeypatch, tmp_path):
@@ -128,7 +130,8 @@ def test_with_no_bash_the_awk_rung_reads(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize("command", ["echo \"it's\" # don't", "cat <<'EOF'\ndon't\nEOF", "cat <<EOF\nit's $(date)\nEOF",
-                                     "echo a\\'b", "printf '%s' \"a'b\""])
+                                     "echo a\\'b", "printf '%s' \"a'b\"",
+                                     "echo $'it\\'s'", "echo \\$'a' b"])
 def test_the_awk_rung_refuses_no_closed_quote(monkeypatch, command):
     monkeypatch.setattr(scan, "RUNGS", ("awk",))
     assert scan.parse(command) == ("awk", None)

@@ -72,13 +72,21 @@ def _qclose(t):
 
 def _qopen(t):
     """(quote, index) of the quote _qclose finds open, or ("", -1)."""
-    L, i, have = len(t), 0, False
+    L, i, have, dollar = len(t), 0, False, False
     while i < L:
-        c = t[i]
+        c, after_dollar, dollar = t[i], dollar, False
         if c == "\\":
             if i + 1 < L and t[i + 1] != "\n":
                 have = True
             i += 2
+            continue
+        if c == "'" and after_dollar:
+            have, o, i = True, i, i + 1            # $'...': a backslash escapes, \' included
+            while i < L and t[i] != "'":
+                i += 2 if t[i] == "\\" else 1
+            if i >= L:
+                return "'", o
+            i += 1
             continue
         if c == "'":
             have, e = True, t.find("'", i + 1)
@@ -104,6 +112,7 @@ def _qopen(t):
             have = False
         elif c not in "{}" or have:
             have = True
+        dollar = c == "$"                      # an unescaped $: `\$` went by above
         i += 1
     return "", -1
 
@@ -271,11 +280,14 @@ def _awk(text):
         raise Unparseable(f"the {q} opened at `{snip}` never closes")
 
 
-def parse(text):
+def parse(text, words=False):
     """(rung, tree) from the first rung that reads the text, a pip rung named
-    by its parser; the tree is None on the awk rung and True from bash -n. Raises Unparseable,
-    naming the rung, when one refuses the text."""
+    by its parser; the tree is None on the awk rung and True from bash -n.
+    Raises Unparseable, naming the rung, when one refuses the text. words:
+    only the rungs whose reading Scan maps to words, shfmt and awk."""
     for rung in RUNGS:
+        if words and rung not in ("shfmt", "awk"):
+            continue
         for name in PIP if rung == "pip" else (rung,):
             read = {"shfmt": _shfmt_tree, "tree-sitter-bash": _tree_sitter, "bash -n": _bash_n, "awk": _awk}[name]
             try:
@@ -382,10 +394,8 @@ class Scan:
         text with heredocs stripped -- falls to the awk rung when a rung
         refuses it or its tree cannot be mapped. Only shfmt's tree maps."""
         try:
-            self.rung, tree = parse(text)
+            self.rung, tree = parse(text, words=True)
         except Unparseable:
-            self.rung, tree = "awk", None
-        if self.rung != "shfmt":
             self.rung, tree = "awk", None
         self._reset()
         if tree is not None:
