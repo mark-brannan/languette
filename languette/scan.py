@@ -235,8 +235,10 @@ def _tree_sitter(text):
         row, col = bad.start_point
         if bad.is_missing:
             raise Unparseable(f"{row + 1}:{col + 1}: missing `{bad.type}`")
-        snip = bad.text.decode("utf-8", "replace").split("\n")[0][:24]
-        raise Unparseable(f"{row + 1}:{col + 1}: cannot read `{snip}`")
+        raw = bad.text                         # an ERROR node takes the blank before it
+        lead = len(raw) - len(raw.lstrip(b" \t"))
+        snip = raw[lead:].decode("utf-8", "replace").split("\n")[0][:24]
+        raise Unparseable(f"{row + 1}:{col + lead + 1}: cannot read `{snip}`")
     return tree
 
 

@@ -152,7 +152,8 @@ def fake_ts(monkeypatch, root):
 
 
 @pytest.mark.parametrize("root, found", [
-    (Node(children=[Node(), Node("ERROR", at=(0, 4), text=b"'unclosed")]), "1:5: cannot read `'unclosed`"),
+    (Node(children=[Node(), Node("ERROR", at=(0, 4), text=b" 'unclosed")]), "1:6: cannot read `'unclosed`"),
+    (Node(children=[Node("ERROR", at=(0, 0), text=b"case x in")]), "1:1: cannot read `case x in`"),
     (Node(children=[Node(children=[Node("MISSING", at=(1, 11), type=")")]), Node("ERROR")]), "2:12: missing `)`"),
 ])
 def test_a_tree_sitter_error_or_missing_node_is_a_refusal(monkeypatch, root, found):

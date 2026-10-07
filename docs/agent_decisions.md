@@ -91,3 +91,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261007t193848z
 - A tree-sitter crash or failed import passes the text down the ladder, as a crashed shfmt does Undo: raise in scan._tree_sitter's except ([#75](https://github.com/mark-brannan/languette/pull/75))
+
+### 20261007t232120z
+- tree-sitter's in-process parse has no timeout, unlike shfmt and bash -n: measured 0.4 s for 200,000 commands and 3 ms for 3,000 nested substitutions Undo: pass a progress_callback to parser.parse in scan._tree_sitter that stops it after a deadline ([#75](https://github.com/mark-brannan/languette/pull/75))
