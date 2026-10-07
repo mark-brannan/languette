@@ -18,9 +18,12 @@ needs_shfmt = pytest.mark.skipif(not REAL and not os.environ.get("CI"), reason="
 
 @pytest.fixture(autouse=True)
 def fresh():
-    scan.shfmt.cache_clear(); scan._shfmt_tree.cache_clear(); scan._bash_n.cache_clear()
+    def clear():                               # a test may have patched one out
+        for f in (scan.shfmt, scan._shfmt_tree, scan._bash_n, scan._ts_parser, scan._tree_sitter):
+            getattr(f, "cache_clear", lambda: None)()
+    clear()
     yield
-    scan.shfmt.cache_clear(); scan._shfmt_tree.cache_clear(); scan._bash_n.cache_clear()
+    clear()
 
 
 def fake_shfmt(tmp_path, monkeypatch, body):
@@ -131,9 +134,49 @@ def test_the_awk_rung_refuses_no_closed_quote(monkeypatch, command):
     assert scan.parse(command) == ("awk", None)
 
 
-def test_the_pip_rung_is_an_empty_slot(monkeypatch):
+class Node:
+    """Enough of a tree-sitter node for _tree_sitter: kind is "ok", "ERROR" or "MISSING"."""
+    def __init__(self, kind="ok", children=(), at=(0, 0), text=b"", type="program"):
+        self.is_error, self.is_missing = kind == "ERROR", kind == "MISSING"
+        self.children, self.start_point, self.text, self.type = list(children), at, text, type
+        self.has_error = self.is_error or self.is_missing or any(c.has_error for c in self.children)
+
+
+def fake_ts(monkeypatch, root):
+    tree = type("Tree", (), {"root_node": root})()
+    monkeypatch.setattr(scan, "_ts_parser", lambda: type("P", (), {"parse": lambda self, b: tree})())
     monkeypatch.setattr(scan, "RUNGS", ("pip", "awk"))
-    assert scan.Scan("rm -rf x").rung == "awk"
+
+
+@pytest.mark.parametrize("root, found", [
+    (Node(children=[Node(), Node("ERROR", at=(0, 4), text=b"'unclosed")]), "1:5: cannot read `'unclosed`"),
+    (Node(children=[Node(children=[Node("MISSING", at=(1, 11), type=")")]), Node("ERROR")]), "2:12: missing `)`"),
+])
+def test_a_tree_sitter_error_or_missing_node_is_a_refusal(monkeypatch, root, found):
+    fake_ts(monkeypatch, root)
+    with pytest.raises(scan.Unparseable) as e:
+        scan.check("x")
+    assert (e.value.rung, str(e.value)) == ("tree-sitter-bash", found)
+
+
+def test_a_tree_sitter_tree_with_no_error_reads(monkeypatch):
+    fake_ts(monkeypatch, Node(children=[Node()]))
+    assert scan.parse("echo 'unclosed")[0] == "tree-sitter-bash"
+    assert scan.Scan("rm -rf x").rung == "awk"               # only shfmt's tree maps to words
+
+
+def test_a_crashing_tree_sitter_passes_the_text_down(monkeypatch):
+    def boom(self, b):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(scan, "_ts_parser", lambda: type("P", (), {"parse": boom})())
+    monkeypatch.setattr(scan, "RUNGS", ("pip", "awk"))
+    assert scan.parse("echo ok") == ("awk", None)
+
+
+def test_with_no_pip_parser_the_pip_rung_passes_the_text_down(monkeypatch):
+    monkeypatch.setattr(scan, "_ts_parser", lambda: None)
+    monkeypatch.setattr(scan, "RUNGS", ("pip", "awk"))
+    assert scan.parse("rm -rf x") == ("awk", None)
 
 
 def feature_commands(files=None):

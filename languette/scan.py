@@ -10,7 +10,7 @@ segment is led by a shell, so `echo ... | sh` is executed text).
 
 The parser ladder (docs/decisions.md, "Parser ladder") picks who reads the
 text: a user-installed shfmt when it is on PATH and new enough, then a pip
-parser (a slot, unruled: #4), then `bash -n`, then the awk port below. Each
+parser, then `bash -n`, then the awk port below. Each
 rung that reads the text either accepts it or refuses it (Unparseable), and a
 refusal is final; a rung that is missing, crashed or cannot say passes the
 text down. Only shfmt's tree is mapped to words: a real parser decides where
@@ -144,6 +144,9 @@ SHFMT_MIN = (3, 6, 0)
 SHFMT_TIMEOUT = 2                              # seconds; a parse measures ~6 ms
 BASH_TIMEOUT = 2                               # seconds
 RUNGS = ("shfmt", "pip", "bash -n", "awk")     # tests narrow this to one rung
+# The pip rung's parsers, asked in turn. Which comes first is open (#4);
+# tree-sitter-bash first is an assumption.
+PIP = ("tree-sitter-bash",)
 
 
 class Unparseable(Exception):
@@ -193,7 +196,51 @@ def _shfmt_tree(text):
     return tree if isinstance(tree, dict) and tree.get("Type") == "File" else None
 
 
-_pip_tree = None                               # rung two: a pip-installed parser, unruled (#4)
+@functools.lru_cache(maxsize=1)
+def _ts_parser():
+    """A tree-sitter parser for bash, or None when either package is missing
+    or will not load."""
+    try:
+        import tree_sitter
+        import tree_sitter_bash
+        return tree_sitter.Parser(tree_sitter.Language(tree_sitter_bash.language()))
+    except Exception:  # noqa: BLE001 -- any failure to load is a missing rung
+        return None
+
+
+@functools.lru_cache(maxsize=256)
+def _tree_sitter(text):
+    """tree-sitter-bash's tree of `text`, or None when it is missing or
+    crashed. tree-sitter never fails a parse; it recovers, marking what it
+    could not read with an ERROR node and what it had to supply with a
+    MISSING one. Either is a refusal, at the first one's line:col."""
+    parser = _ts_parser()
+    if parser is None:
+        return None
+    try:
+        tree = parser.parse(text.encode("utf-8", "surrogatepass"))
+        bad = _ts_error(tree.root_node) if tree.root_node.has_error else None
+    except Exception:  # noqa: BLE001 -- a crash is a missing rung, not a verdict
+        return None
+    if bad is not None:
+        row, col = bad.start_point
+        if bad.is_missing:
+            raise Unparseable(f"{row + 1}:{col + 1}: missing `{bad.type}`")
+        snip = bad.text.decode("utf-8", "replace").split("\n")[0][:24]
+        raise Unparseable(f"{row + 1}:{col + 1}: cannot read `{snip}`")
+    return tree
+
+
+def _ts_error(root):
+    """The first ERROR or MISSING node under root, in source order."""
+    stack = [root]
+    while stack:
+        n = stack.pop()
+        if n.is_error or n.is_missing:
+            return n
+        if n.has_error:
+            stack.extend(reversed(n.children))
+    return None
 
 
 @functools.lru_cache(maxsize=256)
@@ -225,18 +272,19 @@ def _awk(text):
 
 
 def parse(text):
-    """(rung, tree) from the first rung that reads the text; the tree is None
-    on every rung but shfmt's (and True from bash -n). Raises Unparseable,
+    """(rung, tree) from the first rung that reads the text, a pip rung named
+    by its parser; the tree is None on the awk rung and True from bash -n. Raises Unparseable,
     naming the rung, when one refuses the text."""
     for rung in RUNGS:
-        read = {"shfmt": _shfmt_tree, "pip": _pip_tree, "bash -n": _bash_n, "awk": _awk}[rung]
-        try:
-            tree = read(text) if read else None
-        except Unparseable as e:
-            e.rung = rung
-            raise
-        if rung == "awk" or tree is not None:
-            return rung, tree
+        for name in PIP if rung == "pip" else (rung,):
+            read = {"shfmt": _shfmt_tree, "tree-sitter-bash": _tree_sitter, "bash -n": _bash_n, "awk": _awk}[name]
+            try:
+                tree = read(text)
+            except Unparseable as e:
+                e.rung = name
+                raise
+            if name == "awk" or tree is not None:
+                return name, tree
     raise RuntimeError(f"no parser rung read the text (rungs: {', '.join(RUNGS)})")
 
 

@@ -147,12 +147,18 @@ def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():
             and opt.get("description"), f"userConfig.{key}: want a titled, described boolean defaulting to {str(want).lower()}"
 
 
+# The parser ladder's pip rung (docs/decisions.md, "Runtime dependencies"):
+# optional, and imported only by scan.py, which reads on without them.
+LADDER = {"languette/scan.py": {"tree_sitter", "tree_sitter_bash"}}
+
+
 def test_languette_imports_only_the_standard_library():
     bad = [f"{f.relative_to(ROOT)}: {n}" for f in (ROOT / "languette").rglob("*.py")
            for node in ast.walk(ast.parse(f.read_text()))
            for n in ([a.name for a in node.names] if isinstance(node, ast.Import) else
                      [node.module] if isinstance(node, ast.ImportFrom) and node.level == 0 else [])
-           if n.split(".")[0] not in sys.stdlib_module_names | {"languette"}]
+           if n.split(".")[0] not in sys.stdlib_module_names | {"languette"}
+           | LADDER.get(str(f.relative_to(ROOT)), set())]
     assert_that(bad, empty())
 
 
