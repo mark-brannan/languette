@@ -1,5 +1,5 @@
-"""guard-pipe-to-shell: a port of hooks/guard-pipe-to-shell.sh, whose header is the
-spec.
+"""guard-pipe-to-shell: the Python guard (it replaced
+hooks/guard-pipe-to-shell.sh).
 
 Blocks a download that is run as it arrives: curl, wget or fetch piped into
 an interpreter that reads its program from stdin (`curl u | sh`, `| sudo bash

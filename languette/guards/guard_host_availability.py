@@ -1,4 +1,4 @@
-"""guard-host-availability: a port of hooks/guard-host-availability.sh, whose header is the spec.
+"""guard-host-availability: the Python guard (it replaced hooks/guard-host-availability.sh).
 
 Blocks the commands that take the machine down: shutdown, reboot, halt and
 poweroff, at command position or as the one-word script of `sh -c`, and the

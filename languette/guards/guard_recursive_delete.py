@@ -1,4 +1,4 @@
-"""guard-recursive-delete: a port of hooks/guard-recursive-delete.sh, whose header is the spec.
+"""guard-recursive-delete: the Python guard (it replaced hooks/guard-recursive-delete.sh).
 
 Blocks recursive `rm` and `find ... -delete` unless every target, resolved
 against the payload's cwd and then through the filesystem, is Claude's to
@@ -237,7 +237,7 @@ def check(payload, env=os.environ):
         if not allowed(abs_):
             return deny(
                 f"`{what}` is blocked: only the scratchpad, /tmp, agent worktrees and the generated "
-                "directories named in guard-recursive-delete.sh (node_modules, dist, coverage, .pio ...) may be removed "
+                "directories named in guard-recursive-delete (node_modules, dist, coverage, .pio ...) may be removed "
                 f"recursively, and {abs_} is none of those. `git status --short {raw}` and `git clean -n {raw}` "
                 "show what is there; `git rm` tracked files by path, and hand anything untracked to the user "
                 "-- a directory they own can hold downloads and logs no session knows about.")

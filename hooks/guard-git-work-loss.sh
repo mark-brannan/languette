@@ -25,7 +25,7 @@
 #
 # `yadm` (a git wrapper for managing dotfiles) is treated as `git`.
 #
-# Scanning is shared with guard-recursive-delete.sh: lib-shell-words.awk (read its
+# Scanning is shared through lib-shell-words.awk (read its
 # header). Heredoc bodies are dropped (a doc that *mentions* `git add -A` is
 # not a git command); quotes are removed and escapes applied, so `\git` and
 # 'git' are git; redirections vanish; the text is split on shell separators,

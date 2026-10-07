@@ -1,4 +1,4 @@
-"""guard-scheduled-jobs: a port of hooks/guard-scheduled-jobs.sh, whose header is the spec.
+"""guard-scheduled-jobs: the Python guard (it replaced hooks/guard-scheduled-jobs.sh).
 
 Blocks `crontab -r`, which deletes the whole crontab with no undo: at command
 position, behind a wrapper, and with r in a short-option cluster (`-ir`).

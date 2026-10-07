@@ -291,7 +291,7 @@ to Claude Code, and every command goes through. One entry:
 
 ```json
 {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command",
-  "command": "h=\"$HOME/languette/hooks/guard-recursive-delete.sh\"; { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"guard-recursive-delete.sh is missing or crashed. This is a gate and fails closed.\"}}'"}]}]}}
+  "command": "h=\"$HOME/languette/hooks/guard-git-work-loss.sh\"; { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"guard-git-work-loss.sh is missing or crashed. This is a gate and fails closed.\"}}'"}]}]}}
 ```
 
 ## Working on it
