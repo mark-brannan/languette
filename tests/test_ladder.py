@@ -151,6 +151,10 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens(monkeypatch
                        "{ clientMutationId } }"]
     # A ' in a heredoc body: the awk lexer, reading the raw command, opens a
     # quote to the end; the shfmt rung resumes at the next Word. Every guard
-    # strips heredoc bodies first, so neither reading reaches one.
+    # strips heredoc bodies first, so neither reading reaches one. A " inside
+    # a $(...) inside double quotes: the awk lexer closes the quote there, the
+    # shfmt rung does not; both queue the substitution's body (texts_of).
     assert differ == ["cat <<EOF\n$(echo \"it's\") don't\nEOF\nrm -rf examples",
-                      "cat <<\\<<< EOF\n<\necho it's\nEOF\nrm -rf examples"]
+                      "cat <<\\<<< EOF\n<\necho it's\nEOF\nrm -rf examples",
+                      'echo "$(echo "x"; rm -rf examples)"',
+                      'echo "a $(echo "$(rm -rf examples)") b"']
