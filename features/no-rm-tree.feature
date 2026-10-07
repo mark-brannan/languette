@@ -467,6 +467,13 @@ Feature: no-rm-tree
       """
     Then the guard denies, naming "rm -r examples"
 
+  Scenario: an escaped backtick inside a backtick substitution inside double quotes is run
+    When the agent runs:
+      """
+      echo "`echo \`rm -rf examples\``"
+      """
+    Then the guard denies, naming "rm -r examples"
+
   Scenario: a substitution in an unquoted heredoc inside a quoted commit message is run
     When the agent runs:
       """

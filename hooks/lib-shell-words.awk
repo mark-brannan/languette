@@ -272,8 +272,9 @@ function scan(b, w, k, q,   L, i, c, d, n, s) {
 # walk that called it goes on over the same characters, so the words are
 # what they always were. A $(...) ends where sw_hd_close says, and a quote
 # or anything else it cannot be sure of keeps the rest of the text; a
-# backtick runs to the next unescaped one, or to the end.
-function sw_dq_sub(b, i,   L, j, c) {
+# backtick runs to the next unescaped one, or to the end, and its body loses
+# the backslash before $ ` \ or ", as the shell's does before it runs it.
+function sw_dq_sub(b, i,   L, j, c, s) {
   L = length(b)
   if (substr(b, i, 2) == "$(") {
     j = sw_hd_close(b, i + 2)
@@ -283,10 +284,13 @@ function sw_dq_sub(b, i,   L, j, c) {
   if (substr(b, i, 1) != "`") return
   for (j = i + 1; j <= L; j++) {
     c = substr(b, j, 1)
-    if (c == "\\") { j++; continue }
-    if (c == "`") break
+    if (c == "\\") {
+      j++; c = substr(b, j, 1)
+      if (c !~ /[$`\\"]/) s = s "\\"
+    } else if (c == "`") break
+    s = s c
   }
-  SW_sub[++SW_nsub] = substr(b, i + 1, j - i - 1)
+  SW_sub[++SW_nsub] = s
 }
 
 function sw_emit(w, k, q) {

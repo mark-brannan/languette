@@ -371,15 +371,21 @@ class Scan:
         command substitution, keep its body in subs for texts_of. The awk's
         sw_dq_sub: a $(...) ends where _sub_end says, and one it cannot be
         sure of keeps the rest of b; a backtick runs to the next unescaped
-        one, or to the end."""
+        one, or to the end, and its body loses the backslash before $ ` \\ or ",
+        as the shell's does before it runs it."""
         if b.startswith("$(", i):
             j = _sub_end(b, i + 2)
             self.subs.append(b[i + 2:j - 1 if b[j - 1:j] == ")" else j])
         elif b[i] == "`":
-            j = i + 1
+            j, t = i + 1, ""
             while j < len(b) and b[j] != "`":
-                j += 2 if b[j] == "\\" else 1
-            self.subs.append(b[i + 1:j])
+                if b[j] == "\\":
+                    j += 1
+                    if b[j:j + 1] not in ("$", "`", "\\", '"'):
+                        t += "\\"
+                t += b[j:j + 1]
+                j += 1
+            self.subs.append(t)
 
     def __len__(self):
         return len(self.w)
