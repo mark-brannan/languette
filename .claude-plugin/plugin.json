@@ -51,6 +51,12 @@
       "description": "Deny git branch -D and --delete --force. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
       "default": true
     },
+    "parse_check": {
+      "type": "boolean",
+      "title": "Deny a command that does not parse",
+      "description": "Deny a Bash command the shell parser refuses, with its line and column, before any of it runs. Turned off, the other guards read such a command through a weaker parser instead.",
+      "default": true
+    },
     "guard_recursive_delete": {
       "type": "boolean",
       "title": "Block recursive rm",

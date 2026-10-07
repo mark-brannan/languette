@@ -16,7 +16,7 @@ from conftest import hooks_json_commands, hooks_json_prompt_command
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"no-git-footguns", "guard-recursive-delete", "no-delete-stacked-base", "ask-first", "guard-github-issues",
           "guard-private-terms", "prose-budget-commit", "no-checkout-home", "no-foreign-worktree",
-          "no-bypass-labels", "guard-infra"}
+          "no-bypass-labels", "parse-check", "guard-infra"}
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"no_checkout_home", "no_foreign_worktree"}
 # Options that are not a guard's on/off toggle: name -> type.

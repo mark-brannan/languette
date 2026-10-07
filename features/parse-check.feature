@@ -1,10 +1,10 @@
 @python
 Feature: parse-check
-  languette/run.py checks a Bash command once, before any guard runs: when
-  the parser ladder's top rung refuses the command itself, the hook denies
-  with the parser's line:col message. Every guard runs, so a silent row is
-  silent to all of them. The awk rung refuses nothing, so the deny rows run
-  on the shfmt rung only.
+  A Bash command the parser refuses is denied, whole, naming shfmt's line:col
+  and what it found, and saying nothing ran. The other guards skip such a
+  command rather than deny it again. Without shfmt, `bash -n` reads the
+  command instead. The awk rung refuses nothing, so the deny rows run on the
+  shfmt rung only.
 
   Rows marked "seen" are anonymized from a replay of 101,671 commands that
   agents ran (October 2026). 32 did not parse, about 1 in 3,000, and the awk
@@ -74,9 +74,13 @@ Feature: parse-check
       """
     Then the guard denies, naming "1:5: unclosed here-document"
 
+  @python_only
+  Scenario: without shfmt, bash -n denies a command it cannot read
+    When the agent runs `echo "unclosed`
+    Then the guard denies, naming "bash -n"
+
   @shfmt_only
-  Scenario: a substitution in a heredoc with no closing line is denied before a guard reads it
-    # guard-recursive-delete's row: on the awk rung the guard names the rm instead.
+  Scenario: a substitution in a heredoc with no closing line is denied
     When the agent runs:
       """
       cat <<EOF
@@ -87,8 +91,7 @@ Feature: parse-check
   @shfmt_only
   Scenario: an escaped ; before # in a backtick substitution in a heredoc is denied
     # Stricter than bash, never seen: bash reads `echo \;#'` as echo ; and a
-    # comment, shfmt reads the ' as opening a quote. guard-recursive-delete's row: on the
-    # awk rung the guard names the rm instead.
+    # comment, shfmt reads the ' as opening a quote.
     When the agent runs:
       """
       cat <<EOF

@@ -45,3 +45,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - Branched from main while #52 is open, Depends-On: #52 holding the merge Undo: rebase onto #52's head ([#62](https://github.com/mark-brannan/languette/pull/62))
 ### 20261004t192604z
 - no-iac-destroy is one toggle (no_iac_destroy) covering the destroys and the unattended applies (apply -auto-approve, pulumi up --yes, cdk deploy --require-approval never) alike Undo: split the three apply rules behind their own option in hooks.json and plugin.json ([#54](https://github.com/mark-brannan/languette/pull/54))
+
+### 20261007t095052z
+- With parse_check=false, the other Python guards read an unparseable Bash command on the awk rung instead of skipping it (the bot's fix); the alternative was denying it outright as before the split Undo: revert e6196ea ([#65](https://github.com/mark-brannan/languette/pull/65))
