@@ -445,6 +445,48 @@ Feature: no-rm-tree
       """
     Then the guard denies, naming "rm -r examples"
 
+  Scenario Outline: a command substitution inside double quotes is run, though the words around it are prose
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                                              | verdict                            | why                                         |
+      | echo "$(rm -rf examples)"                            | denies, naming "rm -r examples"    | echo prints what rm left behind             |
+      | git commit -m "msg: $(rm -rf examples)"              | denies, naming "rm -r examples"    | the message is prose; its substitution runs |
+      | echo "$(echo "x"; rm -rf examples)"                  | denies, naming "rm -r examples"    | quotes nested inside the substitution       |
+      | echo "a $(echo "$(rm -rf examples)") b"              | denies, naming "rm -r examples"    | a substitution inside a substitution        |
+      | echo "$(rm -rf node_modules)"                        | is silent                          | an allowed target stays allowed             |
+      | git commit -m "hooks: $(date) block rm -rf examples" | is silent                          | only the substitution is scanned, not prose |
+      | echo '$(rm -rf examples)'                            | is silent                          | single quotes make it text                  |
+      | echo "\$(rm -rf examples)"                           | is silent                          | an escaped $ is text                        |
+
+  Scenario: a backtick substitution inside double quotes is run
+    When the agent runs:
+      """
+      echo "today `rm -rf examples` again"
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a substitution in an unquoted heredoc inside a quoted commit message is run
+    When the agent runs:
+      """
+      git commit -m "$(cat <<EOF
+      $(rm -rf examples)
+      EOF
+      )"
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a quoted heredoc inside a quoted commit message stays prose
+    When the agent runs:
+      """
+      git commit -m "$(cat <<'EOF'
+      hooks: block rm -rf examples, and $(rm -rf examples) too
+      EOF
+      )"
+      """
+    Then the guard is silent
+
   Scenario: a comment is not run
     When the agent runs:
       """

@@ -309,6 +309,7 @@ class Scan:
 
     def _reset(self):
         self.w, self.k, self.q, self.live = [], [], [], []
+        self.subs = []                     # bodies of $(...) and `...` inside double quotes
         self.pipes = set()                 # the separators that are a | or |&
         self._cur, self._have, self._quoted, self._skip, self._livecur = "", False, False, False, False
 
@@ -342,14 +343,18 @@ class Scan:
                 if t == "SglQuoted":
                     self._cur += dec(s + 1, e - 1)
                 else:
-                    self._dq(dec(s + 1, e - 1))
+                    body = dec(s + 1, e - 1)
+                    self._dq(body, body)
             else:                                  # $(...), ${...}, $((...)) and the rest
                 self._region(src, p, s, e)
             at = e
         self._lex(dec(at, _off(w, "End")))
 
-    def _dq(self, body):
-        r"""A double-quoted body: \" \\ \$ \` escape; the rest literal."""
+    def _dq(self, body, rest):
+        r"""A double-quoted body: \" \\ \$ \` escape; the rest literal. rest is
+        the text from the body's start to wherever a substitution in it may
+        run (_dq_sub): the body itself when a parser bounded it, the rest of
+        the text when the awk lexer did."""
         i = 0
         while i < len(body):
             d = body[i]
@@ -357,8 +362,24 @@ class Scan:
                 i += 1; d = body[i]
             elif d in ("$", "`"):
                 self._livecur = True
+                self._dq_sub(rest, i)
             self._cur += d
             i += 1
+
+    def _dq_sub(self, b, i):
+        """b[i] is a live $ or backtick inside double quotes; when it opens a
+        command substitution, keep its body in subs for texts_of. The awk's
+        sw_dq_sub: a $(...) ends where _sub_end says, and one it cannot be
+        sure of keeps the rest of b; a backtick runs to the next unescaped
+        one, or to the end."""
+        if b.startswith("$(", i):
+            j = _sub_end(b, i + 2)
+            self.subs.append(b[i + 2:j - 1 if b[j - 1:j] == ")" else j])
+        elif b[i] == "`":
+            j = i + 1
+            while j < len(b) and b[j] != "`":
+                j += 2 if b[j] == "\\" else 1
+            self.subs.append(b[i + 1:j])
 
     def __len__(self):
         return len(self.w)
@@ -425,7 +446,7 @@ class Scan:
                 e = i + 1
                 while e < L and b[e] != '"':
                     e += 2 if b[e] == "\\" and at(e + 1) in ('"', "\\", "$", "`") else 1
-                self._dq(b[i + 1:e])
+                self._dq(b[i + 1:e], b[i + 1:])
                 i = e + 1
                 continue
             if c == "#" and not self._have:        # comment to end of line
@@ -489,7 +510,9 @@ def texts_of(text, prose=PROSE):
     """[(text, nested)]: the text itself plus, recursively, every quoted string
     in it that holds whitespace and may run. A segment's quoted strings are
     skipped only when it is led by a prose consumer, holds no executor, and no
-    segment of its text is a shell. `prose` widens the consumer set for a
+    segment of its text is a shell. A command substitution inside double
+    quotes runs whoever leads the segment, so its body is queued alone,
+    heredocs stripped, even where the words around it are prose. `prose` widens the consumer set for a
     guard whose command names also appear as arguments (pkill -f). Capped so a pathological command cannot spin."""
     out = [(text, False)]
     x = 0
@@ -504,6 +527,8 @@ def texts_of(text, prose=PROSE):
                         break
                     if s.k[j] == "q":
                         out.append((s.q[j], True))
+        for t in s.subs[:NESTED_CAP - len(out)]:
+            out.append((strip_heredocs(t), True))
         x += 1
     return out
 
