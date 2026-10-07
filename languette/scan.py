@@ -137,7 +137,7 @@ RUNGS = ("shfmt", "pip", "awk")                # tests narrow this to one rung
 
 class Unparseable(Exception):
     """The parser read the command and refused it. Bad input is a deny, never a
-    reason to try a weaker parser."""
+    reason to try a weaker parser. The message leads with the rung's name."""
 
 
 @functools.lru_cache(maxsize=1)
@@ -168,7 +168,7 @@ def _shfmt_tree(text):
         return None
     err = r.stderr.decode("utf-8", "replace").strip()
     if r.returncode == 1 and re.match(r"(?:<standard input>:)?\d+:\d+: ", err):
-        raise Unparseable(err.splitlines()[0])
+        raise Unparseable("shfmt: " + err.splitlines()[0])
     if r.returncode:
         return None
     try:
