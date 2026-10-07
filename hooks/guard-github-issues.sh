@@ -5,12 +5,16 @@
 # (Solace, 2026-09-30). `guard-github-issues.sh prompt` on UserPromptSubmit opens the
 # door; the next identifier write that runs spends it.
 #
-# Checked before the call, spent after it: PreToolUse only asks whether the
-# door is open, and `guard-github-issues.sh post`, on PostToolUse and
-# PostToolUseFailure, spends it once the call has run. Each guard is its own
-# hook process and cannot see the others' verdicts, so a spend at PreToolUse
-# shut the door on a create another guard denied, and the retry found it
-# shut with nothing posted. A call that never ran never spends.
+# Claimed before the call, spent after it. PreToolUse claims the door by
+# renaming it to `<door>.held`, which only one call can win, and writes its
+# tool_use_id there; `guard-github-issues.sh post`, on PostToolUse and
+# PostToolUseFailure, deletes the claim once the call has run. A claim
+# whose call already has a result in the transcript, but was never spent,
+# belongs to a call another guard denied: it never ran, so the next write
+# takes the claim over. Each guard is its own hook process and cannot see
+# the others' verdicts; spending at PreToolUse shut the door on a create
+# another guard denied, with nothing posted. A claim whose call has no
+# result yet is still in flight, and a second write is denied.
 #
 # Counts as an identifier write: `gh issue create|new|transfer|delete`; `gh
 # api` POST to repos/o/r/issues; a graphql createIssue, transferIssue or
@@ -39,10 +43,11 @@ fi
 door="${TMPDIR:-/tmp}/languette-guard-github-issues.$(printf '%s' "$p" | jq -r '.session_id // "none"' | tr -c 'A-Za-z0-9_\n-' _)"
 # Replace, never follow: a symlink pre-planted at the door path must not be
 # truncated through. rm drops the link itself; noclobber refuses to open one.
-[ "${1:-}" = prompt ] && { rm -f "$door"; (set -C; : > "$door") 2>/dev/null; exit 0; }
+held="$door.held"
+[ "${1:-}" = prompt ] && { rm -f "$door" "$held"; (set -C; : > "$door") 2>/dev/null; exit 0; }
 # After the call, a deny has nothing left to refuse: an unreadable call fails
 # closed by spending the door instead.
-[ "${1:-}" = post ] && deny() { rm -f "$door"; exit 0; }
+[ "${1:-}" = post ] && deny() { rm -f "$door" "$held"; exit 0; }
 
 loop=0
 case $(printf '%s' "$p" | jq -r '.tool_name // ""') in
@@ -127,7 +132,23 @@ esac
 [ "$n" -gt 0 ] || exit 0
 # The call ran (or tried to): spend the door whatever the verdict was, so a
 # failed create cannot be followed by a second in the same turn.
-[ "${1:-}" = post ] && { rm -f "$door"; exit 0; }
+[ "${1:-}" = post ] && { rm -f "$door" "$held"; exit 0; }
 [ "$n" -gt 1 ] && deny "$n issue creates, transfers or deletes in one call. One per human turn, never a batch."
 [ "$loop" = 1 ] && deny "an issue create, transfer or delete inside a loop. One per human turn, never a batch."
-[ -e "$door" ] || [ -L "$door" ] || deny "the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or the human has not spoken since. Show the human the draft and wait for their yes."
+shut="the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or the human has not spoken since. Show the human the draft and wait for their yes."
+id=$(printf '%s' "$p" | jq -r '.tool_use_id // ""' | tr -cd 'A-Za-z0-9_-')
+# claim <file>: rename it to a name of this process's own (atomic: one
+# racer wins), stamp this call's id in it, and make it the claim.
+claim() { mine="$door.claim.$$"; mv "$1" "$mine" 2>/dev/null || return 1; printf '%s' "$id" > "$mine"; mv "$mine" "$held"; }
+if [ -e "$door" ] || [ -L "$door" ]; then
+  claim "$door" || deny "an issue create, transfer or delete is already in flight this turn. $shut"
+elif [ -f "$held" ]; then
+  # The claimant ran if it was spent; still holding with a result in the
+  # transcript means it never ran. No result yet: in flight, or unknowable.
+  was=$(cat "$held" 2>/dev/null)
+  t=$(printf '%s' "$p" | jq -r '.transcript_path // ""')
+  [ -n "$was" ] && [ -r "$t" ] && grep -Eq "\"tool_use_id\": ?\"$was\"" "$t" || deny "$shut"
+  claim "$held" || deny "$shut"
+else
+  deny "$shut"
+fi

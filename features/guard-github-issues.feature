@@ -144,6 +144,12 @@ Feature: guard-github-issues
     And the agent runs `gh issue create -t u -b c`
     Then the guard denies
 
+  Scenario: a write while the turn's first is still running is denied
+    When the human speaks, opening the door
+    And the agent starts `gh issue create -t t -b b`
+    And the agent runs `gh issue create -t u -b c`
+    Then the guard denies
+
   Scenario: another session's turn does not open this one's door
     Given the session is "s2"
     When the human speaks, opening the door

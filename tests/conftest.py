@@ -479,8 +479,25 @@ def _runs(ctx, command):
     _ran(ctx)
 
 
+def _transcript(ctx):
+    if not ctx.proj:
+        ctx.proj = Path(ctx.mkdtemp())
+    (ctx.proj / "t.jsonl").touch()
+
+
 @when(parsers.re(r"another guard denies `(?P<command>.*)`", flags=re.S))
 def _denied_elsewhere(ctx, command):
+    # This guard's PreToolUse ran, the call did not: Claude Code records the
+    # deny as its result, and fires no PostToolUse.
+    _transcript(ctx)
+    ctx.run(ctx.payload(command))
+    _record_result(ctx, "guard-private-terms: denied")
+
+
+@when(parsers.re(r"the agent starts `(?P<command>.*)`", flags=re.S))
+def _starts(ctx, command):
+    # PreToolUse ran and the call is still running: no result, no PostToolUse.
+    _transcript(ctx)
     ctx.run(ctx.payload(command))
 
 
