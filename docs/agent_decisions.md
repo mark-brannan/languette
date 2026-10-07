@@ -81,3 +81,7 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261007t114536z
 - The three stub guards are listed in the README's guard list, marked (planned), not in a line under Development. Undo: move the bullet back to the line under Development ([#69](https://github.com/mark-brannan/languette/pull/69))
+
+### 20261007t193515z
+- bash -n sits below the pip slot and above awk on the parser ladder; the ruling names shfmt, pip, awk, and bash -n was not on it Undo: reorder scan.RUNGS ([#74](https://github.com/mark-brannan/languette/pull/74))
+- The awk rung refuses only a quote left open at the end, read by the lexer's own rules after heredoc bodies are stripped Undo: drop _awk's raise in scan.py ([#74](https://github.com/mark-brannan/languette/pull/74))
