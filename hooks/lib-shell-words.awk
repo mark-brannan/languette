@@ -196,6 +196,9 @@ function sw_qclose(t,   L, i, c, d, have) {
 # quotes those are ordinary characters, so a body holding a markdown code
 # span or a literal $(...) is text, not substitution, and a hook that
 # refuses unresolvable values must not refuse it.
+# SW_sub[1..SW_nsub] are the bodies of the command substitutions, $(...) or
+# `...`, that stand inside double quotes, where the shell runs them though
+# the word around them is text (sw_dq_sub).
 #   k[i] == ";"  a command separator: ; | & newline ( ) ` or a lone { }.
 #                Runs of separators collapse to one; SW_sepc[i] keeps their
 #                characters (`&&`, `|`, `(`...), for a hook that must tell a
@@ -204,7 +207,7 @@ function sw_qclose(t,   L, i, c, d, have) {
 # globals, so a hook must finish with w/k/q before calling scan() again.
 function scan(b, w, k, q,   L, i, c, d, n, s) {
   delete w; delete k; delete q
-  delete SW_live; delete SW_sepc
+  delete SW_live; delete SW_sepc; delete SW_sub; SW_nsub = 0
   SW_n = 0; SW_cur = ""; SW_have = 0; SW_quoted = 0; SW_skip = 0; SW_livecur = 0
   L = length(b)
   for (i = 1; i <= L; i++) {
@@ -226,7 +229,7 @@ function scan(b, w, k, q,   L, i, c, d, n, s) {
         d = substr(b, i, 1)
         if (d == "\"") break
         if (d == "\\" && substr(b, i + 1, 1) ~ /["\\$`]/) { i++; d = substr(b, i, 1) }
-        else if (d == "$" || d == "`") SW_livecur = 1
+        else if (d == "$" || d == "`") { SW_livecur = 1; sw_dq_sub(b, i) }
         SW_cur = SW_cur d
       }
       continue
@@ -262,6 +265,32 @@ function scan(b, w, k, q,   L, i, c, d, n, s) {
   sw_emit(w, k, q)
   sw_mark_shell(w, k, SW_n)
   return SW_n
+}
+
+# sw_dq_sub(b, i): b[i] is a live $ or backtick inside double quotes; when it
+# opens a command substitution, keep its body in SW_sub for texts_of. The
+# walk that called it goes on over the same characters, so the words are
+# what they always were. A $(...) ends where sw_hd_close says, and a quote
+# or anything else it cannot be sure of keeps the rest of the text; a
+# backtick runs to the next unescaped one, or to the end, and its body loses
+# the backslash before $ ` \ or ", as the shell's does before it runs it.
+function sw_dq_sub(b, i,   L, j, c, s) {
+  L = length(b)
+  if (substr(b, i, 2) == "$(") {
+    j = sw_hd_close(b, i + 2)
+    SW_sub[++SW_nsub] = substr(b, i + 2, (substr(b, j, 1) == ")" ? j - 1 : j) - i - 1)
+    return
+  }
+  if (substr(b, i, 1) != "`") return
+  for (j = i + 1; j <= L; j++) {
+    c = substr(b, j, 1)
+    if (c == "\\") {
+      j++; c = substr(b, j, 1)
+      if (c !~ /[$`\\"]/) s = s "\\"
+    } else if (c == "`") break
+    s = s c
+  }
+  SW_sub[++SW_nsub] = s
 }
 
 function sw_emit(w, k, q) {
@@ -320,8 +349,10 @@ function sw_mark_shell(w, k, n,   a, i, c) {
 # library does not know. Skipped only when the segment is led by a prose
 # consumer (sw_prose), holds no executor (sw_exec) and no segment of the
 # text is a shell. Returns the count; nested[x] is 1 for the quoted ones,
-# which the hooks judge by command position only. Capped so a pathological
-# command cannot spin.
+# which the hooks judge by command position only. A command substitution
+# inside double quotes (SW_sub) runs whoever leads the segment, so its body
+# is queued alone, heredocs stripped, even where the words around it are
+# prose. Capped so a pathological command cannot spin.
 function texts_of(text, texts, nested,   x, cnt, n, i, j, a, c, ex, w, k, q) {
   texts[1] = text; nested[1] = 0; cnt = 1
   for (x = 1; x <= cnt && cnt < 64; x++) {
@@ -336,6 +367,7 @@ function texts_of(text, texts, nested,   x, cnt, n, i, j, a, c, ex, w, k, q) {
         for (j = a; j < i && cnt < 64; j++) if (k[j] == "q") { cnt++; texts[cnt] = q[j]; nested[cnt] = 1 }
       a = i + 1
     }
+    for (j = 1; j <= SW_nsub && cnt < 64; j++) { cnt++; texts[cnt] = strip_heredocs(SW_sub[j]); nested[cnt] = 1 }
   }
   return cnt
 }
