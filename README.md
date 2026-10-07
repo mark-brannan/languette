@@ -32,10 +32,9 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
 It needs:
 
-- `python3`, standard library only, for `ask-first` and `no-bypass-labels`;
-  `no-rm-tree` runs on it when present;
-- `jq` and a POSIX `awk`, for the shell guards and for `no-rm-tree` without
-  `python3`, until a real shell parser replaces them
+- `python3`, standard library only, for every `run.py` guard (`ask-first`,
+  `no-bypass-labels`, `no-rm-tree`);
+- `jq` and a POSIX `awk`, for the shell guards, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
 - `gh`, for `no-delete-stacked-base`.
 

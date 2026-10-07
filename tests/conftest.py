@@ -371,17 +371,6 @@ def _crash(ctx, guard):
     ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
 
 
-@given(parsers.parse('the plugin\'s shell fallback for "{guard}" {state}'))
-def _fallback(ctx, guard, state):
-    root = Path(ctx.mkdtemp())
-    (root / "hooks").mkdir()
-    if state == "crashes":
-        (root / f"hooks/{guard}.sh").write_text("exit 3\n")
-    else:
-        assert state == "is missing", f"test setup: unknown fallback state {state!r}"
-    ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
-
-
 def hooks_json_commands():
     """guard name -> its command in hooks/hooks.json."""
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())

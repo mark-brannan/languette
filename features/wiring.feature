@@ -67,24 +67,8 @@ Feature: wiring
       | no-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
-  # The no-rm-tree command runs languette/run.py under python3 and falls back to
-  # the shell guard when `command -v python3` fails. The PATH below holds the
-  # shell guard's tools and no python3, so a silent harmless command also
-  # proves the fallback judged rather than crashed.
-  Scenario Outline: with python3 absent from PATH, the hooks.json no-rm-tree command falls back to the shell guard
-    Given the hook is the hooks.json command for "no-rm-tree"
-    And PATH holds only "sh jq awk cat cut dirname head printf readlink realpath git"
-    And the working directory is "/x"
-    When the agent runs `<command>`
-    Then the guard <verdict>
-
-    Examples:
-      | command          | verdict   |
-      | rm -rf /some/dir | denies    |
-      | ls -la           | is silent |
-
   # The run.py guards have no shell fallback, so with python3 absent they
-  # still deny, but say why instead of blaming the plugin directory.
+  # deny, but say why instead of blaming the plugin directory.
   Scenario Outline: with python3 absent from PATH, a run.py guard denies and says python3 is required
     Given the hook is the hooks.json command for "<guard>"
     And PATH holds only "sh cat printf dirname"
@@ -94,21 +78,9 @@ Feature: wiring
 
     Examples:
       | guard            | option           | command                           |
+      | no-rm-tree       | no_rm_tree       | rm -rf build                      |
       | ask-first        | ask_first        | npm run walk                      |
       | no-bypass-labels | no_bypass_labels | gh pr edit 4 --add-label churn-ok |
-
-  # Whatever the fallback does wrong, python3 being absent must not open the gate.
-  Scenario Outline: with python3 absent from PATH, a shell fallback that crashes or is missing is a deny
-    Given the hook is the hooks.json command for "no-rm-tree"
-    And PATH holds only "sh cat printf dirname"
-    And the plugin's shell fallback for "no-rm-tree" <state>
-    When the agent runs `rm -rf build`
-    Then the guard denies
-
-    Examples:
-      | state      |
-      | crashes    |
-      | is missing |
 
   Scenario Outline: with python3 absent from PATH, the option set to false still skips the guard
     Given the hook is the hooks.json command for "<guard>"
