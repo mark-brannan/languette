@@ -34,7 +34,8 @@ def refusal(command):
         r = subprocess.run(["bash", "-n"], input=command.encode("utf-8", "surrogatepass"), capture_output=True,
                            timeout=BASH_TIMEOUT, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
     except (OSError, subprocess.SubprocessError):
-        return None
+        return None                            # no bash -n: the awk rung's reading, which denies no parse
+
     if r.returncode == 0:
         return None
     err = r.stderr.decode("utf-8", "replace").strip().splitlines()

@@ -58,6 +58,18 @@ def test_with_parse_check_off_the_other_guards_read_an_unparseable_command():
     assert v["permissionDecision"] == "deny"
 
 
+@pytest.mark.parametrize("option", [None, "false"])
+@pytest.mark.parametrize("guard", ["parse-check", "no-rm-tree"])
+def test_a_parser_crash_is_a_deny(monkeypatch, guard, option):
+    def boom(text):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(scan, "parse", boom)
+    env = {"HOME": os.environ["HOME"], **({"CLAUDE_PLUGIN_OPTION_PARSE_CHECK": option} if option else {})}
+    out = run.respond(payload("echo hi"), env, only=guard)
+    v = json.loads(out)["hookSpecificOutput"]
+    assert v["permissionDecision"] == "deny" and "crashed" in v["permissionDecisionReason"]
+
+
 @needs_shfmt
 def test_nested_text_shfmt_refuses_is_read_by_awk():
     # The quoted string may be Python, not shell: no deny for that.
