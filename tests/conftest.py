@@ -7,7 +7,8 @@ except under CI); @shell runs hooks/<guard>.sh by subprocess (under
 $AWK_PATH's awk when set). @shell_only narrows a scenario to the shell,
 @shfmt_only to the shfmt rung; @no_shfmt drops the shfmt rung, for a row its
 parse check denies before any guard reads it. The feature's name is the guard's name, except
-parse-check, which runs every guard behind run.py's parse check.
+parse-check, which has its own guard. @python_only narrows a scenario to the
+awk rung (bash -n reads instead of shfmt).
 """
 
 import json
@@ -64,6 +65,8 @@ def pytest_generate_tests(metafunc):
     engines = [e for e in ENGINES if e in marks or (e == "shfmt" and "python" in marks)]
     if "shell_only" in marks:
         engines = ["shell"]
+    if "python_only" in marks:
+        engines = ["python"]
     if "shfmt_only" in marks:
         engines = ["shfmt"]
     if "no_shfmt" in marks:

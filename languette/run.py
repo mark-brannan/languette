@@ -5,8 +5,8 @@ registered for its hook event and tool, print one decision.
 
 --guard restricts the run to one guard (the hooks.json wiring runs each
 Python guard alone this way). Fails closed: an unreadable payload is a deny,
-a Bash command the parser refuses is a deny (languette/scan.py, the parser
-ladder), and a guard that raises is a deny naming the guard. No guard
+a Bash command the parser refuses is a deny (parse-check; the other guards
+skip it), and a guard that raises is a deny naming the guard. No guard
 matched, or none objected, is exit 0 with no output. Standard library only.
 """
 
@@ -25,8 +25,7 @@ def _out(event, fields):
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
-    from languette import scan
-    from languette.guards import ask_first, no_bypass_labels, no_iac_destroy, no_rm_tree
+    from languette.guards import ask_first, no_bypass_labels, no_iac_destroy, no_rm_tree, parse_check
     from languette.verdict import context, deny
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
@@ -35,7 +34,7 @@ except Exception as e:  # noqa: BLE001
 
 # (hook event, tool name pattern, guards in the order they judge).
 GUARDS = (
-    ("PreToolUse", re.compile(r"Bash\Z"), (no_rm_tree, ask_first, no_iac_destroy, no_bypass_labels)),
+    ("PreToolUse", re.compile(r"Bash\Z"), (parse_check, no_rm_tree, ask_first, no_iac_destroy, no_bypass_labels)),
     ("PreToolUse", re.compile(r"mcp__.+"), (no_bypass_labels,)),
 )
 
@@ -57,14 +56,16 @@ def respond(stdin_text, env, only=None):
               for g in gs if only in (None, g.NAME)]
     ti = payload.get("tool_input")
     command = ti.get("command") if tool == "Bash" and isinstance(ti, dict) else None
-    if guards and isinstance(command, str):
+    if guards and isinstance(command, str) and env.get("CLAUDE_PLUGIN_OPTION_PARSE_CHECK") != "false":
+        # A command that does not parse is parse-check's to deny; the others
+        # would only read it again through a weaker parser. With parse-check
+        # off, nothing would deny it, so the others read it on the awk rung.
         try:
-            scan.check(command)
-        except scan.Unparseable as e:
-            return _out(event, deny(f"languette: shfmt cannot parse this command ({e}). "
-                                    "Bad input is a deny; fix the syntax and run it again"))
-        except Exception as e:  # noqa: BLE001
-            return _out(event, deny(f"languette: the parser crashed ({type(e).__name__}: {e})"))
+            unparsed = parse_check.refusal(command)
+        except Exception:  # noqa: BLE001 -- parse-check's own run reports the crash
+            unparsed = False
+        if unparsed:
+            guards = [g for g in guards if g is parse_check]
     reasons, notes = [], []
     for g in guards:
         try:
