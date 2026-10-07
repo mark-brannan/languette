@@ -92,6 +92,8 @@ scenarios for a command run in `~/project`, and CI fails if the table drifts:
 With `shfmt` 3.6 or later on `PATH`, a command that doesn't parse is a deny.
 In a replay of 101,671 agent commands, about 1 in 3,000 didn't parse, and
 each [would have broken](features/parse-check.feature).
+Bash runs a broken command in part, the lines before the error or prose in
+backticks as a command; the deny stops all of it, so the agent looks again.
 
 ## Ask first
 
