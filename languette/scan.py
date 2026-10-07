@@ -21,7 +21,8 @@ import re
 import shutil
 import subprocess
 
-_OPENER = re.compile(r"""<<-?[ \t]*["']?[A-Za-z_][A-Za-z0-9_]*["']?""")
+_DPART = r"""'[^'\n]*'|"[^"\n]*"|\\."""
+_OPENER = re.compile(r"(?<!<)<<-?[ \t]*(?:[A-Za-z_]|" + _DPART + r")(?:[A-Za-z0-9_]|" + _DPART + r")*")
 _ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _WS = re.compile(r"[ \t\n]")
 
@@ -33,6 +34,97 @@ SHELL = frozenset("sh bash zsh dash ksh ash eval source .".split())
 WRAP = frozenset("sudo env command exec time nice nohup timeout doas builtin "
                  "if then else elif while until do !".split())
 NESTED_CAP = 64
+_CASE = re.compile(r"(?<![A-Za-z0-9_])case(?![A-Za-z0-9_])")
+
+
+def _sub_end(s, j):
+    """Index just past the `)` closing a `$(` whose text starts at j, or len(s)
+    when none does or the walk cannot be sure: a quote, backtick, backslash,
+    `#` or `case` before the `)` sends it to the end, because a guard must not
+    stake a bypass on out-guessing the shell's grammar."""
+    L, depth = len(s), 1
+    while j < L:
+        c = s[j]
+        if c in "\"'`\\#" or (c == "c" and _CASE.match(s, j)):
+            return L
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if not depth:
+                return j + 1
+        j += 1
+    return L
+
+
+def _qclose(t):
+    """The quote the scanner would still hold open at the end of t ("'", '"'
+    or ""), read by its own rules: a backslash escapes outside single quotes,
+    and a `#` comments to the end of its line only before a word has begun,
+    so `a\\ #'` opens a quote and `a #'` does not."""
+    L, i, have = len(t), 0, False
+    while i < L:
+        c = t[i]
+        if c == "\\":
+            if i + 1 < L and t[i + 1] != "\n":
+                have = True
+            i += 2
+            continue
+        if c == "'":
+            have, e = True, t.find("'", i + 1)
+            if e < 0:
+                return "'"
+            i = e + 1
+            continue
+        if c == '"':
+            have, i = True, i + 1
+            while i < L and t[i] != '"':
+                i += 2 if t[i] == "\\" else 1
+            if i >= L:
+                return '"'
+            i += 1
+            continue
+        if c == "#" and not have:
+            e = t.find("\n", i)
+            if e < 0:
+                return ""
+            i = e
+            continue
+        if c in " \t\n;|&()`<>":
+            have = False
+        elif c not in "{}" or have:
+            have = True
+        i += 1
+    return ""
+
+
+def heredoc_subs(s):
+    """The $(...) and `...` command substitutions in an unquoted heredoc's body,
+    each on a line of its own with any quote it leaves open closed (_qclose),
+    so prose like `don't` cannot swallow the commands after the heredoc. A
+    $(...) whose end _sub_end cannot be sure of keeps the rest of the body."""
+    out, L, i = "", len(s), 0
+    while i < L:
+        c = s[i]
+        if c == "\\":
+            i += 2
+            continue
+        if c == "`":
+            j = i + 1
+            while j < L and s[j] != "`":
+                j += 2 if s[j] == "\\" else 1
+            t = s[i:j + 1]
+            out += "\n" + t + _qclose(t)
+            i = j + 1
+            continue
+        if c == "$" and s[i + 1:i + 2] == "(":
+            j = _sub_end(s, i + 2)
+            t = s[i:j]
+            out += "\n" + t + _qclose(t)
+            i = j
+            continue
+        i += 1
+    return out
 
 # --- the parser ladder ---------------------------------------------------
 
@@ -128,36 +220,54 @@ def _words(node, out):
 
 
 def _heredocs(b):
-    """Yield (b_after, body, quoted) per heredoc, as the awk's twin loops find
-    them; body is None when the opener has no newline or no closing line, and
-    quoted says the delimiter was quoted, so the shell expands nothing in it."""
+    """(stripped, [(body, quoted)]) -- the awk's sw_heredocs walk. Every opener
+    on a line takes its body in turn from the lines below; the rest of the
+    opener line stays. quoted says the delimiter was quoted, so the shell
+    expands nothing in it; an unquoted one's body keeps its command
+    substitutions (heredoc_subs). A body whose closing line never comes stays
+    in the text as commands. body is "" when the opener ends the text. The
+    search resumes after each heredoc, never inside what it kept, so a `<<X`
+    in a kept substitution cannot pair with a later X line."""
+    done, docs = "", []
     while True:
         m = _OPENER.search(b)
         if not m:
-            return
-        start = m.start()
-        raw = re.sub(r"^<<-?[ \t]*", "", m.group())
-        d = raw.replace('"', "").replace("'", "")
-        quoted = raw != d
-        nl = b.find("\n", start)
-        if nl < 0:
-            yield b[:start] + " HEREDOC ", None, quoted
-            return
-        tail = b[nl + 1:]
-        e = re.search("(?:^|\n)[ \t]*" + d + "[ \t]*(?:\n|\\Z)", tail)
-        if not e:
-            yield b[:start] + " HEREDOC ", None, quoted
-            return
-        # awk keeps the last character of the match: the closing newline.
-        b = b[:start] + " HEREDOC " + tail[e.end() - 1:]
-        yield b, tail[:e.start()], quoted
+            return done + b, docs
+        head, b = b[:m.start()], b[m.start():]
+        nl = b.find("\n")
+        seg, tail = (b, "") if nl < 0 else (b[:nl], b[nl + 1:])
+        delims = []
+
+        def opener(o):
+            raw = re.sub(r"^<<-?[ \t]*", "", o.group())
+            d = re.sub(r"""["'\\]""", "", raw)
+            delims.append((d, d != raw))
+            return " HEREDOC "
+        out, m = "", _OPENER.search(seg)
+        while m:                            # the awk's per-line loop: each search
+            out += seg[:m.start()] + opener(m)  # starts afresh after the last opener
+            seg = seg[m.end():]
+            m = _OPENER.search(seg)
+        seg = out + seg
+        subs, closed = "", nl >= 0
+        for d, quoted in delims:
+            body = ""
+            if closed:
+                e = re.search("(?:^|\n)[ \t]*" + re.escape(d) + "[ \t]*(?:\n|\\Z)", tail)
+                if e:
+                    body, tail = tail[:e.start()], tail[e.end():]
+                    subs += "" if quoted else heredoc_subs(body)
+                else:                       # never closes: keep it, as commands
+                    body, closed = tail, False
+            docs.append((body, quoted))
+        done += head + seg + subs
+        b = "" if nl < 0 else "\n" + tail
 
 
 def strip_heredocs(b):
-    """Drop every heredoc body; the marker becomes the word HEREDOC."""
-    for b, _, _ in _heredocs(b):
-        pass
-    return b
+    """Drop every heredoc body but an unquoted one's command substitutions; the
+    marker becomes the word HEREDOC."""
+    return _heredocs(b)[0]
 
 
 def heredoc_bodies(b):
@@ -165,10 +275,10 @@ def heredoc_bodies(b):
 
 
 def heredocs(b):
-    """[(body, live)] per closed heredoc; live when the delimiter was unquoted
-    and the body holds a $ or a backtick the shell would expand."""
+    """[(body, live)] per heredoc; live when the delimiter was unquoted and the
+    body holds a $ or a backtick the shell would expand."""
     return [(body, not quoted and ("$" in body or "`" in body))
-            for _, body, quoted in _heredocs(b) if body is not None]
+            for body, quoted in _heredocs(b)[1]]
 
 
 class Scan:

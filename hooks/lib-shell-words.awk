@@ -21,39 +21,170 @@
 # Drop every heredoc body: from the end of the line carrying <<WORD to the
 # line that is exactly WORD. The marker itself becomes a plain word. Runs on
 # the raw text before scan(), so a `<<EOF` inside quotes is stripped too --
-# a doc that *mentions* a command is not that command either way.
-function strip_heredocs(b,  d, eol, endm, tail, start) {
-  while (match(b, /<<-?[ \t]*["']?[A-Za-z_][A-Za-z0-9_]*["']?/)) {
-    start = RSTART  # match() below clobbers RSTART; keep the opener's position
-    d = substr(b, start, RLENGTH); sub(/^<<-?[ \t]*/, "", d); gsub(/["']/, "", d)
-    eol = index(substr(b, start), "\n")
-    if (!eol) return substr(b, 1, start - 1) " HEREDOC "
-    tail = substr(b, start + eol)
-    endm = match(tail, "(^|\n)[ \t]*" d "[ \t]*(\n|$)")
-    if (!endm) return substr(b, 1, start - 1) " HEREDOC "
-    b = substr(b, 1, start - 1) " HEREDOC " substr(tail, endm + RLENGTH - 1)
-  }
-  return b
+# a doc that *mentions* a command is not that command either way. With an
+# unquoted delimiter (<<EOF, <<-EOF) the shell runs the body's command
+# substitutions, so those stay behind, each on a line of its own
+# (sw_hd_subs), and scan() reads them as commands like any other $(...).
+# Any quote or backslash in the word (<<'EOF', <<E"O"F, <<\EOF) quotes it.
+# The rest of the opener line stays, and every opener on it takes its body
+# in turn from the lines below, as the shell does. A body whose closing line
+# never comes stays as it is, read as commands. `<<<` is a here-string, not
+# an opener. The search resumes after each heredoc, never inside what it
+# kept, so a `<<X` in a kept substitution cannot pair with a later X line.
+function strip_heredocs(b,  x) {
+  sw_heredocs(b, x)
+  return SW_hd_out
 }
 
 # heredoc_bodies(b, bodies): companion to strip_heredocs -- run on the same
 # original text, it finds the same heredocs in the same order but returns
-# their body text (bodies[1..n]) instead of throwing it away. b itself is
-# untouched (awk passes scalars by value).
-function heredoc_bodies(b, bodies,   d, eol, endm, tail, start, n) {
-  n = 0
-  while (match(b, /<<-?[ \t]*["']?[A-Za-z_][A-Za-z0-9_]*["']?/)) {
-    start = RSTART
-    d = substr(b, start, RLENGTH); sub(/^<<-?[ \t]*/, "", d); gsub(/["']/, "", d)
-    eol = index(substr(b, start), "\n")
-    if (!eol) return n
-    tail = substr(b, start + eol)
-    endm = match(tail, "(^|\n)[ \t]*" d "[ \t]*(\n|$)")
-    if (!endm) return n
-    bodies[++n] = substr(tail, 1, endm - 1)
-    b = substr(b, 1, start - 1) " HEREDOC " substr(tail, endm + RLENGTH - 1)
+# their body text (bodies[1..n]; "" when the opener ends the text) instead
+# of throwing it away. b itself is untouched (awk passes scalars by value).
+function heredoc_bodies(b, bodies) {
+  return sw_heredocs(b, bodies)
+}
+
+# sw_hd_open(s): 1 when s holds a heredoc opener; SW_hs and SW_hl are its
+# start and length. awk has no lookbehind, so the character before the
+# opener rides in the match and is trimmed off.
+function sw_hd_open(s) {
+  if (!match(s, /(^|[^<])<<-?[ \t]*([A-Za-z_]|'[^'\n]*'|"[^"\n]*"|\\.)([A-Za-z0-9_]|'[^'\n]*'|"[^"\n]*"|\\.)*/)) return 0
+  SW_hs = RSTART; SW_hl = RLENGTH
+  if (substr(s, SW_hs, 1) != "<") { SW_hs++; SW_hl-- }
+  return 1
+}
+
+# sw_heredocs(b, bodies): the one walk both functions above share. Fills
+# bodies[1..n], returns n, and leaves the stripped text in SW_hd_out.
+function sw_heredocs(b, bodies,   done, n, head, eol, seg, out, raw, nd, ds, dq, i, tail, endm, subs, open, body) {
+  done = ""; n = 0
+  while (sw_hd_open(b)) {
+    head = substr(b, 1, SW_hs - 1); b = substr(b, SW_hs)
+    eol = index(b, "\n")
+    if (eol) { seg = substr(b, 1, eol - 1); tail = substr(b, eol + 1) }
+    else { seg = b; tail = "" }
+    out = ""; nd = 0
+    while (sw_hd_open(seg)) {
+      raw = substr(seg, SW_hs, SW_hl)
+      out = out substr(seg, 1, SW_hs - 1) " HEREDOC "
+      seg = substr(seg, SW_hs + SW_hl)
+      sub(/^<<-?[ \t]*/, "", raw)
+      ds[++nd] = raw; gsub(/["'\\]/, "", ds[nd]); dq[nd] = (ds[nd] != raw)
+    }
+    out = out seg; subs = ""; open = (eol > 0)
+    for (i = 1; i <= nd; i++) {
+      body = ""
+      if (open) {
+        endm = sw_hd_end(tail, ds[i])
+        if (endm) {
+          body = substr(tail, 1, endm - 1); tail = substr(tail, endm + RLENGTH)
+          if (!dq[i]) subs = subs sw_hd_subs(body)
+        } else { body = tail; open = 0 }   # never closes: keep it, as commands
+      }
+      bodies[++n] = body
+    }
+    done = done head out subs
+    b = eol ? "\n" tail : ""
   }
+  SW_hd_out = done b
   return n
+}
+
+# sw_hd_end(t, d): where heredoc text t closes on a line that is d, give or
+# take blanks and tabs, or 0 when none does. Like match(): the start of the
+# closing line, or of the newline before it, and RLENGTH runs past its own
+# newline. Compared as a string, so a delimiter like END-X or a.b is not a
+# regex.
+function sw_hd_end(t, d,   p, e, line) {
+  for (p = 1; ; p += e) {
+    e = index(substr(t, p), "\n")
+    line = e ? substr(t, p, e - 1) : substr(t, p)
+    sub(/^[ \t]+/, "", line); sub(/[ \t]+$/, "", line)
+    if (line == d) {
+      RLENGTH = (e ? e : length(substr(t, p))) + (p > 1)
+      return p > 1 ? p - 1 : 1
+    }
+    if (!e) return 0
+  }
+}
+
+# sw_hd_subs(s): the $(...) and `...` command substitutions in heredoc body s,
+# each after a newline and with any quote it leaves open closed (sw_qclose),
+# so prose like `don't` cannot swallow the commands after the heredoc. A
+# backslash escapes the next character. A $(...) whose end sw_hd_close cannot
+# be sure of keeps the rest of the body.
+function sw_hd_subs(s,   L, i, j, c, out, t) {
+  L = length(s); out = ""
+  for (i = 1; i <= L; i++) {
+    c = substr(s, i, 1)
+    if (c == "\\") { i++; continue }
+    if (c == "`") {
+      for (j = i + 1; j <= L; j++) {
+        c = substr(s, j, 1)
+        if (c == "\\") { j++; continue }
+        if (c == "`") break
+      }
+      t = substr(s, i, j - i + 1); out = out "\n" t sw_qclose(t); i = j; continue
+    }
+    if (c == "$" && substr(s, i + 1, 1) == "(") {
+      j = sw_hd_close(s, i + 2)
+      t = substr(s, i, j - i + 1); out = out "\n" t sw_qclose(t); i = j
+    }
+  }
+  return out
+}
+
+# sw_hd_close(s, j): index of the `)` closing a `$(` whose text starts at j,
+# or length(s) when none does or the walk cannot be sure: a quote, backtick,
+# backslash, `#` or `case` before the `)` sends it to the end, because a
+# guard must not stake a bypass on out-guessing the shell's grammar.
+function sw_hd_close(s, j,   L, c, depth) {
+  L = length(s); depth = 1
+  for (; j <= L; j++) {
+    c = substr(s, j, 1)
+    if (index("\"'`\\#", c)) return L
+    if (c == "c" && substr(s, j, 4) == "case" && substr(s, j + 4, 1) !~ /[A-Za-z0-9_]/ \
+        && substr(s, j - 1, 1) !~ /[A-Za-z0-9_]/) return L
+    if (c == "(") depth++
+    else if (c == ")") { depth--; if (!depth) return j }
+  }
+  return L
+}
+
+# sw_qclose(t): the quote scan() would still hold open at the end of t ("'",
+# "\"" or ""), read by scan()'s own rules: a backslash escapes outside single
+# quotes, and a `#` comments to the end of its line only before a word has
+# begun, so `a\ #'` opens a quote and `a #'` does not.
+function sw_qclose(t,   L, i, c, d, have) {
+  L = length(t); have = 0
+  for (i = 1; i <= L; i++) {
+    c = substr(t, i, 1)
+    if (c == "\\") { i++; if (i <= L && substr(t, i, 1) != "\n") have = 1; continue }
+    if (c == "'") {
+      have = 1; d = index(substr(t, i + 1), "'")
+      if (!d) return "'"
+      i += d; continue
+    }
+    if (c == "\"") {
+      have = 1
+      for (i++; i <= L; i++) {
+        c = substr(t, i, 1)
+        if (c == "\\") { i++; continue }
+        if (c == "\"") break
+      }
+      if (i > L) return "\""
+      continue
+    }
+    if (c == "#" && !have) {
+      d = index(substr(t, i), "\n")
+      if (!d) return ""
+      i += d - 2; continue
+    }
+    if (index(" \t\n;|&()`<>", c)) { have = 0; continue }
+    if ((c == "{" || c == "}") && !have) continue
+    have = 1
+  }
+  return ""
 }
 
 # scan(text, w, k, q): tokenise shell text into w[1..n]; returns n.
