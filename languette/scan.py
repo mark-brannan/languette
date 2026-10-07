@@ -309,6 +309,7 @@ class Scan:
 
     def _reset(self):
         self.w, self.k, self.q, self.live = [], [], [], []
+        self.pipes = set()                 # the separators that are a | or |&
         self._cur, self._have, self._quoted, self._skip, self._livecur = "", False, False, False, False
 
     def _region(self, src, node, a, b):
@@ -457,8 +458,11 @@ class Scan:
                 continue
             if c in (";", "|", "&", "\n", "(", ")", "`"):
                 self._emit(); self._sep()
+                o = i
                 while at(i + 1) in (";", "|", "&"):
                     i += 1
+                if b[o:i + 1] in ("|", "|&") and self.w:
+                    self.pipes.add(len(self.w) - 1)
                 i += 1
                 continue
             if c in ("{", "}") and not self._have:
