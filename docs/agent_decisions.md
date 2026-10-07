@@ -35,6 +35,22 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - MCP read-tool detection stays a denylist of write words after the read verb, widened (modify, change, tag, attach, delete, ...), rather than an allowlist of read-tool names Undo: an allowlist of whole read-tool names instead ([#41](https://github.com/mark-brannan/languette/pull/41))
 - true, : and cd may share a call with a file-reading gh even with a redirect, since they can only truncate the file; pushd and popd may not, since they print the stack Undo: refuse any redirect in the call instead ([#41](https://github.com/mark-brannan/languette/pull/41))
 
+### 20261004t114814z
+- no-perm-sweep, no-pipe-to-shell and no-disk-wreck each ship in both engines (awk hook and Python guard), run from one scenario file Undo: delete the Python guard and drop @python from the feature; the hook keeps working ([#55](https://github.com/mark-brannan/languette/pull/55))
+
+### 20261004t114823z
+- LANGUETTE_PERM_ALLOW takes absolute paths only, no bare names (no-perm-sweep) Undo: accept names as no-rm-tree does; one case in parse_allow in the hook and the guard ([#55](https://github.com/mark-brannan/languette/pull/55))
+
+### 20261004t114824z
+- chmod 777 is judged like a sweep (allowed inside the agent's areas) rather than denied everywhere (no-perm-sweep) Undo: drop the allowlist step for the world-writable case; one branch in perm() ([#55](https://github.com/mark-brannan/languette/pull/55))
+
+### 20261004t114825z
+- a recursive target inside any .git is denied even in an agent's area (no-perm-sweep) Undo: drop the .git component check in target() ([#55](https://github.com/mark-brannan/languette/pull/55))
+- shutdown, reboot, halt and poweroff match at command position, so sudo -u root reboot is a known false allow (no-disk-wreck) Undo: match the words anywhere in a segment and accept false denies on npm run halt ([#55](https://github.com/mark-brannan/languette/pull/55))
+
+### 20261004t192745z
+- env -C, sudo -D and sudo -R (a chroot) count as a cd in every spelling getopt takes (attached, clustered, a long-option prefix); only the options of the wrapper itself are read, and one the guard does not know errs toward denying a relative path (no-perm-sweep, no-disk-wreck) Undo: match the detached -C, -D and --chdir spellings only; one regex in paths.chdir_wrapper and chdirw() in the two hooks ([#55](https://github.com/mark-brannan/languette/pull/55))
+
 ### 20261007t041411z
 - no-ruleset-bypass denies a push to a PR-only default branch rather than asking; the user's bypass stays in their own terminal Undo: deny( -> ask( in _judge ([#64](https://github.com/mark-brannan/languette/pull/64))
 - no-ruleset-bypass also denies gh pr merge --admin, the same bypass through another door Undo: drop _admin_merge ([#64](https://github.com/mark-brannan/languette/pull/64))
@@ -59,3 +75,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261007t095052z
 - With parse_check=false, the other Python guards read an unparseable Bash command on the awk rung instead of skipping it (the bot's fix); the alternative was denying it outright as before the split Undo: revert e6196ea ([#65](https://github.com/mark-brannan/languette/pull/65))
+
+### 20261007t105057z
+- The #55 guards take the curia's names, so the entries above that name them read under the old ones: no-perm-sweep is guard-permissions, no-pipe-to-shell is guard-pipe-to-shell, and no-disk-wreck splits three ways in both engines: guard-disk (dd, mkfs, wipefs, shred, a write onto a device, the cd-into-/dev tracking), guard-host-availability (shutdown, reboot, halt, poweroff, the fork bomb) and guard-scheduled-jobs (crontab -r). Their hooks.json entries run run.py, as guard-recursive-delete's does Undo: git revert the rename-and-split commit on #55 ([#55](https://github.com/mark-brannan/languette/pull/55))

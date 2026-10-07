@@ -21,6 +21,31 @@
           },
           {
             "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-permissions; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-permissions and was not found on PATH. This is a gate and fails closed: install python3, or set guard_permissions=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-permissions) is missing from the plugin directory or crashed, so a recursive chmod, chown or chgrp could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for a recursive permission change"
+          },
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-pipe-to-shell; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-pipe-to-shell and was not found on PATH. This is a gate and fails closed: install python3, or set guard_pipe_to_shell=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-pipe-to-shell) is missing from the plugin directory or crashed, so a download piped into a shell could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for a download piped into a shell"
+          },
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_DISK-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-disk; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-disk and was not found on PATH. This is a gate and fails closed: install python3, or set guard_disk=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-disk) is missing from the plugin directory or crashed, so a disk wipe could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for a disk wipe"
+          },
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-host-availability; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-host-availability and was not found on PATH. This is a gate and fails closed: install python3, or set guard_host_availability=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-host-availability) is missing from the plugin directory or crashed, so a shutdown or a fork bomb could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for a shutdown or a fork bomb"
+          },
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-scheduled-jobs; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-scheduled-jobs and was not found on PATH. This is a gate and fails closed: install python3, or set guard_scheduled_jobs=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-scheduled-jobs) is missing from the plugin directory or crashed, so a crontab deletion could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for a crontab deletion"
+          },
+          {
+            "type": "command",
             "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/no-delete-stacked-base.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"no-delete-stacked-base.sh is missing from the plugin directory or crashed, so a remote-branch deletion could not be checked for open PRs stacked on it. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for open PRs stacked on the branch being deleted"
           },
