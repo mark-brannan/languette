@@ -155,17 +155,45 @@ Feature: ask-first
       When the agent runs it again
       Then the guard denies
 
-    Scenario: an approval is not spent on a command another guard denies
-      Given every guard judges the command
-      And the transcript holds:
+    Scenario: a click comes back when the user declines the command
+      Given the transcript holds:
         """
         {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Run `npm run e2e` (e2e)?", "header": "Walk", "multiSelect": false, "options": [{"label": "Run e2e", "description": "46 min"}, {"label": "Skip", "description": ""}]}]}}]}}
         {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Run `npm run e2e` (e2e)?\"=\"Run e2e\". You can now continue with the user's answers in mind."}]}}
         """
       When the agent runs `npm run e2e && dd if=/dev/zero of=/dev/sda`
-      Then the guard denies, naming "guard-disk"
+      Then the guard is silent
+      When the user declines that call
+      And the agent runs `npm run e2e`
+      Then the guard is silent
+      When the agent runs it again
+      Then the guard denies
+
+    Scenario: a click comes back when another hook denies the command
+      Given the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Run `npm run e2e` (e2e)?", "header": "Walk", "multiSelect": false, "options": [{"label": "Run e2e", "description": "46 min"}, {"label": "Skip", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Run `npm run e2e` (e2e)?\"=\"Run e2e\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `npm run e2e && dd if=/dev/zero of=/dev/sda`
+      Then the guard is silent
+      When Claude Code records that call's result as "guard-disk: dd onto /dev/sda wipes a disk."
+      And the agent runs `npm run e2e`
+      Then the guard is silent
+      When the agent runs it again
+      Then the guard denies
+
+    Scenario: a click stays spent when the command ran and failed
+      Given the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Run `npm run e2e` (e2e)?", "header": "Walk", "multiSelect": false, "options": [{"label": "Run e2e", "description": "46 min"}, {"label": "Skip", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Run `npm run e2e` (e2e)?\"=\"Run e2e\". You can now continue with the user's answers in mind."}]}}
+        """
       When the agent runs `npm run e2e`
       Then the guard is silent
+      When Claude Code records that call's result as "Exit code 1"
+      And the agent runs `npm run e2e`
+      Then the guard denies
 
     Scenario: already spent
       Given the transcript holds:

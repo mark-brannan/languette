@@ -15,9 +15,7 @@ read from them (a git ref, GitHub's rules for a branch, a file, the clock, the
 user's approvals) it asks for: its check is then a generator that yields a
 languette.verdict.Need and gets the answer back, and returns its finding. This
 runner answers every Need through languette.world, the only module that does
-I/O, and throws world's exception into the guard when the fact can't be had. A
-finding may carry approvals to spend; they are spent after the verdict, and
-only when it is not a deny, so a command another guard denies costs no click.
+I/O, and throws world's exception into the guard when the fact can't be had.
 A guard whose check returns a finding directly needs no change.
 """
 
@@ -103,7 +101,7 @@ def respond(stdin_text, env, only=None):
         if unparsed:
             guards = [g for g in guards if g is guard_unparsable]
     world = World(env, payload)
-    reasons, asks, notes, wants = [], [], [], {}
+    reasons, asks, notes = [], [], []
     for g in guards:
         try:
             r = _drive(g.check(payload, env), world)
@@ -111,8 +109,6 @@ def respond(stdin_text, env, only=None):
             r = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command")
         if not r:
             continue
-        for label, n in r.get("spend", {}).items():
-            wants[label] = wants.get(label, 0) + n
         if r.get("permissionDecision") == "deny":
             reasons.append(r["permissionDecisionReason"])
         if r.get("permissionDecision") == "ask":
@@ -121,17 +117,6 @@ def respond(stdin_text, env, only=None):
             notes.append(r["additionalContext"])
     if reasons:
         return _out(event, deny("\n\n".join(reasons)))
-    if wants:
-        # A click is one run: spent only now, when no guard denied, so a denied command keeps it.
-        try:
-            spent = world.spend(wants)
-        except (OSError, ValueError) as e:
-            return _out(event, deny(f"languette: cannot record the user's approval as spent ({e}), so the "
-                                    "command is denied. Ask the user to run it themselves."))
-        if not spent:
-            return _out(event, deny(f"languette: this command needs more unspent approvals ({', '.join(sorted(wants))}) "
-                                    "than there are: another command judged at the same time spent one, or two "
-                                    "guards each need one for the same label. Ask the user again."))
     if asks:
         return _out(event, ask("\n\n".join(asks)))
     if notes:

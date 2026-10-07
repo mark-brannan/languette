@@ -24,7 +24,7 @@ import re
 
 from languette import scan as sw
 from languette.guards.ask_first import LOOP, claim
-from languette.verdict import deny, spend
+from languette.verdict import deny
 
 NAME = "guard-bypass-hooks"
 APPROVE_LABEL = "Skip hooks once"
@@ -118,15 +118,14 @@ def check(payload, env=None):
         return deny(f"{NAME}: skipping the hooks inside a loop, xargs, parallel or watch skips the hooks an "
                     "unknown number of times, and each run needs its own approval. Fix what the blocking "
                     "hook reported, or run it once, on its own, after asking.")
-    wants = {APPROVE_LABEL: runs}
     try:
-        approved, enough = yield from claim(wants)
+        approved, spent = yield from claim({APPROVE_LABEL: runs})
     except (OSError, ValueError) as e:
         return deny(f"{NAME}: cannot read the session transcript to look for the user's approval, or "
                     f"record it as spent ({e}), so `{cmd.strip()}` is denied. Fix what the blocking "
                     "hook reported, or ask the user to run it themselves.")
-    if enough:
-        return spend(wants)
+    if spent:
+        return None
     have = len(approved[APPROVE_LABEL])
     return deny(f"{NAME}: --no-verify, -n or core.hooksPath skips this repo's hooks, and that is the user's call, not "
                 f"yours: a hook that blocks a commit, push or merge is telling you something. "

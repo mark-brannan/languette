@@ -39,7 +39,7 @@ import os
 import re
 
 from languette import scan as sw
-from languette.verdict import Need, Refuse, deny, spend
+from languette.verdict import Need, Refuse, deny
 
 NAME = "ask-first"
 CONFIG = ".languette/ask-first.json"
@@ -187,16 +187,15 @@ def _matches(entry, text):
 
 
 def claim(wants):
-    """Ask for the user's unspent approvals; `wants` is {approve_label: runs}.
-    Use as `approved, enough = yield from claim(wants)`: approved is {label:
-    unspent tool_use ids}, enough is whether every label has its runs' worth.
-    Nothing is spent here: return spend(wants) and the runner spends them once
-    the verdict is in, atomically, under the spent file's lock (languette.world).
-    The world's OSError or ValueError, for a payload with no transcript or a
-    transcript that can't be read, is raised from here. Shared with guard-infra
-    and guard-bypass-hooks: one click is one run, whichever guard asked."""
-    approved = yield Need("approvals", tuple(wants))
-    return approved, all(len(approved[label]) >= n for label, n in wants.items())
+    """Spend one of the user's approvals per run; `wants` is {approve_label: runs}.
+    Use as `approved, spent = yield from claim({c["approve_label"]: runs[c["id"]] for c in hits})`: approved is {label:
+    tool_use ids}, spent is whether every label had its runs' worth, now recorded
+    against this tool call. A click comes back when the transcript shows the call
+    never ran (languette.world). The world's OSError or ValueError, for a payload
+    with no transcript or a transcript that can't be read, is raised from here.
+    Shared with guard-infra and guard-bypass-hooks: one click is one run,
+    whichever guard asked."""
+    return (yield Need("claim", dict(wants)))
 
 
 def check(payload, env=os.environ):
@@ -232,14 +231,13 @@ def check(payload, env=os.environ):
                      "parallel or watch runs an unknown number of times, and each run needs its own "
                      "approval. Run it once, on its own.")
 
-    wants = {c["approve_label"]: runs[c["id"]] for c in hits}
     try:
-        approved, enough = yield from claim(wants)
+        approved, spent = yield from claim({c["approve_label"]: runs[c["id"]] for c in hits})
     except (OSError, ValueError) as e:
         return deny(f"ask-first: cannot read the session transcript to look for the user's approval, or "
                      f"record it as spent ({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
-    if enough:
-        return spend(wants)
+    if spent:
+        return None
     parts = []
     for c in hits:
         have = len(approved[c["approve_label"]])

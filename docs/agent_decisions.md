@@ -82,11 +82,9 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 ### 20261007t114536z
 - The three stub guards are listed in the README's guard list, marked (planned), not in a line under Development. Undo: move the bullet back to the line under Development ([#69](https://github.com/mark-brannan/languette/pull/69))
 
-### 20261007t214335z
-- Approvals are spent on an ask verdict too, as #79 says (not a deny); the user may then decline the prompt and lose the click. Undo: make run.py spend only when no guard asks either ([#81](https://github.com/mark-brannan/languette/pull/81))
-
-### 20261007t214339z
-- When a parallel hook spends the approval first, the runner denies with one generic reason, not the asking guard's own wording. Undo: pass each guard's own short-approval reason on the finding and deny with it ([#81](https://github.com/mark-brannan/languette/pull/81))
-
 ### 20261007t214340z
 - Facts the payload and env carry stay plain arguments to check, not Needs; only facts that need I/O are asked for. Undo: add an env Need kind answered in run.py and route guards' env reads through it ([#81](https://github.com/mark-brannan/languette/pull/81))
+
+### 20261007t223657z
+- A tool result the click parser does not recognise as a refusal counts as a call that ran, so its click stays spent; only a declined prompt, a hook error, the classifier or a languette guard's deny gives it back. Undo: widen the refusal pattern in languette/world.py, or treat every error other than 'Exit code N' as never ran ([#81](https://github.com/mark-brannan/languette/pull/81))
+- A payload without tool_use_id spends its click for good, as before this PR, rather than matching the call by its command in the transcript. Undo: find the call as the latest unanswered Bash tool_use whose command matches the payload's ([#81](https://github.com/mark-brannan/languette/pull/81))

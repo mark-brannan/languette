@@ -112,6 +112,7 @@ class Ctx:
         self.arg = None                        # an extra CLI argument to the guard script
         self.session = "s1"                    # session_id in the payload, for guard-github-issues
         self._doordir = None
+        self.calls = 0                         # tool_use_id in the payload: one per call, as Claude Code gives
         self.stdin = self.verdict = self.scanned = None
         self._dirs = []
 
@@ -146,8 +147,9 @@ class Ctx:
     # --- running a guard -------------------------------------------------
 
     def payload(self, command):
+        self.calls += 1
         p = {"tool_name": "Bash", "tool_input": {"command": self.expand(command)}, "cwd": self.expand(self.cwd),
-             "session_id": self.session}
+             "session_id": self.session, "tool_use_id": f"toolu_call{self.calls}"}
         if self.proj:
             p["transcript_path"] = f"{self.proj}/t.jsonl"
         return json.dumps(p)
@@ -253,11 +255,6 @@ def _terms(ctx, docstring):
     f = Path(ctx.mkdtemp()) / "private-terms.txt"
     f.write_text(ctx.expand(docstring) + "\n")
     ctx.env["CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE"] = str(f)
-
-
-@given("every guard judges the command")
-def _every_guard(ctx):
-    ctx.guard = None                           # as one process for the event, not --guard <feature's guard>
 
 
 @given("the transcript holds:")
@@ -477,7 +474,30 @@ def _runs_doc(ctx, docstring):
 
 @when("the agent runs it again")
 def _rerun(ctx):
-    ctx.run(ctx.stdin)
+    p = json.loads(ctx.stdin)
+    if "tool_use_id" in p:
+        ctx.calls += 1
+        p["tool_use_id"] = f"toolu_call{ctx.calls}"
+    ctx.run(json.dumps(p))
+
+
+def _record_result(ctx, content, **extra):
+    call = json.loads(ctx.stdin)["tool_use_id"]
+    rec = {"type": "user", "message": {"role": "user", "content": [
+        {"type": "tool_result", "tool_use_id": call, "content": content, "is_error": True}]}, **extra}
+    with (ctx.proj / "t.jsonl").open("a") as f:
+        f.write(json.dumps(rec) + "\n")
+
+
+@when(parsers.parse('Claude Code records that call\'s result as "{content}"'))
+def _call_result(ctx, content):
+    _record_result(ctx, content)
+
+
+@when("the user declines that call")
+def _call_declined(ctx):
+    _record_result(ctx, "The user doesn't want to proceed with this tool use. The tool use was rejected.",
+                   toolUseResult="User rejected tool use")
 
 
 @when("the human speaks, opening the door")

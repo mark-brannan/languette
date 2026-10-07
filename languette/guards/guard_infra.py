@@ -46,7 +46,7 @@ import re
 
 from languette import scan as sw
 from languette.guards.ask_first import LAUNCH, LOOP, PROSE, claim
-from languette.verdict import deny, spend
+from languette.verdict import deny
 
 NAME = "guard-infra"
 
@@ -317,14 +317,13 @@ def check(payload, env=None):
         return deny("guard-infra: " + ", ".join(f"`{r}`" for r in found) + " inside a loop, xargs, "
                     "parallel or watch runs an unknown number of times, and each run needs its own "
                     "approval. Run it once, on its own, after looking at what it would remove.")
-    wants = {RULES[r][0]: len(found[r]) for r in found}
     try:
-        approved, enough = yield from claim(wants)
+        approved, spent = yield from claim({RULES[r][0]: len(found[r]) for r in found})
     except (OSError, ValueError) as e:
         return deny(f"guard-infra: cannot read the session transcript to look for the user's approval, or "
                     f"record it as spent ({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
-    if enough:
-        return spend(wants)
+    if spent:
+        return None
     parts = []
     for r in found:
         label, what, cost, instead = RULES[r]

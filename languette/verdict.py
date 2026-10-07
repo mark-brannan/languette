@@ -1,8 +1,7 @@
 """The verdicts a guard returns, in Claude Code's hookSpecificOutput words,
 and the facts a guard may ask for.
 
-A guard's check returns deny(reason), ask(reason), context(text), spend(wants)
-or None; or it is a generator that yields Needs and returns one of those.
+A guard's check returns deny(reason), ask(reason), context(text) or None; or it is a generator that yields Needs and returns one of those.
 Refuse is how a guard's internals say "deny, for this reason" from deep inside
 a walk; check catches it and returns deny. Standard library only.
 """
@@ -25,7 +24,7 @@ class Need:
         ruleset-cache slug, branch        -> (mtime, text), or None
         ruleset-keep  slug, branch, text  -> None, once written
         clock                             -> seconds since the epoch
-        approvals     labels              -> {label: [unspent AskUserQuestion ids]}
+        claim         {label: runs}       -> ({label: [AskUserQuestion ids]}, spent)
     """
 
     __slots__ = ("kind", "args")
@@ -48,8 +47,3 @@ def ask(reason):
 def context(text):
     return {"additionalContext": text}
 
-
-def spend(wants, finding=None):
-    """`finding`, or no objection, that spends `wants` ({approve_label: runs}) once
-    the verdict is in. The runner spends only when the verdict is not a deny."""
-    return {**(finding or {}), "spend": dict(wants)}
