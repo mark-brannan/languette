@@ -43,6 +43,10 @@ ENVS = {
                          "the pip rung is an empty slot (#4): tree-sitter-bash is installed and never asked"),
 }
 
+# The pip rows' venvs, proven outside the xfail: a strict xfail swallows any
+# failure in its body, a missing venv's included.
+IMPORTS = {"bashlex": "bashlex", "tree-sitter-bash": "tree_sitter, tree_sitter_bash"}
+
 
 def hook_command():
     """guard-unparsable's command string, read from hooks.json, never copied."""
@@ -114,3 +118,14 @@ def test_bad_command_is_denied_naming_its_parser(env, tmp_path):
 def test_good_command_is_silent(env, tmp_path):
     tools, var, _, _ = ENVS[env]
     assert run_hook(make_path(tmp_path, tools, python_for(var)), tmp_path, GOOD) is None
+
+
+@pytest.mark.parametrize("env", list(IMPORTS))
+def test_pip_row_has_its_parser(env, tmp_path):
+    """The venv a pip row names imports its parser through the PATH's python3,
+    run as the hook runs it (-I), so an xfail row is red for the ladder's reason only."""
+    tools, var, _, _ = ENVS[env]
+    d = make_path(tmp_path, tools, python_for(var))
+    r = subprocess.run([str(d / "python3"), "-I", "-c", f"import {IMPORTS[env]}"], capture_output=True, text=True,
+                       env={"PATH": str(d), "HOME": str(tmp_path)}, timeout=20)
+    assert r.returncode == 0, f"{var} cannot import {IMPORTS[env]}: {r.stderr}"
