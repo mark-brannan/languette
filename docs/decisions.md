@@ -31,6 +31,12 @@ interface is; this file says who decided it and why, one line each.
   available.
 - Which pip parser, or both in turn (tree-sitter-bash, bashlex), is open (#4).
 
+## Parser ladder refusals: Solace, 2026-10-07
+
+- `bash -n` is a rung; a rung reads, refuses (a deny naming it) or passes down.
+- tree-sitter-bash refuses on an ERROR node; bashlex on an unclosed quote,
+  bracket or unexpected end; the built-in lexer on an unclosed quote.
+
 ## Runtime dependencies: Solace, 2026-10-06
 
 - Languette runs on python3 and its standard library plus the parser ladder

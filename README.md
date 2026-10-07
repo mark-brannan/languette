@@ -43,11 +43,10 @@ Without the plugin system, see [Installing by hand](#installing-by-hand).
 
 ## The guards
 
-Each guard denies one class of command:
+Each guard checks for one kind of hazard:
 
-- [`guard-unparsable`](features/guard-unparsable.feature): a Bash command the shell
-  parser refuses (`shfmt`, else `bash -n`), denied whole with its line and
-  column; the other guards skip it
+- [`guard-unparsable`](features/guard-unparsable.feature): a Bash command that
+  doesn't parse; the other guards skip it
 - [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
 - [`guard-permissions`](features/guard-permissions.feature): recursive `chmod`,
@@ -108,8 +107,9 @@ scenarios for a command run in `~/project`, and CI fails if the table drifts:
 | `./cleanup.sh` | allow | no rule; silent (known gap) |
 <!-- /fixtures-table -->
 
-With `shfmt` 3.6 or later on `PATH` (else `bash -n`, which says less), the
-`guard-unparsable` guard denies a command that doesn't parse.
+With `shfmt` 3.6 or later on `PATH`, the `guard-unparsable` guard denies a
+command that doesn't parse. Without `shfmt`, it falls back to the next parser
+it finds: tree-sitter-bash or bashlex, then `bash -n`, then its own lexer.
 In a replay of 101,671 agent commands, about 1 in 3,000 didn't parse, and
 each [would have broken](features/guard-unparsable.feature).
 Bash runs a broken command in part, the lines before the error or prose in
@@ -249,7 +249,7 @@ guard reads beyond the command, it declares:
 | Guard | Reads |
 |---|---|
 | `guard-git-work-loss` | nothing: a pure function of the command |
-| `guard-unparsable` | `shfmt`, else `bash -n`, which runs nothing |
+| `guard-unparsable` | a shell parser; nothing runs the command |
 | `guard-recursive-delete` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
 | `guard-bypass-hooks` | the transcript, and the approvals spent |
