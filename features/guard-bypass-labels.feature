@@ -1,5 +1,5 @@
 @python
-Feature: no-bypass-labels
+Feature: guard-bypass-labels
   A label that waives a CI gate is a human's to apply, never a session's: a
   gate whose bypass the gated party can apply to its own PR is not a gate.
   The labels are the bypass_labels option, comma-separated, by default

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for public-issue-guard.sh. Run: bash hooks/public-issue-guard.test.sh
+# Tests for guard-private-terms.sh. Run: bash hooks/guard-private-terms.test.sh
 # Set AWK_PATH to a directory whose `awk` is another implementation to run
 # the same cases under it (CI does mawk, gawk, original-awk).
 #
@@ -10,7 +10,7 @@
 # shellcheck disable=SC2016  # the commands under test contain $(...) and $VAR on purpose
 set -uo pipefail
 
-HOOK="$(cd "$(dirname "$0")" && pwd)/public-issue-guard.sh"
+HOOK="$(cd "$(dirname "$0")" && pwd)/guard-private-terms.sh"
 [ -n "${AWK_PATH:-}" ] && PATH="$AWK_PATH:$PATH"
 pass=0; fail=0
 SCRATCH=$(mktemp -d); trap 'rm -rf "$SCRATCH"' EXIT

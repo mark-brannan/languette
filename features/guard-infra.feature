@@ -1,5 +1,5 @@
 @python
-Feature: no-iac-destroy
+Feature: guard-infra
   A command that destroys real infrastructure, or applies it without review,
   is denied until the user approves that one run through AskUserQuestion: the
   approval mechanism of ask-first, with the rules built in instead of listed

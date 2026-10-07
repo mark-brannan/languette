@@ -74,9 +74,9 @@ TO_PRIVATE="target a repo listed in the private_repos option"
 
 deny() {
   if command -v jq >/dev/null 2>&1; then
-    jq -cn --arg r "public-issue-guard: $1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
+    jq -cn --arg r "guard-private-terms: $1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
   else
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"public-issue-guard: jq missing, cannot inspect the text about to be posted"}}\n'
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"guard-private-terms: jq missing, cannot inspect the text about to be posted"}}\n'
   fi
   exit 0
 }
@@ -91,7 +91,7 @@ tool=$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null) || deny
 cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
 [ -n "$cwd" ] || cwd=$PWD
 
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/public-issue-guard.XXXXXX") || deny 'cannot create a scratch directory'
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/guard-private-terms.XXXXXX") || deny 'cannot create a scratch directory'
 trap 'rm -rf "$WORK"' EXIT
 TEXT="$WORK/text"      # everything that will be posted, one candidate per line
 META="$WORK/meta"      # R repo (- = the cwd's, ? = unknown) | F file | CDTO dir | CDPUSH/CDPOP ( ) | HFED written here | STDIN | OPAQUE | HEREDOC | CD | UNSEEN flag

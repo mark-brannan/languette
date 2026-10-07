@@ -51,13 +51,13 @@
       "description": "Deny git branch -D and --delete --force. Leave on unless you want this git command through unchecked. Has no effect while no_git_footguns is false.",
       "default": true
     },
-    "parse_check": {
+    "guard_unparsable": {
       "type": "boolean",
       "title": "Deny a command that does not parse",
       "description": "Deny a Bash command the shell parser refuses, with its line and column, before any of it runs. Turned off, the other guards read such a command through a weaker parser instead.",
       "default": true
     },
-    "no_rm_tree": {
+    "guard_recursive_delete": {
       "type": "boolean",
       "title": "Block recursive rm",
       "description": "Deny recursive rm and find -delete outside scratch areas and generated directories. Leave on unless you want recursive deletes through unchecked.",
@@ -75,19 +75,19 @@
       "description": "Deny a command the repo lists in .languette/ask-first.json until the user approves that one run through AskUserQuestion. Leave on unless you want those commands through unasked.",
       "default": true
     },
-    "no_iac_destroy": {
+    "guard_infra": {
       "type": "boolean",
       "title": "Ask before destroying infrastructure",
       "description": "Deny terraform, terragrunt, pulumi, cdk, aws, gcloud, az, kubectl and helm commands that destroy infrastructure or apply without review until the user approves that one run through AskUserQuestion. Plans, previews and dry runs pass. Leave on unless you want those commands through unasked.",
       "default": true
     },
-    "issue_door": {
+    "guard_github_issues": {
       "type": "boolean",
       "title": "One issue create, transfer or delete per turn",
       "description": "Deny a second GitHub issue create, transfer or delete in the same human turn, and any inside a loop or xargs. Leave on unless you want issue creates, transfers and deletes through unchecked.",
       "default": true
     },
-    "public_issue_guard": {
+    "guard_private_terms": {
       "type": "boolean",
       "title": "Keep private terms out of public issues and PRs",
       "description": "Deny issue and PR text posted to a public GitHub repo that names a term from your private-terms file. Does nothing until you also set the private terms file. Leave on unless you want that text through unchecked.",
@@ -105,7 +105,7 @@
       "description": "Repos whose issue and PR text is never scanned, as owner/name, comma-separated. Empty by default: every repo is scanned.",
       "required": false
     },
-    "no_bypass_labels": {
+    "guard_bypass_labels": {
       "type": "boolean",
       "title": "Keep CI-gate bypass labels for humans",
       "description": "Deny a session applying a label that waives a CI gate (bypass_labels) to an issue or PR, through gh, gh api or an MCP tool, in any repo. Leave on unless you want sessions to waive their own gates.",

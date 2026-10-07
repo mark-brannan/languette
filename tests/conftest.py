@@ -7,7 +7,7 @@ except under CI); @shell runs hooks/<guard>.sh by subprocess (under
 $AWK_PATH's awk when set). @shell_only narrows a scenario to the shell,
 @shfmt_only to the shfmt rung; @no_shfmt drops the shfmt rung, for a row its
 parse check denies before any guard reads it. The feature's name is the guard's name, except
-parse-check, which has its own guard. @python_only narrows a scenario to the
+guard-unparsable, which has its own guard. @python_only narrows a scenario to the
 awk rung (bash -n reads instead of shfmt).
 """
 
@@ -44,7 +44,7 @@ _REAL_HOME = os.environ.get("HOME")
 def pytest_configure(config):
     # A throwaway $HOME for the whole run, so no verdict depends on, and no
     # step can touch, the real one. {HOME}/project is the default cwd. Not
-    # under /tmp: no-rm-tree allows all of /tmp, so every target would pass.
+    # under /tmp: guard-recursive-delete allows all of /tmp, so every target would pass.
     home = tempfile.mkdtemp(prefix="languette-home-", dir="/var/tmp")
     os.mkdir(os.path.join(home, "project"))
     os.environ["HOME"] = home
@@ -110,7 +110,7 @@ class Ctx:
         self.stubs = False
         self.hook = None                       # a hooks.json command, for wiring
         self.arg = None                        # an extra CLI argument to the guard script
-        self.session = "s1"                    # session_id in the payload, for issue-door
+        self.session = "s1"                    # session_id in the payload, for guard-github-issues
         self._doordir = None
         self.stdin = self.verdict = self.scanned = None
         self._dirs = []
@@ -121,8 +121,8 @@ class Ctx:
         return d
 
     def doordir(self):
-        # Lazy and once per scenario: issue-door's state lives at
-        # $TMPDIR/languette-issue-door.<session>, and a scenario that opens
+        # Lazy and once per scenario: the guard-github-issues state lives at
+        # $TMPDIR/languette-guard-github-issues.<session>, and a scenario that opens
         # the door in one step and spends it in another needs that file to
         # survive across subprocess calls.
         if self._doordir is None:
@@ -206,7 +206,7 @@ def ctx(engine):
 
 
 def pytest_bdd_before_scenario(request, feature, scenario):
-    request.getfixturevalue("ctx").guard = None if feature.name == "parse-check" else feature.name
+    request.getfixturevalue("ctx").guard = None if feature.name == "guard-unparsable" else feature.name
 
 
 # --- Given ---------------------------------------------------------------
@@ -329,12 +329,12 @@ def _claude_door_still(ctx):
 def _door_symlink(ctx, target):
     victim = Path(ctx.expand(target))
     victim.write_text("keep")
-    Path(ctx.doordir(), f"languette-issue-door.{ctx.session}").symlink_to(victim)
+    Path(ctx.doordir(), f"languette-guard-github-issues.{ctx.session}").symlink_to(victim)
 
 
 @then(parsers.parse('the door file is a plain file and "{target}" still holds "{content}"'))
 def _door_replaced(ctx, target, content):
-    door = Path(ctx.doordir(), f"languette-issue-door.{ctx.session}")
+    door = Path(ctx.doordir(), f"languette-guard-github-issues.{ctx.session}")
     assert not door.is_symlink(), "door file is still a symlink"
     assert Path(ctx.expand(target)).read_text() == content
 
@@ -407,7 +407,7 @@ def hooks_json_commands():
 
 
 def hooks_json_prompt_command():
-    """The one UserPromptSubmit command in hooks/hooks.json (issue-door's)."""
+    """The one UserPromptSubmit command in hooks/hooks.json (the guard-github-issues hook)."""
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
     [h] = [h for e in hj["hooks"]["UserPromptSubmit"] for h in e["hooks"]]
     return h["command"]

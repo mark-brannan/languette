@@ -40,3 +40,13 @@ interface is; this file says who decided it and why, one line each.
   out `$HOME` through git, yadm, chezmoi or another common dotfiles manager,
   without needing that tool installed. `gh` is optional, for
   `no-delete-stacked-base` only.
+
+## Guard names: Solace, 2026-10-07
+
+- Every guard is named `guard-<concept>`, the asset or scenario it guards
+  against; no `no-` prefix, no "footguns". One guard per concept, a setting
+  per scenario inside it.
+- `no-rm-tree` is `guard-recursive-delete`, `no-iac-destroy`
+  `guard-infra`, `issue-door` `guard-github-issues`, `public-issue-guard`
+  `guard-private-terms`; config keys follow, with underscores. The rest are
+  renamed as reached.

@@ -1,5 +1,5 @@
 """The README's failure-mode table, from the @table scenario in
-features/no-rm-tree.feature. Run it to regenerate the table in README.md;
+features/guard-recursive-delete.feature. Run it to regenerate the table in README.md;
 it prints the table too. Standard library only, so plain python3 runs it."""
 
 import re
@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-FEATURE = ROOT / "features/no-rm-tree.feature"
+FEATURE = ROOT / "features/guard-recursive-delete.feature"
 README = ROOT / "README.md"
 BLOCK = re.compile(r"(<!-- fixtures-table -->\n)(.*?)(<!-- /fixtures-table -->)", re.S)
 

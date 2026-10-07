@@ -1,4 +1,4 @@
-"""no-iac-destroy: a command that destroys real infrastructure runs only after
+"""guard-infra: a command that destroys real infrastructure runs only after
 the user said yes to it, once, through AskUserQuestion.
 
 The approval is ask-first's: an AskUserQuestion whose answer (not the
@@ -48,7 +48,7 @@ from languette import scan as sw
 from languette.guards.ask_first import LAUNCH, LOOP, PROSE, claim
 from languette.verdict import deny
 
-NAME = "no-iac-destroy"
+NAME = "guard-infra"
 
 # id -> (approve_label, what it does, cost, what to run instead). {tool} is the
 # command word as written (terraform or tofu).
@@ -314,13 +314,13 @@ def check(payload, env=None):
     if not found:
         return None
     if loop:
-        return deny("no-iac-destroy: " + ", ".join(f"`{r}`" for r in found) + " inside a loop, xargs, "
+        return deny("guard-infra: " + ", ".join(f"`{r}`" for r in found) + " inside a loop, xargs, "
                     "parallel or watch runs an unknown number of times, and each run needs its own "
                     "approval. Run it once, on its own, after looking at what it would remove.")
     try:
         approved, spent = claim(payload, {RULES[r][0]: len(found[r]) for r in found})
     except (OSError, ValueError) as e:
-        return deny(f"no-iac-destroy: cannot read the session transcript to look for the user's approval, or "
+        return deny(f"guard-infra: cannot read the session transcript to look for the user's approval, or "
                     f"record it as spent ({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
     if spent:
         return None
@@ -337,4 +337,4 @@ def check(payload, env=None):
             f" If the user then wants this run, call AskUserQuestion: give the exact command, why it must run "
             f"now and the cost above, with one option labelled exactly \"{label}\" and one to skip. "
             "One approval is one run; ask again before running it again.")
-    return deny("no-iac-destroy: " + "\n\n".join(parts))
+    return deny("guard-infra: " + "\n\n".join(parts))

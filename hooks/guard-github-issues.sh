@@ -2,7 +2,7 @@
 # One GitHub issue create, transfer or delete per human turn; never two in
 # one call, never one in a loop. An issue number is an identifier things link
 # to where no agent can see, so minting or moving one is a one-way door
-# (Solace, 2026-09-30). `issue-door.sh prompt` on UserPromptSubmit opens the
+# (Solace, 2026-09-30). `guard-github-issues.sh prompt` on UserPromptSubmit opens the
 # door; the next identifier write spends it.
 #
 # Counts as an identifier write: `gh issue create|new|transfer|delete`; `gh
@@ -23,12 +23,12 @@ set -uf
 
 LIB="$(dirname "$0")/lib-shell-words.awk"
 p=$(cat)
-deny() { jq -cn --arg r "issue-door: $1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'; exit 0; }
+deny() { jq -cn --arg r "guard-github-issues: $1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'; exit 0; }
 if ! command -v jq >/dev/null 2>&1 || ! command -v awk >/dev/null 2>&1 || [ ! -r "$LIB" ]; then
-  case $p in *[Ii]ssue*) printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"issue-door: jq, awk or lib-shell-words.awk is missing, so this call could not be checked"}}' ;; esac
+  case $p in *[Ii]ssue*) printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"guard-github-issues: jq, awk or lib-shell-words.awk is missing, so this call could not be checked"}}' ;; esac
   exit 0
 fi
-door="${TMPDIR:-/tmp}/languette-issue-door.$(printf '%s' "$p" | jq -r '.session_id // "none"' | tr -c 'A-Za-z0-9_\n-' _)"
+door="${TMPDIR:-/tmp}/languette-guard-github-issues.$(printf '%s' "$p" | jq -r '.session_id // "none"' | tr -c 'A-Za-z0-9_\n-' _)"
 # Replace, never follow: a symlink pre-planted at the door path must not be
 # truncated through. rm drops the link itself; noclobber refuses to open one.
 [ "${1:-}" = prompt ] && { rm -f "$door"; (set -C; : > "$door") 2>/dev/null; exit 0; }

@@ -1,10 +1,10 @@
 @shell
-Feature: public-issue-guard
+Feature: guard-private-terms
   Text bound for a public GitHub repo is checked against the user's private
   terms file, wherever the text travels: a flag value, a heredoc, a file, an
   MCP field. The file is the private_terms_file option. Without one the guard
   is inert; with one that cannot be read it is closed. The standalone suite,
-  hooks/public-issue-guard.test.sh, walks the long tail of shell shapes.
+  hooks/guard-private-terms.test.sh, walks the long tail of shell shapes.
 
   Background:
     Given the private terms file holds:
