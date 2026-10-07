@@ -70,10 +70,11 @@ Each guard denies one class of command:
   or delete in one human turn, or any inside a loop
 - [`guard-private-terms`](#settings-for-guard-private-terms): a term from your
   private list, posted to a public repo (off until you give it the list)
-- [`guard-worktrees`](hooks/guard-worktrees.sh): opt-in; a branch switch in `$HOME`
-  when home is a worktree, or a command or edit in another session's worktree
+- [`guard-worktrees`](hooks/guard-worktrees.sh): opt-in; a branch switch in a `$HOME`
+  that is a worktree, or a reach into another session's worktree
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
   applying a label that waives a CI gate, such as `churn-ok`
+- `guard-secrets`, `guard-protected-paths`, `guard-database` (planned)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
 - [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
@@ -318,7 +319,3 @@ verdict out. The scanner (`hooks/lib-shell-words.awk`) and the guards began
 as copies of the ones in
 [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles); this repo
 is where they are maintained now.
-
-Stubs, not yet wired: `guard-secrets` (a credential committed, printed or posted),
-`guard-protected-paths` (paths no agent write may touch) and `guard-database`
-(`DROP`, `TRUNCATE` and other DDL; name in pencil).
