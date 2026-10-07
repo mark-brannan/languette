@@ -1,6 +1,6 @@
 {
   "name": "languette",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, and costly commands the repo says to ask about first.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, and commands that destroy infrastructure.",
   "author": {
     "name": "Mark Brannan"
   },
@@ -67,6 +67,12 @@
       "type": "boolean",
       "title": "Ask before costly commands",
       "description": "Deny a command the repo lists in .languette/ask-first.json until the user approves that one run through AskUserQuestion. Leave on unless you want those commands through unasked.",
+      "default": true
+    },
+    "no_iac_destroy": {
+      "type": "boolean",
+      "title": "Ask before destroying infrastructure",
+      "description": "Deny terraform, terragrunt, pulumi, cdk, aws, gcloud, az, kubectl and helm commands that destroy infrastructure or apply without review until the user approves that one run through AskUserQuestion. Plans, previews and dry runs pass. Leave on unless you want those commands through unasked.",
       "default": true
     },
     "issue_door": {
