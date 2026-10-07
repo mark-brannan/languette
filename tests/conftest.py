@@ -431,6 +431,14 @@ def _crash(ctx, guard):
     ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
 
 
+@given(parsers.parse('the plugin\'s part "{part}" crashes'))
+def _crash_part(ctx, part):
+    root = Path(ctx.mkdtemp())
+    shutil.copytree(ROOT / "hooks", root / "hooks")
+    (root / f"hooks/{part}.sh").write_text("exit 3\n")
+    ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
+
+
 def hooks_json_commands():
     """guard name -> its command in hooks/hooks.json."""
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())

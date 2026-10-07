@@ -13,9 +13,11 @@
 # and hooks.json turns that into a deny.
 dir=$(cd "$(dirname "$0")" && pwd) || exit 3
 payload=$(cat) || exit 3
-for part in checkout-home:GUARD_WORKTREES_CHECKOUT_HOME foreign:GUARD_WORKTREES_FOREIGN; do
-  name=${part%%:*}
-  eval "opt=\${CLAUDE_PLUGIN_OPTION_${part#*:}-}"
+for name in checkout-home foreign; do
+  case $name in
+    checkout-home) opt=${CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME-} ;;
+    foreign) opt=${CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_FOREIGN-} ;;
+  esac
   [ "$opt" = false ] && continue
   out=$(printf '%s' "$payload" | sh "$dir/guard-worktrees-$name.sh") || exit 3
   if [ -n "$out" ]; then printf '%s\n' "$out"; exit 0; fi

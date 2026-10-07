@@ -330,3 +330,43 @@ Feature: wiring
     And CLAUDE_PLUGIN_ROOT is "/nonexistent"
     When the agent runs `git checkout some-branch`
     Then the guard is silent
+
+  # guard-worktrees runs two parts; each has its own off switch under the
+  # guard's, and a part that crashes is a deny like the guard crashing.
+  Scenario: with the opt-in guard on, a reach into another worktree is a deny
+    Given the hook is the hooks.json command for "guard-worktrees"
+    And a git repository at "{TMP}/repo"
+    And a linked worktree "{TMP}/repo/.claude/worktrees/mine" of the repository at "{TMP}/repo"
+    And a linked worktree "{TMP}/repo/.claude/worktrees/theirs" of the repository at "{TMP}/repo"
+    And the working directory is "{TMP}/repo/.claude/worktrees/mine"
+    And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES is "true"
+    When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
+    Then the guard denies
+
+  Scenario: the foreign part set to false lets a reach into another worktree through
+    Given the hook is the hooks.json command for "guard-worktrees"
+    And a git repository at "{TMP}/repo"
+    And a linked worktree "{TMP}/repo/.claude/worktrees/mine" of the repository at "{TMP}/repo"
+    And a linked worktree "{TMP}/repo/.claude/worktrees/theirs" of the repository at "{TMP}/repo"
+    And the working directory is "{TMP}/repo/.claude/worktrees/mine"
+    And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES is "true"
+    And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_FOREIGN is "false"
+    When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
+    Then the guard is silent
+
+  Scenario: the checkout-home part set to false lets a branch switch in HOME through
+    Given the hook is the hooks.json command for "guard-worktrees"
+    And HOME is "{TMP}"
+    And a git repository at "{TMP}"
+    And the working directory is "{TMP}"
+    And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES is "true"
+    And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME is "false"
+    When the agent runs `git checkout some-branch`
+    Then the guard is silent
+
+  Scenario: with the opt-in guard on, a part that crashes is a deny
+    Given the hook is the hooks.json command for "guard-worktrees"
+    And the plugin's part "guard-worktrees-foreign" crashes
+    And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES is "true"
+    When the agent runs `git status`
+    Then the guard denies
