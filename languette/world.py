@@ -78,7 +78,7 @@ class World:
         try:
             with open(f) as fh:
                 return os.fstat(fh.fileno()).st_mtime, fh.read().strip()
-        except OSError:
+        except (OSError, ValueError):              # unreadable or garbled: a miss
             return None
 
     def _ruleset_keep(self, slug, branch, text):

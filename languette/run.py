@@ -129,8 +129,9 @@ def respond(stdin_text, env, only=None):
             return _out(event, deny(f"languette: cannot record the user's approval as spent ({e}), so the "
                                     "command is denied. Ask the user to run it themselves."))
         if not spent:
-            return _out(event, deny("languette: another command judged at the same time spent the approval "
-                                    f"this one needs ({', '.join(sorted(wants))}). Ask the user again."))
+            return _out(event, deny(f"languette: this command needs more unspent approvals ({', '.join(sorted(wants))}) "
+                                    "than there are: another command judged at the same time spent one, or two "
+                                    "guards each need one for the same label. Ask the user again."))
     if asks:
         return _out(event, ask("\n\n".join(asks)))
     if notes:
