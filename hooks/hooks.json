@@ -11,7 +11,7 @@
           },
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/no-rm-tree.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_NO_RM_TREE-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"no-rm-tree.sh is missing from the plugin directory or crashed, so recursive rm could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_NO_RM_TREE-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard no-rm-tree; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for no-rm-tree and was not found on PATH. This is a gate and fails closed: install python3, or set no_rm_tree=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (no-rm-tree) is missing from the plugin directory or crashed, so recursive rm could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for a recursive rm"
           },
           {
@@ -21,12 +21,12 @@
           },
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_ASK_FIRST-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard ask-first; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (ask-first) is missing from the plugin directory or crashed, so commands the repo marks ask-first could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_ASK_FIRST-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard ask-first; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for ask-first and was not found on PATH. This is a gate and fails closed: install python3, or set ask_first=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (ask-first) is missing from the plugin directory or crashed, so commands the repo marks ask-first could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking whether this command needs the user's approval first"
           },
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard no-iac-destroy; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (no-iac-destroy) is missing from the plugin directory or crashed, so destructive infrastructure commands could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_NO_IAC_DESTROY-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard no-iac-destroy; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for no-iac-destroy and was not found on PATH. This is a gate and fails closed: install python3, or set no_iac_destroy=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (no-iac-destroy) is missing from the plugin directory or crashed, so destructive infrastructure commands could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for a command that destroys infrastructure"
           },
           {
@@ -66,7 +66,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard no-bypass-labels; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (no-bypass-labels) is missing from the plugin directory or crashed, so a label that waives a CI gate could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_NO_BYPASS_LABELS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard no-bypass-labels; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for no-bypass-labels and was not found on PATH. This is a gate and fails closed: install python3, or set no_bypass_labels=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (no-bypass-labels) is missing from the plugin directory or crashed, so a label that waives a CI gate could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for a label that waives a CI gate"
           }
         ]

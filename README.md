@@ -32,9 +32,10 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
 It needs:
 
-- `jq` and a POSIX `awk`, until a real shell parser replaces them
+- `python3`, standard library only, for every `run.py` guard (`ask-first`,
+  `no-bypass-labels`, `no-iac-destroy`, `no-rm-tree`);
+- `jq` and a POSIX `awk`, for the shell guards, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
-- `python3`, standard library only, for `ask-first`, `no-bypass-labels` and `no-iac-destroy`;
 - `gh`, for `no-delete-stacked-base`.
 
 Without the plugin system, see [Installing by hand](#installing-by-hand).
