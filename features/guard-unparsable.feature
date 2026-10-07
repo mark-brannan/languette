@@ -4,7 +4,7 @@ Feature: guard-unparsable
   and what it found, and saying nothing ran. The other guards skip such a
   command rather than deny it again. Without shfmt, a lower rung reads it:
   `bash -n`, else the awk lexer, which refuses only a quote that never
-  closes, so the deny rows run on the shfmt rung only.
+  closes, so the line:col deny rows run on the shfmt rung only.
 
   Rows marked "seen" are anonymized from a replay of 101,671 commands that
   agents ran (October 2026). 32 did not parse, about 1 in 3,000, and the awk

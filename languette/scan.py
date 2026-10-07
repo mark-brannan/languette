@@ -64,8 +64,8 @@ def _sub_end(s, j):
 
 def _qclose(t):
     """The quote the scanner would still hold open at the end of t ("'", '"'
-    or ""), read by its own rules: a backslash escapes outside single quotes,
-    and a `#` comments to the end of its line only before a word has begun,
+    or ""), read by its own rules: a backslash escapes outside single quotes
+    (and inside `$'...'`), and a `#` comments to the end of its line only before a word has begun,
     so `a\\ #'` opens a quote and `a #'` does not."""
     return _qopen(t)[0]
 
@@ -112,7 +112,7 @@ def _qopen(t):
             have = False
         elif c not in "{}" or have:
             have = True
-        dollar = c == "$"                      # an unescaped $: `\$` went by above
+        dollar = c == "$" and not after_dollar  # one unescaped $: `\$` went by above, `$$` is a PID
         i += 1
     return "", -1
 
