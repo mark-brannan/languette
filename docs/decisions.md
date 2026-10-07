@@ -50,3 +50,13 @@ interface is; this file says who decided it and why, one line each.
   `guard-infra`, `issue-door` `guard-github-issues`, `public-issue-guard`
   `guard-private-terms`; config keys follow, with underscores. The rest are
   renamed as reached.
+
+## Three concerns: Solace, 2026-10-07
+
+- The plugin has three concerns. Parse: the parser ladder reads the command
+  into its parts. Guards: each guard is a pure function that reports a
+  finding. Verdict: a pure function of the findings and the configuration
+  returns the action (silent, deny, warn, ask).
+- Some guards need their data enriched before they evaluate. How is not
+  ruled. The first attempt is request-and-answer: the guard asks for a fact
+  and the runner fetches it (#79).
