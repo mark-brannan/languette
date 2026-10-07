@@ -24,23 +24,11 @@ interface is; this file says who decided it and why, one line each.
   pattern times the hook out, and a timed-out hook does not block.
 - Examples and fixtures use generic commands, not one project's.
 
-## License: Solace, 2026-10-04
-
-- languette stays unlicensed (all rights reserved), confirming #25. Not
-  revisited before 2026-11-04, unless someone outside asks to use or fork it
-  first.
-
-## Shell parser: Solace, 2026-10-04
-
-- Languette goes to a real shell parser (#4); it is part of the value
-  proposition.
-- The engines cascade: a guard uses whichever the user has installed, the
-  parser first and awk last.
-
 ## Parser ladder: Solace, 2026-10-06
 
-- The cascade's order: a user-installed `shfmt` first, then a pip-installed
-  parser, and awk only when none of those is available.
+- The shell parser's cascade (#4), in order: a user-installed `shfmt`
+  first, then a pip-installed parser, and awk only when none of those is
+  available.
 - Which pip parser, or both in turn (tree-sitter-bash, bashlex), is open (#4).
 
 ## Runtime dependencies: Solace, 2026-10-06
