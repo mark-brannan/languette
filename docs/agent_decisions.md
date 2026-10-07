@@ -83,10 +83,10 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - The three stub guards are listed in the README's guard list, marked (planned), not in a line under Development. Undo: move the bullet back to the line under Development ([#69](https://github.com/mark-brannan/languette/pull/69))
 
 ### 20261007t214335z
-- Approvals are spent on an ask verdict too, as #79 says (not a deny); the user may then decline the prompt and lose the click Undo: make run.py spend only when no guard asks either ([#81](https://github.com/mark-brannan/languette/pull/81))
+- Approvals are spent on an ask verdict too, as #79 says (not a deny); the user may then decline the prompt and lose the click. Undo: make run.py spend only when no guard asks either ([#81](https://github.com/mark-brannan/languette/pull/81))
 
 ### 20261007t214339z
-- When a parallel hook spends the approval first, the runner denies with one generic reason, not the asking guard's own wording Undo: pass each guard's own short-approval reason on the finding and deny with it ([#81](https://github.com/mark-brannan/languette/pull/81))
+- When a parallel hook spends the approval first, the runner denies with one generic reason, not the asking guard's own wording. Undo: pass each guard's own short-approval reason on the finding and deny with it ([#81](https://github.com/mark-brannan/languette/pull/81))
 
 ### 20261007t214340z
-- Facts the payload and env carry stay plain arguments to check, not Needs; only facts that need I/O are asked for Undo: add an env Need kind answered in run.py and route guards' env reads through it ([#81](https://github.com/mark-brannan/languette/pull/81))
+- Facts the payload and env carry stay plain arguments to check, not Needs; only facts that need I/O are asked for. Undo: add an env Need kind answered in run.py and route guards' env reads through it ([#81](https://github.com/mark-brannan/languette/pull/81))
