@@ -31,19 +31,15 @@ or `gh alias`, and `push.default=matching` (a bare `git push origin` pushing
 every matching branch).
 """
 
-import json
 import os
 import re
-import subprocess
-import time
 from urllib.parse import quote
 
 from languette import scan as sw
-from languette.verdict import Refuse, ask, deny
+from languette.verdict import Need, Refuse, ask, deny
 
 NAME = "guard-bypass-ruleset"
 TTL = 3600
-GH_TIMEOUT = 10
 
 _GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 _GH = re.compile(r"(?:^|/)gh\Z")
@@ -240,47 +236,20 @@ def _walk(cmd, cwd):
 def _git(p, env, *args):
     if p.here is None and p.prog == "git":
         return None
-    try:
-        r = subprocess.run([p.prog, *args], cwd=p.here or env.get("HOME") or "/", env=env,
-                           capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    out = r.stdout.strip()
-    return out if r.returncode == 0 and out else None
-
-
-def _api(path, env):
-    """(status, body) from `gh api path`, or (None, None) when gh can't answer."""
-    try:
-        r = subprocess.run(["gh", "api", path], env=env, capture_output=True, text=True,
-                           timeout=GH_TIMEOUT, stdin=subprocess.DEVNULL)
-        body = json.loads(r.stdout)
-    except (OSError, subprocess.SubprocessError, ValueError):
-        return None, None
-    if r.returncode == 0:
-        return 200, body
-    status = body.get("status") if isinstance(body, dict) else None
-    return (int(status), body) if isinstance(status, str) and status.isdigit() else (None, None)
+    return (yield Need("git", p.prog, p.here or env.get("HOME") or "/", *args))
 
 
 def _says(body, words):
     return isinstance(body, dict) and words in str(body.get("message", "")).lower()
 
 
-def _requires_pr(slug, branch, env):
+def _requires_pr(slug, branch):
     """"pr", "open", or None when GitHub can't answer."""
-    base = env.get("XDG_CACHE_HOME") or os.path.join(env.get("HOME") or "/", ".cache")
-    f = os.path.join(base, "languette", "rulesets", slug, quote(branch, safe=""))
-    try:
-        if time.time() - os.path.getmtime(f) < TTL:
-            with open(f) as fh:
-                got = fh.read().strip()
-            if got == "pr":
-                return got
-    except OSError:
-        pass
+    cached = yield Need("ruleset-cache", slug, branch)
+    if cached and cached[1] == "pr" and (yield Need("clock")) - cached[0] < TTL:
+        return "pr"
     b = quote(branch, safe="")
-    code, body = _api(f"repos/{slug}/rules/branches/{b}", env)
+    code, body = yield Need("gh-api", f"repos/{slug}/rules/branches/{b}")
     if code == 200 and isinstance(body, list) and any(isinstance(r, dict) and r.get("type") == "pull_request"
                                                       for r in body):
         got = "pr"
@@ -289,7 +258,7 @@ def _requires_pr(slug, branch, env):
     elif code != 200:
         return None
     else:
-        code, body = _api(f"repos/{slug}/branches/{b}/protection", env)
+        code, body = yield Need("gh-api", f"repos/{slug}/branches/{b}/protection")
         if code == 200 and isinstance(body, dict):
             got = "pr" if body.get("required_pull_request_reviews") else "open"
         elif code == 404 and (_says(body, "not protected") or _says(body, "branch not found")):
@@ -297,12 +266,7 @@ def _requires_pr(slug, branch, env):
         else:
             return None
     if got == "pr":
-        try:
-            os.makedirs(os.path.dirname(f), exist_ok=True)
-            with open(f, "w") as fh:
-                fh.write(got + "\n")
-        except OSError:
-            pass
+        yield Need("ruleset-keep", slug, branch, got)
     return got
 
 
@@ -311,7 +275,7 @@ def _judge(p, env):
     remote, dsts = p.remote, list(p.dsts)
     if IMPLICIT in dsts:
         dsts.remove(IMPLICIT)
-        up = _git(p, env, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{push}")
+        up = yield from _git(p, env, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{push}")
         if up and "/" in up:
             r, br = up.split("/", 1)
             remote = remote or r
@@ -320,18 +284,22 @@ def _judge(p, env):
             dsts.append(HEAD)
     if HEAD in dsts:
         dsts.remove(HEAD)
-        cur = _git(p, env, "symbolic-ref", "--short", "HEAD")
+        cur = yield from _git(p, env, "symbolic-ref", "--short", "HEAD")
         if cur is None:
             return ask(f"guard-bypass-ruleset: this {p.prog} push sends the current branch, and the hook can't "
                        "tell which branch that is (another directory, or a detached HEAD), so it can't check "
                        "whether the push goes around a rule that requires a pull request.")
         dsts.append(cur)
     if remote is None:
-        cur = _git(p, env, "symbolic-ref", "--short", "HEAD") or ""
-        remote = (_git(p, env, "config", f"branch.{cur}.pushRemote") or _git(p, env, "config", "remote.pushDefault")
-                  or _git(p, env, "config", f"branch.{cur}.remote") or "origin")
-    url = remote if ("/" in remote or ":" in remote) else _git(p, env, "remote", "get-url", "--push", remote)
-    head = _git(p, env, "symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD")
+        cur = (yield from _git(p, env, "symbolic-ref", "--short", "HEAD")) or ""
+        for key in (f"branch.{cur}.pushRemote", "remote.pushDefault", f"branch.{cur}.remote"):
+            remote = yield from _git(p, env, "config", key)
+            if remote:
+                break
+        remote = remote or "origin"
+    url = remote if ("/" in remote or ":" in remote) else (yield from _git(p, env, "remote", "get-url", "--push",
+                                                                           remote))
+    head = yield from _git(p, env, "symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD")
     defaults = list(_FALLBACK)
     if head and "/" in head and head.split("/", 1)[1] not in defaults:
         defaults.insert(0, head.split("/", 1)[1])
@@ -351,7 +319,7 @@ def _judge(p, env):
     slug = f"{m.group(1)}/{m.group(2)}"
     asked = None
     for branch in hits:
-        got = _requires_pr(slug, branch, env)
+        got = yield from _requires_pr(slug, branch)
         if got == "pr":
             return deny(f"guard-bypass-ruleset: `{branch}` on {slug} requires a pull request, and this push would go "
                         "around it on the user's bypass. Push a branch and open a PR. A direct push is the user's "
@@ -370,13 +338,13 @@ def check(payload, env=os.environ):
         return None
     cwd = payload.get("cwd")
     if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = os.getcwd()
+        cwd = yield Need("cwd")
     pushes, admin, refused = _walk(cmd.rstrip("\n"), cwd)
     if admin:
         return deny(ADMIN)
     asked = None
     for p in pushes:
-        v = _judge(p, env)
+        v = yield from _judge(p, env)
         if v and v["permissionDecision"] == "deny":
             return v
         asked = asked or v
