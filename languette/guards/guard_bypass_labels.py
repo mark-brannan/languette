@@ -1,4 +1,4 @@
-"""no-bypass-labels: a label that waives a CI gate is a human's to apply.
+"""guard-bypass-labels: a label that waives a CI gate is a human's to apply.
 
 `churn-ok` waives the churn gate and `mixed-loops-ok` the mixed-loops gate.
 A gate whose bypass the gated party can apply to its own PR is not a gate, so
@@ -42,7 +42,7 @@ import stat
 from languette import scan as sw
 from languette.verdict import Refuse, deny
 
-NAME = "no-bypass-labels"
+NAME = "guard-bypass-labels"
 OPTION = "CLAUDE_PLUGIN_OPTION_BYPASS_LABELS"
 DEFAULT = ("churn-ok", "mixed-loops-ok")
 

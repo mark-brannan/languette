@@ -14,9 +14,9 @@ import readme_table
 from conftest import hooks_json_commands, hooks_json_prompt_command
 
 ROOT = Path(__file__).resolve().parent.parent
-GUARDS = {"no-git-footguns", "no-rm-tree", "no-delete-stacked-base", "ask-first", "issue-door",
-          "public-issue-guard", "prose-budget-commit", "no-checkout-home", "no-foreign-worktree",
-          "no-bypass-labels", "parse-check", "no-iac-destroy"}
+GUARDS = {"no-git-footguns", "guard-recursive-delete", "no-delete-stacked-base", "ask-first", "guard-github-issues",
+          "guard-private-terms", "prose-budget-commit", "no-checkout-home", "no-foreign-worktree",
+          "guard-bypass-labels", "guard-unparsable", "guard-infra"}
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"no_checkout_home", "no_foreign_worktree"}
 # Options that are not a guard's on/off toggle: name -> type.
@@ -71,9 +71,9 @@ def hooks_shape(text):
 
 
 def prompt_hooks_shape(text):
-    """One line per way hooks.UserPromptSubmit is not what opens issue-door's
+    """One line per way hooks.UserPromptSubmit is not what opens the guard-github-issues
     door: a non-empty array of entries, each with a non-empty `hooks` array of
-    `type: "command"` objects, one of which runs issue-door.sh with the
+    `type: "command"` objects, one of which runs guard-github-issues.sh with the
     argument `prompt`. Without that argument the script reads the payload as a
     PreToolUse one, allows it, and the door never opens."""
     try:
@@ -91,10 +91,10 @@ def prompt_hooks_shape(text):
             if not isinstance(h, dict) or h.get("type") != "command" \
                     or not isinstance(h.get("command"), str) or not h["command"]:
                 bad.append(f'UserPromptSubmit[{i}].hooks[{j}] is not a {{"type": "command", "command": "..."}} object')
-            elif re.search(r'issue-door\.sh".*sh "\$h" prompt\b', h["command"]):
+            elif re.search(r'guard-github-issues\.sh".*sh "\$h" prompt\b', h["command"]):
                 door += 1
     if not door:
-        bad.append('no UserPromptSubmit command runs issue-door.sh with the argument "prompt"')
+        bad.append('no UserPromptSubmit command runs guard-github-issues.sh with the argument "prompt"')
     return bad
 
 
@@ -167,7 +167,7 @@ def _prompt_hooks(*hooks):
     return json.dumps({"hooks": {"UserPromptSubmit": [{"hooks": list(hooks)}]}})
 
 
-_DOOR = 'h="${CLAUDE_PLUGIN_ROOT}/hooks/issue-door.sh"; sh "$h" prompt'
+_DOOR = 'h="${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh"; sh "$h" prompt'
 
 
 @pytest.mark.parametrize("wrong", [
@@ -178,73 +178,73 @@ _DOOR = 'h="${CLAUDE_PLUGIN_ROOT}/hooks/issue-door.sh"; sh "$h" prompt'
     _prompt_hooks({"type": "prompt", "command": _DOOR}),
     _prompt_hooks({"type": "command", "command": ""}),
     # The mutation this guards: the `prompt` argument dropped.
-    _prompt_hooks({"type": "command", "command": 'h="${CLAUDE_PLUGIN_ROOT}/hooks/issue-door.sh"; sh "$h"'}),
+    _prompt_hooks({"type": "command", "command": 'h="${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh"; sh "$h"'}),
     "not json",
 ])
 def test_the_prompt_shape_check_rejects(wrong):
     assert_that(prompt_hooks_shape(wrong), is_not(empty()))
 
 
-def _issue_door_matcher():
+def _guard_github_issues_matcher():
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("issue-door.sh" in h["command"] for h in e["hooks"])]
+    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("guard-github-issues.sh" in h["command"] for h in e["hooks"])]
     return e["matcher"]
 
 
 def _mcp_tools_the_guard_handles():
     # From the guard's own `case`, so a tool added there must be matched here.
-    suffixes = set(re.findall(r"mcp__\*__(\w+)", (ROOT / "hooks/issue-door.sh").read_text()))
+    suffixes = set(re.findall(r"mcp__\*__(\w+)", (ROOT / "hooks/guard-github-issues.sh").read_text()))
     assert suffixes >= {"create_issue", "transfer_issue", "delete_issue", "issue_write"}
     return sorted(f"{prefix}{s}" for s in suffixes for prefix in ("mcp__github__", "mcp__plugin_github_github__"))
 
 
 @pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_handles())
-def test_the_issue_door_matcher_covers_the_tool(tool):
-    assert_that(re.fullmatch(_issue_door_matcher(), tool), is_not(None))
+def test_the_guard_github_issues_matcher_covers_the_tool(tool):
+    assert_that(re.fullmatch(_guard_github_issues_matcher(), tool), is_not(None))
 
 
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__add_issue_comment"])
-def test_the_issue_door_matcher_leaves_other_tools_alone(tool):
-    assert_that(re.fullmatch(_issue_door_matcher(), tool), is_(None))
+def test_the_guard_github_issues_matcher_leaves_other_tools_alone(tool):
+    assert_that(re.fullmatch(_guard_github_issues_matcher(), tool), is_(None))
 
 
-def _public_issue_guard_matcher():
+def _guard_private_terms_matcher():
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("public-issue-guard.sh" in h["command"] for h in e["hooks"])]
+    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("guard-private-terms.sh" in h["command"] for h in e["hooks"])]
     return e["matcher"]
 
 
-def _mcp_tools_the_public_issue_guard_handles():
+def _mcp_tools_the_guard_private_terms_handles():
     # From the guard's own `case`, so a tool added there must be matched here.
-    text = (ROOT / "hooks/public-issue-guard.sh").read_text()
+    text = (ROOT / "hooks/guard-private-terms.sh").read_text()
     suffixes = set(re.findall(r"mcp__\*__(\w+)", text))
     assert suffixes >= {"create_issue", "add_issue_comment", "create_pull_request", "pull_request_review_write"}
     return sorted(f"{prefix}{s}" for s in suffixes for prefix in ("mcp__github__", "mcp__plugin_github_github__"))
 
 
-@pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_public_issue_guard_handles())
-def test_the_public_issue_guard_matcher_covers_the_tool(tool):
-    assert_that(re.fullmatch(_public_issue_guard_matcher(), tool), is_not(None))
+@pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_private_terms_handles())
+def test_the_guard_private_terms_matcher_covers_the_tool(tool):
+    assert_that(re.fullmatch(_guard_private_terms_matcher(), tool), is_not(None))
 
 
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__list_pull_requests"])
-def test_the_public_issue_guard_matcher_leaves_other_tools_alone(tool):
-    assert_that(re.fullmatch(_public_issue_guard_matcher(), tool), is_(None))
+def test_the_guard_private_terms_matcher_leaves_other_tools_alone(tool):
+    assert_that(re.fullmatch(_guard_private_terms_matcher(), tool), is_(None))
 
 
-def _no_bypass_labels_matcher():
+def _guard_bypass_labels_matcher():
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard no-bypass-labels" in h["command"] for h in e["hooks"])]
+    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard guard-bypass-labels" in h["command"] for h in e["hooks"])]
     return e["matcher"]
 
 
 # Any MCP tool may carry a labels field; the guard itself tells writes from reads.
 @pytest.mark.parametrize("tool", ["Bash", "mcp__github__update_issue", "mcp__plugin_github_github__issue_write",
                                   "mcp__gitea__edit_issue"])
-def test_the_no_bypass_labels_matcher_covers_the_tool(tool):
-    assert_that(re.fullmatch(_no_bypass_labels_matcher(), tool), is_not(None))
+def test_the_guard_bypass_labels_matcher_covers_the_tool(tool):
+    assert_that(re.fullmatch(_guard_bypass_labels_matcher(), tool), is_not(None))
 
 
 @pytest.mark.parametrize("tool", ["Read", "Write", "Edit"])
-def test_the_no_bypass_labels_matcher_leaves_other_tools_alone(tool):
-    assert_that(re.fullmatch(_no_bypass_labels_matcher(), tool), is_(None))
+def test_the_guard_bypass_labels_matcher_leaves_other_tools_alone(tool):
+    assert_that(re.fullmatch(_guard_bypass_labels_matcher(), tool), is_(None))

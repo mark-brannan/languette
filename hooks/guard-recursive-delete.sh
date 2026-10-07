@@ -91,17 +91,17 @@ deny() {
   if command -v jq >/dev/null 2>&1; then
     jq -cn --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
   else
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"no-rm-tree: jq missing, cannot inspect the command"}}\n'
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"guard-recursive-delete: jq missing, cannot inspect the command"}}\n'
   fi
   exit 0
 }
 
-command -v jq  >/dev/null 2>&1 || deny 'no-rm-tree: jq missing, cannot inspect the command'
-command -v awk >/dev/null 2>&1 || deny 'no-rm-tree: awk missing, cannot inspect the command'
-[ -r "$LIB" ] || deny "no-rm-tree: $LIB missing, cannot inspect the command"
+command -v jq  >/dev/null 2>&1 || deny 'guard-recursive-delete: jq missing, cannot inspect the command'
+command -v awk >/dev/null 2>&1 || deny 'guard-recursive-delete: awk missing, cannot inspect the command'
+[ -r "$LIB" ] || deny "guard-recursive-delete: $LIB missing, cannot inspect the command"
 
-payload=$(cat) || deny 'no-rm-tree: unreadable hook payload'
-cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null) || deny 'no-rm-tree: unreadable hook payload'
+payload=$(cat) || deny 'guard-recursive-delete: unreadable hook payload'
+cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null) || deny 'guard-recursive-delete: unreadable hook payload'
 [ -n "$cmd" ] || exit 0
 
 cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
@@ -111,7 +111,7 @@ case $cwd in
 esac
 case $HOME in
   /*) : ;;
-  *) deny 'no-rm-tree: $HOME is not an absolute path, cannot resolve targets' ;;
+  *) deny 'guard-recursive-delete: $HOME is not an absolute path, cannot resolve targets' ;;
 esac
 
 # physical PATH: the longest existing prefix resolved through symlinks, the
@@ -275,17 +275,17 @@ END {
       a = i + 1
     }
   }
-}') || deny 'no-rm-tree: awk failed, cannot inspect the command'
+}') || deny 'guard-recursive-delete: awk failed, cannot inspect the command'
 
 # Nothing recursive in front of the guard: a malformed LANGUETTE_RM_ALLOW only
 # warns, on every Bash call, and the command runs.
 if [ -z "$out" ]; then
-  [ -z "$allow_msg" ] || jq -cn --arg m "no-rm-tree: $allow_msg" '{hookSpecificOutput:{hookEventName:"PreToolUse",additionalContext:$m}}'
+  [ -z "$allow_msg" ] || jq -cn --arg m "guard-recursive-delete: $allow_msg" '{hookSpecificOutput:{hookEventName:"PreToolUse",additionalContext:$m}}'
   exit 0
 fi
 # A recursive rm or find -delete is being judged: fail closed, before the
 # allowlist is consulted.
-[ -z "$allow_msg" ] || deny "no-rm-tree: $allow_msg"
+[ -z "$allow_msg" ] || deny "guard-recursive-delete: $allow_msg"
 tab=$(printf '\t')
 # The refusal is the awk's last line: targets judged before it come first, so
 # the DENY is looked for on every line, not only the first. A target the awk
@@ -352,11 +352,11 @@ while IFS=$tab read -r tag abs kind raw; do
     *) what="rm -r $raw" ;;
   esac
   allowed "$abs" || deny "\`$what\` is blocked: only the scratchpad, /tmp, agent worktrees and \
-the generated directories named in no-rm-tree.sh (node_modules, dist, coverage, .pio ...) may be \
+the generated directories named in guard-recursive-delete.sh (node_modules, dist, coverage, .pio ...) may be \
 removed recursively, and $abs is none of those. \`git status --short $raw\` and \`git clean -n $raw\` \
 show what is there; \`git rm\` tracked files by path, and hand anything untracked to the user -- a \
 directory they own can hold downloads and logs no session knows about."
-  phys=$(physical "$abs") || deny "no-rm-tree: cannot resolve $abs through the filesystem (no \
+  phys=$(physical "$abs") || deny "guard-recursive-delete: cannot resolve $abs through the filesystem (no \
 readlink -f or realpath here), so \`$what\` is blocked. Install coreutils or ask the user."
   [ "$phys" = "$abs" ] || allowed "$phys" || deny "\`$what\` is blocked: $abs resolves through \
 a symlink to $phys, which is not a generated directory, the scratchpad, /tmp or an agent worktree. \
