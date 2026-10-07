@@ -14,19 +14,20 @@ import readme_table
 from conftest import hooks_json_commands, hooks_json_prompt_command
 
 ROOT = Path(__file__).resolve().parent.parent
-GUARDS = {"no-git-footguns", "guard-recursive-delete", "no-delete-stacked-base", "ask-first", "guard-github-issues",
-          "guard-private-terms", "prose-budget-commit", "no-checkout-home", "no-foreign-worktree",
+GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
+          "guard-private-terms", "prose-budget-commit", "guard-worktrees",
           "guard-bypass-labels", "guard-unparsable", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
           "guard-permissions", "guard-pipe-to-shell", "guard-disk",
           "guard-host-availability", "guard-scheduled-jobs"}
 # Guards that are off unless the user turns them on: their option defaults to false.
-OPT_IN = {"no_checkout_home", "no_foreign_worktree"}
+OPT_IN = {"guard_worktrees"}
 # Options that are not a guard's on/off toggle: name -> type.
 OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string"}
 # Per-rule switches inside one guard: boolean, on by default.
-RULE_OPTIONS = {f"no_git_footguns_{r}" for r in ("blanket_staging", "stash", "force_push", "discard", "branch_delete")}
+RULE_OPTIONS = {f"guard_git_work_loss_{r}" for r in ("blanket_staging", "stash", "force_push", "discard", "branch_delete")} | {
+    "guard_worktrees_checkout_home", "guard_worktrees_foreign"}
 # Guards that also judge file-editing tools and EnterWorktree, so they match more than Bash.
-WIDE_MATCHER = {"no-foreign-worktree": "Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree"}
+WIDE_MATCHER = {"guard-worktrees": "Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree"}
 
 
 def hooks_shape(text):

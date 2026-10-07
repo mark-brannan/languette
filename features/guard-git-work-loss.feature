@@ -1,5 +1,5 @@
 @shell
-Feature: no-git-footguns
+Feature: guard-git-work-loss
   The git commands that throw work away are denied, wherever in the command
   they hide; prose that names them is not them.
 
@@ -308,14 +308,14 @@ Feature: no-git-footguns
 
     Examples:
       | setting                                              | command                     |
-      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_BLANKET_STAGING | git add -A                  |
-      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_STASH           | git stash pop               |
-      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_FORCE_PUSH      | git push --force origin foo |
-      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_DISCARD         | git reset --hard            |
-      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_BRANCH_DELETE   | git branch -D foo           |
+      | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_BLANKET_STAGING | git add -A                  |
+      | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_STASH           | git stash pop               |
+      | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_FORCE_PUSH      | git push --force origin foo |
+      | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_DISCARD         | git reset --hard            |
+      | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_BRANCH_DELETE   | git branch -D foo           |
 
   Scenario Outline: turning one rule off leaves the others denying
-    Given CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_BLANKET_STAGING is "false"
+    Given CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_BLANKET_STAGING is "false"
     When the agent runs `<command>`
     Then the guard denies
 
@@ -327,7 +327,7 @@ Feature: no-git-footguns
       | git branch -D foo           |
 
   Scenario: a setting that is not exactly false leaves the rule on
-    Given CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_BLANKET_STAGING is "no"
+    Given CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_BLANKET_STAGING is "no"
     When the agent runs `git add -A`
     Then the guard denies
 
@@ -338,7 +338,7 @@ Feature: no-git-footguns
 
     Examples:
       | setting                                         | command                                       |
-      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_STASH      | git stash pop; git push --force origin foo    |
-      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_STASH      | git push --force origin foo && git stash pop  |
-      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_DISCARD    | git reset --hard && git branch -D foo         |
-      | CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS_FORCE_PUSH | bash -c 'git push --force origin foo; git add -A' |
+      | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_STASH      | git stash pop; git push --force origin foo    |
+      | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_STASH      | git push --force origin foo && git stash pop  |
+      | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_DISCARD    | git reset --hard && git branch -D foo         |
+      | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_FORCE_PUSH | bash -c 'git push --force origin foo; git add -A' |

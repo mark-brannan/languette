@@ -1,6 +1,6 @@
 @shell
-Feature: no-checkout-home
-  Opt-in: the plugin option no_checkout_home turns this guard on (see
+Feature: guard-worktrees
+  Opt-in: the plugin option guard_worktrees turns this guard on (see
   wiring.feature). For a $HOME that is itself a worktree (yadm, a bare-repo
   setup), a checkout or switch there changes the branch every shell and
   session on the machine sees. Every scenario runs against a fake $HOME that

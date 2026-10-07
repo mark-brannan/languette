@@ -11,8 +11,8 @@
           },
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/no-git-footguns.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_NO_GIT_FOOTGUNS-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"no-git-footguns.sh is missing from the plugin directory or crashed, so the git footguns could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for git footguns"
+            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git-work-loss.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"guard-git-work-loss.sh is missing from the plugin directory or crashed, so the git work-loss moves could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for git work loss"
           },
           {
             "type": "command",
@@ -46,7 +46,7 @@
           },
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/no-delete-stacked-base.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_NO_DELETE_STACKED_BASE-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"no-delete-stacked-base.sh is missing from the plugin directory or crashed, so a remote-branch deletion could not be checked for open PRs stacked on it. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git-stacked-base.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"guard-git-stacked-base.sh is missing from the plugin directory or crashed, so a remote-branch deletion could not be checked for open PRs stacked on it. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for open PRs stacked on the branch being deleted"
           },
           {
@@ -73,11 +73,6 @@
             "type": "command",
             "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/prose-budget-commit.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"prose-budget-commit.sh is missing from the plugin directory or crashed, so staged prose could not be checked against the repo budgets. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking staged prose against the repo's budgets"
-          },
-          {
-            "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/no-checkout-home.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_NO_CHECKOUT_HOME-}\" != true ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"no-checkout-home.sh is missing from the plugin directory or crashed, so a branch switch in $HOME could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a branch switch in $HOME"
           }
         ]
       },
@@ -116,8 +111,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/no-foreign-worktree.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_NO_FOREIGN_WORKTREE-}\" != true ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"no-foreign-worktree.sh is missing from the plugin directory or crashed, so a reach into a worktree that belongs to another session could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a reach into another session's worktree"
+            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktrees.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES-}\" != true ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"guard-worktrees.sh is missing from the plugin directory or crashed, so a branch switch in $HOME or a reach into a worktree of another session could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for a branch switch in $HOME or a reach into another session's worktree"
           }
         ]
       }

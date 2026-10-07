@@ -1,6 +1,6 @@
 @shell
-Feature: no-foreign-worktree
-  Opt-in: the plugin option no_foreign_worktree turns this guard on (see
+Feature: guard-worktrees
+  Opt-in: the plugin option guard_worktrees turns this guard on (see
   wiring.feature). A session may not reach into a linked git worktree that is
   not its own, in any command or file edit: that directory belongs to a
   session that may be archived under it. Every scenario runs against a

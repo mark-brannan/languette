@@ -78,3 +78,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261007t105057z
 - The #55 guards take the curia's names, so the entries above that name them read under the old ones: no-perm-sweep is guard-permissions, no-pipe-to-shell is guard-pipe-to-shell, and no-disk-wreck splits three ways in both engines: guard-disk (dd, mkfs, wipefs, shred, a write onto a device, the cd-into-/dev tracking), guard-host-availability (shutdown, reboot, halt, poweroff, the fork bomb) and guard-scheduled-jobs (crontab -r). Their hooks.json entries run run.py, as guard-recursive-delete's does Undo: git revert the rename-and-split commit on #55 ([#55](https://github.com/mark-brannan/languette/pull/55))
+
+### 20261007t114536z
+- The three stub guards are listed in the README's guard list, marked (planned), not in a line under Development. Undo: move the bullet back to the line under Development ([#69](https://github.com/mark-brannan/languette/pull/69))

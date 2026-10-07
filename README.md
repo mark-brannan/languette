@@ -37,7 +37,7 @@ It needs:
   `guard-unparsable`);
 - `jq` and a POSIX `awk`, for the shell guards, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
-- `gh`, for `no-delete-stacked-base` and `guard-bypass-ruleset`.
+- `gh`, for `guard-git-stacked-base` and `guard-bypass-ruleset`.
 
 Without the plugin system, see [Installing by hand](#installing-by-hand).
 
@@ -59,9 +59,9 @@ Each guard denies one class of command:
 - [`guard-host-availability`](features/guard-host-availability.feature):
   shutdown, reboot, fork bomb
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
-- [`no-git-footguns`](hooks/no-git-footguns.sh): `add -A`, `commit -a`,
+- [`guard-git-work-loss`](hooks/guard-git-work-loss.sh): `add -A`, `commit -a`,
   `stash pop`, force-push, `reset --hard` and other moves that throw work away
-- [`no-delete-stacked-base`](hooks/no-delete-stacked-base.sh): deleting a
+- [`guard-git-stacked-base`](hooks/guard-git-stacked-base.sh): deleting a
   remote branch an open PR is based on (GitHub silently closes the PR)
 - [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push to
   a branch GitHub says requires a pull request, or `gh pr merge --admin`; the
@@ -70,12 +70,11 @@ Each guard denies one class of command:
   or delete in one human turn, or any inside a loop
 - [`guard-private-terms`](#settings-for-guard-private-terms): a term from your
   private list, posted to a public repo (off until you give it the list)
-- [`no-checkout-home`](hooks/no-checkout-home.sh): switching the branch
-  checked out in `$HOME`, when home is itself a worktree (opt-in)
-- [`no-foreign-worktree`](hooks/no-foreign-worktree.sh): a command or edit
-  that reaches into another session's git worktree (opt-in)
+- [`guard-worktrees`](hooks/guard-worktrees.sh): opt-in; a branch switch in a `$HOME`
+  that is a worktree, or a reach into another session's worktree
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
   applying a label that waives a CI gate, such as `churn-ok`
+- `guard-secrets`, `guard-protected-paths`, `guard-database` (planned)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
 - [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
@@ -152,8 +151,8 @@ meant. Spent approvals are kept beside the session transcript, in
 
 ## Configuration
 
-Every guard is on by default except `no-checkout-home` and
-`no-foreign-worktree`, which are opt-in. Turn one off (or those on) with
+Every guard is on by default except `guard-worktrees`, which is opt-in. Turn
+one off (or that one on) with
 `/plugin configure languette@languette`,
 or at install, by its name with underscores:
 
@@ -163,20 +162,22 @@ claude plugin install languette@languette --config guard_recursive_delete=false
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
-`no_checkout_home` and `no_foreign_worktree` are the reverse: each runs only
-when its setting is exactly `true`, so a misconfiguration leaves it off.
+`guard_worktrees` is the reverse: it runs only when its setting is exactly
+`true`, so a misconfiguration leaves it off. Its two controls,
+`guard_worktrees_checkout_home` and `guard_worktrees_foreign`, are each on
+unless set to `false`.
 
-### One setting per `no-git-footguns` rule
+### One setting per `guard-git-work-loss` rule
 
-`no_git_footguns=false` skips all five rules. To keep four, turn off one:
+`guard_git_work_loss=false` skips all five rules. To keep four, turn off one:
 
 | Setting | Rule it switches off |
 | --- | --- |
-| `no_git_footguns_blanket_staging` | `add -A`, `add .`, `commit -a` |
-| `no_git_footguns_stash` | `stash pop`, `stash clear`, a bare `stash drop` |
-| `no_git_footguns_force_push` | a bare force push; a force push to or delete of main |
-| `no_git_footguns_discard` | `reset --hard`, `checkout .`, `restore .`, `clean -f` |
-| `no_git_footguns_branch_delete` | `branch -D`, `branch --delete --force` |
+| `guard_git_work_loss_blanket_staging` | `add -A`, `add .`, `commit -a` |
+| `guard_git_work_loss_stash` | `stash pop`, `stash clear`, a bare `stash drop` |
+| `guard_git_work_loss_force_push` | a bare force push; a force push to or delete of main |
+| `guard_git_work_loss_discard` | `reset --hard`, `checkout .`, `restore .`, `clean -f` |
+| `guard_git_work_loss_branch_delete` | `branch -D`, `branch --delete --force` |
 
 ### Allowing more for `guard-recursive-delete`
 
@@ -247,19 +248,18 @@ guard reads beyond the command, it declares:
 
 | Guard | Reads |
 |---|---|
-| `no-git-footguns` | nothing: a pure function of the command |
+| `guard-git-work-loss` | nothing: a pure function of the command |
 | `guard-unparsable` | `shfmt`, else `bash -n`, which runs nothing |
 | `guard-recursive-delete` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
 | `guard-bypass-hooks` | the transcript, and the approvals spent |
 | `guard-infra` | the transcript, the approvals spent |
-| `no-delete-stacked-base` | GitHub, through `gh` |
+| `guard-git-stacked-base` | GitHub, through `gh` |
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
 | `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
-| `no-checkout-home` | `$HOME`, and what `git rev-parse --show-toplevel` resolves to |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
-| `no-foreign-worktree` | git, for where each path lands, and a record per session in `$TMPDIR` |
+| `guard-worktrees` | `$HOME` and what `git rev-parse --show-toplevel` resolves to; git, for where each path lands, and a record per session in `$TMPDIR` |
 | `prose-budget-commit` | the staged diff and, for a commit that reaches past the index, the named working-tree files, through `prose-budget` |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes
