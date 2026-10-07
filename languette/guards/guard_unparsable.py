@@ -1,45 +1,30 @@
 """guard-unparsable: a Bash command the parser refuses is denied, whole, before
 anything in it runs.
 
-The parser is the top rung of languette/scan.py's ladder (shfmt). Without it,
-`bash -n` reads the command instead: it runs nothing, and says less. The deny
-carries the parser's position and what it found, since an agent that is told
-only "syntax error" guesses at the fix.
+The parser is languette/scan.py's ladder, read top down: shfmt, a pip
+parser, `bash -n`, then the awk lexer, which refuses only a quote that never
+closes. The deny names the rung that refused and what it found, with the
+position when the rung gives one, since an agent that is told only "syntax
+error" guesses at the fix.
 
 The other guards skip a command that does not parse (run.py), rather than
 deny it a second time on a weaker reading.
 """
 
-import os
-import re
-import subprocess
-
 from languette import scan
 from languette.verdict import deny
 
 NAME = "guard-unparsable"
-BASH_TIMEOUT = 2                               # seconds
 
 
 def refusal(command):
-    """What the parser found wrong with `command`, or None when it parses
-    (or no parser could read it)."""
+    """What the ladder's top rung on hand found wrong with `command`, or None
+    when it reads."""
     try:
-        rung, _ = scan.parse(command)
+        scan.check(command)
     except scan.Unparseable as e:
-        return f"shfmt: {e}"
-    if rung == "shfmt":
-        return None
-    try:
-        r = subprocess.run(["bash", "-n"], input=command.encode("utf-8", "surrogatepass"), capture_output=True,
-                           timeout=BASH_TIMEOUT, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
-    except (OSError, subprocess.SubprocessError):
-        return None                            # no bash -n: the awk rung's reading, which denies no parse
-
-    if r.returncode == 0:
-        return None
-    err = r.stderr.decode("utf-8", "replace").strip().splitlines()
-    return "bash -n: " + re.sub(r"^(?:\S*bash: )+", "", err[0]) if err else "bash -n: syntax error"
+        return f"{e.rung}: {e}"
+    return None
 
 
 def check(payload, env):

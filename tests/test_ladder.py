@@ -18,9 +18,9 @@ needs_shfmt = pytest.mark.skipif(not REAL and not os.environ.get("CI"), reason="
 
 @pytest.fixture(autouse=True)
 def fresh():
-    scan.shfmt.cache_clear(); scan._shfmt_tree.cache_clear()
+    scan.shfmt.cache_clear(); scan._shfmt_tree.cache_clear(); scan._bash_n.cache_clear()
     yield
-    scan.shfmt.cache_clear(); scan._shfmt_tree.cache_clear()
+    scan.shfmt.cache_clear(); scan._shfmt_tree.cache_clear(); scan._bash_n.cache_clear()
 
 
 def fake_shfmt(tmp_path, monkeypatch, body):
@@ -105,6 +105,30 @@ def test_a_crashing_shfmt_drops_to_awk_and_denies_nothing(tmp_path, monkeypatch,
     assert scan.Scan("rm -rf x").rung == "awk"
     assert verdict("ls") is None
     assert verdict("rm -rf ~")["permissionDecision"] == "deny"
+
+
+def test_without_shfmt_bash_n_refuses_and_its_tree_is_not_mapped(monkeypatch):
+    monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
+    v = verdict('echo "unclosed', guard="guard-unparsable")
+    assert v["permissionDecision"] == "deny" and "(bash -n: " in v["permissionDecisionReason"]
+    assert scan.parse("rm -rf x") == ("bash -n", True)
+    assert scan.Scan("rm -rf x").rung == "awk"
+
+
+def test_with_no_bash_the_awk_rung_reads(monkeypatch, tmp_path):
+    monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
+    monkeypatch.setenv("PATH", str(tmp_path))
+    assert scan.parse("rm -rf x") == ("awk", None)
+    with pytest.raises(scan.Unparseable) as e:
+        scan.check("echo 'unclosed")
+    assert e.value.rung == "awk"
+
+
+@pytest.mark.parametrize("command", ["echo \"it's\" # don't", "cat <<'EOF'\ndon't\nEOF", "cat <<EOF\nit's $(date)\nEOF",
+                                     "echo a\\'b", "printf '%s' \"a'b\""])
+def test_the_awk_rung_refuses_no_closed_quote(monkeypatch, command):
+    monkeypatch.setattr(scan, "RUNGS", ("awk",))
+    assert scan.parse(command) == ("awk", None)
 
 
 def test_the_pip_rung_is_an_empty_slot(monkeypatch):
