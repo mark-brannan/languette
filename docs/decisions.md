@@ -31,6 +31,19 @@ interface is; this file says who decided it and why, one line each.
   available.
 - Which pip parser, or both in turn (tree-sitter-bash, bashlex), is open (#4).
 
+## Parser ladder refusals: Solace, 2026-10-07
+
+- `bash -n` is a rung of the ladder, not a fallback inside guard-unparsable.
+- A rung either reads the command, refuses it, or passes it down; a refusal
+  is a deny that names the rung.
+- tree-sitter-bash refuses when its tree holds an ERROR node.
+- bashlex passes down a construct it does not support, and denies only an
+  unclosed quote or bracket, or an unexpected end; its other syntax errors
+  pass down too, since it reports valid bash (`[[ ]]`, a quoted heredoc
+  delimiter) as one.
+- With nothing else on PATH, the built-in lexer denies a quote that never
+  closes.
+
 ## Runtime dependencies: Solace, 2026-10-06
 
 - Languette runs on python3 and its standard library plus the parser ladder
