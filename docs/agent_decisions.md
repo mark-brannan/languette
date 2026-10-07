@@ -34,3 +34,12 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 ### 20261004t084420z
 - MCP read-tool detection stays a denylist of write words after the read verb, widened (modify, change, tag, attach, delete, ...), rather than an allowlist of read-tool names Undo: an allowlist of whole read-tool names instead ([#41](https://github.com/mark-brannan/languette/pull/41))
 - true, : and cd may share a call with a file-reading gh even with a redirect, since they can only truncate the file; pushd and popd may not, since they print the stack Undo: refuse any redirect in the call instead ([#41](https://github.com/mark-brannan/languette/pull/41))
+
+### 20261007t011723z
+- A text that only might be shell (a nested string, the heredoc-stripped text) that shfmt refuses is read by the awk rung; only the command itself is denied Undo: make Scan raise Unparseable for every text ([#62](https://github.com/mark-brannan/languette/pull/62))
+- The shfmt rung keeps the token contract by running the awk lexer over the AST's pieces; the four awk-shaped rows are not re-baselined Undo: map the AST directly and re-baseline those rows ([#62](https://github.com/mark-brannan/languette/pull/62))
+- shfmt reads as bash (-ln=bash) Undo: change the flag in _shfmt_tree ([#62](https://github.com/mark-brannan/languette/pull/62))
+- The awk rung in run.py is scan.py's port of lib-shell-words.awk, not a subprocess awk Undo: shell out to awk in the awk rung ([#62](https://github.com/mark-brannan/languette/pull/62))
+
+### 20261007t011724z
+- Branched from main while #52 is open, Depends-On: #52 holding the merge Undo: rebase onto #52's head ([#62](https://github.com/mark-brannan/languette/pull/62))
