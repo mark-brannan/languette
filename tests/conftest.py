@@ -1,7 +1,9 @@
 """Engines and the step vocabulary for features/*.feature.
 
 Every scenario runs once per engine its feature is tagged with: @python runs
-languette/ in-process, @shell runs hooks/<guard>.sh by subprocess (under
+languette/ in-process twice, as the "python" engine on the parser ladder's awk
+rung and as "shfmt" on its shfmt rung (skipped without a shfmt new enough,
+except under CI); @shell runs hooks/<guard>.sh by subprocess (under
 $AWK_PATH's awk when set). @shell_only narrows a scenario to the shell.
 The feature's name is the guard's name.
 """
@@ -25,7 +27,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from languette import run, scan  # noqa: E402
 
-ENGINES = ("python", "shell")
+ENGINES = ("python", "shfmt", "shell")
+IN_PROCESS = {"python": ("awk",), "shfmt": ("shfmt",)}   # engine -> scan.RUNGS
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
          "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH",
@@ -56,7 +59,7 @@ def pytest_unconfigure(config):
 
 def pytest_generate_tests(metafunc):
     marks = {m.name for m in metafunc.definition.iter_markers()}
-    engines = [e for e in ENGINES if e in marks]
+    engines = [e for e in ENGINES if e in marks or (e == "shfmt" and "python" in marks)]
     if "shell_only" in marks:
         engines = ["shell"]
     if engines:
@@ -66,6 +69,18 @@ def pytest_generate_tests(metafunc):
 @pytest.fixture(autouse=True)
 def engine():
     return None                                # plain tests in test_repo.py have no engine
+
+
+@pytest.fixture(autouse=True)
+def rungs(engine, monkeypatch):
+    """Pin the parser ladder to the engine's one rung."""
+    if engine not in IN_PROCESS:
+        return
+    if engine == "shfmt" and not scan.shfmt():
+        if os.environ.get("CI"):
+            pytest.fail(f"CI runs the shfmt engine: no shfmt >= {scan.SHFMT_MIN} on PATH")
+        pytest.skip(f"no shfmt >= {scan.SHFMT_MIN} on PATH")
+    monkeypatch.setattr(scan, "RUNGS", IN_PROCESS[engine])
 
 
 def awk_path():
@@ -136,7 +151,7 @@ class Ctx:
 
     def run(self, stdin):
         self.stdin = stdin
-        if self.engine == "python":
+        if self.engine in IN_PROCESS:
             # These steps only shape a subprocess; in-process they would do nothing.
             assert not (self.hook or self.bare or self.stubs), \
                 "test setup: a hook command, a bare PATH or the stubs need the shell engine (@shell_only)"
@@ -455,9 +470,11 @@ def _scan_json(ctx, js):
 
 
 def scanned(ctx, mode):
-    if ctx.engine == "python":
+    if ctx.engine in IN_PROCESS:
         if mode == "tokens":
-            return scan.Scan(ctx.scanned).tokens()
+            s = scan.Scan(ctx.scanned)
+            assert s.rung == IN_PROCESS[ctx.engine][0], f"the {s.rung} rung read it"
+            return s.tokens()
         return [("1:" if nested else "0:") + t for t, nested in scan.texts_of(scan.strip_heredocs(ctx.scanned + "\n"))]
     lib, prog = ROOT / "hooks/lib-shell-words.awk", ROOT / "tests/scan_json.awk"
     r = subprocess.run([which_awk(), "-v", f"mode={mode}", "-f", str(lib), "-f", str(prog)],
