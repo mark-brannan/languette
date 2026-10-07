@@ -462,8 +462,52 @@ def hooks_json_prompt_command():
 # --- When ----------------------------------------------------------------
 
 # Greedy to the last backtick, so a command may hold backticks of its own.
+def _ran(ctx):
+    """Claude Code fires PostToolUse only for a call that ran: when this guard
+    let it through, spend the door as the post hook would. The verdict the
+    scenario judges stays the PreToolUse one."""
+    if ctx.guard != "guard-github-issues" or ctx.hook or ctx.verdict.decision == "deny":
+        return
+    pre, ctx.arg = ctx.verdict, "post"
+    ctx.run(ctx.stdin)
+    ctx.arg, ctx.verdict = None, pre
+
+
 @when(parsers.re(r"the agent runs `(?P<command>.*)`", flags=re.S))
 def _runs(ctx, command):
+    ctx.run(ctx.payload(command))
+    _ran(ctx)
+
+
+def _transcript(ctx):
+    if not ctx.proj:
+        ctx.proj = Path(ctx.mkdtemp())
+    (ctx.proj / "t.jsonl").touch()
+
+
+@when(parsers.re(r"another guard denies `(?P<command>.*)`", flags=re.S))
+def _denied_elsewhere(ctx, command):
+    # This guard's PreToolUse ran, the call did not: Claude Code records the
+    # deny as its result, and fires no PostToolUse.
+    _transcript(ctx)
+    ctx.run(ctx.payload(command))
+    _record_result(ctx, "guard-private-terms: denied")
+
+
+@when("that call ran, but its post hook never did")
+def _ran_unspent(ctx):
+    _record_result(ctx, "https://github.com/o/r/issues/9", is_error=False)
+
+
+@then(parsers.parse('"{target}" still holds "{content}"'))
+def _still_holds(ctx, target, content):
+    assert Path(ctx.expand(target)).read_text() == content
+
+
+@when(parsers.re(r"the agent starts `(?P<command>.*)`", flags=re.S))
+def _starts(ctx, command):
+    # PreToolUse ran and the call is still running: no result, no PostToolUse.
+    _transcript(ctx)
     ctx.run(ctx.payload(command))
 
 
@@ -481,10 +525,10 @@ def _rerun(ctx):
     ctx.run(json.dumps(p))
 
 
-def _record_result(ctx, content, **extra):
+def _record_result(ctx, content, is_error=True, **extra):
     call = json.loads(ctx.stdin)["tool_use_id"]
     rec = {"type": "user", "message": {"role": "user", "content": [
-        {"type": "tool_result", "tool_use_id": call, "content": content, "is_error": True}]}, **extra}
+        {"type": "tool_result", "tool_use_id": call, "content": content, "is_error": is_error}]}, **extra}
     with (ctx.proj / "t.jsonl").open("a") as f:
         f.write(json.dumps(rec) + "\n")
 
@@ -519,6 +563,7 @@ def _open_door_via_hooks_json(ctx):
 @when(parsers.re(r'the agent calls MCP tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
 def _mcp_call(ctx, tool, inp):
     ctx.run(json.dumps({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)}))
+    _ran(ctx)
 
 
 @when(parsers.re(r'the agent calls tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
