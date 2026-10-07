@@ -31,6 +31,12 @@ interface is; this file says who decided it and why, one line each.
   available.
 - Which pip parser, or both in turn (tree-sitter-bash, bashlex), is open (#4).
 
+## Parser ladder refusals: Solace, 2026-10-07
+
+- `bash -n` is a rung; a rung reads, refuses (a deny naming it) or passes down.
+- tree-sitter-bash refuses on an ERROR node; bashlex on an unclosed quote,
+  bracket or unexpected end; the built-in lexer on an unclosed quote.
+
 ## Runtime dependencies: Solace, 2026-10-06
 
 - Languette runs on python3 and its standard library plus the parser ladder
@@ -50,3 +56,10 @@ interface is; this file says who decided it and why, one line each.
   `guard-infra`, `issue-door` `guard-github-issues`, `public-issue-guard`
   `guard-private-terms`; config keys follow, with underscores. The rest are
   renamed as reached.
+
+## Three concerns: Solace, 2026-10-07
+
+- Parse reads the command into parts. Guards are pure functions reporting
+  findings. Verdict turns findings and configuration into an action.
+- Guards needing enriched data: how is unruled; first try is
+  request-and-answer (#79).
