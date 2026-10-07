@@ -33,7 +33,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 It needs:
 
 - `python3`, standard library only, for every `run.py` guard (`ask-first`,
-  `no-bypass-labels`, `no-rm-tree`, `parse-check`);
+  `no-bypass-labels`, `no-iac-destroy`, `no-rm-tree`, `parse-check`);
 - `jq` and a POSIX `awk`, for the shell guards, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
 - `gh`, for `no-delete-stacked-base`.
@@ -65,6 +65,8 @@ Each guard denies one class of command:
   applying a label that waives a CI gate, such as `churn-ok`
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
+- [`no-iac-destroy`](languette/guards/no_iac_destroy.py): `terraform destroy`, `kubectl delete` and
+  other infrastructure destroys, until you approve that one run
 - [`prose-budget-commit`](hooks/prose-budget-commit.sh): a `git commit` whose
   staged prose runs over the repo's word budgets
 
@@ -234,6 +236,7 @@ guard reads beyond the command, it declares:
 | `parse-check` | `shfmt`, else `bash -n`, which runs nothing |
 | `no-rm-tree` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
+| `no-iac-destroy` | the transcript, the approvals spent |
 | `no-delete-stacked-base` | GitHub, through `gh` |
 | `issue-door` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `no-checkout-home` | `$HOME`, and what `git rev-parse --show-toplevel` resolves to |

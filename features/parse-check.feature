@@ -78,3 +78,25 @@ Feature: parse-check
   Scenario: without shfmt, bash -n denies a command it cannot read
     When the agent runs `echo "unclosed`
     Then the guard denies, naming "bash -n"
+
+  @shfmt_only
+  Scenario: a substitution in a heredoc with no closing line is denied
+    When the agent runs:
+      """
+      cat <<EOF
+      $(rm -rf examples)
+      """
+    Then the guard denies, naming "1:5: unclosed here-document"
+
+  @shfmt_only
+  Scenario: an escaped ; before # in a backtick substitution in a heredoc is denied
+    # Stricter than bash, never seen: bash reads `echo \;#'` as echo ; and a
+    # comment, shfmt reads the ' as opening a quote.
+    When the agent runs:
+      """
+      cat <<EOF
+      `echo \;#'`
+      EOF
+      rm -rf examples
+      """
+    Then the guard denies, naming "2:10: reached EOF without closing quote"

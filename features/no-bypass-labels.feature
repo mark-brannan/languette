@@ -83,6 +83,10 @@ Feature: no-bypass-labels
         | shell                 |
         | bash <<'EOF'          |
         | sh <<EOF              |
+        | cat <<EOF \| sh       |
+        | cat <<'EOF' \|& bash  |
+        | cat <<EOF \| tee l \| sh |
+        | (cat <<EOF) \| sh     |
 
     Scenario: a heredoc fed to a shell and built at run time cannot be read
       When the agent runs:
@@ -390,6 +394,22 @@ Feature: no-bypass-labels
         bash t.sh
         """
       Then the guard is silent
+
+    Scenario Outline: a heredoc piped to a non-shell is text though the line runs a shell
+      When the agent runs:
+        """
+        <line>
+        gh pr edit 12 --add-label churn-ok
+        EOF
+        """
+      Then the guard is silent
+
+      Examples:
+        | line                          |
+        | cat <<EOF \| grep gh          |
+        | cat <<EOF; echo hi \| sh      |
+        | cat <<EOF \|\| sh             |
+        | sh -c true \| cat <<EOF       |
 
     Scenario Outline: an MCP call that applies no bypass label
       When the agent calls MCP tool "<tool>" with input `<input>`

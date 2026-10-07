@@ -326,6 +326,7 @@ Feature: ask-first
         | command                              | note                |
         | for i in 1 2 3; do npm run e2e; done | loop, even approved |
         | seq 3 \| xargs -I{} npm run e2e      | xargs fan-out       |
+        | find . -exec npm run e2e \;          | find -exec fan-out  |
 
     Scenario: the list is found from the git toplevel of the cwd
       Given CLAUDE_PROJECT_DIR is unset

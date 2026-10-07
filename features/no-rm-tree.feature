@@ -62,6 +62,21 @@ Feature: no-rm-tree
       """
     Then the guard denies
 
+  Scenario Outline: one target that is not Claude's denies the command, whichever side of an allowed target it stands
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                         | verdict                                           | note                                  |
+      | rm -rf dist "$X"                | denies, naming "variable or command substitution" | allowed, then unresolved              |
+      | rm -rf "$X" dist                | denies, naming "variable or command substitution" | unresolved, then allowed              |
+      | rm -rf dist examples            | denies, naming "is none of those"                 | allowed, then a foreign path          |
+      | rm -rf examples dist            | denies, naming "is none of those"                 | foreign path, then allowed            |
+      | rm -rf dist /tmp/ok "$X"        | denies, naming "variable or command substitution" | two allowed, then unresolved          |
+      | rm -rf dist dist/* node_modules | denies, naming "glob or brace expansion"          | allowed, a glob, allowed              |
+      | find dist /home -delete         | denies, naming "is none of those"                 | find start paths follow the same rule |
+      | rm -rf dist node_modules        | is silent                                         | every target allowed                  |
+
   Scenario Outline: rm reached through another command is still rm
     When the agent runs `<command>`
     Then the guard denies
@@ -175,6 +190,260 @@ Feature: no-rm-tree
       EOF
       """
     Then the guard is silent
+
+  Scenario: a command substitution in an unquoted heredoc body is run
+    When the agent runs:
+      """
+      cat <<EOF
+      $(rm -rf examples)
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a command substitution in a <<- heredoc body, tab-indented, is run
+    When the agent runs:
+      """
+      cat <<-EOF
+      	today is $(rm -rf examples)
+      	EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a backtick substitution in an unquoted heredoc body is run
+    When the agent runs:
+      """
+      cat <<EOF
+      `rm -rf examples`
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a heredoc opener inside a kept substitution does not hide the lines after the heredoc
+    When the agent runs:
+      """
+      cat <<EOF
+      $(cat <<X)
+      EOF
+      rm -rf examples
+      X
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a single-quoted heredoc delimiter makes the body text, substitutions too
+    When the agent runs:
+      """
+      cat <<'EOF'
+      $(rm -rf examples) `rm -rf examples`
+      EOF
+      """
+    Then the guard is silent
+
+  Scenario: a double-quoted heredoc delimiter makes the body text, substitutions too
+    When the agent runs:
+      """
+      cat <<"EOF"
+      $(rm -rf examples) `rm -rf examples`
+      EOF
+      """
+    Then the guard is silent
+
+  Scenario: an escaped $ in an unquoted heredoc body is text
+    When the agent runs:
+      """
+      cat <<EOF
+      \$(rm -rf examples)
+      EOF
+      """
+    Then the guard is silent
+
+  Scenario: a partially quoted heredoc delimiter still closes on its unquoted word
+    When the agent runs:
+      """
+      cat <<E"O"F
+      hi
+      EOF
+      rm -rf examples
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a partially quoted heredoc delimiter makes the body text
+    When the agent runs:
+      """
+      cat <<E"O"F
+      $(rm -rf examples)
+      EOF
+      """
+    Then the guard is silent
+
+  Scenario: a backslash-quoted heredoc delimiter makes the body text
+    When the agent runs:
+      """
+      cat <<\EOF
+      $(rm -rf examples)
+      EOF
+      """
+    Then the guard is silent
+
+  Scenario: the rest of a heredoc opener line is run
+    When the agent runs:
+      """
+      cat <<EOF && rm -rf examples
+      hi
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a here-string is not a heredoc opener
+    When the agent runs:
+      """
+      cat <<<foo; rm -rf examples
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: two heredocs on one line take their bodies in turn, the second unquoted
+    When the agent runs:
+      """
+      cat <<A <<B
+      a
+      A
+      $(rm -rf examples)
+      B
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: two heredocs on one line take their bodies in turn, the second quoted
+    When the agent runs:
+      """
+      cat <<A <<'B'
+      a
+      A
+      $(rm -rf examples)
+      B
+      """
+    Then the guard is silent
+
+  # On the shfmt rung run.py's parse check denies it first (parse-check).
+  @no_shfmt
+  Scenario: a heredoc that never closes is read as commands
+    When the agent runs:
+      """
+      cat <<EOF
+      $(rm -rf examples)
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a heredoc inside bash -c keeps its substitutions
+    When the agent runs:
+      """
+      bash -c 'cat <<EOF
+      $(rm -rf examples)
+      EOF'
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a nested substitution in an unquoted heredoc body is run
+    When the agent runs:
+      """
+      cat <<EOF
+      $(echo $(rm -rf examples) ")")
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a quoted heredoc, then a <<- heredoc with a backtick substitution
+    When the agent runs:
+      """
+      cat <<'A'
+      $(rm -rf src)
+      A
+      cat <<-B
+      	`rm -rf examples`
+      	B
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a case pattern's ) does not close a substitution in a heredoc body
+    When the agent runs:
+      """
+      cat <<EOF
+      $(case x in a) rm -rf examples;; esac)
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a ) in a comment does not close a substitution in a heredoc body
+    When the agent runs:
+      """
+      cat <<EOF
+      $(echo hi # )
+      rm -rf examples)
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a ) inside nested quotes does not close a substitution in a heredoc body
+    When the agent runs:
+      """
+      cat <<EOF
+      $(echo "$(echo ")")" ; rm -rf examples)
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: an apostrophe kept from a heredoc body does not hide the commands after it
+    When the agent runs:
+      """
+      cat <<EOF
+      $(echo "it's") don't
+      EOF
+      rm -rf examples
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a quoted heredoc delimiter with a dash closes only on the whole word
+    When the agent runs:
+      """
+      cat <<'END-X'
+      END
+      rm -rf examples
+      END-X
+      """
+    Then the guard is silent
+
+  Scenario: an escaped blank before # in a kept substitution does not hide the commands after it
+    When the agent runs:
+      """
+      cat <<EOF
+      $(echo a\ #'
+      ')
+      echo hi
+      EOF
+      rm -rf examples
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  # On the shfmt rung run.py's parse check denies it first (parse-check).
+  @no_shfmt
+  Scenario: an escaped ; before # in a kept backtick substitution does not hide the commands after it
+    When the agent runs:
+      """
+      cat <<EOF
+      `echo \;#'`
+      EOF
+      rm -rf examples
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: an escaped < before a second heredoc opener on a line
+    When the agent runs:
+      """
+      cat <<\<<< EOF
+      <
+      echo it's
+      EOF
+      rm -rf examples
+      """
+    Then the guard denies, naming "rm -r examples"
 
   Scenario: a comment is not run
     When the agent runs:

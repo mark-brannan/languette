@@ -170,10 +170,19 @@ Feature: no-git-footguns
     When the agent runs:
       """
       cat > doc.md <<EOF
-      - `git push --force` is bad
+      - git push --force is bad
       EOF
       """
     Then the guard is silent
+
+  Scenario: a backtick code span in an unquoted heredoc body is run by the shell
+    When the agent runs:
+      """
+      cat > doc.md <<EOF
+      - `git push --force` is bad
+      EOF
+      """
+    Then the guard denies, naming "git push --force"
 
   Scenario: a <<- heredoc body, tab-indented, is not run
     When the agent runs:
