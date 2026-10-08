@@ -100,7 +100,7 @@ def test_no_shfmt_drops_to_awk(monkeypatch, tmp_path):
     assert scan.Scan("rm -rf x").rung == "awk"
 
 
-@pytest.mark.parametrize("crash", ["echo 'panic: boom' >&2; exit 2", "kill -9 $$", "echo not json",
+@pytest.mark.parametrize("crash", ["echo 'panic: boom' >&2; exit 2", "echo not json",
                                    'echo \'{"Type": "Stmt"}\''])
 def test_a_crashing_shfmt_drops_to_awk_and_denies_nothing(tmp_path, monkeypatch, crash):
     fake_shfmt(tmp_path, monkeypatch, f'[ "$1" = --version ] && echo v3.12.0 && exit 0\n{crash}\n')
@@ -108,6 +108,31 @@ def test_a_crashing_shfmt_drops_to_awk_and_denies_nothing(tmp_path, monkeypatch,
     assert scan.Scan("rm -rf x").rung == "awk"
     assert verdict("ls") is None
     assert verdict("rm -rf ~")["permissionDecision"] == "deny"
+
+
+@pytest.mark.parametrize("stall, why", [("sleep 5", "shfmt took over 0.2 s"),
+                                         ("kill -9 $$", "shfmt was killed by signal 9")])
+@pytest.mark.parametrize("probe", [False, True])
+def test_a_shfmt_run_that_fails_denies_and_never_passes_down(tmp_path, monkeypatch, stall, why, probe):
+    monkeypatch.setattr(scan, "SHFMT_TIMEOUT", 0.2)
+    body = f"{stall}\n" if probe else f'[ "$1" = --version ] && echo v3.12.0 && exit 0\n{stall}\n'
+    fake_shfmt(tmp_path, monkeypatch, body)
+    v = verdict("ls", guard="guard-unparsable")
+    assert v["permissionDecision"] == "deny" and f"(shfmt: {why}" in v["permissionDecisionReason"]
+    with pytest.raises(scan.Unparseable):      # a failed run is not cached as a pass
+        scan.check("ls")
+
+
+def test_a_bash_n_past_its_timeout_denies(tmp_path, monkeypatch):
+    monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
+    monkeypatch.setattr(scan, "BASH_TIMEOUT", 0.2)
+    f = tmp_path / "bash"
+    f.write_text("#!/bin/sh\nsleep 5\n")
+    f.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
+    with pytest.raises(scan.Unparseable) as e:
+        scan.check("ls")
+    assert e.value.rung == "bash -n" and "bash took over 0.2 s" in str(e.value)
 
 
 def test_without_shfmt_bash_n_refuses_and_its_tree_is_not_mapped(monkeypatch):

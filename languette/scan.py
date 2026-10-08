@@ -164,31 +164,51 @@ class Unparseable(Exception):
         self.rung = rung
 
 
+def _run(argv, text, timeout, **kw):
+    """subprocess.run on `text`, or None when the program is not there.
+    Raises Unparseable when the run failed rather than the program: past its
+    timeout, killed by a signal, or refused by the OS. Those turn on the
+    machine's load, not the command, so they deny; passing the command down a
+    rung would let the clock pick its reader."""
+    name = os.path.basename(argv[0])
+    try:
+        r = subprocess.run(argv, input=text.encode("utf-8", "surrogatepass") if text is not None else None,
+                           capture_output=True, timeout=timeout, **kw)
+    except subprocess.TimeoutExpired:
+        raise Unparseable(f"{name} took over {timeout} s; a busy machine can cause this, so retry") from None
+    except FileNotFoundError:
+        return None
+    except OSError as e:
+        raise Unparseable(f"{name} could not run ({e.strerror or e}); retry") from None
+    if r.returncode < 0:
+        raise Unparseable(f"{name} was killed by signal {-r.returncode}; retry")
+    return r
+
+
 @functools.lru_cache(maxsize=1)
 def shfmt():
-    """Path of a usable shfmt, or None: missing, too old, or no version."""
+    """Path of a usable shfmt, or None: missing, too old, or no version.
+    Raises Unparseable when asking it failed (_run); that is not cached."""
     path = shutil.which("shfmt")
     if not path:
         return None
-    try:
-        r = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=SHFMT_TIMEOUT)
-    except (OSError, subprocess.SubprocessError):
+    r = _run([path, "--version"], None, SHFMT_TIMEOUT)
+    if r is None:
         return None
-    m = re.search(r"(\d+)\.(\d+)\.(\d+)", r.stdout)
+    m = re.search(r"(\d+)\.(\d+)\.(\d+)", r.stdout.decode("utf-8", "replace"))
     return path if r.returncode == 0 and m and tuple(map(int, m.groups())) >= SHFMT_MIN else None
 
 
 @functools.lru_cache(maxsize=256)
 def _shfmt_tree(text):
-    """shfmt's AST of `text`, or None when shfmt is missing or crashed. Raises
-    Unparseable when shfmt reports a syntax error (exit 1, "line:col: why")."""
+    """shfmt's AST of `text`, or None when shfmt is missing or crashed on this
+    text. Raises Unparseable when shfmt reports a syntax error (exit 1,
+    "line:col: why") or the run failed (_run)."""
     path = shfmt()
     if not path:
         return None
-    try:
-        r = subprocess.run([path, "--to-json", "-ln=bash"], input=text.encode("utf-8", "surrogatepass"),
-                           capture_output=True, timeout=SHFMT_TIMEOUT)
-    except (OSError, subprocess.SubprocessError):
+    r = _run([path, "--to-json", "-ln=bash"], text, SHFMT_TIMEOUT)
+    if r is None:
         return None
     err = r.stderr.decode("utf-8", "replace").strip()
     if r.returncode == 1 and re.match(r"(?:<standard input>:)?\d+:\d+: ", err):
@@ -208,12 +228,11 @@ _pip_tree = None                               # rung two: a pip-installed parse
 @functools.lru_cache(maxsize=256)
 def _bash_n(text):
     """True when `bash -n` accepts `text`, None when there is no bash to ask.
-    Raises Unparseable with bash's first line, its "bash: " prefixes dropped.
-    It runs nothing, and says less than shfmt: a line, no column."""
-    try:
-        r = subprocess.run(["bash", "-n"], input=text.encode("utf-8", "surrogatepass"), capture_output=True,
-                           timeout=BASH_TIMEOUT, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
-    except (OSError, subprocess.SubprocessError):
+    Raises Unparseable with bash's first line, its "bash: " prefixes dropped,
+    or when the run failed (_run). It runs nothing, and says less than shfmt:
+    a line, no column."""
+    r = _run(["bash", "-n"], text, BASH_TIMEOUT, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+    if r is None:
         return None
     if r.returncode == 0:
         return True
