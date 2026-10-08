@@ -134,9 +134,17 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - A bashlex crash, failed import, or error with no position adds no column; the refusal stands as its rung wrote it Undo: raise in scan._bashlex's except ([#77](https://github.com/mark-brannan/languette/pull/77))
 - bashlex's in-process parse has no timeout; it runs only on text a rung refused and tree-sitter left without a column. Measured, bashlex 0.18: 0.9 s for 20,000 commands (180 KB), 0 s for 3,000 nested substitutions (no column) Undo: run bashlex in a subprocess with a deadline, as bash -n runs ([#77](https://github.com/mark-brannan/languette/pull/77))
 
+### 20261008t034107z
+- guard-secrets: a context-only hit asks and a shape hit denies; the verdict layer can remap once #76 settles Undo: in guard_secrets.check, return deny for contexts too ([#97](https://github.com/mark-brannan/languette/pull/97))
+- guard-secrets: short options other than -u (-p and the rest) are not read as credentials; too many other meanings Undo: add the option to secrets._OPTS ([#97](https://github.com/mark-brannan/languette/pull/97))
+- secrets.redact masks the value, not the key: GITHUB_TOKEN=**** Undo: widen the Finding span to the whole word ([#97](https://github.com/mark-brannan/languette/pull/97))
+- guard-secrets: -u user:pass and --user user:pass are read as a credential; other short options still are not Undo: drop the _USER_OPTS branch in secrets._context ([#97](https://github.com/mark-brannan/languette/pull/97))
+- guard-secrets: a project pattern's regex is capped at 512 characters and may not reuse a shipped rule id; no backtracking bound beyond the hook's timeout Undo: drop the MAX_REGEX and _SHIPPED checks in guard_secrets._load ([#97](https://github.com/mark-brannan/languette/pull/97))
 ### 20261008t024021z
 - A failed parser run (RunFailed: timeout, signal, OS) gets no pip-parser column; the column belongs to a refusal of the text, and a retry message with one reads as a syntax fault Undo: drop the isinstance(e, RunFailed) test in scan.parse ([#93](https://github.com/mark-brannan/languette/pull/93))
 
+### 20261008t053753z
+- A project secret pattern that nests one unbounded repeat inside another is refused, read from the stdlib regex parser (re._parser, sre_parse before 3.11); a time budget was not added, Solace's choice. Undo: delete _nested_repeat and its check in guard_secrets._load ([#97](https://github.com/mark-brannan/languette/pull/97))
 ### 20261008t034001z
 - guard-git-work-loss, guard-git-stacked-base and guard-worktrees are ported in today's runner shape (a check that yields Needs), not epic #76's pure functions Undo: rework under #76 ([#96](https://github.com/mark-brannan/languette/pull/96))
 - guard-git-stacked-base keeps `timeout 20 gh pr list` and asks when neither timeout nor gtimeout is installed, as its feature file says Undo: bound gh in World's subprocess call alone and drop the timeout rows from guard-git-stacked-base.feature ([#96](https://github.com/mark-brannan/languette/pull/96))
@@ -158,3 +166,5 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - guard-github-issues reads the hook event from the payload's hook_event_name, not a prompt/post argument Undo: add an --event argument to run.py ([#98](https://github.com/mark-brannan/languette/pull/98))
 - three differences from the shell: an unreadable or directory --body-file denies; an engine past 50 s counts as a crash (no-op); with python3 absent all three deny on their PreToolUse matcher Undo: restore each shell behaviour with a feature row ([#98](https://github.com/mark-brannan/languette/pull/98))
 - the PR 98 review's three findings (whole-command HOME rewrite, allow skipping the permission prompt, engine failures as no-ops) stay as the shell has them: parity is W3's bar Undo: close each with a feature row, in its own PR ([#98](https://github.com/mark-brannan/languette/pull/98))
+### 20261008t184358z
+- guard-secrets: a credential key=value inside a word (after =, ?, &, ;, comma, { or a space) is read as context, its value ending at the next &, comma, ;, } or space Undo: drop the _INNER loop in secrets._context ([#97](https://github.com/mark-brannan/languette/pull/97))
