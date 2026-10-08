@@ -151,3 +151,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - guard-worktrees reads and writes its per-session record, globs for the scratchpad and stats claim-stamp.sh directly, not through World Undo: move them behind Needs under #76 ([#96](https://github.com/mark-brannan/languette/pull/96)) -- undone in #96 itself: they are World's `worktree` and `which` facts; the write still happens before the verdict, which is #76's
 - checkout-home resolves a relative cd or -C that follows an earlier cd and judges where it lands; the shell denied it as unresolvable Undo: deny when the base is lost, as the shell did ([#96](https://github.com/mark-brannan/languette/pull/96))
 - the fail-open paths claude-review found on #96 (a --config-env or --attr-source value read as the subcommand; an unresolvable --git-dir allowed; checkout-home with git absent allows; foreign with no cwd or no $HOME allows) stay as the shell has them: parity is W2's bar Undo: close each with a feature row, in its own PR ([#96](https://github.com/mark-brannan/languette/pull/96))
+
+### 20261008t184358z
+- guard-secrets: a credential key=value inside a word (after =, ?, &, ;, comma, { or a space) is read as context, its value ending at the next &, comma, ;, } or space Undo: drop the _INNER loop in secrets._context ([#97](https://github.com/mark-brannan/languette/pull/97))

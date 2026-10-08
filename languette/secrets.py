@@ -9,7 +9,8 @@ Three layers, in the order prior art (gitleaks, detect-secrets) uses them:
 - shape: a word holds a vendor-prefixed or fixed-format token
   (secret_rules.RULES, ported from gitleaks, plus the caller's own rules);
 - context: the word is `KEY=value`, `Key: value` (a data line's indent, an
-  `export` and quotes around key or value set aside) or follows an option that
+  `export` and quotes around key or value set aside), holds such a pair after
+  an `=`, `?`, `&` or `{` (`?api_key=v`), or follows an option that
   names a credential (`--password`, `--token`, `-u user:pass`), or is a URL
   with a password;
 - entropy: only confirms a shape or context hit, never fires alone, so
@@ -46,6 +47,10 @@ _KEY = re.compile(r"(?:^|[_.-]|(?<=[a-z])(?=[A-Z]))"
 # `KEY=value` or `Key: value`, after a data line's indent and an optional
 # export/set/setenv; the key may sit in one pair of matching quotes.
 _PAIR = re.compile(r"""^\s*(?:(?:export|set|setenv)\s+)?(["']?)([^=:\s"']+)\1\s*[=:]\s*""")
+# The same pair inside a word: `--from-literal=password=v`, `?api_key=v&x=1`,
+# `{"password": "v"}`. Its value ends at the next `&`, `,`, `;`, `}` or space.
+_INNER = re.compile(r"""(?<=[=?&;,{\s])(["']?)([A-Za-z_][\w.-]*)\1\s*[=:]\s*""")
+_INNER_END = re.compile(r"[&,;}\s]")
 # Options whose next word, or whose =value, is a credential. Short options
 # (-p) are too many other things (mkdir -p, ssh -p) to be read this way.
 _OPTS = frozenset("--password --passwd --pass --token --secret --api-key --apikey --access-key --client-secret "
@@ -137,6 +142,14 @@ def _context(text, prev):
             span = _value_span(text, m.end())
             if span:
                 return f"context:{key}", span
+    for m in _INNER.finditer(text):
+        if not _KEY.search(m.group(2)):
+            continue
+        a = m.end()
+        end = None if text[a:a + 1] in ("'", '"') else (_INNER_END.search(text, a) or re.search(r"\Z", text)).start()
+        span = _value_span(text, a, end)
+        if span:
+            return f"context:{m.group(2)}", span
     return None
 
 

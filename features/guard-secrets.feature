@@ -67,6 +67,9 @@ Feature: guard-secrets
       | curl -H "X-Api-Key: S3cr3tPa55w0rdXy" https://example.com                  | gitleaks:allow            |
       | githubToken=Zq9kLm2pQ7rXv4Tn ./run                                          | camelCase key: gitleaks:allow |
       | curl -u app:S3cr3tPa55w0rdXy https://example.com                           | user:password: gitleaks:allow |
+      | kubectl create secret generic db --from-literal=password=S3cr3tPa55w0rdXy  | key inside an option's value: gitleaks:allow |
+      | curl "https://example.com/v1?api_key=S3cr3tPa55w0rdXy&page=2"            | URL query: gitleaks:allow |
+      | echo '{"user": "app", "password": "S3cr3tPa55w0rdXy"}' > creds.json   | inline JSON: gitleaks:allow |
 
   Scenario Outline: an indented data line is read whole: indent, export and quotes set aside
     When the agent runs:
@@ -102,6 +105,9 @@ Feature: guard-secrets
       | sudo -u root ls                                                | -u names a user, no password           |
       | bypass=Zq9kLm2pQ7rXv4Tn ./run                                  | ends in pass, not a key: gitleaks:allow |
       | compass=Zq9kLm2pQ7rXv4Tn ./run                                 | ends in pass, not a key: gitleaks:allow |
+      | curl "https://example.com/v1?page=2&per_page=100"            | a query with no credential key         |
+      | helm install app chart --set auth.enabled=true                 | a key that only starts with auth       |
+      | sed -i 's/password=.*/password=REDACTED/' app.env              | a pattern, after a slash               |
       | echo done                                                      |                                        |
 
   Scenario: the project's own patterns extend the list
