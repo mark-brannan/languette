@@ -304,20 +304,20 @@ to Claude Code, and every command goes through. One entry:
 
 ```
 git clone https://github.com/mark-brannan/languette && cd languette
-sudo apt install shfmt jq shellcheck
+sudo apt install shfmt shellcheck
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 python3 -m pytest                       # every scenario
-bash tests/guard-worktrees.test.sh      # and guard-private-terms: two bash suites, ~40 s
 python3 tests/readme_table.py           # regenerate the table
 shellcheck --severity=warning tests/stubs/* tests/*.test.sh   # as CI runs it
 ```
 
-The tests need pytest, pytest-bdd and PyHamcrest, the bash suites `jq`; the
-hooks need none of them. The same run checks the shape of `hooks/hooks.json`,
-because `claude plugin validate --strict` passes a malformed one. The headless
-smoke test, which installs the plugin in a scratch project and confirms a
-recursive `rm` is really blocked, stays manual: it needs a model call and a login.
+Running the tests needs pytest, pytest-bdd and PyHamcrest; the hooks do not.
+
+The same run checks the shape of `hooks/hooks.json`, because
+`claude plugin validate --strict` passes a malformed one. The headless smoke
+test, which installs the plugin in a scratch project and confirms a recursive
+`rm` is really blocked, stays manual: it needs a model call and a login.
 
 `features/` holds the contract as scenarios: a command in, tokens or a
 verdict out. The guards began as shell scripts copied from
