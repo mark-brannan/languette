@@ -38,13 +38,37 @@ def test_nothing_is_written_unless_turned_on(tmp_path):
     assert not (tmp_path / "state").exists()
 
 
-def test_a_deny_is_recorded_with_the_command_redacted(tmp_path):
+def test_a_deny_is_recorded_with_the_command_and_reason_whole(tmp_path):
     out = run.respond(_payload(RM), _env(tmp_path), "guard-recursive-delete")
     [rec] = _records(tmp_path)
     assert rec["v"] == 1 and rec["verdict"] == "deny" and json.loads(out)
-    assert rec["findings"] == [{"guard": "guard-recursive-delete", "decision": "deny"}]
-    assert rec["command"] == {"redacted": True, "programs": ["rm", "git"], "length": len(RM)}
-    assert "secret-project" not in json.dumps(rec)
+    [f] = rec["findings"]
+    assert f["guard"] == "guard-recursive-delete" and f["decision"] == "deny" and f["reason"]
+    assert rec["command"] == {"text": RM, "masked": 0, "programs": ["rm", "git"]}
+
+
+SECRET = [
+    ("GITHUB_TOKEN=ghp_abc123 gh api repos/acme/app", "GITHUB_TOKEN=<secret> gh api repos/acme/app"),
+    ("export OPENAI_API_KEY='sk-x y'", "export OPENAI_API_KEY=<secret>"),
+    ("docker login -u acme --password Hunter2", "docker login -u acme --password <secret>"),
+    ("gh auth login --with-token=abc", "gh auth login --with-token=<secret>"),
+    ("curl -H 'Authorization: Bearer abc123' https://x", "curl -H 'Authorization: Bearer <secret>' https://x"),
+    ("curl -u acme:pw https://x", "curl -u acme:<secret> https://x"),
+    ("git clone https://acme:pw@git.example.com/a.git", "git clone https://acme:<secret>@git.example.com/a.git"),
+    ("mysql -u root -phunter2 db", "mysql -u root -p<secret> db"),
+    ("echo ghp_" + "a1" * 18, "echo <secret>"),
+    ("echo AKIA" + "ABCD1234" * 2, "echo <secret>"),
+    ("echo " + "Ab3" * 12, "echo <secret>"),
+]
+KEPT = ["git checkout " + "3f2a9c1e" * 5, "rm -rf ~/secret-project && git push", "mkdir -p a/b",
+        "cat ~/.ssh/id_rsa", "aws s3 cp x s3://bucket --profile prod", "ls /usr/lib/x86_64-linux-gnu/libpython3.12.so"]
+
+
+def test_only_secret_looking_values_are_masked():
+    for before, after in SECRET:
+        assert record.scrub(before)[0] == after, before
+    for kept in KEPT:
+        assert record.scrub(kept) == (kept, 0), kept
 
 
 def test_a_command_every_guard_let_through_is_recorded(tmp_path):

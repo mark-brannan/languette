@@ -187,14 +187,14 @@
     "record_decisions": {
       "type": "boolean",
       "title": "Record decisions",
-      "description": "Off by default. Write one line per hook call (each guard's finding, the verdict, the parser rung) to $XDG_STATE_HOME/languette/decisions.jsonl, readable only by you. Nothing leaves the machine; the command is redacted to the programs it runs.",
+      "description": "Off by default. Write one line per hook call (each guard's finding, the verdict, the parser rung) to $XDG_STATE_HOME/languette/decisions.jsonl, readable only by you. Nothing leaves the machine; what looks like a secret in the command (a token, a password) is masked.",
       "default": false,
       "required": false
     },
     "record_raw_commands": {
       "type": "boolean",
       "title": "Record raw commands",
-      "description": "Off by default; applies only when record_decisions is on. Keep each command whole, with the guards' reasons, instead of redacting it.",
+      "description": "Off by default; applies only when record_decisions is on. Keep each command and the guards' reasons exactly as written, secrets included.",
       "default": false,
       "required": false
     }
