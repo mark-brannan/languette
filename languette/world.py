@@ -133,9 +133,11 @@ class World:
     def _send_state(self, session):
         """guard-cross-session-send's state for `session`: {"subagents": [ids],
         "read": the tool that read untrusted content this turn, or None}.
-        Raises OSError or ValueError when it is missing, a link, or garbled."""
+        Raises OSError or ValueError when it is missing, a link, someone
+        else's, open to others, or garbled."""
         fd = os.open(self._send_file(session), os.O_RDONLY | os.O_NOFOLLOW)
         with os.fdopen(fd, encoding="utf-8") as f:
+            _own(f)
             fcntl.flock(f, fcntl.LOCK_SH)
             st = json.load(f)
         if not (isinstance(st, dict) and isinstance(st.get("subagents"), list)
@@ -155,6 +157,7 @@ class World:
                 os.unlink(path)
             fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
             with os.fdopen(fd, "r+", encoding="utf-8") as f:
+                _own(f)
                 fcntl.flock(f, fcntl.LOCK_EX)
                 try:
                     st = json.loads(f.read() or "null")
@@ -247,6 +250,14 @@ class World:
         if self._seen is None:
             self._seen = scan(self._transcript())
         return self._seen
+
+
+def _own(f):
+    """Refuse a state file another user made, or one others may write: on a
+    shared /tmp it could have been planted to say the door is closed."""
+    st = os.fstat(f.fileno())
+    if st.st_uid != os.geteuid() or st.st_mode & 0o022:
+        raise PermissionError("guard-cross-session-send state is not this user's alone")
 
 
 def _record(line):

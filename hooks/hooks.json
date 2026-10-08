@@ -143,7 +143,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send >/dev/null; }; true",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { p=$(cat); o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send 2>/dev/null) && [ -z \"$o\" ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); [ -n \"$s\" ] && rm -f \"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; }; }; true",
             "statusMessage": "Noting a read of untrusted content for the cross-session guard"
           }
         ]
@@ -165,7 +165,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send >/dev/null; }; true",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { p=$(cat); o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send 2>/dev/null) && [ -z \"$o\" ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); [ -n \"$s\" ] && rm -f \"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; }; }; true",
             "statusMessage": "Noting a read of untrusted content for the cross-session guard"
           }
         ]
@@ -185,7 +185,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send >/dev/null; }; true",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { p=$(cat); o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send 2>/dev/null) && [ -z \"$o\" ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); [ -n \"$s\" ] && rm -f \"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; }; }; true",
             "statusMessage": "Closing the cross-session door for this turn"
           }
         ]
@@ -196,7 +196,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send >/dev/null; }; true",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { p=$(cat); o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send 2>/dev/null) && [ -z \"$o\" ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); [ -n \"$s\" ] && rm -f \"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; }; }; true",
             "statusMessage": "Noting this session's subagent for the cross-session guard"
           }
         ]

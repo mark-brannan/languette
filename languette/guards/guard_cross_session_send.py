@@ -107,13 +107,26 @@ def untrusted_read(payload):
     return f"Bash {what}" if what else None
 
 
+# Control characters and bidi overrides: either can make what the dialog shows
+# differ from what is sent.
+_UNSHOWN = re.compile(r"[\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]")
+
+
+def _shown(text):
+    text = _UNSHOWN.sub("?", text.strip())
+    return text if len(text) <= FIRST_LINE else text[:FIRST_LINE - 1].rstrip() + "…"
+
+
 def _first_line(message):
+    """The message's first non-empty line as the dialog shows it, and how many
+    non-empty lines follow it unseen."""
     if not isinstance(message, str):
         message = "" if message is None else json.dumps(message)
-    line = next((ln.strip() for ln in message.splitlines() if ln.strip()), "")
-    if not line:
-        return "(no message)"
-    return line if len(line) <= FIRST_LINE else line[:FIRST_LINE - 1].rstrip() + "…"
+    lines = [ln for ln in message.splitlines() if ln.strip()]
+    if not lines:
+        return '"(no message)"'
+    more = f" (+{len(lines) - 1} more line{'s' if len(lines) > 2 else ''})" if len(lines) > 1 else ""
+    return f'"{_shown(lines[0])}"{more}'
 
 
 def check(payload, env=os.environ):
@@ -157,7 +170,7 @@ def check(payload, env=os.environ):
         return None
     closed = isinstance(state, dict) and state.get("read") is None
     mode = payload.get("permission_mode")
-    target = f"`{to}`" if to else "an unnamed target"
+    target = f"`{_shown(to)}`" if to else "an unnamed target"
     if mode in _NO_PROMPT or not isinstance(mode, str):
         if closed:
             return None if mode in _NO_PROMPT else ask(_ask_reason(target, ti))
@@ -171,4 +184,4 @@ def check(payload, env=os.environ):
 
 def _ask_reason(target, ti):
     return (f"{NAME}: a message to {target}, which may be another of the user's sessions, "
-            f"leaves this one: \"{_first_line(ti.get('message'))}\"")
+            f"leaves this one: {_first_line(ti.get('message'))}")

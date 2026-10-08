@@ -429,6 +429,28 @@ def _hooks_json(ctx, guard):
     ctx.hook = hooks_json_commands()[guard]
 
 
+@given(parsers.parse('the hook is the hooks.json {event} command for "{guard}"'))
+def _hooks_json_event(ctx, event, guard):
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
+    [ctx.hook] = [h["command"] for e in hj["hooks"][event] for h in e["hooks"] if f"--guard {guard}" in h["command"]]
+
+
+@when(parsers.parse('Claude Code fires {event} for tool "{tool}"'))
+def _fires(ctx, event, tool):
+    ctx.run(json.dumps(ctx.moded({"hook_event_name": event, "session_id": ctx.session, "tool_name": tool,
+                                  "tool_input": {}, "tool_response": "..."})))
+
+
+@then("the cross-session state file is gone")
+def _send_state_gone(ctx):
+    assert not _send_state_file(ctx).exists()
+
+
+@then(parsers.parse('the cross-session state file names "{tool}"'))
+def _send_state_names(ctx, tool):
+    assert json.loads(_send_state_file(ctx).read_text())["read"] == tool
+
+
 @given(parsers.parse('the plugin\'s script for "{guard}" crashes'))
 def _crash(ctx, guard):
     root = Path(ctx.mkdtemp())
@@ -647,6 +669,11 @@ def _send_state_file(ctx):
 @when(parsers.parse("the cross-session state file holds `{text}`"))
 def _send_state(ctx, text):
     _send_state_file(ctx).write_text(text)
+
+
+@when("the cross-session state file is open to others")
+def _send_state_open(ctx):
+    _send_state_file(ctx).chmod(0o666)
 
 
 @given(parsers.parse('the cross-session state file is a symlink to "{target}"'))
