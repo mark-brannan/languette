@@ -18,7 +18,8 @@ GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-ba
           "guard-private-terms", "prose-budget-commit", "guard-worktrees",
           "guard-bypass-labels", "guard-unparsable", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
           "guard-permissions", "guard-pipe-to-shell", "guard-disk",
-          "guard-host-availability", "guard-scheduled-jobs", "guard-secrets"}
+          "guard-host-availability", "guard-scheduled-jobs", "guard-cross-session-send",
+          "guard-secrets"}
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"guard_worktrees"}
 # Options that are not a guard's on/off toggle: name -> type.
@@ -131,7 +132,7 @@ def test_hooks_json_wires_exactly_the_guards():
 def test_the_foreign_worktree_guard_matches_the_file_tools_and_enterworktree():
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
     for guard, want in WIDE_MATCHER.items():
-        [e] = [e for e in hj["hooks"]["PreToolUse"] if any(f"/hooks/{guard}.sh" in h["command"] for h in e["hooks"])]
+        [e] = [e for e in hj["hooks"]["PreToolUse"] if any(f"--guard {guard};" in h["command"] for h in e["hooks"])]
         assert_that(e["matcher"], equal_to(want))
 
 

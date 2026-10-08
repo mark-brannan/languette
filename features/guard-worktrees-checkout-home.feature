@@ -1,4 +1,4 @@
-@shell
+@python @shell
 Feature: guard-worktrees
   Opt-in: the plugin option guard_worktrees turns this guard on (see
   wiring.feature). For a $HOME that is itself a worktree (yadm, a bare-repo

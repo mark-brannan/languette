@@ -34,9 +34,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
 It needs:
 
-- `python3`, standard library only, for every `run.py` guard (`ask-first`,
-  `guard-bypass-hooks`, `guard-bypass-labels`, `guard-infra`, `guard-recursive-delete`,
-  `guard-unparsable`);
+- `python3`, standard library only, for every `run.py` guard;
 - `jq` and a POSIX `awk`, for the shell guards, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
 - `gh`, for `guard-git-stacked-base` and `guard-bypass-ruleset`.
@@ -55,10 +53,8 @@ Each guard checks for one kind of hazard:
   `chown`, `chgrp` or `chmod 777` outside agent-owned or
   `LANGUETTE_PERM_ALLOW` directories
 - [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`
-- [`guard-disk`](features/guard-disk.feature): `dd`, `mkfs`, `wipefs`,
-  `shred` onto disks
-- [`guard-host-availability`](features/guard-host-availability.feature):
-  shutdown, reboot, fork bomb
+- [`guard-disk`](features/guard-disk.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
+- [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
 - [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
   `stash pop`, force-push, `reset --hard` and other moves that throw work away
@@ -70,12 +66,13 @@ Each guard checks for one kind of hazard:
 - [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub issue create, transfer
   or delete in one human turn, or any inside a loop
 - [`guard-private-terms`](#settings-for-guard-private-terms): a term from your
-  private list, posted to a public repo (off until you give it the list)
+  private list, posted to a public repo (off until given the list)
 - [`guard-worktrees`](features/guard-worktrees-checkout-home.feature): opt-in; a branch switch in a `$HOME`
   that is a worktree, or a [reach into another session's worktree](features/guard-worktrees-foreign.feature)
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
   applying a label that waives a CI gate, such as `churn-ok`
-- [`guard-secrets`](languette/guards/guard_secrets.py): a credential in the command
+- [`guard-secrets`](languette/guards/guard_secrets.py): a pasted credential
+- [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to another session: asks; in `bypassPermissions`, denies after a network read
 - `guard-protected-paths`, `guard-database` (planned)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
@@ -266,6 +263,7 @@ guard reads beyond the command, it declares:
 | `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
+| `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
 | `guard-worktrees` | `$HOME` and what `git rev-parse --show-toplevel` resolves to; git, for where each path lands, and a record per session in `$TMPDIR` |
 | `prose-budget-commit` | the staged diff and, for a commit that reaches past the index, the named working-tree files, through `prose-budget` |
 

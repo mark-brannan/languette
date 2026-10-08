@@ -111,10 +111,12 @@ class Ctx:
         self.hook = None                       # a hooks.json command, for wiring
         self.arg = None                        # an extra CLI argument to the guard script
         self.session = "s1"                    # session_id in the payload, for guard-github-issues
+        self.mode = None                       # permission_mode in the payload, for guard-cross-session-send
         self._doordir = None
         self.calls = 0                         # tool_use_id in the payload: one per call, as Claude Code gives
         self.stdin = self.verdict = self.scanned = None
         self._dirs = []
+        self.cleanups = []
 
     def mkdtemp(self):
         d = tempfile.mkdtemp(prefix="languette-", dir="/tmp")
@@ -141,6 +143,8 @@ class Ctx:
         return s
 
     def cleanup(self):
+        for f in self.cleanups:
+            f()
         for d in self._dirs:
             shutil.rmtree(d, ignore_errors=True)
 
@@ -152,12 +156,19 @@ class Ctx:
              "session_id": self.session, "tool_use_id": f"toolu_call{self.calls}"}
         if self.proj:
             p["transcript_path"] = f"{self.proj}/t.jsonl"
-        return json.dumps(p)
+        return json.dumps(self.moded(p))
+
+    def moded(self, p):
+        if self.mode is not None:
+            p["permission_mode"] = self.mode
+        return p
 
     def scenario_env(self):
         env = {k: self.expand(v) for k, v in self.env.items() if v is not None}
         if self.proj and self.project_env and "CLAUDE_PROJECT_DIR" not in self.env:
             env["CLAUDE_PROJECT_DIR"] = str(self.proj)
+        if "TMPDIR" not in self.env:
+            env["TMPDIR"] = self.doordir()     # the per-session state files, one place per scenario
         if "XDG_CACHE_HOME" not in self.env:
             self.cache = self.cache or self.mkdtemp()
             env["XDG_CACHE_HOME"] = self.cache
@@ -166,10 +177,15 @@ class Ctx:
     def run(self, stdin):
         self.stdin = stdin
         if self.engine in IN_PROCESS:
-            # These steps only shape a subprocess; in-process they would do nothing.
-            assert not (self.hook or self.bare or self.stubs), \
-                "test setup: a hook command, a bare PATH or the stubs need the shell engine (@shell_only)"
-            env = {"HOME": os.environ["HOME"], **self.scenario_env()}
+            # A hook command only shapes a subprocess; in-process it would do nothing.
+            assert not self.hook, "test setup: a hook command needs the shell engine (@shell_only)"
+            # TMPDIR as the shell engine has it, so a guard's per-session file
+            # starts fresh each scenario; PATH and the stub log as the stubs need.
+            env = {"HOME": os.environ["HOME"], "TMPDIR": self.doordir(), **self.scenario_env()}
+            if self.bare or self.stubs:
+                env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
+            if self.stub_log:
+                env["LANGUETTE_STUB_LOG"] = self.stub_log
             self.verdict = Verdict(run.respond(stdin, env, only=self.guard))
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
@@ -421,6 +437,28 @@ def _hooks_json(ctx, guard):
     ctx.hook = hooks_json_commands()[guard]
 
 
+@given(parsers.parse('the hook is the hooks.json {event} command for "{guard}"'))
+def _hooks_json_event(ctx, event, guard):
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
+    [ctx.hook] = [h["command"] for e in hj["hooks"][event] for h in e["hooks"] if f"--guard {guard}" in h["command"]]
+
+
+@when(parsers.parse('Claude Code fires {event} for tool "{tool}"'))
+def _fires(ctx, event, tool):
+    ctx.run(json.dumps(ctx.moded({"hook_event_name": event, "session_id": ctx.session, "tool_name": tool,
+                                  "tool_input": {}, "tool_response": "..."})))
+
+
+@then("the cross-session state file is gone")
+def _send_state_gone(ctx):
+    assert not _send_state_file(ctx).exists()
+
+
+@then(parsers.parse('the cross-session state file names "{tool}"'))
+def _send_state_names(ctx, tool):
+    assert json.loads(_send_state_file(ctx).read_text())["read"] == tool
+
+
 @given(parsers.parse('the plugin\'s script for "{guard}" crashes'))
 def _crash(ctx, guard):
     root = Path(ctx.mkdtemp())
@@ -430,14 +468,6 @@ def _crash(ctx, guard):
     else:
         (root / "hooks").mkdir()
         (root / f"hooks/{guard}.sh").write_text("exit 3\n")
-    ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
-
-
-@given(parsers.parse('the plugin\'s part "{part}" crashes'))
-def _crash_part(ctx, part):
-    root = Path(ctx.mkdtemp())
-    shutil.copytree(ROOT / "hooks", root / "hooks")
-    (root / f"hooks/{part}.sh").write_text("exit 3\n")
     ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
 
 
@@ -453,9 +483,9 @@ def hooks_json_commands():
 
 
 def hooks_json_prompt_command():
-    """The one UserPromptSubmit command in hooks/hooks.json (the guard-github-issues hook)."""
+    """The UserPromptSubmit command in hooks/hooks.json that opens the guard-github-issues door."""
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [h] = [h for e in hj["hooks"]["UserPromptSubmit"] for h in e["hooks"]]
+    [h] = [h for e in hj["hooks"]["UserPromptSubmit"] for h in e["hooks"] if "guard-github-issues.sh" in h["command"]]
     return h["command"]
 
 
@@ -466,11 +496,27 @@ def _ran(ctx):
     """Claude Code fires PostToolUse only for a call that ran: when this guard
     let it through, spend the door as the post hook would. The verdict the
     scenario judges stays the PreToolUse one."""
+    if ctx.guard == "guard-cross-session-send" and not ctx.hook:
+        _post(ctx, "PostToolUse")
     if ctx.guard != "guard-github-issues" or ctx.hook or ctx.verdict.decision == "deny":
         return
     pre, ctx.arg = ctx.verdict, "post"
     ctx.run(ctx.stdin)
     ctx.arg, ctx.verdict = None, pre
+
+
+def _post(ctx, event):
+    """The call ran: fire `event` on its payload, keeping the PreToolUse verdict."""
+    pre, p = ctx.verdict, json.loads(ctx.stdin)
+    ctx.run(json.dumps({**p, "hook_event_name": event, "tool_response": "..."}))
+    assert ctx.verdict.stdout == "", f"{event} hook printed {ctx.verdict.stdout!r}"
+    ctx.verdict = pre
+
+
+@when(parsers.re(r"the agent runs `(?P<command>.*)`, which fails", flags=re.S))
+def _runs_failing(ctx, command):
+    ctx.run(ctx.payload(command))
+    _post(ctx, "PostToolUseFailure")
 
 
 @when(parsers.re(r"the agent runs `(?P<command>.*)`", flags=re.S))
@@ -571,14 +617,104 @@ def _open_door_via_hooks_json(ctx):
 
 @when(parsers.re(r'the agent calls MCP tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
 def _mcp_call(ctx, tool, inp):
-    ctx.run(json.dumps({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)}))
+    ctx.run(json.dumps(ctx.moded({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)})))
     _ran(ctx)
 
 
 @when(parsers.re(r'the agent calls tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
 def _tool_call(ctx, tool, inp):
-    ctx.run(json.dumps({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(ctx.expand(inp)),
-                        "cwd": ctx.expand(ctx.cwd)}))
+    ctx.run(json.dumps(ctx.moded({"session_id": ctx.session, "tool_name": tool,
+                                  "tool_input": json.loads(ctx.expand(inp)), "cwd": ctx.expand(ctx.cwd)})))
+    _ran(ctx)
+
+
+@given(parsers.parse('the permission mode is "{mode}"'))
+@when(parsers.parse('the permission mode is "{mode}"'))
+def _mode(ctx, mode):
+    ctx.mode = mode
+
+
+@given("the payload carries no permission mode")
+def _no_mode(ctx):
+    ctx.mode = None
+
+
+@when("the human speaks")
+def _speaks(ctx):
+    ctx.run(json.dumps(ctx.moded({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
+                                  "prompt": "go on"})))
+    assert ctx.verdict.stdout == "", f"UserPromptSubmit printed {ctx.verdict.stdout!r}"
+
+
+@given(parsers.parse('the session starts from "{source}"'))
+@when(parsers.parse('the session starts from "{source}"'))
+def _session_starts(ctx, source):
+    ctx.run(json.dumps(ctx.moded({"hook_event_name": "SessionStart", "session_id": ctx.session, "source": source})))
+    assert ctx.verdict.stdout == "", f"SessionStart printed {ctx.verdict.stdout!r}"
+
+
+@when(parsers.parse('the agent spawns a subagent named "{name}", given id "{agent}"'))
+def _spawns(ctx, name, agent):
+    ctx.run(json.dumps(ctx.moded({"hook_event_name": "PostToolUse", "session_id": ctx.session, "tool_name": "Agent",
+                                  "tool_input": {"name": name, "prompt": "p", "description": "d"},
+                                  "tool_response": {"status": "async_launched", "agentId": agent}})))
+    assert ctx.verdict.stdout == "", f"PostToolUse printed {ctx.verdict.stdout!r}"
+
+
+@given(parsers.parse('the session\'s team config lists "{name}"'))
+def _team(ctx, name):
+    d = Path(os.environ["HOME"], ".claude", "teams", f"session-{ctx.session[:8]}")
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "config.json").write_text(json.dumps({"members": [{"name": "team-lead", "agentType": "team-lead"},
+                                                           {"name": name, "agentId": f"{name}@x"}]}))
+    ctx.cleanups.append(lambda: shutil.rmtree(d, ignore_errors=True))
+
+
+@when(parsers.parse('subagent "{agent}" starts'))
+def _subagent_starts(ctx, agent):
+    ctx.run(json.dumps(ctx.moded({"hook_event_name": "SubagentStart", "session_id": ctx.session,
+                                  "agent_id": agent, "agent_type": "general-purpose"})))
+    assert ctx.verdict.stdout == "", f"SubagentStart printed {ctx.verdict.stdout!r}"
+
+
+def _send(ctx, to, message, **extra):
+    ctx.calls += 1
+    ctx.run(json.dumps(ctx.moded({"hook_event_name": "PreToolUse", "session_id": ctx.session, "tool_name": "SendMessage",
+                                  "tool_input": {"to": to, "message": message},
+                                  "tool_use_id": f"toolu_call{ctx.calls}", **extra})))
+
+
+@when(parsers.re(r'the agent sends "(?P<to>[^"]*)" the message `(?P<message>.*)`', flags=re.S))
+def _sends(ctx, to, message):
+    _send(ctx, to, message.replace("\\n", "\n"))
+
+
+@when(parsers.re(r'subagent "(?P<agent>[^"]+)" sends "(?P<to>[^"]*)" the message `(?P<message>.*)`', flags=re.S))
+def _subagent_sends(ctx, agent, to, message):
+    _send(ctx, to, message, agent_id=agent)
+
+
+def _send_state_file(ctx):
+    return Path(ctx.doordir(), f"languette-guard-cross-session-send.{ctx.session}")
+
+
+@given(parsers.parse("the cross-session state file holds `{text}`"))
+@when(parsers.parse("the cross-session state file holds `{text}`"))
+def _send_state(ctx, text):
+    _send_state_file(ctx).write_text(text)
+
+
+@when("the cross-session state file is open to others")
+def _send_state_open(ctx):
+    _send_state_file(ctx).chmod(0o666)
+
+
+@given(parsers.parse('the cross-session state file is a symlink to "{target}"'))
+def _send_state_link(ctx, target):
+    victim = Path(ctx.expand(target))
+    victim.write_text("keep")
+    _send_state_file(ctx).unlink(missing_ok=True)
+    _send_state_file(ctx).symlink_to(victim)
 
 
 @when("the payload is:")
@@ -625,6 +761,11 @@ def _denies(ctx):
 @then(parsers.re(r'the guard denies, naming "(?P<text>.*)"'))
 def _denies_naming(ctx, text):
     assert_that(ctx.verdict, denies(naming=ctx.expand(text)))
+
+
+@then(parsers.re(r'the guard asks, naming "(?P<text>.*)"'))
+def _asks_naming(ctx, text):
+    assert_that(ctx.verdict, asks(naming=ctx.expand(text)))
 
 
 @then("the guard asks")
