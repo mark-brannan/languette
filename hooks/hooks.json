@@ -71,7 +71,7 @@
           },
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/prose-budget-commit.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"prose-budget-commit.sh is missing from the plugin directory or crashed, so staged prose could not be checked against the repo budgets. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard prose-budget-commit; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for prose-budget-commit and was not found on PATH. This is a gate and fails closed: install python3, or set prose_budget_commit=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (prose-budget-commit) is missing from the plugin directory or crashed, so staged prose could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking staged prose against the repo's budgets"
           }
         ]
@@ -81,7 +81,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"guard-github-issues.sh is missing from the plugin directory or crashed, so this issue create, transfer or delete could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-github-issues; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-github-issues and was not found on PATH. This is a gate and fails closed: install python3, or set guard_github_issues=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-github-issues) is missing from the plugin directory or crashed, so this issue create, transfer or delete could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for an issue create, transfer or delete"
           }
         ]
@@ -91,7 +91,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-private-terms.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"guard-private-terms.sh is missing from the plugin directory or crashed, so text bound for a public GitHub repo could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-private-terms; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-private-terms and was not found on PATH. This is a gate and fails closed: install python3, or set guard_private_terms=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-private-terms) is missing from the plugin directory or crashed, so text bound for a public GitHub repo could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking issue/PR text against the private-terms list"
           }
         ]
@@ -123,7 +123,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\" post; }; true",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-github-issues >/dev/null 2>&1; }; true",
             "statusMessage": "Spending the issue door for this turn"
           }
         ]
@@ -135,7 +135,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\" post; }; true",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-github-issues >/dev/null 2>&1; }; true",
             "statusMessage": "Spending the issue door for this turn"
           }
         ]
@@ -146,7 +146,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\" prompt; }; true",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-github-issues >/dev/null 2>&1; }; true",
             "statusMessage": "Opening the issue door for this turn"
           }
         ]

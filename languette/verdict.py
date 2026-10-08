@@ -1,7 +1,8 @@
 """The verdicts a guard returns, in Claude Code's hookSpecificOutput words,
 and the facts a guard may ask for.
 
-A guard's check returns deny(reason), ask(reason), context(text) or None; or it is a generator that yields Needs and returns one of those.
+A guard's check returns deny(reason), ask(reason), context(text), allow(input)
+or None; or it is a generator that yields Needs and returns one of those.
 Refuse is how a guard's internals say "deny, for this reason" from deep inside
 a walk; check catches it and returns deny. Standard library only.
 """
@@ -22,12 +23,16 @@ class Need:
         which         name                -> the program's path on the env's PATH, or None
         read          path                -> the file's text
         path          op, path            -> os.path.<op>(path): isdir, isfile, islink, exists,
-                                             lexists, realpath
+                                             lexists, realpath; or executable
         cwd                               -> the hook process's own directory
         ruleset-cache slug, branch        -> (mtime, text), or None
         ruleset-keep  slug, branch, text  -> None, once written
         clock                             -> seconds since the epoch
         claim         {label: runs}       -> ({label: [AskUserQuestion ids]}, spent)
+        run           cwd, timeout, *argv -> (exit code, stdout, stderr); raises on a
+                                             program that cannot start or times out
+        door          op, session[, call] -> guard-github-issues' per-session door
+                                             (world.World._door)
     """
 
     __slots__ = ("kind", "args")
@@ -50,3 +55,8 @@ def ask(reason):
 def context(text):
     return {"additionalContext": text}
 
+
+
+def allow(updated_input):
+    """Let the call run with its input rewritten to `updated_input`."""
+    return {"permissionDecision": "allow", "updatedInput": updated_input}

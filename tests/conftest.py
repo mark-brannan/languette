@@ -34,11 +34,13 @@ ENGINES = ("python", "shfmt", "shell")
 IN_PROCESS = {"python": ("awk",), "shfmt": ("shfmt",)}   # engine -> scan.RUNGS
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "LANGUETTE_PERM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
-         "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH",
+         "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH", "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND",
          "CLAUDE_CODE_TMPDIR", "CLAIM_STAMP_BIN", "GH_RULES", "GH_PROTECTION", "XDG_CACHE_HOME")
 
 
 _REAL_HOME = os.environ.get("HOME")
+# The shell guard's CLI argument -> the hook event it stands for.
+EVENTS = {"prompt": "UserPromptSubmit", "post": "PostToolUse"}
 
 
 def pytest_configure(config):
@@ -175,6 +177,10 @@ class Ctx:
                 env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
             if self.stub_log:
                 env["LANGUETTE_STUB_LOG"] = self.stub_log
+            if self.arg:
+                # The shell script's argument names the hook event, which a Python
+                # guard reads from the payload, as Claude Code sends it.
+                stdin = json.dumps({**json.loads(stdin), "hook_event_name": EVENTS[self.arg]})
             self.verdict = Verdict(run.respond(stdin, env, only=self.guard))
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
@@ -282,6 +288,11 @@ def _setenv(ctx, var, value):
     ctx.env[var] = value
 
 
+@given("no engine is configured")
+def _no_engine(ctx):
+    ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = ctx.env["PROSE_BUDGET"] = None
+
+
 @given(parsers.re(r"(?P<var>[A-Z][A-Z0-9_]*) is unset"))
 def _unsetenv(ctx, var):
     ctx.env[var] = None
@@ -387,10 +398,16 @@ def _remote_head(ctx, path, branch):
                    check=True)
 
 
+def _engine(ctx, command):
+    # The prose_budget_command option names the engine; PROSE_BUDGET is how the
+    # shell script, still run by the shell engine, finds it.
+    ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = ctx.env["PROSE_BUDGET"] = command
+
+
 @given('the stub "prose-budget" is the engine')
 def _prose_budget_stub(ctx):
     ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
-    ctx.env["PROSE_BUDGET"] = str(ROOT / "tests/stubs/prose-budget")
+    _engine(ctx, str(ROOT / "tests/stubs/prose-budget"))
 
 
 @given('the stub "prose-budget" is the engine, at a relative path')
@@ -400,13 +417,13 @@ def _prose_budget_stub_relative(ctx):
     dest = ctx.proj / "prose-budget"
     shutil.copy(ROOT / "tests/stubs/prose-budget", dest)
     dest.chmod(0o755)
-    ctx.env["PROSE_BUDGET"] = "./prose-budget"
+    _engine(ctx, "./prose-budget")
 
 
 @given('the stub "prose-budget" is the engine, by bare name on PATH')
 def _prose_budget_stub_bare(ctx):
     ctx.stubs, ctx.stub_log = True, ctx.stub_log or ctx.mkdtemp()
-    ctx.env["PROSE_BUDGET"] = "prose-budget"
+    _engine(ctx, "prose-budget")
 
 
 @given(parsers.re(r'PATH holds only "(?P<tools>[^"]*)"(?P<gh> and the stub "gh")?'))
@@ -544,7 +561,7 @@ def _call_declined(ctx):
 @when("the human speaks, opening the door")
 def _open_door(ctx):
     ctx.arg = "prompt"
-    ctx.run(json.dumps({"session_id": ctx.session, "prompt": "yes, file it"}))
+    ctx.run(json.dumps({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session, "prompt": "yes, file it"}))
     ctx.arg = None
 
 
@@ -553,7 +570,7 @@ def _open_door_via_hooks_json(ctx):
     # The UserPromptSubmit command exactly as hooks.json writes it, run the way
     # Claude Code runs it; the PreToolUse hook is restored for the next step.
     pretool, ctx.hook = ctx.hook, hooks_json_prompt_command()
-    ctx.run(json.dumps({"session_id": ctx.session, "prompt": "yes, file it"}))
+    ctx.run(json.dumps({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session, "prompt": "yes, file it"}))
     ctx.hook = pretool
 
 

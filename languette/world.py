@@ -22,7 +22,8 @@ SPENT = ".languette-ask"            # appended to the transcript path
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
-KINDS = frozenset("git gh-api pr-list which read path cwd clock ruleset-cache ruleset-keep claim".split())
+KINDS = frozenset("git gh-api pr-list which read path cwd clock ruleset-cache ruleset-keep claim run door".split())
+DOOR = "languette-guard-github-issues."   # + the session id, under $TMPDIR
 
 
 class World:
@@ -75,9 +76,74 @@ class World:
             return f.read()
 
     def _path(self, op, path):
+        if op == "executable":
+            return os.path.isfile(path) and os.access(path, os.X_OK)
         if op not in ("isdir", "isfile", "islink", "exists", "lexists", "realpath"):
             raise ValueError(f"no path fact {op!r}")
         return getattr(os.path, op)(path)
+
+    def _run(self, cwd, timeout, *argv):
+        r = subprocess.run(list(argv), cwd=cwd, env=self.env, capture_output=True, timeout=timeout,
+                           stdin=subprocess.DEVNULL)
+        dec = lambda b: b.decode("utf-8", "surrogateescape")
+        return r.returncode, dec(r.stdout), dec(r.stderr)
+
+    def _door(self, op, session, call=""):
+        """guard-github-issues' door for one session: a file under $TMPDIR that a
+        human turn opens and one identifier write claims, then spends.
+
+            open           -> None: the door is a fresh plain file, any claim dropped
+            spend          -> None: door and claim both gone
+            claim          -> True when this call took the open door; False when
+                              another call won it first; else the id the standing
+                              claim holds ("" when there is none)
+            take           -> True when this call took the standing claim over
+
+        A taker renames the file to a name of its own (atomic: one racer wins)
+        and stamps its id in a file made fresh, so a link planted at the door
+        or the claim is removed, never written through."""
+        door = os.path.join(self.env.get("TMPDIR") or "/tmp", DOOR + session)
+        held = door + ".held"
+        if op in ("open", "spend"):
+            for f in (door, held):
+                try:
+                    os.unlink(f)
+                except FileNotFoundError:
+                    pass
+            if op == "open":
+                os.close(os.open(door, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
+            return None
+        if op == "claim":
+            if os.path.lexists(door):
+                return self._take(door, door, call)
+            if not os.path.isfile(held):
+                return ""
+            try:
+                with open(held, encoding="utf-8", errors="replace") as f:
+                    return f.read()
+            except OSError:
+                return ""
+        if op == "take":
+            return self._take(held, door, call)
+        raise ValueError(f"no door op {op!r}")
+
+    @staticmethod
+    def _take(src, door, call):
+        mine, held = f"{door}.claim.{os.getpid()}", door + ".held"
+        try:
+            os.rename(src, mine)
+        except OSError:
+            return False
+        for f in (mine, held):
+            try:
+                os.unlink(f)
+            except FileNotFoundError:
+                pass
+        fd = os.open(mine, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(call)
+        os.rename(mine, held)
+        return True
 
     def _cwd(self):
         return os.getcwd()

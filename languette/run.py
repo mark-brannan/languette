@@ -37,26 +37,34 @@ def _out(event, fields):
 try:
     from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_bypass_ruleset,
                                   guard_disk, guard_git_stacked_base, guard_git_work_loss,
-                                  guard_host_availability, guard_infra, guard_permissions,
-                                  guard_pipe_to_shell, guard_recursive_delete, guard_scheduled_jobs,
-                                  guard_unparsable, guard_worktrees)
+                                  guard_github_issues, guard_host_availability, guard_infra,
+                                  guard_permissions, guard_pipe_to_shell, guard_private_terms,
+                                  guard_recursive_delete, guard_scheduled_jobs, guard_unparsable,
+                                  guard_worktrees, prose_budget_commit)
     from languette import record
-    from languette.verdict import ask, context, deny
+    from languette.verdict import allow, ask, context, deny
     from languette.world import World
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
                                          "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"}))
     sys.exit(0)
 
-# (hook event, tool name pattern, guards in the order they judge).
+# (hook event, tool name pattern or None for an event with no tool, guards in
+# the order they judge).
 GUARDS = (
     ("PreToolUse", re.compile(r"Bash\Z"), (guard_unparsable, guard_git_work_loss, guard_recursive_delete, ask_first,
                                            guard_bypass_hooks, guard_infra, guard_bypass_labels,
                                            guard_bypass_ruleset, guard_permissions, guard_pipe_to_shell,
                                            guard_disk, guard_host_availability, guard_scheduled_jobs,
-                                           guard_git_stacked_base)),
+                                           guard_git_stacked_base, prose_budget_commit)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
+    ("PreToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
+    ("PreToolUse", guard_private_terms.TOOLS, (guard_private_terms,)),
     ("PreToolUse", re.compile(r"(?:Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree)\Z"), (guard_worktrees,)),
+    # guard-github-issues' door: a human turn opens it, a write that ran spends it.
+    ("UserPromptSubmit", None, (guard_github_issues,)),
+    ("PostToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
+    ("PostToolUseFailure", guard_github_issues.TOOLS, (guard_github_issues,)),
 )
 
 
@@ -117,11 +125,12 @@ def _respond(stdin_text, env, only):
     tool = payload.get("tool_name")
     # An opt-in guard (OPT_IN names its option) runs alone by name, or with the
     # rest only when its option is exactly "true", as hooks.json runs it.
-    guards = [g for ev, rx, gs in GUARDS if ev == event and isinstance(tool, str) and rx.match(tool)
+    guards = [g for ev, rx, gs in GUARDS if ev == event and (rx is None or isinstance(tool, str) and rx.match(tool))
               for g in gs if only == g.NAME or (only is None and _on(g, env))]
     ti = payload.get("tool_input")
     command = ti.get("command") if tool == "Bash" and isinstance(ti, dict) else None
-    if guards and isinstance(command, str) and env.get("CLAUDE_PLUGIN_OPTION_GUARD_UNPARSABLE") != "false":
+    if (guards and event == "PreToolUse" and isinstance(command, str)
+            and env.get("CLAUDE_PLUGIN_OPTION_GUARD_UNPARSABLE") != "false"):
         # A command that does not parse is guard-unparsable's to deny; the others
         # would only read it again through a weaker parser. With guard-unparsable
         # off, nothing would deny it, so the others read it on the awk rung.
@@ -132,7 +141,7 @@ def _respond(stdin_text, env, only):
         if unparsed:
             guards = [g for g in guards if g is guard_unparsable]
     world = World(env, payload)
-    reasons, asks, notes, findings = [], [], [], []
+    reasons, asks, notes, rewrites, findings = [], [], [], [], []
     for g in guards:
         crashed = False
         try:
@@ -146,13 +155,19 @@ def _respond(stdin_text, env, only):
             reasons.append(r["permissionDecisionReason"])
         if r.get("permissionDecision") == "ask":
             asks.append(r["permissionDecisionReason"])
+        if r.get("permissionDecision") == "allow" and "updatedInput" in r:
+            rewrites.append(r["updatedInput"])
         if r.get("additionalContext"):
             notes.append(r["additionalContext"])
     judged = (world, payload, findings)
+    if event != "PreToolUse":                  # the door's bookkeeping: nothing to decide
+        return "", judged
     if reasons:
         return _out(event, deny("\n\n".join(reasons))), judged
     if asks:
         return _out(event, ask("\n\n".join(asks))), judged
+    if rewrites:                               # the first rewrite wins; two cannot both apply
+        return _out(event, {**allow(rewrites[0]), **(context("\n\n".join(notes)) if notes else {})}), judged
     if notes:
         return _out(event, context("\n\n".join(notes))), judged
     return "", judged

@@ -1,4 +1,4 @@
-@shell
+@python @shell
 Feature: guard-github-issues
   One GitHub issue create, transfer or delete per human turn. The human's
   own turn is the door: it opens on UserPromptSubmit and the first identifier

@@ -1,10 +1,10 @@
-@shell
+@python @shell
 Feature: prose-budget-commit
-  Before a `git commit`, runs the prose-budget engine
-  (mark-brannan/claude, bin/prose-budget) with --staged and denies on a
-  finding. The engine is never bundled here, so every scenario stubs it
-  through PROSE_BUDGET; without that (or any engine on PATH) the guard is
-  silent -- it can only narrow what already passes, never widen it.
+  Before a `git commit`, runs the prose-budget engine with --staged and
+  denies on a finding. The engine is the command the prose_budget_command
+  option names, else prose-budget on PATH; it is never bundled here, so every
+  scenario stubs it. Without an engine the guard is silent -- it can only
+  narrow what already passes, never widen it.
 
   Background:
     Given a project directory
@@ -98,13 +98,13 @@ Feature: prose-budget-commit
       | cd a && git -C b commit -m x     | a cd, then a -C          |
       | cd a; cd b; git commit -m x      | separated by semicolons  |
 
-  Scenario: a relative PROSE_BUDGET still resolves after the hook changes directory
+  Scenario: a relative engine command still resolves after the hook changes directory
     Given the stub "prose-budget" is the engine, at a relative path
     And PROSE_BUDGET_FAIL is "1"
     When the agent runs `cd sub && git commit -m x`
     Then the guard denies, naming "sections.max_words"
 
-  Scenario: a bare-name PROSE_BUDGET is looked up on PATH, not under the project
+  Scenario: a bare-name engine command is looked up on PATH, not under the project
     Given the stub "prose-budget" is the engine, by bare name on PATH
     And PROSE_BUDGET_FAIL is "1"
     When the agent runs `git commit -m x`
@@ -308,9 +308,8 @@ Feature: prose-budget-commit
       | git commit -m a && git -C sub commit -m b    | -C on the second     |
       | git commit -m a && yadm commit -m b          | git, then yadm       |
 
-  @shell_only
-  Scenario: with no engine on PROSE_BUDGET or PATH the guard is silent
-    Given PROSE_BUDGET is unset
+  Scenario: with no engine configured or on PATH the guard is silent
+    Given no engine is configured
     And PATH holds only "sh jq awk cat cut dirname"
     When the agent runs `git commit -m x`
     Then the guard is silent

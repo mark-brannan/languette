@@ -1,4 +1,4 @@
-@shell
+@python @shell
 Feature: guard-private-terms
   Text bound for a public GitHub repo is checked against the user's private
   terms file, wherever the text travels: a flag value, a heredoc, a file, an
