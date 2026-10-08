@@ -155,7 +155,7 @@ BASH_TIMEOUT = 2                               # seconds
 RUNGS = ("shfmt", "bash -n", "awk")            # tests narrow this to one rung
 # The pip parsers asked for a refusal's column, in turn. Which comes first is
 # open (#4); tree-sitter-bash first is an assumption.
-PIP = ("tree-sitter-bash",)
+PIP = ("tree-sitter-bash", "bashlex")
 
 
 class Unparseable(Exception):
@@ -241,6 +241,36 @@ def _tree_sitter(text):
     return f"{row + 1}:{col + 1}"
 
 
+@functools.lru_cache(maxsize=1)
+def _bashlex_mod():
+    """The bashlex module, or None when it is missing or will not load."""
+    try:
+        import bashlex
+        return bashlex
+    except Exception:  # noqa: BLE001 -- any failure to load is a missing parser
+        return None
+
+
+@functools.lru_cache(maxsize=256)
+def _bashlex(text):
+    """The line:col where bashlex stopped reading `text`, or None: no
+    package, a crash, a clean parse, or an error with no position (an
+    unsupported construct raises NotImplementedError). It locates; it never
+    decides."""
+    m = _bashlex_mod()
+    if m is None:
+        return None
+    try:
+        m.parse(text)
+    except Exception as e:  # noqa: BLE001 -- only a positioned error gives a column
+        pos = getattr(e, "position", None)
+        if not isinstance(pos, int) or isinstance(pos, bool):
+            return None
+        pos = min(max(pos, 0), len(text))
+        return f"{text.count(chr(10), 0, pos) + 1}:{pos - text.rfind(chr(10), 0, pos)}"
+    return None
+
+
 def _ts_error(root):
     """The first ERROR or MISSING node under root, in source order."""
     stack = [root]
@@ -284,7 +314,7 @@ def _column(text):
     """(parser, line:col) from the first pip parser that locates a fault in
     `text`, or None."""
     for name in PIP:
-        at = {"tree-sitter-bash": _tree_sitter}[name](text)
+        at = {"tree-sitter-bash": _tree_sitter, "bashlex": _bashlex}[name](text)
         if at:
             return name, at
     return None
