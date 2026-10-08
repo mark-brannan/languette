@@ -11,7 +11,7 @@
           },
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git-work-loss.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"guard-git-work-loss.sh is missing from the plugin directory or crashed, so the git work-loss moves could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-git-work-loss; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-git-work-loss and was not found on PATH. This is a gate and fails closed: install python3, or set guard_git_work_loss=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-git-work-loss) is missing from the plugin directory or crashed, so the git work-loss moves could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for git work loss"
           },
           {
@@ -46,7 +46,7 @@
           },
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git-stacked-base.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"guard-git-stacked-base.sh is missing from the plugin directory or crashed, so a remote-branch deletion could not be checked for open PRs stacked on it. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-git-stacked-base; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-git-stacked-base and was not found on PATH. This is a gate and fails closed: install python3, or set guard_git_stacked_base=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-git-stacked-base) is missing from the plugin directory or crashed, so a remote-branch deletion could not be checked for open PRs stacked on it. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for open PRs stacked on the branch being deleted"
           },
           {
@@ -111,7 +111,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktrees.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES-}\" != true ] || { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"guard-worktrees.sh is missing from the plugin directory or crashed, so a branch switch in $HOME or a reach into a worktree of another session could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES-}\" != true ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-worktrees; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-worktrees and was not found on PATH. This is a gate and fails closed: install python3, or set guard_worktrees=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-worktrees) is missing from the plugin directory or crashed, so a branch switch in $HOME or a reach into a worktree of another session could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for a branch switch in $HOME or a reach into another session's worktree"
           }
         ]

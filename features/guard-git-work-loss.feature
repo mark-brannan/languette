@@ -1,4 +1,4 @@
-@shell
+@python @shell
 Feature: guard-git-work-loss
   The git commands that throw work away are denied, wherever in the command
   they hide; prose that names them is not them.

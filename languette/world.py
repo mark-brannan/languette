@@ -10,17 +10,19 @@ import fcntl
 import json
 import os
 import re
+import shutil
 import subprocess
 import time
 from urllib.parse import quote
 
 GIT_TIMEOUT = 5
 GH_TIMEOUT = 10
+PR_LIST_TIMEOUT = 25                # past the `timeout 20` guard-git-stacked-base wraps gh pr list in
 SPENT = ".languette-ask"            # appended to the transcript path
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
-KINDS = frozenset("git gh-api read path cwd clock ruleset-cache ruleset-keep claim".split())
+KINDS = frozenset("git gh-api pr-list which read path cwd clock ruleset-cache ruleset-keep claim".split())
 
 
 class World:
@@ -56,12 +58,24 @@ class World:
         status = body.get("status") if isinstance(body, dict) else None
         return (int(status), body) if isinstance(status, str) and status.isdigit() else (None, None)
 
+    def _pr_list(self, cwd, *argv):
+        try:
+            r = subprocess.run(list(argv), cwd=cwd, env=self.env, capture_output=True, text=True,
+                               timeout=PR_LIST_TIMEOUT, stdin=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        out = r.stdout.strip()
+        return out if r.returncode == 0 and out else None
+
+    def _which(self, name):
+        return shutil.which(name, path=os.pathsep.join(os.get_exec_path(self.env)))
+
     def _read(self, path):
         with open(path, encoding="utf-8") as f:
             return f.read()
 
     def _path(self, op, path):
-        if op not in ("isdir", "lexists", "realpath"):
+        if op not in ("isdir", "isfile", "islink", "exists", "lexists", "realpath"):
             raise ValueError(f"no path fact {op!r}")
         return getattr(os.path, op)(path)
 
