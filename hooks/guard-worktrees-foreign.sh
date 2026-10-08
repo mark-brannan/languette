@@ -111,8 +111,8 @@
 # string for a nested scan when its segment could execute it -- so a commit
 # message, an issue body or a card that names a worktree path passes.
 #
-# Scanning is shared with guard-git-work-loss.sh/guard-worktrees-checkout-home.sh/
-# guard-recursive-delete.sh: lib-shell-words.awk (read its header).
+# Scanning is shared with guard-git-work-loss.sh and guard-worktrees-checkout-home.sh:
+# lib-shell-words.awk (read its header).
 #
 # This is a GATE, so it fails closed: no jq, no awk, no sed, no git, no
 # library, unreadable payload -> deny.
