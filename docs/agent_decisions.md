@@ -122,6 +122,13 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - NAME=lit; git push (a ; not &&) is trusted though a readonly NAME inherited from the shell would make the set fail; shell-set names are excluded Undo: require && between the set and the push ([#91](https://github.com/mark-brannan/languette/pull/91))
 - A . in command position or any shell keyword on the line turns literal resolution off, stricter than needed Undo: narrow _RESERVED in guard_bypass_ruleset.py ([#91](https://github.com/mark-brannan/languette/pull/91))
 
+### 20261008t014318z
+- A parser killed by a signal denies instead of falling to the next rung (kill -9 moved out of the crash test) Undo: drop the returncode < 0 check in scan._run ([#93](https://github.com/mark-brannan/languette/pull/93))
+- An OSError other than FileNotFoundError running a parser denies Undo: catch OSError with FileNotFoundError in scan._run ([#93](https://github.com/mark-brannan/languette/pull/93))
+
+### 20261008t021218z
+- The nesting limit is 10,000 weight (~450 ms of shfmt at 0.25 CPU, 4x under its 2 s timeout); the length limit is 64 KB Undo: raise WEIGHT_MAX in scan.py ([#93](https://github.com/mark-brannan/languette/pull/93))
+- A nested text over the limit raises through Scan like RunFailed, never falls to awk Undo: let Scan catch TooBig and fall to awk ([#93](https://github.com/mark-brannan/languette/pull/93))
 ### 20261008t012656z
 - Any bashlex error that carries a position gives the column, not only an open pair or an early end; a bashlex grammar gap (`[[ ]]`, a quoted heredoc delimiter) can then point at a spot other than the rung's fault Undo: in scan._bashlex, return None unless the error is a MatchedPairError or 'unexpected EOF' ([#77](https://github.com/mark-brannan/languette/pull/77))
 - A bashlex crash, failed import, or error with no position adds no column; the refusal stands as its rung wrote it Undo: raise in scan._bashlex's except ([#77](https://github.com/mark-brannan/languette/pull/77))
@@ -133,3 +140,5 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - secrets.redact masks the value, not the key: GITHUB_TOKEN=**** Undo: widen the Finding span to the whole word ([#97](https://github.com/mark-brannan/languette/pull/97))
 - guard-secrets: -u user:pass and --user user:pass are read as a credential; other short options still are not Undo: drop the _USER_OPTS branch in secrets._context ([#97](https://github.com/mark-brannan/languette/pull/97))
 - guard-secrets: a project pattern's regex is capped at 512 characters and may not reuse a shipped rule id; no backtracking bound beyond the hook's timeout Undo: drop the MAX_REGEX and _SHIPPED checks in guard_secrets._load ([#97](https://github.com/mark-brannan/languette/pull/97))
+### 20261008t024021z
+- A failed parser run (RunFailed: timeout, signal, OS) gets no pip-parser column; the column belongs to a refusal of the text, and a retry message with one reads as a syntax fault Undo: drop the isinstance(e, RunFailed) test in scan.parse ([#93](https://github.com/mark-brannan/languette/pull/93))

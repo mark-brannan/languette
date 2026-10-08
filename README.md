@@ -115,6 +115,9 @@ In a replay of 101,671 agent commands, about 1 in 3,000 didn't parse, and
 each [would have broken](features/guard-unparsable.feature).
 Bash runs a broken command in part, the lines before the error or prose in
 backticks as a command; the deny stops all of it, so the agent looks again.
+Over 64 KB or a nesting weight of 10,000, a command is denied unread: a
+limit holds on any machine. 10,000 takes shfmt ~450 ms on a quarter CPU, a
+fourth of its timeout; the heaviest of 83,430 agent commands weighs 1,022.
 
 ## Ask first
 

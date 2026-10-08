@@ -106,3 +106,27 @@ Feature: guard-unparsable
       rm -rf examples
       """
     Then the guard denies, naming "2:10: reached EOF without closing quote"
+
+  Scenario Outline: a command over the size or nesting limit is denied before any parser reads it
+    # A parser's time grows with nesting, so a timeout alone gives a verdict
+    # that turns on the machine's load. A limit on the text gives the same
+    # verdict everywhere. 10,000 is about 450 ms of shfmt on a quarter CPU;
+    # the heaviest of 83,430 past agent commands weighs 1,022.
+    When the agent nests `<template>` <n> deep
+    Then the guard denies, naming "<found>"
+
+    Examples:
+      | template       | n   | found                                     | note                                 |
+      | echo $({})     | 141 | its nesting weighs 10,152, over the limit | nested command substitutions         |
+      | true && {}     | 142 | its nesting weighs 10,295, over the limit | one long chain of &&                 |
+      | if x; then {}; fi | 141 | its nesting weighs 10,152, over the limit | nested ifs                        |
+      | echo {}{}      | 14  | bytes, over the limit of 65,536           | 98 KB of plain words                 |
+
+  Scenario Outline: a command under the limits reads as usual
+    When the agent nests `<template>` <n> deep
+    Then the guard is silent
+
+    Examples:
+      | template          | n   | note                                          |
+      | echo $({})        | 139 | just under the nesting limit                  |
+      | echo "$({})"      | 20  | quoted substitutions weigh as unquoted ones   |
