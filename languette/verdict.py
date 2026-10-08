@@ -18,12 +18,18 @@ class Need:
 
         git           prog, cwd, *argv    -> stdout, stripped, or None
         gh-api        path                -> (status, body), or (None, None)
+        pr-list       cwd, *argv          -> stdout of argv run in cwd, stripped, or None
+        which         name                -> the program's path on the env's PATH, or None
         read          path                -> the file's text
-        path          op, path            -> os.path.<op>(path): isdir, lexists, realpath
+        path          op, path            -> os.path.<op>(path): isdir, isfile, islink, exists,
+                                             lexists, realpath
         cwd                               -> the hook process's own directory
         ruleset-cache slug, branch        -> (mtime, text), or None
         ruleset-keep  slug, branch, text  -> None, once written
         clock                             -> seconds since the epoch
+        worktree      op, *args           -> guard-worktrees' per-session record: arrive rec, top
+                                             -> (usable, adopt); recorded rec, top -> bool; keep rec, top
+                                             and leave rec, text -> None; scratchpad sid -> dir, or None
         claim         {label: runs}       -> ({label: [AskUserQuestion ids]}, spent)
     """
 

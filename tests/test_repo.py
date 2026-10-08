@@ -131,7 +131,7 @@ def test_hooks_json_wires_exactly_the_guards():
 def test_the_foreign_worktree_guard_matches_the_file_tools_and_enterworktree():
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
     for guard, want in WIDE_MATCHER.items():
-        [e] = [e for e in hj["hooks"]["PreToolUse"] if any(f"/hooks/{guard}.sh" in h["command"] for h in e["hooks"])]
+        [e] = [e for e in hj["hooks"]["PreToolUse"] if any(f"--guard {guard};" in h["command"] for h in e["hooks"])]
         assert_that(e["matcher"], equal_to(want))
 
 

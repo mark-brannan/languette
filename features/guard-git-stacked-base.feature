@@ -1,4 +1,4 @@
-@shell
+@python @shell
 Feature: guard-git-stacked-base
   Deleting a remote branch an open PR uses is denied. gh and timeout are
   stubs throughout, so no scenario reaches the network: the stub lists three
