@@ -39,6 +39,7 @@ try:
                                   guard_disk, guard_host_availability, guard_infra, guard_permissions,
                                   guard_pipe_to_shell, guard_recursive_delete, guard_scheduled_jobs,
                                   guard_unparsable)
+    from languette import record
     from languette.verdict import ask, context, deny
     from languette.world import World
 except Exception as e:  # noqa: BLE001
@@ -75,13 +76,33 @@ def _drive(r, world):
 
 def respond(stdin_text, env, only=None):
     """The hook's whole stdout for one payload: "" (no objection) or one
-    JSON line. `env` is what the guards read in place of os.environ."""
+    JSON line. `env` is what the guards read in place of os.environ. With
+    record_decisions on, the call is recorded after the verdict (record.py)."""
+    out, judged = _respond(stdin_text, env, only)
+    if judged and record.wanted(env):
+        try:
+            world, payload, findings = judged
+            world.keep(record.build(payload, env, only, findings, _verdict(out)))
+        except Exception:  # noqa: BLE001 -- a record never changes the verdict
+            pass
+    return out
+
+
+def _verdict(out):
+    if not out:
+        return "silent"
+    hso = json.loads(out)["hookSpecificOutput"]
+    return hso.get("permissionDecision") or "context"
+
+
+def _respond(stdin_text, env, only):
+    """(stdout, (world, payload, [(guard, result, crashed)]) or None)."""
     try:
         payload = json.loads(stdin_text)
         if not isinstance(payload, dict):
             raise ValueError("payload is not an object")
     except Exception as e:  # noqa: BLE001 -- a gate fails closed on anything
-        return _out("PreToolUse", deny(f"languette: unreadable hook payload ({e})"))
+        return _out("PreToolUse", deny(f"languette: unreadable hook payload ({e})")), None
     # The shell guards never read the event; a payload without one is judged
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
@@ -101,12 +122,14 @@ def respond(stdin_text, env, only=None):
         if unparsed:
             guards = [g for g in guards if g is guard_unparsable]
     world = World(env, payload)
-    reasons, asks, notes = [], [], []
+    reasons, asks, notes, findings = [], [], [], []
     for g in guards:
+        crashed = False
         try:
             r = _drive(g.check(payload, env), world)
         except Exception as e:  # noqa: BLE001
-            r = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command")
+            r, crashed = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
+        findings.append((g.NAME, r, crashed))
         if not r:
             continue
         if r.get("permissionDecision") == "deny":
@@ -115,13 +138,14 @@ def respond(stdin_text, env, only=None):
             asks.append(r["permissionDecisionReason"])
         if r.get("additionalContext"):
             notes.append(r["additionalContext"])
+    judged = (world, payload, findings)
     if reasons:
-        return _out(event, deny("\n\n".join(reasons)))
+        return _out(event, deny("\n\n".join(reasons))), judged
     if asks:
-        return _out(event, ask("\n\n".join(asks)))
+        return _out(event, ask("\n\n".join(asks))), judged
     if notes:
-        return _out(event, context("\n\n".join(notes)))
-    return ""
+        return _out(event, context("\n\n".join(notes))), judged
+    return "", judged
 
 
 def main(argv):

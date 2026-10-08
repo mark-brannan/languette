@@ -17,6 +17,8 @@ from urllib.parse import quote
 GIT_TIMEOUT = 5
 GH_TIMEOUT = 10
 SPENT = ".languette-ask"            # appended to the transcript path
+RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
+RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
 KINDS = frozenset("git gh-api read path cwd clock ruleset-cache ruleset-keep claim".split())
 
 
@@ -120,6 +122,39 @@ class World:
                          for label, n in wants.items() for i in approved[label][:n]
                          if i not in spent)
             return approved, True
+
+    # --- acts ------------------------------------------------------------
+
+    def keep(self, rec):
+        """Append one decision record (languette.record). Silent on any failure:
+        a record never changes the verdict. Lines go in whole under an exclusive
+        lock, so parallel hooks cannot interleave them; rotation happens under
+        the same lock, and a writer that waited on a file rotated away from it
+        reopens rather than rotating the new one."""
+        try:
+            base = self.env.get("XDG_STATE_HOME") or os.path.join(self.env["HOME"], ".local", "state")
+            d = os.path.join(base, "languette")
+            os.makedirs(d, mode=0o700, exist_ok=True)
+            path = os.path.join(d, RECORDS)
+            line = (json.dumps(rec, separators=(",", ":")) + "\n").encode("utf-8", "surrogatepass")
+            for _ in range(3):
+                fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX)
+                    st = os.fstat(fd)
+                    if os.stat(path).st_ino != st.st_ino:
+                        continue                   # rotated while we waited
+                    if st.st_mode & 0o077:
+                        os.fchmod(fd, 0o600)
+                    if st.st_size + len(line) > RECORDS_MAX and st.st_size:
+                        os.replace(path, path + ".1")
+                        continue
+                    os.write(fd, line)
+                    return
+                finally:
+                    os.close(fd)
+        except Exception:  # noqa: BLE001
+            pass
 
     # --- the transcript --------------------------------------------------
 
