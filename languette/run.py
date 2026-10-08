@@ -129,23 +129,26 @@ def _respond(stdin_text, env, only):
               for g in gs if only == g.NAME or (only is None and _on(g, env))]
     ti = payload.get("tool_input")
     command = ti.get("command") if tool == "Bash" and isinstance(ti, dict) else None
+    judged_once = None   # guard-unparsable's verdict, when this reading got one
     if (guards and event == "PreToolUse" and isinstance(command, str)
             and env.get("CLAUDE_PLUGIN_OPTION_GUARD_UNPARSABLE") != "false"):
         # A command that does not parse is guard-unparsable's to deny; the others
         # would only read it again through a weaker parser. With guard-unparsable
         # off, nothing would deny it, so the others read it on the awk rung.
+        # guard-unparsable's verdict is this one reading, never a second parse:
+        # a parser that timed out here may finish there, and pass what it denied.
         try:
-            unparsed = guard_unparsable.refusal(command)
+            judged_once = (guard_unparsable.judge(command),)
         except Exception:  # noqa: BLE001 -- guard-unparsable's own run reports the crash
-            unparsed = False
-        if unparsed:
+            pass
+        if judged_once and judged_once[0]:
             guards = [g for g in guards if g is guard_unparsable]
     world = World(env, payload)
     reasons, asks, notes, rewrites, findings = [], [], [], [], []
     for g in guards:
         crashed = False
         try:
-            r = _drive(g.check(payload, env), world)
+            r = judged_once[0] if judged_once and g is guard_unparsable else _drive(g.check(payload, env), world)
         except Exception as e:  # noqa: BLE001
             r, crashed = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
         findings.append((g.NAME, r, crashed))

@@ -493,6 +493,15 @@ def _runs(ctx, command):
     _ran(ctx)
 
 
+@when(parsers.re(r"the agent nests `(?P<template>.*)` (?P<n>\d+) deep"))
+def _nests(ctx, template, n):
+    # Each {} becomes the template again, n times over; the last ones are x.
+    command = template
+    for _ in range(int(n) - 1):
+        command = command.replace("{}", template)
+    ctx.run(ctx.payload(command.replace("{}", "x")))
+
+
 def _transcript(ctx):
     if not ctx.proj:
         ctx.proj = Path(ctx.mkdtemp())
