@@ -85,6 +85,18 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 ### 20261007t193515z
 - bash -n sits below the pip slot and above awk on the parser ladder; the ruling names shfmt, pip, awk, and bash -n was not on it Undo: reorder scan.RUNGS ([#74](https://github.com/mark-brannan/languette/pull/74))
 - The awk rung refuses only a quote left open at the end, read by the lexer's own rules after heredoc bodies are stripped Undo: drop _awk's raise in scan.py ([#74](https://github.com/mark-brannan/languette/pull/74))
+
+### 20261007t193847z
+- A tree-sitter MISSING node gives a column, like an ERROR node Undo: drop 'or n.is_missing' in scan._ts_error ([#75](https://github.com/mark-brannan/languette/pull/75))
+
+### 20261007t193848z
+- A tree-sitter crash or failed import adds no column; the refusal stands as its rung wrote it Undo: raise in scan._tree_sitter's except ([#75](https://github.com/mark-brannan/languette/pull/75))
+
+### 20261007t232120z
+- tree-sitter's in-process parse has no timeout, unlike shfmt and bash -n; it runs only on text a rung already refused. Measured: 0.4 s for 200,000 commands and 3 ms for 3,000 nested substitutions Undo: pass a progress_callback to parser.parse in scan._tree_sitter that stops it after a deadline ([#75](https://github.com/mark-brannan/languette/pull/75))
+
+### 20261008t000000z
+- The column reads `<rung's message>, at L:C per tree-sitter-bash`, after the deciding rung's own words, which keep bash's line Undo: reformat in scan.parse ([#75](https://github.com/mark-brannan/languette/pull/75))
 ### 20261007t214340z
 - Facts the payload and env carry stay plain arguments to check, not Needs; only facts that need I/O are asked for. Undo: add an env Need kind answered in run.py and route guards' env reads through it ([#81](https://github.com/mark-brannan/languette/pull/81))
 
@@ -117,3 +129,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 ### 20261008t021218z
 - The nesting limit is 10,000 weight (~450 ms of shfmt at 0.25 CPU, 4x under its 2 s timeout); the length limit is 64 KB Undo: raise WEIGHT_MAX in scan.py ([#93](https://github.com/mark-brannan/languette/pull/93))
 - A nested text over the limit raises through Scan like RunFailed, never falls to awk Undo: let Scan catch TooBig and fall to awk ([#93](https://github.com/mark-brannan/languette/pull/93))
+
+### 20261008t024021z
+- A failed parser run (RunFailed: timeout, signal, OS) gets no pip-parser column; the column belongs to a refusal of the text, and a retry message with one reads as a syntax fault Undo: drop the isinstance(e, RunFailed) test in scan.parse ([#93](https://github.com/mark-brannan/languette/pull/93))

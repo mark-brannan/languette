@@ -1,11 +1,11 @@
 """guard-unparsable: a Bash command the parser refuses is denied, whole, before
 anything in it runs.
 
-The parser is languette/scan.py's ladder, read top down: shfmt, a pip
-parser, `bash -n`, then the awk lexer, which refuses only a quote that never
-closes. The deny names the rung that refused and what it found, with the
-position when the rung gives one, since an agent that is told only "syntax
-error" guesses at the fix. A command over the size or nesting limit
+The parser is languette/scan.py's ladder, read top down: shfmt, `bash -n`,
+then the awk lexer, which refuses only a quote that never closes. The deny
+names the rung that refused and what it found, with the position when the
+rung gives one or a pip parser adds it, since an agent that is told only
+"syntax error" guesses at the fix. A command over the size or nesting limit
 (scan.TooBig) is denied before any rung reads it, with what to change.
 
 The other guards skip a command that does not parse (run.py), rather than

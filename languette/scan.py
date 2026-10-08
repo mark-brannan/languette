@@ -8,12 +8,12 @@ or ";"), q (raw text of a quoted word holding whitespace, else ""), live (the
 word carried a $ or backtick the shell would act on), and shellseg (some
 segment is led by a shell, so `echo ... | sh` is executed text).
 
-The parser ladder (docs/decisions.md, "Parser ladder") picks who reads the
-text: a user-installed shfmt when it is on PATH and new enough, then a pip
-parser (a slot, unruled: #4), then `bash -n`, then the awk port below. Each
-rung that reads the text either accepts it or refuses it (Unparseable), and a
-refusal is final; a rung that is missing, crashed or cannot say passes the
-text down. Only shfmt's tree is mapped to words: a real parser decides where
+The parser ladder (docs/decisions.md, "Parse check") picks who reads the
+text: a user-installed shfmt when it is on PATH and new enough, then `bash
+-n`, then the awk port below. Each rung that reads the text either accepts it
+or refuses it (Unparseable), and a refusal is final; a rung that is missing,
+crashed or cannot say passes the text down. A pip parser, if installed, only
+adds the column to a refusal from below shfmt. Only shfmt's tree is mapped to words: a real parser decides where
 words and quotes begin and end, the awk lexer still shapes each piece, so the
 tokens are the same contract whichever rung read them. Below shfmt the awk
 lexer reads the words; the rung above it only accepts or refuses.
@@ -152,7 +152,10 @@ def heredoc_subs(s):
 SHFMT_MIN = (3, 6, 0)
 SHFMT_TIMEOUT = 2                              # seconds; a parse measures ~6 ms
 BASH_TIMEOUT = 2                               # seconds
-RUNGS = ("shfmt", "pip", "bash -n", "awk")     # tests narrow this to one rung
+RUNGS = ("shfmt", "bash -n", "awk")            # tests narrow this to one rung
+# The pip parsers asked for a refusal's column, in turn. Which comes first is
+# open (#4); tree-sitter-bash first is an assumption.
+PIP = ("tree-sitter-bash",)
 
 
 class Unparseable(Exception):
@@ -319,7 +322,52 @@ def _shfmt_tree(text):
     return tree if isinstance(tree, dict) and tree.get("Type") == "File" else None
 
 
-_pip_tree = None                               # rung two: a pip-installed parser, unruled (#4)
+@functools.lru_cache(maxsize=1)
+def _ts_parser():
+    """A tree-sitter parser for bash, or None when either package is missing
+    or will not load."""
+    try:
+        import tree_sitter
+        import tree_sitter_bash
+        return tree_sitter.Parser(tree_sitter.Language(tree_sitter_bash.language()))
+    except Exception:  # noqa: BLE001 -- any failure to load is a missing rung
+        return None
+
+
+@functools.lru_cache(maxsize=256)
+def _tree_sitter(text):
+    """The line:col of the first thing tree-sitter-bash could not read in
+    `text`, or None: no package, a crash, or a clean tree. tree-sitter never
+    fails a parse; it recovers, marking what it could not read with an ERROR
+    node and what it had to supply with a MISSING one. It locates; it never
+    decides."""
+    parser = _ts_parser()
+    if parser is None:
+        return None
+    try:
+        tree = parser.parse(text.encode("utf-8", "surrogatepass"))
+        bad = _ts_error(tree.root_node) if tree.root_node.has_error else None
+    except Exception:  # noqa: BLE001 -- a crash adds no column
+        return None
+    if bad is None:
+        return None
+    row, col = bad.start_point
+    if not bad.is_missing:                     # an ERROR node takes the blank before it
+        raw = bad.text
+        col += len(raw) - len(raw.lstrip(b" \t"))
+    return f"{row + 1}:{col + 1}"
+
+
+def _ts_error(root):
+    """The first ERROR or MISSING node under root, in source order."""
+    stack = [root]
+    while stack:
+        n = stack.pop()
+        if n.is_error or n.is_missing:
+            return n
+        if n.has_error:
+            stack.extend(reversed(n.children))
+    return None
 
 
 @functools.lru_cache(maxsize=256)
@@ -348,21 +396,35 @@ def _awk(text):
         raise Unparseable(f"the {q} opened at `{snip}` never closes")
 
 
+def _column(text):
+    """(parser, line:col) from the first pip parser that locates a fault in
+    `text`, or None."""
+    for name in PIP:
+        at = {"tree-sitter-bash": _tree_sitter}[name](text)
+        if at:
+            return name, at
+    return None
+
+
 def parse(text, words=False):
     """(rung, tree) from the first rung that reads the text; the tree is None
-    on every rung but shfmt's (and True from bash -n). Raises Unparseable,
-    naming the rung, when one refuses the text. words: only the rungs whose
-    reading Scan maps to words, shfmt and awk. A text over a limit is
-    refused before any rung reads it (TooBig)."""
+    on the awk rung and True from bash -n. Raises Unparseable, naming the
+    rung, when one refuses the text; below shfmt, a pip parser adds the
+    column, never to a failed run. words: only the rungs whose reading Scan
+    maps to words, shfmt and awk. A text over a limit is refused before any
+    rung reads it (TooBig)."""
     _limit(text)
     for rung in RUNGS:
         if words and rung not in ("shfmt", "awk"):
             continue
-        read = {"shfmt": _shfmt_tree, "pip": _pip_tree, "bash -n": _bash_n, "awk": _awk}[rung]
+        read = {"shfmt": _shfmt_tree, "bash -n": _bash_n, "awk": _awk}[rung]
         try:
-            tree = read(text) if read else None
+            tree = read(text)
         except Unparseable as e:
             e.rung = rung
+            at = _column(text) if rung != "shfmt" and not isinstance(e, RunFailed) else None
+            if at:
+                e.args = (f"{e}, at {at[1]} per {at[0]}",)
             raise
         if rung == "awk" or tree is not None:
             return rung, tree
