@@ -199,7 +199,8 @@ def _admin_merge(s, a, b, nested):
         if admin:
             return True                        # a live subcommand beside a literal --admin
         first = [k for k, x in enumerate(w) if not x.startswith("-")][:2]
-        if any(dyn[k] for k in first):
+        # Only a run-time group, or a run-time verb under a literal `pr`, could spell `pr merge`.
+        if first and (dyn[first[0]] or (w[first[0]] == "pr" and len(first) > 1 and dyn[first[1]])):
             raise Refuse("the `gh` subcommand is built at run time and could be `pr merge --admin`")
     return False
 

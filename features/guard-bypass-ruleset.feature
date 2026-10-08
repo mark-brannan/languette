@@ -77,6 +77,10 @@ Feature: guard-bypass-ruleset
       | git push git@gitlab.com:o/r.git main      | not on github.com                         |
       | echo git push origin main                 | text, not a push                          |
       | gh pr merge 5 --squash --auto             | a merge that waits for the rules          |
+      | gh api repos/$R/pulls/5                   | a run-time path under a literal api       |
+      | gh api -X POST repos/o/r/issues           | a method value is not a subcommand        |
+      | gh pr checks 5 -R $R                      | a run-time repo beside a literal pr       |
+      | gh issue $verb 5                          | a run-time word under issue, not pr       |
 
   Scenario Outline: on main itself, the branch's own push lands on main
     Given a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
@@ -142,6 +146,7 @@ Feature: guard-bypass-ruleset
       | git -c url.https://github.com/o/r.insteadOf=foo push foo main | a URL rewrite |
       | gh pr merge 5 "$flags"            | a flag built at run time              |
       | gh $p merge 5                     | a gh subcommand built at run time     |
+      | gh pr $v 5                        | a pr subcommand built at run time     |
       | export GIT_DIR=/x; git push origin main | another repository, exported       |
 
   Scenario Outline: a cd the shell may undo before the push asks
