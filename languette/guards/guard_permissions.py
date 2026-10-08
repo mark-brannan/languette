@@ -1,43 +1,12 @@
-"""guard-permissions: a permission sweep only on what is the agent's own.
+"""guard-permissions: features/guard-permissions.feature is the spec.
 
-Blocks a permission sweep -- recursive chown, chgrp and chmod (-R,
---recursive, or any short cluster containing R), `chmod 777`, and
-`find ... -exec chown|chgrp|chmod` -- unless every target, resolved against
-the payload's cwd and then through the filesystem, is the agent's own.
-
-Allowlist, not a denylist, in the shape of guard-recursive-delete. A target
-is allowed only when it is under the session scratchpad, an agent worktree
-or /tmp, or under an absolute path named in LANGUETTE_PERM_ALLOW. Never `/`,
-$HOME itself, or anything inside a .git, whatever the allow-list says: a
-`chmod -R` there breaks every repository's own store.
-
-What is judged: a recursive chown/chgrp/chmod, a `chmod` whose mode is
-777 (0777, a+rwx, ugo+rwx), and the start paths of a find that runs one of
-the three with -exec, -execdir, -ok or -okdir. Any other chmod or chown
-(`chmod +x run.sh`, `chown me file`) is not a sweep and passes. A target
-this guard cannot resolve to one allowed path is denied on sight, with a
-reason naming what it saw: a glob, a brace, a shell variable or $(...), a
-`..` segment, a `~` other than a leading one, a quoted string with
-whitespace in it, a relative target after a `cd` in the same command, and a
-recursive command with NO visible target (what `xargs chmod -R` looks like).
-In each the fix is the same: run it on the resolved paths, spelled out.
-
-LANGUETTE_PERM_ALLOW adds absolute paths to the roots, colon-separated; it
-never replaces them. Entries use letters, digits and . _ @ + - only; a path
-may not hold a . or .. segment and may not be / or $HOME. A value that does
-not parse warns on every Bash call and denies only a judged command, naming
-the variable: a typo cannot stop unrelated commands, and cannot open the
-gate.
-
-Out of scope, by design (an accident guard, not a sandbox): flags arriving
-through a variable, `setfacl -R`, `install -m`, a permission change run
-through a program this guard does not know (`find . -exec ./fix.sh {} +`),
-and the one a script or an interpreter one-liner makes. `xargs chmod 644`
-with a mode that is not 777 and no -R is not seen as a sweep.
-
-Scanning is languette/scan.py's (read its docstring). This is a GATE, so it
-fails closed: an unreadable payload or a crash here is a deny (run.py), and
-the hooks.json wrapper denies when python3 or run.py is missing.
+Blocks a recursive chown, chgrp or chmod (-R, --recursive, a short cluster
+holding R), `chmod 777`, and `find ... -exec chown|chgrp|chmod` unless every
+target, resolved against the payload's cwd and then through the filesystem,
+is the agent's own: under the scratchpad, an agent worktree or /tmp, or an
+absolute path named in LANGUETTE_PERM_ALLOW. Never `/`, $HOME itself, or
+anything inside a .git. A target this guard cannot resolve to one allowed path
+is denied on sight, with a reason naming what it saw.
 """
 
 import json

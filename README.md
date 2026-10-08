@@ -58,19 +58,19 @@ Each guard checks for one kind of hazard:
 - [`guard-host-availability`](features/guard-host-availability.feature):
   shutdown, reboot, fork bomb
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
-- [`guard-git-work-loss`](hooks/guard-git-work-loss.sh): `add -A`, `commit -a`,
+- [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
   `stash pop`, force-push, `reset --hard` and other moves that throw work away
-- [`guard-git-stacked-base`](hooks/guard-git-stacked-base.sh): deleting a
+- [`guard-git-stacked-base`](features/guard-git-stacked-base.feature): deleting a
   remote branch an open PR is based on (GitHub silently closes the PR)
 - [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push to
   a branch GitHub says requires a pull request, or `gh pr merge --admin`; the
   agent holds your credentials, so it holds your bypass
-- [`guard-github-issues`](hooks/guard-github-issues.sh): a second GitHub issue create, transfer
+- [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub issue create, transfer
   or delete in one human turn, or any inside a loop
 - [`guard-private-terms`](#settings-for-guard-private-terms): a term from your
   private list, posted to a public repo (off until you give it the list)
-- [`guard-worktrees`](hooks/guard-worktrees.sh): opt-in; a branch switch in a `$HOME`
-  that is a worktree, or a reach into another session's worktree
+- [`guard-worktrees`](features/guard-worktrees-checkout-home.feature): opt-in; a branch switch in a `$HOME`
+  that is a worktree, or a [reach into another session's worktree](features/guard-worktrees-foreign.feature)
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
   applying a label that waives a CI gate, such as `churn-ok`
 - `guard-secrets`, `guard-protected-paths`, `guard-database` (planned)
@@ -80,7 +80,7 @@ Each guard checks for one kind of hazard:
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
 - [`guard-infra`](languette/guards/guard_infra.py): `terraform destroy`, `kubectl delete` and
   other infrastructure destroys, until you approve that one run
-- [`prose-budget-commit`](hooks/prose-budget-commit.sh): a `git commit` whose
+- [`prose-budget-commit`](features/prose-budget-commit.feature): a `git commit` whose
   staged prose runs over the repo's word budgets
 
 ## The promise
@@ -291,7 +291,7 @@ to Claude Code, and every command goes through. One entry:
 
 ```json
 {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command",
-  "command": "h=\"$HOME/languette/hooks/guard-git-work-loss.sh\"; { [ -f \"$h\" ] && sh \"$h\"; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"guard-git-work-loss.sh is missing or crashed. This is a gate and fails closed.\"}}'"}]}]}}
+  "command": "h=\"$HOME/languette/languette/run.py\"; { [ -f \"$h\" ] && python3 -I \"$h\" --guard guard-recursive-delete; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-recursive-delete) is missing or crashed, or python3 is not on PATH. This is a gate and fails closed.\"}}'"}]}]}}
 ```
 
 ## Working on it
