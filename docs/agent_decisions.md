@@ -150,3 +150,11 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261008t053443z
 - the two bash suites (guard-private-terms, guard-worktrees) stay, moved to tests/ and pointed at languette/run.py: about 200 of their ~306 cases have no feature scenario yet, and all but the obsolete no-awk case pass on the Python guards Undo: delete tests/*.test.sh and their CI steps once features/ holds the cases ([#100](https://github.com/mark-brannan/languette/pull/100))
+
+### 20261008t184222z
+- guard-github-issues, guard-private-terms and prose-budget-commit are ported in today's runner shape (a check that yields Needs), not epic #76's pure functions Undo: rework under #76 ([#98](https://github.com/mark-brannan/languette/pull/98))
+- prose-budget-commit's engine is the command the prose_budget_command option names (empty: prose-budget on PATH); the Python guard no longer reads PROSE_BUDGET Undo: revert ([#98](https://github.com/mark-brannan/languette/pull/98))
+- prose-budget-commit denies on engine exit 2, a bad budgets config (ruling 179108882424d36c8d open) Undo: change rc == 2 in prose_budget_commit.py ([#98](https://github.com/mark-brannan/languette/pull/98))
+- guard-github-issues reads the hook event from the payload's hook_event_name, not a prompt/post argument Undo: add an --event argument to run.py ([#98](https://github.com/mark-brannan/languette/pull/98))
+- three differences from the shell: an unreadable or directory --body-file denies; an engine past 50 s counts as a crash (no-op); with python3 absent all three deny on their PreToolUse matcher Undo: restore each shell behaviour with a feature row ([#98](https://github.com/mark-brannan/languette/pull/98))
+- the PR 98 review's three findings (whole-command HOME rewrite, allow skipping the permission prompt, engine failures as no-ops) stay as the shell has them: parity is W3's bar Undo: close each with a feature row, in its own PR ([#98](https://github.com/mark-brannan/languette/pull/98))

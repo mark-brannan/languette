@@ -175,7 +175,7 @@
     "prose_budget_command": {
       "type": "string",
       "title": "Prose-budget engine",
-      "description": "The command prose_budget_commit runs as its engine, with --staged or --file: an absolute path, a path relative to the commit's directory, or a bare name looked up on PATH. Empty means prose-budget on PATH.",
+      "description": "The command prose_budget_commit runs as its engine, with --staged or --file: an absolute path, a path relative to the session's working directory (before any cd in the command), or a bare name looked up on PATH. Empty means prose-budget on PATH.",
       "required": false
     },
     "guard_worktrees": {
