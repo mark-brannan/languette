@@ -143,3 +143,10 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - guard-worktrees reads and writes its per-session record, globs for the scratchpad and stats claim-stamp.sh directly, not through World Undo: move them behind Needs under #76 ([#96](https://github.com/mark-brannan/languette/pull/96))
 - checkout-home resolves a relative cd or -C that follows an earlier cd and judges where it lands; the shell denied it as unresolvable Undo: deny when the base is lost, as the shell did ([#96](https://github.com/mark-brannan/languette/pull/96))
 - the fail-open paths claude-review found on #96 (a --config-env or --attr-source value read as the subcommand; an unresolvable --git-dir allowed; checkout-home with git absent allows; foreign with no cwd or no $HOME allows) stay as the shell has them: parity is W2's bar Undo: close each with a feature row, in its own PR ([#96](https://github.com/mark-brannan/languette/pull/96))
+
+### 20261008t035451z
+- W4 moves each deleted shell script's rationale into its feature file's description (ruling 1791421640d08e92b2 open) Undo: revert PR 100 ([#100](https://github.com/mark-brannan/languette/pull/100))
+- the test harness keeps a subprocess engine for the hooks.json wiring scenarios, renamed shell to hook, and drops the four no-jq-or-awk scenarios Undo: revert PR 100 ([#100](https://github.com/mark-brannan/languette/pull/100))
+
+### 20261008t053443z
+- the two bash suites (guard-private-terms, guard-worktrees) stay, moved to tests/ and pointed at languette/run.py: about 200 of their ~306 cases have no feature scenario yet, and all but the obsolete no-awk case pass on the Python guards Undo: delete tests/*.test.sh and their CI steps once features/ holds the cases ([#100](https://github.com/mark-brannan/languette/pull/100))

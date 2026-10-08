@@ -1,7 +1,7 @@
-"""Shell-text scanner: a port of hooks/lib-shell-words.awk, whose header is
-the spec. Nothing here decides anything; it turns the Bash tool's command
-string into words a guard judges, and every ambiguity resolves toward MORE
-words reaching the guard, never fewer.
+"""Shell-text scanner: a port of the retired lib-shell-words.awk, whose
+header was the spec (see git history). Nothing here decides anything; it
+turns the Bash tool's command string into words a guard judges, and every
+ambiguity resolves toward MORE words reaching the guard, never fewer.
 
 Indices are 0-based. A Scan holds parallel lists: w (word text), k ("w", "q"
 or ";"), q (raw text of a quoted word holding whitespace, else ""), live (the

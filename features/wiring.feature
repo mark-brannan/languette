@@ -1,4 +1,4 @@
-@shell
+@hook
 Feature: wiring
   Each command in hooks/hooks.json, run the way Claude Code runs it (sh -c,
   CLAUDE_PLUGIN_ROOT set to this repo), judges a payload and fails closed.

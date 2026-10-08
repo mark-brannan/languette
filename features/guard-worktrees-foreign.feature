@@ -1,4 +1,4 @@
-@python @shell
+@python
 Feature: guard-worktrees
   Opt-in: the plugin option guard_worktrees turns this guard on (see
   wiring.feature). A session may not reach into a linked git worktree that is
@@ -6,6 +6,81 @@ Feature: guard-worktrees
   session that may be archived under it. Every scenario runs against a
   throwaway repository with real linked worktrees, because the guard asks git
   what a path is and nothing is assumed from the name.
+
+  Why (the scar, 2026-09). A session was handed nothing but "continue
+  <issue> see <PR>". It found the branch already checked out in a sibling
+  worktree, decided that working there with `git -C <that path>` was the
+  clean move, and did. When the session that owned that worktree was
+  archived, correctly by its own git state, the directory went away under the
+  second session mid-turn; it survived only because its commit was already
+  pushed. The mistake was treating another session's working directory as a
+  place to work. A hand-off carries a branch, an issue and a PR, not a
+  directory; everything a leaving session wants handed over is on the remote,
+  and reaching into their worktree to get more is racing a process that is
+  still running.
+
+  So any path inside a linked worktree other than this session's own is
+  refused, in any command, read or write. The alternatives are all local.
+  To inspect a branch, `git log|diff|show <branch>` and `git show
+  <branch>:<path>`: every worktree of a repo shares its objects and refs. To
+  work on a branch, make your own worktree under the scratchpad (or
+  EnterWorktree(name=...) in this repo) and `git merge --ff-only <branch>`
+  inside it; recovery advice used to say `git checkout <branch>`, which the
+  auto-mode classifier denies outright as irreversible local destruction even
+  on a clean tree (dotfiles#233). If `--ff-only` fails the histories have
+  diverged: report it and stop. Worktree hygiene is the user's, not a
+  session's. `EnterWorktree(path=...)` is refused outright: the tool enters
+  an existing worktree with no ownership check, and every legitimate use is
+  reachable via `name=...` plus a fast-forward merge.
+
+  What counts as foreign: git is asked, nothing is assumed from the path. A
+  candidate resolves to a toplevel (`rev-parse --show-toplevel`) that differs
+  from this session's own and is a linked worktree (its `.git` is a file, not
+  a directory). The second test keeps `~/dotfiles`, $HOME and every other
+  clone allowed: those are main worktrees, no session's private space.
+  Sibling worktrees sit inside the repo root by path
+  (`<repo>/.claude/worktrees/<name>`), so a textual "under my toplevel"
+  shortcut would wrongly allow exactly the case this exists for; every
+  candidate is asked. One exception, measured not assumed (2026-09-30, 187
+  denials over 584 sessions, 25 of them this case): a worktree the session
+  created under its own scratchpad. A linked worktree whose canonical
+  toplevel has a whole path component equal to the payload's session_id is
+  this session's own, wherever the scratchpad lives. No session id means
+  nothing newly allowed; a bare `/tmp` never qualifies.
+
+  "This session's own" is sticky (dotfiles#455). The cwd's toplevel alone
+  moved: one `cd` into the state repo and the session's own linked worktree
+  was foreign, the `cd` back denied, its uncommitted work stranded. So each
+  session (and each subagent, keyed on the payload's agent_id) keeps a record
+  of its own linked toplevels in a per-session file under TMPDIR, named
+  `languette-guard-worktrees.<session>[.<agent>]` and apart from the claude
+  plugin's copy: the arrival a call leaves is consumed exactly once, so with
+  one shared file whichever copy ran first would spend it and the other would
+  deny the session's new worktree. Own is the cwd's toplevel now plus every
+  recorded one. A toplevel is recorded only when reached by a route the guard
+  vouches for: the first call of the session; the call after
+  EnterWorktree(name=...); or a `cd` the guard allowed into a path that did
+  not exist yet when checked (`git worktree add X && cd X`). A cwd reached
+  any other way (`cd "$VAR"`) is own while the shell stands in it and is
+  never recorded, so an unchecked route cannot be laundered into a lasting
+  allow. Each record line carries the inode of the worktree's `.git` file, so
+  a worktree removed and re-created at that path by someone else is not
+  inherited. A record not owned by this user, or a symlink, is ignored; any
+  failure to read or write it leaves the rule exactly as strict as the cwd
+  alone.
+
+  A `cd` target is checked whatever its spelling, since a chain of one-name
+  `cd <name>` once reached any sibling; within one command the scanner
+  follows `cd`, and words resolve against where the shell will be and against
+  the payload cwd too (the over-approximation, since a subshell's `cd` does
+  not outlive it). The word after `-C` is a path whatever its spelling. Prose
+  is not a command: a path mentioned inside a quoted string with whitespace
+  stays one unresolvable word, and the scanner queues such a string for a
+  nested scan only when its segment could execute it, so a commit message or
+  card that names a worktree path passes. Known gap, deliberate: redirection
+  targets are not words, so `cmd > /other/worktree/file` is not seen; the
+  ordinary routes (a cd, a `-C`, an Edit, a `sed -i`, a `cp`) are all words.
+  This is a gate: an unreadable payload is a deny.
 
   Background:
     Given a git repository at "{TMP}/repo"

@@ -1,10 +1,42 @@
-@python @shell
+@python
 Feature: guard-worktrees
   Opt-in: the plugin option guard_worktrees turns this guard on (see
   wiring.feature). For a $HOME that is itself a worktree (yadm, a bare-repo
   setup), a checkout or switch there changes the branch every shell and
   session on the machine sees. Every scenario runs against a fake $HOME that
   holds a real .git, so the verdict does not depend on the machine's own.
+
+  Why. A session that checks a branch out in a $HOME that is itself a
+  worktree leaves it checked out for every shell and session on the machine
+  until someone checks the old branch back out. Branch work belongs in a
+  worktree. Editing files in $HOME is not touched: the guard fires only on a
+  `checkout` or `switch`.
+
+  `yadm` and `git` are not symmetric. yadm hardcodes `--work-tree=$HOME` into
+  every invocation, so `yadm checkout <branch>` is dangerous from any
+  directory, a worktree under $HOME included; any `yadm checkout` or `switch`
+  that is not a file-restore is a hit, cwd ignored. Plain git touches $HOME's
+  worktree only if the repo it discovers from the cwd (or a `-C`, `--git-dir`
+  or `--work-tree` target, flag or inline `GIT_DIR=`/`GIT_WORK_TREE=`)
+  resolves to $HOME. That is checked by asking git, not by testing whether
+  the path sits textually under $HOME: a nested repo under $HOME stops git's
+  upward search at its own `.git`, so a prefix check would wrongly deny it.
+  `switch` has no file-restore form, so it denies unconditionally.
+  `checkout`'s file-restore forms (`checkout -- <file>`, `checkout <ref> --
+  <file>`) stay allowed; `-b` and `-B` count as a branch switch; `checkout .`
+  is denied too, since it is no pathspec-restore the guard can single out.
+
+  `checkout` or `switch` is looked for anywhere after the git or yadm command
+  word, and `-C`, `--git-dir` and `--work-tree` anywhere in the segment, so
+  an unparsed leading option can never push the subcommand out of reach. The
+  cost is a false deny on a bare word "checkout" passed as a value to another
+  flag, never a false allow; likewise a quoted path value the shell would not
+  expand is read as if unquoted, which only ever adds denials. The command
+  can move git before it runs (a `cd` or `pushd`, an exported `GIT_DIR`,
+  chained `-C`s, which are cumulative as git applies them); each is followed,
+  and a `--git-dir` counts when it is $HOME's repo or any repo whose work tree
+  is $HOME. It is a gate: a checkout or switch whose directory cannot be
+  resolved (a variable, `cd -`, a stale session cwd) is a deny.
 
   Background:
     Given HOME is "{TMP}"

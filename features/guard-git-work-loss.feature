@@ -1,7 +1,38 @@
-@python @shell
+@python
 Feature: guard-git-work-loss
   The git commands that throw work away are denied, wherever in the command
   they hide; prose that names them is not them.
+
+  Why. These are the git moves that have bitten users, or sit in the same
+  class, and that an agent session never has a good reason to make. Blanket
+  staging (`git add -A`, `--all`, `.`, `-u` with no path, `git commit -a`)
+  stages the home directory where the worktree is $HOME, and elsewhere sweeps
+  in a parallel session's files. The stash stack is shared across worktrees,
+  so a pop, a bare drop or a clear can take another session's entry; apply
+  and drop by sha pass. Force push is bare `--force`, `-f` or a `+refspec`
+  anywhere, `--force-with-lease` to main or master, or deleting main;
+  rebasing a session branch, with `--force-with-lease` to that branch, is the
+  one legitimate force. `git checkout .`, `git restore .` and `git clean -f`
+  throw away uncommitted work, as `reset --hard` does, and `branch -D` throws
+  away unmerged work (`-d` refuses; use that). `yadm`, a git wrapper for
+  dotfiles, is treated as `git`.
+
+  Each rule has its own switch, the plugin options
+  guard_git_work_loss_blanket_staging, _stash, _force_push, _discard and
+  _branch_delete; a rule is skipped only when its option is exactly `false`.
+  The whole-guard option guard_git_work_loss=false skips all five. git takes
+  any unambiguous prefix of a long option (`--har` is `--hard`), so the guard
+  does too.
+
+  This is a gate, so it fails closed: an unreadable payload or a command that
+  does not parse is a deny. Heredoc bodies are dropped (a doc that mentions
+  `git add -A` is not a git command); quotes are removed and escapes applied,
+  so `\git` and `'git'` are git; and git counts as the command wherever it
+  stands in a segment (after sudo, env, VAR=x, timeout, xargs, `do`, `then`)
+  with git's global options skipped. The body of a quoted string with
+  whitespace (`sh -c '...'`, `eval "..."`) is scanned as well, there by
+  command position only, so a commit message that mentions a flag
+  mid-sentence does not trip it.
 
   Scenario Outline: blanket staging is denied; staging by path is not
     When the agent runs `<command>`
@@ -295,11 +326,6 @@ Feature: guard-git-work-loss
       """
     Then the guard is silent
 
-  @shell_only
-  Scenario: with no jq or awk on PATH the guard denies
-    Given PATH holds only "sh cat printf dirname"
-    When the agent runs `git add -A`
-    Then the guard denies
 
   Scenario Outline: a rule's own setting, off, lets its command through
     Given <setting> is "false"
