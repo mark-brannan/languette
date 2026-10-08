@@ -152,5 +152,19 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - checkout-home resolves a relative cd or -C that follows an earlier cd and judges where it lands; the shell denied it as unresolvable Undo: deny when the base is lost, as the shell did ([#96](https://github.com/mark-brannan/languette/pull/96))
 - the fail-open paths claude-review found on #96 (a --config-env or --attr-source value read as the subcommand; an unresolvable --git-dir allowed; checkout-home with git absent allows; foreign with no cwd or no $HOME allows) stay as the shell has them: parity is W2's bar Undo: close each with a feature row, in its own PR ([#96](https://github.com/mark-brannan/languette/pull/96))
 
+### 20261008t035451z
+- W4 moves each deleted shell script's rationale into its feature file's description (ruling 1791421640d08e92b2 open) Undo: revert PR 100 ([#100](https://github.com/mark-brannan/languette/pull/100))
+- the test harness keeps a subprocess engine for the hooks.json wiring scenarios, renamed shell to hook, and drops the four no-jq-or-awk scenarios Undo: revert PR 100 ([#100](https://github.com/mark-brannan/languette/pull/100))
+
+### 20261008t053443z
+- the two bash suites (guard-private-terms, guard-worktrees) stay, moved to tests/ and pointed at languette/run.py: about 200 of their ~306 cases have no feature scenario yet, and all but the obsolete no-awk case pass on the Python guards Undo: delete tests/*.test.sh and their CI steps once features/ holds the cases ([#100](https://github.com/mark-brannan/languette/pull/100))
+
+### 20261008t184222z
+- guard-github-issues, guard-private-terms and prose-budget-commit are ported in today's runner shape (a check that yields Needs), not epic #76's pure functions Undo: rework under #76 ([#98](https://github.com/mark-brannan/languette/pull/98))
+- prose-budget-commit's engine is the command the prose_budget_command option names (empty: prose-budget on PATH); the Python guard no longer reads PROSE_BUDGET Undo: revert ([#98](https://github.com/mark-brannan/languette/pull/98))
+- prose-budget-commit denies on engine exit 2, a bad budgets config (ruling 179108882424d36c8d open) Undo: change rc == 2 in prose_budget_commit.py ([#98](https://github.com/mark-brannan/languette/pull/98))
+- guard-github-issues reads the hook event from the payload's hook_event_name, not a prompt/post argument Undo: add an --event argument to run.py ([#98](https://github.com/mark-brannan/languette/pull/98))
+- three differences from the shell: an unreadable or directory --body-file denies; an engine past 50 s counts as a crash (no-op); with python3 absent all three deny on their PreToolUse matcher Undo: restore each shell behaviour with a feature row ([#98](https://github.com/mark-brannan/languette/pull/98))
+- the PR 98 review's three findings (whole-command HOME rewrite, allow skipping the permission prompt, engine failures as no-ops) stay as the shell has them: parity is W3's bar Undo: close each with a feature row, in its own PR ([#98](https://github.com/mark-brannan/languette/pull/98))
 ### 20261008t184358z
 - guard-secrets: a credential key=value inside a word (after =, ?, &, ;, comma, { or a space) is read as context, its value ending at the next &, comma, ;, } or space Undo: drop the _INNER loop in secrets._context ([#97](https://github.com/mark-brannan/languette/pull/97))

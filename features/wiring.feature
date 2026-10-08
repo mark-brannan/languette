@@ -1,4 +1,4 @@
-@shell
+@hook
 Feature: wiring
   Each command in hooks/hooks.json, run the way Claude Code runs it (sh -c,
   CLAUDE_PLUGIN_ROOT set to this repo), judges a payload and fails closed.
@@ -110,6 +110,9 @@ Feature: wiring
       | guard-bypass-labels | guard_bypass_labels | gh pr edit 4 --add-label churn-ok |
       | guard-git-work-loss | guard_git_work_loss | git add -A |
       | guard-git-stacked-base | guard_git_stacked_base | git push origin --delete "$b" |
+      | guard-github-issues | guard_github_issues | gh issue create -t t -b b |
+      | guard-private-terms | guard_private_terms | gh issue comment 3 -R o/r -b Wanderlust |
+      | prose-budget-commit | prose_budget_commit | git commit -m x |
 
   Scenario Outline: with python3 absent from PATH, the option set to false still skips the guard
     Given the hook is the hooks.json command for "<guard>"
@@ -132,6 +135,9 @@ Feature: wiring
       | guard-bypass-labels | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
       | guard-git-work-loss | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS | git add -A |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | git push origin --delete "$b" |
+      | guard-github-issues | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES | gh issue create -t t -b b |
+      | guard-private-terms | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS | gh issue comment 3 -R o/r -b Wanderlust |
+      | prose-budget-commit | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT | git commit -m x |
 
   Scenario Outline: a script that crashes is a deny
     Given the hook is the hooks.json command for "<guard>"

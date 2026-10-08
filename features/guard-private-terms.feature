@@ -1,10 +1,55 @@
-@shell
+@python
 Feature: guard-private-terms
   Text bound for a public GitHub repo is checked against the user's private
   terms file, wherever the text travels: a flag value, a heredoc, a file, an
   MCP field. The file is the private_terms_file option. Without one the guard
   is inert; with one that cannot be read it is closed. The standalone suite,
-  hooks/guard-private-terms.test.sh, walks the long tail of shell shapes.
+  tests/guard-private-terms.test.sh, walks the long tail of shell shapes.
+
+  Why. A private repo or notes directory holds details (boat names,
+  hostnames, service URLs, account identifiers) that must not reach the
+  public code repos, and a rule kept as prose in CLAUDE.md has already failed
+  at that. Once a term is in a public issue or PR comment it is in GitHub's
+  history and every mirror of it; the undo is a support ticket, not an edit.
+  So the check moves from the model's memory to the moment the text leaves
+  the machine.
+
+  It fires on PreToolUse for Bash `gh issue|pr create|comment|edit|review|
+  close|reopen|merge`, `gh api` writing to repos/*/*/issues|pulls, a graphql
+  mutation that comments on or opens an issue or PR, and the GitHub MCP tools
+  that create or edit an issue, PR, comment or review (matched on the tool
+  name's tail). A body posted from `python -c`, `curl` or a script file is
+  not inspected. The text judged is only what is genuinely posted: literal
+  --body, --title, --comment, --subject and --label values, `gh api`
+  -f/-F/--field/--raw-field values, every heredoc body, and the contents of
+  --body-file, --comment-file, -F, --input and `-F key=@file`, never the path
+  itself, which is read, not posted. A value built from `$(...)` or an unfed
+  `$VAR` is refused, not scanned around. Matching is case-insensitive fixed
+  substrings; the reason names the terms that hit and nothing around them. A
+  --body-file path is read as the shell would read it, `~`, `.` and `..`
+  included, after replaying what the command does before the gh (a cd, an
+  assignment).
+
+  A home-directory path in that text is a sanitization job, not a denial job:
+  where this Claude Code version's PreToolUse hooks support rewriting the
+  call (`updatedInput`) the guard replaces it with `~` and allows; otherwise
+  it stays a denial whose reason names the substitution to make by hand.
+
+  The target repo is --repo/-R, GH_REPO=, a positional issue or PR URL or
+  `owner/repo#n`, the `gh api` path, or MCP owner/repo; failing those, the
+  origin of the payload's cwd, unless the command also runs `cd`, in which
+  case it is unknown. A graphql mutation names its target by node id, so its
+  repo is always unknown, never the cwd's. Unknown is scanned. Only a repo
+  listed in the private_repos option (comma-separated owner/name, default
+  empty) is allowed unscanned, and only when every target of the command is
+  one.
+
+  Inert without a terms file: a guard that denied every public post for want
+  of a list would be unusable for anyone who has none. Once the option is
+  set the file is load-bearing, and the guard is a gate: a body it cannot
+  see, a gh write whose flag shape it does not recognise as carrying text, or
+  a terms file that is set but unreadable or empty while a target is not a
+  private repo is a deny, with the fix in the reason.
 
   Background:
     Given the private terms file holds:
@@ -142,9 +187,3 @@ Feature: guard-private-terms
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is ""
     When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`
     Then the guard is silent
-
-  @shell_only
-  Scenario: with no jq or awk on PATH, a post to a public repo is denied
-    Given PATH holds only "sh cat printf dirname mktemp rm sed grep tr git head"
-    When the agent runs `gh issue create -R o/r -t t -b hi`
-    Then the guard denies

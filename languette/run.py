@@ -36,12 +36,13 @@ def _out(event, fields):
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
     from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_bypass_ruleset,
-                                  guard_cross_session_send, guard_disk, guard_git_stacked_base, guard_git_work_loss,
-                                  guard_host_availability, guard_infra, guard_permissions,
-                                  guard_pipe_to_shell, guard_recursive_delete, guard_scheduled_jobs,
-                                  guard_secrets, guard_unparsable, guard_worktrees)
+                                  guard_cross_session_send, guard_disk, guard_git_stacked_base,
+                                  guard_git_work_loss, guard_github_issues, guard_host_availability,
+                                  guard_infra, guard_permissions, guard_pipe_to_shell, guard_private_terms,
+                                  guard_recursive_delete, guard_scheduled_jobs, guard_secrets, guard_unparsable,
+                                  guard_worktrees, prose_budget_commit)
     from languette import record
-    from languette.verdict import ask, context, deny
+    from languette.verdict import allow, ask, context, deny
     from languette.world import World
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
@@ -57,14 +58,20 @@ GUARDS = (
                                            guard_bypass_hooks, guard_infra, guard_bypass_labels,
                                            guard_bypass_ruleset, guard_permissions, guard_pipe_to_shell,
                                            guard_disk, guard_host_availability, guard_scheduled_jobs,
-                                           guard_git_stacked_base, guard_secrets)),
+                                           guard_git_stacked_base, guard_secrets, prose_budget_commit)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
+    ("PreToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
+    ("PreToolUse", guard_private_terms.TOOLS, (guard_private_terms,)),
     ("PreToolUse", re.compile(r"(?:Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree)\Z"), (guard_worktrees,)),
     ("PreToolUse", re.compile(r"SendMessage\Z"), (guard_cross_session_send,)),
     ("PostToolUse", _SEND_STATE_TOOLS, (guard_cross_session_send,)),
     ("PostToolUseFailure", _SEND_STATE_TOOLS, (guard_cross_session_send,)),
     ("SubagentStart", None, (guard_cross_session_send,)),
     ("SessionStart", None, (guard_cross_session_send,)),
+    # guard-github-issues' door: a human turn opens it, a write that ran spends it.
+    ("UserPromptSubmit", None, (guard_github_issues,)),
+    ("PostToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
+    ("PostToolUseFailure", guard_github_issues.TOOLS, (guard_github_issues,)),
 )
 
 
@@ -145,7 +152,7 @@ def _respond(stdin_text, env, only):
         if judged_once and judged_once[0]:
             guards = [g for g in guards if g is guard_unparsable]
     world = World(env, payload)
-    reasons, asks, notes, findings = [], [], [], []
+    reasons, asks, notes, rewrites, findings = [], [], [], [], []
     for g in guards:
         crashed = False
         try:
@@ -159,13 +166,19 @@ def _respond(stdin_text, env, only):
             reasons.append(r["permissionDecisionReason"])
         if r.get("permissionDecision") == "ask":
             asks.append(r["permissionDecisionReason"])
+        if r.get("permissionDecision") == "allow" and "updatedInput" in r:
+            rewrites.append(r["updatedInput"])
         if r.get("additionalContext"):
             notes.append(r["additionalContext"])
     judged = (world, payload, findings)
+    if event != "PreToolUse":                  # state-keeping events: nothing to decide
+        return "", judged
     if reasons:
         return _out(event, deny("\n\n".join(reasons))), judged
     if asks:
         return _out(event, ask("\n\n".join(asks))), judged
+    if rewrites:                               # the first rewrite wins; two cannot both apply
+        return _out(event, {**allow(rewrites[0]), **(context("\n\n".join(notes)) if notes else {})}), judged
     if notes:
         return _out(event, context("\n\n".join(notes))), judged
     return "", judged

@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Tests for guard-private-terms.sh. Run: bash hooks/guard-private-terms.test.sh
-# Set AWK_PATH to a directory whose `awk` is another implementation to run
-# the same cases under it (CI does mawk, gawk, original-awk).
+# Tests for guard-private-terms. Run: bash tests/guard-private-terms.test.sh
 #
 # What matters: a private term is caught wherever the body travels -- a
 # flag value, a file, a heredoc, an MCP field, a different case -- the
@@ -10,10 +8,13 @@
 # shellcheck disable=SC2016  # the commands under test contain $(...) and $VAR on purpose
 set -uo pipefail
 
-HOOK="$(cd "$(dirname "$0")" && pwd)/guard-private-terms.sh"
-[ -n "${AWK_PATH:-}" ] && PATH="$AWK_PATH:$PATH"
 pass=0; fail=0
 SCRATCH=$(mktemp -d); trap 'rm -rf "$SCRATCH"' EXIT
+# The guard runs as hooks.json runs it, by an absolute python3, so a
+# bare-PATH case below still reaches the guard.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+HOOK="$SCRATCH/hook"
+printf '#!/bin/sh\nexec "%s" -I "%s/languette/run.py" --guard guard-private-terms\n' "$(command -v python3)" "$ROOT" >"$HOOK"
 export HOME="$SCRATCH/home"; mkdir -p "$HOME"
 export TMPDIR="$SCRATCH/tmp"; mkdir -p "$TMPDIR"
 
@@ -390,7 +391,7 @@ out=$(bash_in "$PUB" 'gh issue list' | CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE=$
 if [ -z "$out" ]; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: a read needs no terms file: $out"; fi
 
 # Option unset or empty: inert. The guard allows a post that names a term it
-# was never told about, and never touches jq or awk (a bare PATH proves it).
+# was never told about, and needs nothing on PATH (a bare PATH proves it).
 # Unset is not the same as set-but-unreadable above, which denies.
 for v in unset empty; do
   if [ "$v" = unset ]; then
@@ -496,11 +497,6 @@ check deny 'home path plus another private term: still denied' \
   "$(bash_in "$PUB" "gh issue comment 3 -b 'seen aboard Wanderlust, path $HOME/x'")" "$MIXEDTERMS"
 reason 'still names the other term' 'Wanderlust'
 
-# no awk: deny, do not crash quiet
-mkdir -p "$SCRATCH/noawk"; for b in jq cat dirname mktemp rm sed grep tr git head; do ln -s "$(command -v $b)" "$SCRATCH/noawk/$b"; done
-out=$(bash_in "$PUB" 'gh issue create -t x -b hi' | PATH="$SCRATCH/noawk" /bin/sh "$HOOK" 2>&1); LAST=$out
-if grep -q '"permissionDecision":"deny"' <<<"$out"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: awk absent should deny: $out"; fi
-reason 'names awk as missing'        'awk missing'
 
 printf '%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
