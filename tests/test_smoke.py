@@ -35,9 +35,7 @@ GOOD = "echo ok"
 ENVS = {
     "shfmt": (("shfmt", "bash"), None, "shfmt", None),
     "bash -n": (("bash",), None, "bash -n", None),
-    "lexer only": ((), None, "(?:awk|lexer)",
-                   "with no shfmt and no bash, guard-unparsable has no reader that refuses: the built-in "
-                   "lexer's reading denies nothing, so the command passes silently"),
+    "lexer only": ((), None, "(?:awk|lexer)", None),
     "bashlex": ((), "LANGUETTE_SMOKE_BASHLEX_PY", "bashlex",
                 "the pip rung is an empty slot (#4): bashlex is installed and never asked"),
     "tree-sitter-bash": ((), "LANGUETTE_SMOKE_TREESITTER_PY", "tree-sitter-bash",

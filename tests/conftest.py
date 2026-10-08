@@ -8,7 +8,7 @@ $AWK_PATH's awk when set). @shell_only narrows a scenario to the shell,
 @shfmt_only to the shfmt rung; @no_shfmt drops the shfmt rung, for a row its
 parse check denies before any guard reads it. The feature's name is the guard's name, except
 guard-unparsable, which has its own guard. @python_only narrows a scenario to the
-awk rung (bash -n reads instead of shfmt).
+awk rung.
 """
 
 import json

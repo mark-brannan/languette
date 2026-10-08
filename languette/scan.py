@@ -10,13 +10,18 @@ segment is led by a shell, so `echo ... | sh` is executed text).
 
 The parser ladder (docs/decisions.md, "Parser ladder") picks who reads the
 text: a user-installed shfmt when it is on PATH and new enough, then a pip
-parser (a slot, unruled: #4), then the awk port below. A real parser decides
-where words and quotes begin and end; the awk lexer still shapes each piece,
-so the tokens are the same contract whichever rung read them.
+parser (a slot, unruled: #4), then `bash -n`, then the awk port below. Each
+rung that reads the text either accepts it or refuses it (Unparseable), and a
+refusal is final; a rung that is missing, crashed or cannot say passes the
+text down. Only shfmt's tree is mapped to words: a real parser decides where
+words and quotes begin and end, the awk lexer still shapes each piece, so the
+tokens are the same contract whichever rung read them. Below shfmt the awk
+lexer reads the words; the rung above it only accepts or refuses.
 """
 
 import functools
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -59,43 +64,57 @@ def _sub_end(s, j):
 
 def _qclose(t):
     """The quote the scanner would still hold open at the end of t ("'", '"'
-    or ""), read by its own rules: a backslash escapes outside single quotes,
-    and a `#` comments to the end of its line only before a word has begun,
+    or ""), read by its own rules: a backslash escapes outside single quotes
+    (and inside `$'...'`), and a `#` comments to the end of its line only before a word has begun,
     so `a\\ #'` opens a quote and `a #'` does not."""
-    L, i, have = len(t), 0, False
+    return _qopen(t)[0]
+
+
+def _qopen(t):
+    """(quote, index) of the quote _qclose finds open, or ("", -1)."""
+    L, i, have, dollar = len(t), 0, False, False
     while i < L:
-        c = t[i]
+        c, after_dollar, dollar = t[i], dollar, False
         if c == "\\":
             if i + 1 < L and t[i + 1] != "\n":
                 have = True
             i += 2
             continue
+        if c == "'" and after_dollar:
+            have, o, i = True, i, i + 1            # $'...': a backslash escapes, \' included
+            while i < L and t[i] != "'":
+                i += 2 if t[i] == "\\" else 1
+            if i >= L:
+                return "'", o
+            i += 1
+            continue
         if c == "'":
             have, e = True, t.find("'", i + 1)
             if e < 0:
-                return "'"
+                return "'", i
             i = e + 1
             continue
         if c == '"':
-            have, i = True, i + 1
+            have, o, i = True, i, i + 1
             while i < L and t[i] != '"':
                 i += 2 if t[i] == "\\" else 1
             if i >= L:
-                return '"'
+                return '"', o
             i += 1
             continue
         if c == "#" and not have:
             e = t.find("\n", i)
             if e < 0:
-                return ""
+                return "", -1
             i = e
             continue
         if c in " \t\n;|&()`<>":
             have = False
         elif c not in "{}" or have:
             have = True
+        dollar = c == "$" and not after_dollar  # one unescaped $: `\$` went by above, `$$` is a PID
         i += 1
-    return ""
+    return "", -1
 
 
 def heredoc_subs(s):
@@ -132,12 +151,17 @@ def heredoc_subs(s):
 # 3.4.3 has only `-tojson`, in the older shape.
 SHFMT_MIN = (3, 6, 0)
 SHFMT_TIMEOUT = 2                              # seconds; a parse measures ~6 ms
-RUNGS = ("shfmt", "pip", "awk")                # tests narrow this to one rung
+BASH_TIMEOUT = 2                               # seconds
+RUNGS = ("shfmt", "pip", "bash -n", "awk")     # tests narrow this to one rung
 
 
 class Unparseable(Exception):
-    """The parser read the command and refused it. Bad input is a deny, never a
-    reason to try a weaker parser. The message leads with the rung's name."""
+    """A rung read the command and refused it. Bad input is a deny, never a
+    reason to try a weaker parser. `rung` names the reader."""
+
+    def __init__(self, why, rung=None):
+        super().__init__(why)
+        self.rung = rung
 
 
 @functools.lru_cache(maxsize=1)
@@ -168,7 +192,7 @@ def _shfmt_tree(text):
         return None
     err = r.stderr.decode("utf-8", "replace").strip()
     if r.returncode == 1 and re.match(r"(?:<standard input>:)?\d+:\d+: ", err):
-        raise Unparseable("shfmt: " + err.splitlines()[0])
+        raise Unparseable(err.splitlines()[0])
     if r.returncode:
         return None
     try:
@@ -181,15 +205,48 @@ def _shfmt_tree(text):
 _pip_tree = None                               # rung two: a pip-installed parser, unruled (#4)
 
 
-def parse(text):
-    """(rung, tree) from the first rung on hand; the awk rung's tree is None.
-    Raises Unparseable when a parser refuses the text."""
+@functools.lru_cache(maxsize=256)
+def _bash_n(text):
+    """True when `bash -n` accepts `text`, None when there is no bash to ask.
+    Raises Unparseable with bash's first line, its "bash: " prefixes dropped.
+    It runs nothing, and says less than shfmt: a line, no column."""
+    try:
+        r = subprocess.run(["bash", "-n"], input=text.encode("utf-8", "surrogatepass"), capture_output=True,
+                           timeout=BASH_TIMEOUT, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode == 0:
+        return True
+    err = r.stderr.decode("utf-8", "replace").strip().splitlines()
+    raise Unparseable(re.sub(r"^(?:\S*bash: )+", "", err[0]) if err else "syntax error")
+
+
+def _awk(text):
+    """The awk rung's one refusal (docs/decisions.md, "Parser ladder
+    refusals"): a quote still open at the end of the text, heredoc bodies
+    aside, read by the lexer's own rules (_qopen)."""
+    t = strip_heredocs(text)
+    q, i = _qopen(t)
+    if q:
+        snip = t[i:i + 24].split("\n")[0]
+        raise Unparseable(f"the {q} opened at `{snip}` never closes")
+
+
+def parse(text, words=False):
+    """(rung, tree) from the first rung that reads the text; the tree is None
+    on every rung but shfmt's (and True from bash -n). Raises Unparseable,
+    naming the rung, when one refuses the text. words: only the rungs whose
+    reading Scan maps to words, shfmt and awk."""
     for rung in RUNGS:
-        if rung == "awk":
-            return rung, None
-        read = {"shfmt": _shfmt_tree, "pip": _pip_tree}[rung]
-        tree = read(text) if read else None
-        if tree is not None:
+        if words and rung not in ("shfmt", "awk"):
+            continue
+        read = {"shfmt": _shfmt_tree, "pip": _pip_tree, "bash -n": _bash_n, "awk": _awk}[rung]
+        try:
+            tree = read(text) if read else None
+        except Unparseable as e:
+            e.rung = rung
+            raise
+        if rung == "awk" or tree is not None:
             return rung, tree
     raise RuntimeError(f"no parser rung read the text (rungs: {', '.join(RUNGS)})")
 
@@ -285,10 +342,10 @@ class Scan:
     def __init__(self, text):
         """Read by the first rung on hand. The command itself is checked once,
         by check(); a text that only might be shell -- a nested string, the
-        text with heredocs stripped -- falls to the awk rung when shfmt
-        refuses it or its tree cannot be mapped."""
+        text with heredocs stripped -- falls to the awk rung when a rung
+        refuses it or its tree cannot be mapped. Only shfmt's tree maps."""
         try:
-            self.rung, tree = parse(text)
+            self.rung, tree = parse(text, words=True)
         except Unparseable:
             self.rung, tree = "awk", None
         self._reset()
