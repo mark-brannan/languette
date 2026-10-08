@@ -315,7 +315,7 @@ def feature_commands(files=None):
     for f in files or sorted((ROOT / "features").glob("*.feature")):
         t = f.read_text()
         # A feature's description is prose about the guard, not a command it was given.
-        t = re.sub(r"^Feature:.*?(?=^\s*(?:Background|Scenario|Rule|@|#))", "", t, count=1, flags=re.S | re.M)
+        t = re.sub(r"^Feature:.*?(?=^\s*(?:Background:|Scenario(?: Outline)?:|Rule:|@|#))", "", t, count=1, flags=re.S | re.M)
         out |= set(re.findall(r"`([^`\n]+)`", t))
         for m in re.finditer(r'"""\n(.*?)\n\s*"""', t, re.S):
             lines = m.group(1).split("\n")
