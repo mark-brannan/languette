@@ -194,6 +194,12 @@ Feature: guard-cross-session-send
       | resume  | denies    |
       | compact | denies    |
 
+  Scenario: a cleared session has no subagents yet: a name from before the clear is another session's
+    When subagent "agent-abc123" starts
+    And the session starts from "clear"
+    And the agent sends "agent-abc123" the message `carry on`
+    Then the guard asks
+
   Scenario: another session's start does not close this one's door
     Given the permission mode is "bypassPermissions"
     When the agent calls tool "WebFetch" with input `{}`

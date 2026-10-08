@@ -151,7 +151,7 @@ class World:
 
     def _send_keep(self, session, op, arg):
         """Update that state under an exclusive lock: op "clear" writes a closed
-        door (a new or cleared session), "read" opens it naming `arg`, "names"
+        door with no subagents (a new or cleared session), "read" opens it naming `arg`, "names"
         records the subagent names and ids in `arg`. Only "clear" makes a
         closed door: a file another op creates starts as SEND_LOST. A link
         planted at the path is removed, never written through. A write that
@@ -172,7 +172,7 @@ class World:
                 if not isinstance(st, dict) or not isinstance(st.get("subagents"), list):
                     st = json.loads(SEND_LOST)
                 if op == "clear":
-                    st["read"] = None
+                    st = {"subagents": [], "read": None}   # a fresh context has no subagents yet
                 elif op == "read":
                     st["read"] = arg
                 elif op == "names":
