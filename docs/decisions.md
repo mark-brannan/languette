@@ -70,3 +70,13 @@ interface is; this file says who decided it and why, one line each.
   findings. Verdict turns findings and configuration into an action.
 - Guards needing enriched data: how is unruled; first try is
   request-and-answer (#79).
+
+## The guard pipeline: Solace, 2026-10-07
+
+- Six steps: parse, plan, gather, guard, verdict, act. Plan, guard and
+  verdict are pure; gather does every read and act every write, after the
+  verdict. Parse runs the parser ladder's programs, the named exception.
+- A guard whose questions are known after the parse splits into plan and
+  judge; one whose answers decide its next question asks as it goes.
+- A test checks the guards and the verdict for I/O; the README states
+  that they are pure. Design: [docs/design/guard-pipeline.md](design/guard-pipeline.md).
