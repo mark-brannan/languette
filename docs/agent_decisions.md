@@ -102,3 +102,8 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261008t011048z
 - gitleaks' finding on the synthetic curl -u fixture is ignored by fingerprint in .gitleaksignore, not removed by rewriting the branch Undo: delete .gitleaksignore (once squash-merged, main never holds the commit it names) (mark-brannan/languette#89)
+
+### 20261008t011533z
+- A refspec $NAME is read as the literal export NAME=lit set; declare, typeset and local turn resolution off for the line Undo: widen _Literals in guard_bypass_ruleset.py ([#91](https://github.com/mark-brannan/languette/pull/91))
+- NAME=lit; git push (a ; not &&) is trusted though a readonly NAME inherited from the shell would make the set fail; shell-set names are excluded Undo: require && between the set and the push ([#91](https://github.com/mark-brannan/languette/pull/91))
+- A . in command position or any shell keyword on the line turns literal resolution off, stricter than needed Undo: narrow _RESERVED in guard_bypass_ruleset.py ([#91](https://github.com/mark-brannan/languette/pull/91))
