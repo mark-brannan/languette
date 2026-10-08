@@ -334,6 +334,6 @@ Feature: prose-budget-commit
 
   Scenario: with no engine configured or on PATH the guard is silent
     Given no engine is configured
-    And PATH holds only "sh jq awk cat cut dirname"
+    And PATH holds only "sh"
     When the agent runs `git commit -m x`
     Then the guard is silent

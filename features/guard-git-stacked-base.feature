@@ -117,7 +117,7 @@ Feature: guard-git-stacked-base
     Then the guard asks
 
   Scenario Outline: with no timeout or gtimeout on PATH it asks, and never runs gh unbounded
-    Given PATH holds only "sh jq awk cat dirname grep" and the stub "gh"
+    Given PATH holds only "sh" and the stub "gh"
     When the agent runs `<command>`
     Then the guard asks
     And the stub "gh" was not called
