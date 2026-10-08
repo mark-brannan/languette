@@ -24,9 +24,12 @@ cannot carry rules, so there is nothing to bypass.
 
 The default branch is the remote's HEAD as git last fetched it, and main
 and master beside it: that HEAD is a local ref the agent can move, so it may
-add a branch to watch, never take one away. A `cd` the shell may undo before
-the push (in a subshell, a group or a pipeline, or followed by `||`) and a
-`popd` leave the directory unknown, so the guard asks. Not watched: pushes to
+add a branch to watch, never take one away. A `cd` is followed, `~/` read as
+HOME and `-C $NAME/...` read as `-C` takes a literal refspec. A subshell's cd
+ends with it. A cd the shell may undo another way (in a group, as an element
+of a pipeline, in an and-or list that is backgrounded or carries on past
+`||`), a cd an earlier command in its and-or list may skip, and a `popd` leave the
+directory unknown, so the guard asks. Not watched: pushes to
 any other branch, tags and deletions (guard-git-work-loss and guard-git-stacked-base
 judge those), remotes off github.com or behind an ssh host alias, `gh api`
 writes to a ref or a merge endpoint, an alias from the user's own gitconfig
@@ -54,9 +57,9 @@ _PUSH_VALUED = frozenset("-o --push-option --repo --receive-pack --exec".split()
 _ALL = frozenset("--all --branches --mirror".split())
 _UNREADABLE = re.compile(r"[$`*?\[{]")
 _GITHUB = re.compile(r"github\.com(?::\d+)?[:/]+([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?\Z", re.IGNORECASE)
-# A separator after a `cd` that the shell may undo before the next command: the close of a
-# subshell or group, a pipe (the cd ran in a subshell), `||`, a backtick, or a lone `&`.
-_UNDOES_CD = re.compile(r"[)}|`]|(?<!&)&(?!&)")
+# The operators a separator's text is made of, as Scan piles them up (`;}&&` for `; } &&`).
+_OPS = re.compile(r"\|\||&&|\|&|\||&|;|\n|\(|\)|\{|\}|`")
+_PIPE = ("|", "|&")
 _FALLBACK = ("main", "master")
 # A refspec's one run-time part: $NAME or ${NAME}, nothing else.
 _VAR = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
@@ -139,11 +142,29 @@ class _Literals:
         return None if r.startswith("-") else r  # an option (--all, --delete), not a refspec
 
 
-def _resolve(base, target, live):
-    """The directory `cd target` lands in from base, or None if unreadable."""
+def _resolve(base, target, live, home=None, quoted=True):
+    """The directory `cd target` lands in from base, or None if unreadable. A leading `~` or
+    `~/` is HOME when no part of the word is quoted or escaped; `~user` is not read."""
+    if target == "~" or target.startswith("~/"):
+        if quoted or not (home and home.startswith("/")):
+            return None
+        target = home + target[1:]
     if base is None or live or _UNREADABLE.search(target) or target.startswith("~") or target == "-":
         return None
     return os.path.normpath(target if target.startswith("/") else os.path.join(base, target))
+
+
+def _ops(op):
+    """The operators in a separator's text, a newline read as `;` unless it only continues
+    the line (after `&&`, `||`, a pipe or an opening bracket)."""
+    out = []
+    for o in _OPS.findall(op):
+        if o == "\n":
+            if out and out[-1] in ("&&", "||", "|", "|&", "(", "{"):
+                continue
+            o = ";"
+        out.append(o)
+    return out
 
 
 def _config_value(s, i, b):
@@ -175,7 +196,8 @@ def _push(s, a, b, nested, here, lits=None):
     while i <= b and s.w[i] != "push":
         x = s.w[i]
         if x == "-C" and i + 1 <= b:
-            here = _resolve(here, s.w[i + 1], s.live[i + 1])
+            lit = lits and s.live[i + 1] and lits.word(i + 1, a)
+            here = _resolve(here, lit, False) if lit else _resolve(here, s.w[i + 1], s.live[i + 1])
         if x.startswith(("--git-dir", "--work-tree")):
             here = None
         cfg = _config_value(s, i, b)
@@ -286,33 +308,72 @@ def _admin_merge(s, a, b, nested):
     return False
 
 
-def _walk(cmd, cwd):
+def _walk(cmd, cwd, home=None):
     """(pushes, whether an admin merge was seen, the first Refuse). A Refuse ends only its own
-    command, so an admin merge or a push on PR-only main later in the line still denies."""
+    command, so an admin merge or a push on PR-only main later in the line still denies.
+
+    A cd holds for the commands after it unless the shell may undo it first: a subshell
+    around it closes (back to the directory before the subshell), a group around it closes,
+    it is an element of a pipeline, its and-or list is backgrounded or carries on past `||`,
+    it follows `||`, a command before it in its and-or list may have skipped it and the list
+    ends, or a backtick follows. The last seven leave the directory unknown."""
     pushes, admin, refused = [], False, None
     for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
         s, here, moved = sw.Scan(text), cwd, False
         lits = None if nested else _Literals(s, cmd)
+        # Each open bracket: (here, and the and-or list's state) as it opened. Scan keeps no
+        # separator before the first word, so brackets that lead the text are read here. The
+        # list's state: it held a cd, it held a command, a cd in it may not have run.
+        frames, list_cd, list_cmd, cond_cd = [], False, False, False
+
+        def ops(op):
+            nonlocal here, list_cd, list_cmd, cond_cd
+            for o in _ops(op):
+                if o in ("(", "{"):
+                    frames.append((here, list_cd, list_cmd, cond_cd))
+                    list_cd = list_cmd = cond_cd = False
+                elif o in (")", "}"):
+                    if not frames:
+                        here = None            # a close with no open seen: a case arm, or unread
+                        continue
+                    before, list_cd, list_cmd, cond_cd = frames.pop()
+                    if o == ")":
+                        here = before          # a subshell's cd ends with it
+                    elif here != before:
+                        here = None            # a group may run in a subshell (a pipeline, `&`)
+                elif o == "&" and list_cd or o == "||" and list_cd or o == "`" and moved:
+                    here = None
+                if o in (";", "&"):
+                    if cond_cd:
+                        here = None            # the list ends; the cd in it may have been skipped
+                    list_cd = list_cmd = cond_cd = False
+
+        ops("".join(re.findall(r"[({]", re.match(r"[\s({]*", text).group())))
         for a, b in s.segments():
-            if a > b:
-                continue
-            c = sw.seg_cmd(s, a, b)
+            c = sw.seg_cmd(s, a, b) if a <= b else None
             if c is not None and _CD.match(s.w[c]):
-                here = _resolve(here, s.w[c + 1], s.live[c + 1]) if c + 1 <= b and s.w[c] != "popd" else None
-                moved = True
+                prev = _ops(s.op[a - 1]) if a > 0 else []
+                nxt = _ops(s.op[b + 1]) if b + 1 < len(s) else []
+                if (prev and prev[-1] in _PIPE + ("||",)) or (nxt and nxt[0] in _PIPE) or s.w[c] == "popd" or c + 1 > b:
+                    here = None                # a pipeline element, after `||`, a popd, or a bare cd
+                else:
+                    here = _resolve(here, s.w[c + 1], s.live[c + 1], home, s.quoted[c + 1])
+                cond_cd = cond_cd or list_cmd
+                moved = list_cd = True
             elif c is not None and s.w[c] in _EXPORT and any(s.w[j].startswith(_GIT_ENV) for j in range(c + 1, b + 1)):
                 here = None                    # an exported GIT_DIR moves every later git
-            else:
+            elif a <= b:
                 try:
                     admin = admin or _admin_merge(s, a, b, nested)
                     p = _push(s, a, b, nested, here, lits)
                 except Refuse as e:
                     refused = refused or e
-                    continue
+                    p = None
                 if p:
                     pushes.append(p)
-            if moved and b + 1 < len(s) and _UNDOES_CD.search(s.op[b + 1]):
-                here = None                    # the shell may undo the cd before the next command
+            list_cmd = list_cmd or a <= b
+            if b + 1 < len(s):
+                ops(s.op[b + 1])
     return pushes, admin, refused
 
 
@@ -422,7 +483,7 @@ def check(payload, env=os.environ):
     cwd = payload.get("cwd")
     if not isinstance(cwd, str) or not cwd.startswith("/"):
         cwd = yield Need("cwd")
-    pushes, admin, refused = _walk(cmd.rstrip("\n"), cwd)
+    pushes, admin, refused = _walk(cmd.rstrip("\n"), cwd, env.get("HOME"))
     if admin:
         return deny(ADMIN)
     asked = None

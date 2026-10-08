@@ -101,7 +101,7 @@ def test_no_shfmt_drops_to_awk(monkeypatch, tmp_path):
     assert scan.Scan("rm -rf x").rung == "awk"
 
 
-@pytest.mark.parametrize("crash", ["echo 'panic: boom' >&2; exit 2", "kill -9 $$", "echo not json",
+@pytest.mark.parametrize("crash", ["echo 'panic: boom' >&2; exit 2", "echo not json",
                                    'echo \'{"Type": "Stmt"}\''])
 def test_a_crashing_shfmt_drops_to_awk_and_denies_nothing(tmp_path, monkeypatch, crash):
     fake_shfmt(tmp_path, monkeypatch, f'[ "$1" = --version ] && echo v3.12.0 && exit 0\n{crash}\n')
@@ -109,6 +109,44 @@ def test_a_crashing_shfmt_drops_to_awk_and_denies_nothing(tmp_path, monkeypatch,
     assert scan.Scan("rm -rf x").rung == "awk"
     assert verdict("ls") is None
     assert verdict("rm -rf ~")["permissionDecision"] == "deny"
+
+
+@pytest.mark.parametrize("stall, why", [("exec sleep 5", "shfmt took over 0.2 s"),
+                                         ("kill -9 $$", "shfmt was killed by signal 9")])
+@pytest.mark.parametrize("probe", [False, True])
+def test_a_shfmt_run_that_fails_denies_and_never_passes_down(tmp_path, monkeypatch, stall, why, probe):
+    monkeypatch.setattr(scan, "SHFMT_TIMEOUT", 0.2)
+    body = f"{stall}\n" if probe else f'[ "$1" = --version ] && echo v3.12.0 && exit 0\n{stall}\n'
+    fake_shfmt(tmp_path, monkeypatch, body)
+    v = verdict("ls", guard="guard-unparsable")
+    assert v["permissionDecision"] == "deny" and f"(shfmt: {why}" in v["permissionDecisionReason"]
+    with pytest.raises(scan.Unparseable):      # a failed run is not cached as a pass
+        scan.check("ls")
+    with pytest.raises(scan.RunFailed):        # nor read by awk inside a guard
+        scan.Scan("ls")
+
+
+def test_a_shfmt_that_stalls_once_still_denies_the_whole_run(tmp_path, monkeypatch):
+    """run.py reads guard-unparsable's verdict once: a second parse that
+    finishes in time must not undo the deny the first one earned."""
+    monkeypatch.setattr(scan, "SHFMT_TIMEOUT", 0.2)
+    fake_shfmt(tmp_path, monkeypatch, '[ "$1" = --version ] && echo v3.12.0 && exit 0\n'
+               f'[ -e {tmp_path}/stalled ] || {{ touch {tmp_path}/stalled; exec sleep 5; }}\n'
+               'echo \'{"Type": "File", "Stmts": []}\'\n')
+    v = verdict("ls", guard=None)
+    assert v["permissionDecision"] == "deny" and "(shfmt: shfmt took over 0.2 s" in v["permissionDecisionReason"]
+
+
+def test_a_bash_n_past_its_timeout_denies(tmp_path, monkeypatch):
+    monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
+    monkeypatch.setattr(scan, "BASH_TIMEOUT", 0.2)
+    f = tmp_path / "bash"
+    f.write_text("#!/bin/sh\nexec sleep 5\n")
+    f.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
+    with pytest.raises(scan.Unparseable) as e:
+        scan.check("ls")
+    assert e.value.rung == "bash -n" and "bash took over 0.2 s" in str(e.value)
 
 
 def test_without_shfmt_bash_n_refuses_and_its_tree_is_not_mapped(monkeypatch):
@@ -191,6 +229,17 @@ def test_with_no_column_the_refusal_stands_as_its_rung_wrote_it(monkeypatch, par
     with pytest.raises(scan.Unparseable) as e:
         scan.check("x")
     assert (e.value.rung, str(e.value)) == ("bash -n", "line 1: unexpected EOF")
+
+
+def test_a_failed_run_gets_no_column(monkeypatch):
+    fake_ts(monkeypatch, Node(children=[Node("ERROR", at=(0, 4), text=b" 'x")]))
+    def bash_n(text):
+        raise scan.RunFailed("bash took over 0.2 s; a busy machine can cause this, so retry")
+    monkeypatch.setattr(scan, "_bash_n", bash_n)
+    monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
+    with pytest.raises(scan.RunFailed) as e:
+        scan.check("x")
+    assert str(e.value) == "bash took over 0.2 s; a busy machine can cause this, so retry"
 
 
 def fake_bashlex(monkeypatch, raises):
@@ -305,3 +354,31 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens_and_operato
                       "cat <<\\<<< EOF\n<\necho it's\nEOF\nrm -rf examples",
                       'echo "$(echo "x"; rm -rf examples)"',
                       'echo "a $(echo "$(rm -rf examples)") b"']
+
+
+@pytest.mark.parametrize("text, w", [
+    ("git status", 0),
+    ("echo $(date)", 2),
+    ("a && b && c", 5),                        # the second && stands one deeper
+    ("a && b; c && d", 4),                     # ; ends the chain
+    ("echo '" + "$(" * 500 + "'", 0),          # single-quoted text weighs nothing
+    ('echo "$(date)"', 2),                     # a double quote keeps its substitutions
+    ("echo x#$(" + "$(" * 3, 14),              # a # inside a word is no comment
+    ("# $($($(", 0),
+    ("cat <<'EOF'\n" + "$(" * 500 + "\nEOF\necho $(date)", 2),   # heredoc bodies drop
+    ("$(case x in a) $(b) ;; esac)", 9),      # a pattern's ) closes nothing
+    ("echo done; " + "$(" * 3, 9),             # done as an argument closes nothing
+])
+def test_weight(text, w):
+    assert scan.weight(text) == w
+
+
+def test_the_limits_deny_before_any_rung_runs(monkeypatch):
+    monkeypatch.setattr(scan, "RUNGS", ())     # a rung that ran would raise RuntimeError
+    with pytest.raises(scan.TooBig) as e:
+        scan.check("echo " + "$(" * 141 + "x" + ")" * 141)
+    assert e.value.rung == "limit" and "over the limit of 10,000" in str(e.value)
+    with pytest.raises(scan.TooBig):
+        scan.check("x" * (scan.LENGTH_MAX + 1))
+    with pytest.raises(scan.TooBig):           # nor read by awk inside a guard
+        scan.Scan("x" * (scan.LENGTH_MAX + 1))

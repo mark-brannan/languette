@@ -5,15 +5,17 @@
 ![Jacques Callot, Drill with halberds (NGV 32320, public domain)](assets/callot-drill-with-halberds.jpg)
 
 Before a coding agent runs a shell command, a languette guard reads it and
-answers: allow, ask, or deny. No model decides, and nothing is run to decide.
+answers: *allow*, *ask*, or **deny**.
 
-*Languette* is French for "little tongue". On a halberd it is the strip of
-iron that runs down the shaft from the head, so a stray blow can't cut through
-the pole. These guards are that strip, between an agent's sharp tools and
-your work.
+Nothing external like a cloud/web service decides, nor any ML or AI models.
+The critical execution path is [deterministic](https://en.wikipedia.org/wiki/Deterministic_algorithm), and even uses ["pure functions"](https://en.wikipedia.org/wiki/Pure_function) where possible.
 
-It's also a pun. Shell is a little language, and languette listens for the
-few words in it that can do damage. When it hears one, it tells the agent
+*Languette* is French for "little tongue". On a halberd the languette (or 'langet')
+it is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
+the pole. These guards are that strip: protecting your work, strengthening your tools, while holding back certain agentic hazards that could ruin your day.
+
+It's also a play on words: Shell is a little language, and languette listens for the
+few words in a shell command that can do damage. When it hears one, it tells the errant agent
 "hold your tongue!"
 
 > *"The wise speak only of what they know, Gríma son of Gálmód. A witless worm have you become. Therefore be silent, and keep your forked tongue behind your teeth. I have not passed through fire and death to bandy crooked words with a serving-man till the lightning falls."*
@@ -116,6 +118,9 @@ In a replay of 101,671 agent commands, about 1 in 3,000 didn't parse, and
 each [would have broken](features/guard-unparsable.feature).
 Bash runs a broken command in part, the lines before the error or prose in
 backticks as a command; the deny stops all of it, so the agent looks again.
+Over 64 KB or a nesting weight of 10,000, a command is denied unread: a
+limit holds on any machine. 10,000 takes shfmt ~450 ms on a quarter CPU, a
+fourth of its timeout; the heaviest of 83,430 agent commands weighs 1,022.
 
 ## Ask first
 
@@ -268,9 +273,8 @@ guard reads beyond the command, it declares:
 A guard that cannot decide denies and says what it saw. A guard that crashes
 is a deny naming the guard; the runner holds that rule, so no guard has to.
 
-The contract is written as scenarios, in the words a person uses to state the
-rule, and every scenario runs against every engine a guard has, Python and
-shell alike:
+The contract is written as "[gherkin](https://en.wikipedia.org/wiki/Cucumber_(software)#Gherkin_language)" scenarios, in the words a person uses to state the
+rule.  These are still completely deterministic tests, they're just easy for non-technical folks to read.
 
 ```gherkin
 Scenario: a target the guard cannot resolve is denied on sight
