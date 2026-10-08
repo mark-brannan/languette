@@ -27,8 +27,10 @@ the disk, the network, the clock and other programs into two narrow steps.
 - **Gather** fetches only what plan listed: no speculative reads, no `gh api`
   on a command that never names a repo.
 - **Act** holds every write: spending an approval, saving the ruleset cache,
-  and the simple metrics. A deny writes nothing a guard asked for, so a click
-  is never spent on a command that does not run.
+  and the simple metrics. It runs at two moments: after the verdict, and
+  after the call, for a write that must wait until the command has run
+  (the issue door, #83). A deny writes nothing a guard asked for, so a click
+  is never spent on a command the verdict refuses.
 
 ## Two shapes of guard
 
@@ -42,9 +44,11 @@ the disk, the network, the clock and other programs into two narrow steps.
 A test reads the source of every guard and of the verdict, without running
 them, and fails on any call that opens a file, starts a program, opens a
 connection, reads the clock or asks the disk about a path. Pure path helpers
-(join, dirname, normpath) pass. The README says the guards are pure; this test
-is why that sentence stays true. Cost: one file, a few milliseconds per run
-(estimate).
+(join, dirname, normpath) pass. A file it cannot parse fails. It is a list of
+known ways out, not a proof: it catches the slip a well-meaning author makes,
+not a deliberate escape (`eval`, a command named in a variable). The README
+says the guards are pure; this test catches the slip that would make that
+false. Cost: one file, a few milliseconds per run (estimate).
 
 ## Cross-cutting: metrics
 
