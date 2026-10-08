@@ -169,6 +169,98 @@ class RunFailed(Unparseable):
     Scan re-raises it rather than read the text with awk."""
 
 
+class TooBig(Unparseable):
+    """The text is over a size or weight limit, so no parser reads it: a
+    parser's time grows with nesting, and a limit on the text, unlike a
+    timeout, gives the same answer on every machine. Scan re-raises it."""
+
+
+LENGTH_MAX = 64 * 1024                         # bytes
+WEIGHT_MAX = 10_000                            # ~450 ms of shfmt on a quarter CPU, 4x under its timeout
+_KEYWORD_CLOSER = {"if": "fi", "case": "esac", "do": "done"}
+_KEYWORD_LEADS = frozenset("if then else elif do while until ! time".split())
+_CODE_TOKEN = re.compile(r"""\\.|\$'(?:[^'\\]|\\.)*'|'[^']*'|"|\$\(\(|\$\(|\$\{|&&|\|\||\|&|;;|"""
+                         r"""[|&;\n(){}`]|#|[^\s;|&(){}<>`'"\\$#]+""", re.S)
+_DQ_TOKEN = re.compile(r"""\\.|"|\$\(\(|\$\(|\$\{|`""", re.S)
+
+
+def weight(text):
+    """How hard `text` is for a parser, in one linear pass: every `$(`, `$((`,
+    `${`, `(`, `{`, backtick, `if`, `case` and `do`, and every `&&`, `||` and
+    `|`, adds the depth it stands at. A chain operator nests the rest of its
+    list one level deeper; `;`, `&` and a newline end the chain. Quoted text
+    adds nothing but the substitutions a double quote keeps, and heredoc
+    bodies are read as strip_heredocs leaves them. A closer that does not
+    match the innermost opener is ignored, so a stray `)` or `done` never
+    lowers the depth."""
+    text = strip_heredocs(text)
+    frames = [[None, 0, True]]                  # [closer, chain, is code]
+    depth, w, i, at_cmd = 1, 0, 0, True         # depth: code frames plus their chains
+
+    def push(closer):
+        nonlocal depth, w
+        frames.append([closer, 0, True])
+        depth += 1
+        w += depth
+
+    while True:
+        code = frames[-1][2]
+        m = (_CODE_TOKEN if code else _DQ_TOKEN).search(text, i)
+        if not m:
+            return w
+        k, i = m.group(), m.end()
+        if not code:
+            if k == '"':
+                frames.pop()
+            elif k == "$((":
+                push(")"); push(")")
+            elif k in ("$(", "`"):
+                push(k[-1] if k == "`" else ")")
+            elif k == "${":
+                push("}")
+            continue
+        top = frames[-1]
+        if k == "#" and m.start() and text[m.start() - 1] not in " \t\n;|&()`":
+            continue                            # mid-word: not a comment
+        if k == "#":
+            e = text.find("\n", i)
+            i = len(text) if e < 0 else e
+        elif k == '"':
+            frames.append(['"', 0, False])
+        elif k in ("$((", "$(", "(", "{", "${") or (k == "`" and top[0] != "`"):
+            for c in {"$((": "))", "${": "}", "{": "}", "`": "`"}.get(k, ")"):
+                push(c)
+            at_cmd = k != "${"
+        elif k in (")", "}", "`") or k in _KEYWORD_CLOSER.values() and at_cmd:
+            if top[0] == k and len(frames) > 1:
+                frames.pop()
+                depth -= 1 + top[1]
+            at_cmd = k == "`" or k in _KEYWORD_CLOSER.values()
+        elif k in ("&&", "||", "|", "|&"):
+            top[1] += 1
+            depth += 1
+            w += depth
+            at_cmd = True
+        elif k in (";", ";;", "&", "\n"):
+            depth -= top[1]
+            top[1] = 0
+            at_cmd = True
+        elif at_cmd and k in _KEYWORD_CLOSER:
+            push(_KEYWORD_CLOSER[k])
+        elif not (at_cmd and k in _KEYWORD_LEADS):
+            at_cmd = False
+
+
+def _limit(text):
+    """Raise TooBig when `text` is over LENGTH_MAX bytes or WEIGHT_MAX weight."""
+    n = len(text.encode("utf-8", "surrogatepass"))
+    if n > LENGTH_MAX:
+        raise TooBig(f"it is {n:,} bytes, over the limit of {LENGTH_MAX:,}", "limit")
+    n = weight(text)
+    if n > WEIGHT_MAX:
+        raise TooBig(f"its nesting weighs {n:,}, over the limit of {WEIGHT_MAX:,}", "limit")
+
+
 def _run(argv, text, timeout, **kw):
     """subprocess.run on `text`, or None when the program is not there.
     Raises Unparseable when the run failed rather than the program: past its
@@ -260,7 +352,9 @@ def parse(text, words=False):
     """(rung, tree) from the first rung that reads the text; the tree is None
     on every rung but shfmt's (and True from bash -n). Raises Unparseable,
     naming the rung, when one refuses the text. words: only the rungs whose
-    reading Scan maps to words, shfmt and awk."""
+    reading Scan maps to words, shfmt and awk. A text over a limit is
+    refused before any rung reads it (TooBig)."""
+    _limit(text)
     for rung in RUNGS:
         if words and rung not in ("shfmt", "awk"):
             continue
@@ -371,7 +465,7 @@ class Scan:
         raises: the clock never picks the reader. Only shfmt's tree maps."""
         try:
             self.rung, tree = parse(text, words=True)
-        except RunFailed:
+        except (RunFailed, TooBig):
             raise
         except Unparseable:
             self.rung, tree = "awk", None

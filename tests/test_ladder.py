@@ -216,3 +216,31 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens_and_operato
                       "cat <<\\<<< EOF\n<\necho it's\nEOF\nrm -rf examples",
                       'echo "$(echo "x"; rm -rf examples)"',
                       'echo "a $(echo "$(rm -rf examples)") b"']
+
+
+@pytest.mark.parametrize("text, w", [
+    ("git status", 0),
+    ("echo $(date)", 2),
+    ("a && b && c", 5),                        # the second && stands one deeper
+    ("a && b; c && d", 4),                     # ; ends the chain
+    ("echo '" + "$(" * 500 + "'", 0),          # single-quoted text weighs nothing
+    ('echo "$(date)"', 2),                     # a double quote keeps its substitutions
+    ("echo x#$(" + "$(" * 3, 14),              # a # inside a word is no comment
+    ("# $($($(", 0),
+    ("cat <<'EOF'\n" + "$(" * 500 + "\nEOF\necho $(date)", 2),   # heredoc bodies drop
+    ("$(case x in a) $(b) ;; esac)", 9),      # a pattern's ) closes nothing
+    ("echo done; " + "$(" * 3, 9),             # done as an argument closes nothing
+])
+def test_weight(text, w):
+    assert scan.weight(text) == w
+
+
+def test_the_limits_deny_before_any_rung_runs(monkeypatch):
+    monkeypatch.setattr(scan, "RUNGS", ())     # a rung that ran would raise RuntimeError
+    with pytest.raises(scan.TooBig) as e:
+        scan.check("echo " + "$(" * 141 + "x" + ")" * 141)
+    assert e.value.rung == "limit" and "over the limit of 10,000" in str(e.value)
+    with pytest.raises(scan.TooBig):
+        scan.check("x" * (scan.LENGTH_MAX + 1))
+    with pytest.raises(scan.TooBig):           # nor read by awk inside a guard
+        scan.Scan("x" * (scan.LENGTH_MAX + 1))

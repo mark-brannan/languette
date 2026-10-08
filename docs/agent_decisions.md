@@ -113,3 +113,7 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 ### 20261008t014318z
 - A parser killed by a signal denies instead of falling to the next rung (kill -9 moved out of the crash test) Undo: drop the returncode < 0 check in scan._run ([#93](https://github.com/mark-brannan/languette/pull/93))
 - An OSError other than FileNotFoundError running a parser denies Undo: catch OSError with FileNotFoundError in scan._run ([#93](https://github.com/mark-brannan/languette/pull/93))
+
+### 20261008t021218z
+- The nesting limit is 10,000 weight (~450 ms of shfmt at 0.25 CPU, 4x under its 2 s timeout); the length limit is 64 KB Undo: raise WEIGHT_MAX in scan.py ([#93](https://github.com/mark-brannan/languette/pull/93))
+- A nested text over the limit raises through Scan like RunFailed, never falls to awk Undo: let Scan catch TooBig and fall to awk ([#93](https://github.com/mark-brannan/languette/pull/93))
