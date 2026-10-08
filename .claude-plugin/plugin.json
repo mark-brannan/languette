@@ -1,6 +1,6 @@
 {
   "name": "languette",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, and commands that destroy infrastructure.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, commands that destroy infrastructure, and a credential pasted into a command.",
   "author": {
     "name": "Mark Brannan"
   },
@@ -115,6 +115,12 @@
       "type": "boolean",
       "title": "Ask before skipping git hooks",
       "description": "Deny --no-verify on git commit, push, merge, pull, rebase and am, -n on commit and am, and git -c core.hooksPath= until the user approves that one run through AskUserQuestion. Leave on unless you want agents to skip the repo's hooks unasked.",
+      "default": true
+    },
+    "guard_secrets": {
+      "type": "boolean",
+      "title": "Keep credentials out of commands",
+      "description": "Deny a Bash command holding a known token shape (a GitHub PAT, an AWS key id, a private key header, and more from gitleaks' list), and ask when a value is only named as a credential (DB_PASSWORD=..., --password ..., a URL with a password). The project may add patterns in .languette/secrets.json. Leave on unless you want secrets pasted into commands unchecked.",
       "default": true
     },
     "guard_infra": {

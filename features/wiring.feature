@@ -18,6 +18,10 @@ Feature: wiring
       """
       Wanderlust
       """
+    And the file ".languette/secrets.json" holds:
+      """
+      {"patterns": [{"id": "acme-key", "description": "Acme API key", "regex": "acme_[a-z0-9]{24}"}]}
+      """
     And the stub "prose-budget" is the engine
     And PROSE_BUDGET_FAIL is "1"
 
@@ -38,6 +42,7 @@ Feature: wiring
       | guard-git-stacked-base | git push origin --delete "$b" | asks      |
       | ask-first              | npm run walk                  | denies    |
       | guard-bypass-hooks | git push --no-verify | denies |
+      | guard-secrets | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 | denies |
       | guard-infra         | terraform destroy             | denies    |
       | guard-github-issues             | gh issue create -t t -b b     | denies    |
       | prose-budget-commit    | git commit -m x               | denies    |

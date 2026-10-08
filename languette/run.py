@@ -38,7 +38,7 @@ try:
     from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_bypass_ruleset,
                                   guard_disk, guard_host_availability, guard_infra, guard_permissions,
                                   guard_pipe_to_shell, guard_recursive_delete, guard_scheduled_jobs,
-                                  guard_unparsable)
+                                  guard_secrets, guard_unparsable)
     from languette import record
     from languette.verdict import ask, context, deny
     from languette.world import World
@@ -52,7 +52,7 @@ GUARDS = (
     ("PreToolUse", re.compile(r"Bash\Z"), (guard_unparsable, guard_recursive_delete, ask_first, guard_bypass_hooks,
                                            guard_infra, guard_bypass_labels, guard_bypass_ruleset,
                                            guard_permissions, guard_pipe_to_shell, guard_disk,
-                                           guard_host_availability, guard_scheduled_jobs)),
+                                           guard_host_availability, guard_scheduled_jobs, guard_secrets)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
 )
 

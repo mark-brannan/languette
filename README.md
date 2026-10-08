@@ -73,7 +73,8 @@ Each guard checks for one kind of hazard:
   that is a worktree, or a [reach into another session's worktree](features/guard-worktrees-foreign.feature)
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
   applying a label that waives a CI gate, such as `churn-ok`
-- `guard-secrets`, `guard-protected-paths`, `guard-database` (planned)
+- [`guard-secrets`](languette/guards/guard_secrets.py): a credential in the command
+- `guard-protected-paths`, `guard-database` (planned)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
 - [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
@@ -253,6 +254,7 @@ guard reads beyond the command, it declares:
 | `guard-recursive-delete` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
 | `guard-bypass-hooks` | the transcript, and the approvals spent |
+| `guard-secrets` | the repo's `.languette/secrets.json`, when it has one |
 | `guard-infra` | the transcript, the approvals spent |
 | `guard-git-stacked-base` | GitHub, through `gh` |
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
