@@ -10,7 +10,11 @@ segment is led by a shell, so `echo ... | sh` is executed text).
 
 The parser ladder (docs/decisions.md, "Parser ladder") picks who reads the
 text: a user-installed shfmt when it is on PATH and new enough, then a pip
+<<<<<<< HEAD
 parser, then `bash -n`, then the awk port below. Each
+=======
+parser (a slot, unruled: #4), then `bash -n`, then the awk port below. Each
+>>>>>>> origin/main
 rung that reads the text either accepts it or refuses it (Unparseable), and a
 refusal is final; a rung that is missing, crashed or cannot say passes the
 text down. Only shfmt's tree is mapped to words: a real parser decides where
@@ -153,9 +157,12 @@ SHFMT_MIN = (3, 6, 0)
 SHFMT_TIMEOUT = 2                              # seconds; a parse measures ~6 ms
 BASH_TIMEOUT = 2                               # seconds
 RUNGS = ("shfmt", "pip", "bash -n", "awk")     # tests narrow this to one rung
+<<<<<<< HEAD
 # The pip rung's parsers, asked in turn. Which comes first is open (#4);
 # tree-sitter-bash first is an assumption.
 PIP = ("tree-sitter-bash",)
+=======
+>>>>>>> origin/main
 
 
 class Unparseable(Exception):
@@ -218,6 +225,7 @@ def _ts_parser():
 
 
 @functools.lru_cache(maxsize=256)
+<<<<<<< HEAD
 def _tree_sitter(text):
     """tree-sitter-bash's tree of `text`, or None when it is missing or
     crashed. tree-sitter never fails a parse; it recovers, marking what it
@@ -255,6 +263,8 @@ def _ts_error(root):
 
 
 @functools.lru_cache(maxsize=256)
+=======
+>>>>>>> origin/main
 def _bash_n(text):
     """True when `bash -n` accepts `text`, None when there is no bash to ask.
     Raises Unparseable with bash's first line, its "bash: " prefixes dropped.
@@ -282,6 +292,7 @@ def _awk(text):
 
 
 def parse(text, words=False):
+<<<<<<< HEAD
     """(rung, tree) from the first rung that reads the text, a pip rung named
     by its parser; the tree is None on the awk rung and True from bash -n.
     Raises Unparseable, naming the rung, when one refuses the text. words:
@@ -298,6 +309,23 @@ def parse(text, words=False):
                 raise
             if name == "awk" or tree is not None:
                 return name, tree
+=======
+    """(rung, tree) from the first rung that reads the text; the tree is None
+    on every rung but shfmt's (and True from bash -n). Raises Unparseable,
+    naming the rung, when one refuses the text. words: only the rungs whose
+    reading Scan maps to words, shfmt and awk."""
+    for rung in RUNGS:
+        if words and rung not in ("shfmt", "awk"):
+            continue
+        read = {"shfmt": _shfmt_tree, "pip": _pip_tree, "bash -n": _bash_n, "awk": _awk}[rung]
+        try:
+            tree = read(text) if read else None
+        except Unparseable as e:
+            e.rung = rung
+            raise
+        if rung == "awk" or tree is not None:
+            return rung, tree
+>>>>>>> origin/main
     raise RuntimeError(f"no parser rung read the text (rungs: {', '.join(RUNGS)})")
 
 

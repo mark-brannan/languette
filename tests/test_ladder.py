@@ -19,7 +19,11 @@ needs_shfmt = pytest.mark.skipif(not REAL and not os.environ.get("CI"), reason="
 @pytest.fixture(autouse=True)
 def fresh():
     def clear():                               # a test may have patched one out
+<<<<<<< HEAD
         for f in (scan.shfmt, scan._shfmt_tree, scan._bash_n, scan._ts_parser, scan._tree_sitter):
+=======
+        for f in (scan.shfmt, scan._shfmt_tree, scan._bash_n):
+>>>>>>> origin/main
             getattr(f, "cache_clear", lambda: None)()
     clear()
     yield
@@ -138,6 +142,7 @@ def test_the_awk_rung_refuses_no_closed_quote(monkeypatch, command):
     assert scan.parse(command) == ("awk", None)
 
 
+<<<<<<< HEAD
 class Node:
     """Enough of a tree-sitter node for _tree_sitter: kind is "ok", "ERROR" or "MISSING"."""
     def __init__(self, kind="ok", children=(), at=(0, 0), text=b"", type="program"):
@@ -149,6 +154,9 @@ class Node:
 def fake_ts(monkeypatch, root):
     tree = type("Tree", (), {"root_node": root})()
     monkeypatch.setattr(scan, "_ts_parser", lambda: type("P", (), {"parse": lambda self, b: tree})())
+=======
+def test_the_pip_rung_is_an_empty_slot(monkeypatch):
+>>>>>>> origin/main
     monkeypatch.setattr(scan, "RUNGS", ("pip", "awk"))
 
 
