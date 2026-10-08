@@ -121,6 +121,8 @@ def test_a_shfmt_run_that_fails_denies_and_never_passes_down(tmp_path, monkeypat
     assert v["permissionDecision"] == "deny" and f"(shfmt: {why}" in v["permissionDecisionReason"]
     with pytest.raises(scan.Unparseable):      # a failed run is not cached as a pass
         scan.check("ls")
+    with pytest.raises(scan.RunFailed):        # nor read by awk inside a guard
+        scan.Scan("ls")
 
 
 def test_a_bash_n_past_its_timeout_denies(tmp_path, monkeypatch):

@@ -164,6 +164,11 @@ class Unparseable(Exception):
         self.rung = rung
 
 
+class RunFailed(Unparseable):
+    """The parser's run failed, not the text: a timeout, a signal, the OS.
+    Scan re-raises it rather than read the text with awk."""
+
+
 def _run(argv, text, timeout, **kw):
     """subprocess.run on `text`, or None when the program is not there.
     Raises Unparseable when the run failed rather than the program: past its
@@ -175,13 +180,13 @@ def _run(argv, text, timeout, **kw):
         r = subprocess.run(argv, input=text.encode("utf-8", "surrogatepass") if text is not None else None,
                            capture_output=True, timeout=timeout, **kw)
     except subprocess.TimeoutExpired:
-        raise Unparseable(f"{name} took over {timeout} s; a busy machine can cause this, so retry") from None
+        raise RunFailed(f"{name} took over {timeout} s; a busy machine can cause this, so retry") from None
     except FileNotFoundError:
         return None
     except OSError as e:
-        raise Unparseable(f"{name} could not run ({e.strerror or e}); retry") from None
+        raise RunFailed(f"{name} could not run ({e.strerror or e}); retry") from None
     if r.returncode < 0:
-        raise Unparseable(f"{name} was killed by signal {-r.returncode}; retry")
+        raise RunFailed(f"{name} was killed by signal {-r.returncode}; retry")
     return r
 
 
@@ -362,9 +367,12 @@ class Scan:
         """Read by the first rung on hand. The command itself is checked once,
         by check(); a text that only might be shell -- a nested string, the
         text with heredocs stripped -- falls to the awk rung when a rung
-        refuses it or its tree cannot be mapped. Only shfmt's tree maps."""
+        refuses it or its tree cannot be mapped. A failed run (RunFailed)
+        raises: the clock never picks the reader. Only shfmt's tree maps."""
         try:
             self.rung, tree = parse(text, words=True)
+        except RunFailed:
+            raise
         except Unparseable:
             self.rung, tree = "awk", None
         self._reset()
