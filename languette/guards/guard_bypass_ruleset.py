@@ -28,7 +28,8 @@ add a branch to watch, never take one away. A `cd` is followed, `~/` read as
 HOME and `-C $NAME/...` read as `-C` takes a literal refspec. A subshell's cd
 ends with it. A cd the shell may undo another way (in a group, as an element
 of a pipeline, in an and-or list that is backgrounded or carries on past
-`||`) and a `popd` leave the directory unknown, so the guard asks. Not watched: pushes to
+`||`), a cd an earlier command in its and-or list may skip, and a `popd` leave the
+directory unknown, so the guard asks. Not watched: pushes to
 any other branch, tags and deletions (guard-git-work-loss and guard-git-stacked-base
 judge those), remotes off github.com or behind an ssh host alias, `gh api`
 writes to a ref or a merge endpoint, an alias from the user's own gitconfig
@@ -141,12 +142,11 @@ class _Literals:
         return None if r.startswith("-") else r  # an option (--all, --delete), not a refspec
 
 
-def _resolve(base, target, live, home=None, raw=""):
+def _resolve(base, target, live, home=None, quoted=True):
     """The directory `cd target` lands in from base, or None if unreadable. A leading `~` or
-    `~/` is HOME when it appears unquoted in raw; `~user` is not read."""
+    `~/` is HOME when no part of the word is quoted or escaped; `~user` is not read."""
     if target == "~" or target.startswith("~/"):
-        bare = re.search(r"(?:^|[\s;&|(){}])%s(?=$|[\s;&|()])" % re.escape(target), raw)
-        if not (home and home.startswith("/") and bare):
+        if quoted or not (home and home.startswith("/")):
             return None
         target = home + target[1:]
     if base is None or live or _UNREADABLE.search(target) or target.startswith("~") or target == "-":
@@ -315,26 +315,28 @@ def _walk(cmd, cwd, home=None):
     A cd holds for the commands after it unless the shell may undo it first: a subshell
     around it closes (back to the directory before the subshell), a group around it closes,
     it is an element of a pipeline, its and-or list is backgrounded or carries on past `||`,
-    or a backtick follows. The last five leave the directory unknown."""
+    it follows `||`, a command before it in its and-or list may have skipped it and the list
+    ends, or a backtick follows. The last seven leave the directory unknown."""
     pushes, admin, refused = [], False, None
     for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
         s, here, moved = sw.Scan(text), cwd, False
         lits = None if nested else _Literals(s, cmd)
-        # Each open bracket: (here, whether its and-or list held a cd) as it opened. Scan keeps
-        # no separator before the first word, so brackets that lead the text are read here.
-        frames, list_cd = [], False
+        # Each open bracket: (here, and the and-or list's state) as it opened. Scan keeps no
+        # separator before the first word, so brackets that lead the text are read here. The
+        # list's state: it held a cd, it held a command, a cd in it may not have run.
+        frames, list_cd, list_cmd, cond_cd = [], False, False, False
 
         def ops(op):
-            nonlocal here, list_cd
+            nonlocal here, list_cd, list_cmd, cond_cd
             for o in _ops(op):
                 if o in ("(", "{"):
-                    frames.append((here, list_cd))
-                    list_cd = False
+                    frames.append((here, list_cd, list_cmd, cond_cd))
+                    list_cd = list_cmd = cond_cd = False
                 elif o in (")", "}"):
                     if not frames:
                         here = None            # a close with no open seen: a case arm, or unread
                         continue
-                    before, list_cd = frames.pop()
+                    before, list_cd, list_cmd, cond_cd = frames.pop()
                     if o == ")":
                         here = before          # a subshell's cd ends with it
                     elif here != before:
@@ -342,7 +344,9 @@ def _walk(cmd, cwd, home=None):
                 elif o == "&" and list_cd or o == "||" and list_cd or o == "`" and moved:
                     here = None
                 if o in (";", "&"):
-                    list_cd = False
+                    if cond_cd:
+                        here = None            # the list ends; the cd in it may have been skipped
+                    list_cd = list_cmd = cond_cd = False
 
         ops("".join(re.findall(r"[({]", re.match(r"[\s({]*", text).group())))
         for a, b in s.segments():
@@ -350,10 +354,11 @@ def _walk(cmd, cwd, home=None):
             if c is not None and _CD.match(s.w[c]):
                 prev = _ops(s.op[a - 1]) if a > 0 else []
                 nxt = _ops(s.op[b + 1]) if b + 1 < len(s) else []
-                if (prev and prev[-1] in _PIPE) or (nxt and nxt[0] in _PIPE) or s.w[c] == "popd" or c + 1 > b:
-                    here = None                # a pipeline element, a popd, or a bare cd
+                if (prev and prev[-1] in _PIPE + ("||",)) or (nxt and nxt[0] in _PIPE) or s.w[c] == "popd" or c + 1 > b:
+                    here = None                # a pipeline element, after `||`, a popd, or a bare cd
                 else:
-                    here = _resolve(here, s.w[c + 1], s.live[c + 1], home, text)
+                    here = _resolve(here, s.w[c + 1], s.live[c + 1], home, s.quoted[c + 1])
+                cond_cd = cond_cd or list_cmd
                 moved = list_cd = True
             elif c is not None and s.w[c] in _EXPORT and any(s.w[j].startswith(_GIT_ENV) for j in range(c + 1, b + 1)):
                 here = None                    # an exported GIT_DIR moves every later git
@@ -366,6 +371,7 @@ def _walk(cmd, cwd, home=None):
                     p = None
                 if p:
                     pushes.append(p)
+            list_cmd = list_cmd or a <= b
             if b + 1 < len(s):
                 ops(s.op[b + 1])
     return pushes, admin, refused
