@@ -97,3 +97,15 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261008t004250z
 - Restore the six deleted shell headers' spec into the Python guards' docstrings, shell mechanics reworded Undo: git revert bca98fb ([#72](https://github.com/mark-brannan/languette/pull/72))
+### 20261008t003728z
+- Redaction keeps the command and guards' reasons whole and masks only secret-looking values (credential-named variables and flags, URL passwords, token shapes, long random strings); raw mode masks nothing Undo: edit SECRETS in languette/record.py (mark-brannan/languette#82)
+- Records live at $XDG_STATE_HOME/languette/decisions.jsonl, rotated at 8 MiB keeping one .1 Undo: change RECORDS/RECORDS_MAX in languette/world.py (mark-brannan/languette#82)
+- Two opt-in booleans, record_decisions and record_raw_commands, as plugin options Undo: rename the keys in plugin.json and record.py (mark-brannan/languette#82)
+
+### 20261008t011048z
+- gitleaks' finding on the synthetic curl -u fixture is ignored by fingerprint in .gitleaksignore, not removed by rewriting the branch Undo: delete .gitleaksignore (once squash-merged, main never holds the commit it names) (mark-brannan/languette#89)
+
+### 20261008t011533z
+- A refspec $NAME is read as the literal export NAME=lit set; declare, typeset and local turn resolution off for the line Undo: widen _Literals in guard_bypass_ruleset.py ([#91](https://github.com/mark-brannan/languette/pull/91))
+- NAME=lit; git push (a ; not &&) is trusted though a readonly NAME inherited from the shell would make the set fail; shell-set names are excluded Undo: require && between the set and the push ([#91](https://github.com/mark-brannan/languette/pull/91))
+- A . in command position or any shell keyword on the line turns literal resolution off, stricter than needed Undo: narrow _RESERVED in guard_bypass_ruleset.py ([#91](https://github.com/mark-brannan/languette/pull/91))
