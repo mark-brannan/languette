@@ -74,7 +74,7 @@ interface is; this file says who decided it and why, one line each.
 ## The guard pipeline: Solace, 2026-10-07
 
 - Six steps: parse, plan, gather, guard, verdict, act. Plan, guard and
-  verdict are pure; gather reads, act writes after the verdict.
+  verdict are pure; gather reads, act writes.
 - A guard splits into plan and judge when its questions are known after
-  the parse; otherwise it asks as it goes.
+  the parse.
 - Design: [docs/design/guard-pipeline.md](design/guard-pipeline.md).
