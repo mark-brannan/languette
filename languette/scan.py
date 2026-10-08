@@ -222,10 +222,9 @@ def _bash_n(text):
 
 
 def _awk(text):
-    """The awk rung's one refusal: a quote still open at the end of the text,
-    heredoc bodies aside, read by the lexer's own rules (_qopen). The lexer
-    would take it to the end, so what the agent meant as one word would run
-    as the rest of the command."""
+    """The awk rung's one refusal (docs/decisions.md, "Parser ladder
+    refusals"): a quote still open at the end of the text, heredoc bodies
+    aside, read by the lexer's own rules (_qopen)."""
     t = strip_heredocs(text)
     q, i = _qopen(t)
     if q:
