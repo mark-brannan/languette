@@ -15,8 +15,10 @@ teammates, and to "main", which is ordinary and passes.
 Per-session state, kept by World under $TMPDIR and keyed by session_id, is fed
 by the same guard on other events. PostToolUse (and PostToolUseFailure) on a
 network read opens the door, and stays open for the session: the text is
-still in its context. SessionStart for a new or cleared session closes it, and
-no state file is a closed door. PostToolUse on Agent records the subagent's
+still in its context. Only SessionStart for a new or cleared session writes a
+closed door; a missing or unreadable file is unknown, which denies where no
+prompt can fire and asks elsewhere. A resumed or compacted session keeps the
+file it has, and with none stays unknown. PostToolUse on Agent records the subagent's
 name and id (SubagentStart carries the id, not the name); SubagentStart
 records the id too. Teammates are read from the session's team config,
 ~/.claude/teams/session-<first 8 of session_id>/config.json (the agent-teams
@@ -37,7 +39,8 @@ from languette.verdict import Need, ask, deny
 NAME = "guard-cross-session-send"
 
 FIRST_LINE = 80
-_FETCHERS = frozenset({"curl", "wget", "fetch"})
+_FETCH = re.compile(r"(?:^|/)fetch\Z")      # BSD fetch, at command position only: never `git fetch`
+_FETCHERS = frozenset({"curl", "wget"})
 _GH = re.compile(r"(?:^|/)gh\Z")
 # gh issue and gh pr subcommands that only write; every other one reads.
 _GH_WRITES = frozenset("create new edit close reopen delete transfer comment merge review ready lock unlock pin "
@@ -108,14 +111,16 @@ def _operands(words):
 
 
 def bash_read(command):
-    """What a Bash command fetched from the network, or None: a curl, wget or
-    fetch anywhere among its words, or a `gh` read."""
+    """What a Bash command fetched from the network, or None: a curl or wget
+    anywhere among its words, fetch as the command run, or a `gh` read."""
     for text, nested in sw.texts_of(sw.strip_heredocs(command.rstrip("\n") + "\n")):
         s = sw.Scan(text)
         for i, w in enumerate(s.w):
             if s.k[i] == "w" and os.path.basename(w) in _FETCHERS:
                 return f"`{os.path.basename(w)}`"
         for a, b in s.segments():
+            if a <= b and sw.cmd_index(s, a, b, _FETCH, True) is not None:
+                return "`fetch`"
             g = sw.cmd_index(s, a, b, _GH, nested) if a <= b else None
             if g is None:
                 continue
@@ -225,24 +230,23 @@ def check(payload, env=os.environ):
         return None
     ti = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
     to = ti.get("to") if isinstance(ti.get("to"), str) else ""
-    bare = _REF.sub("", to)
-    if bare == "main":
+    if to == "main":
         return None
     state, lost = None, sid is None
     if sid is not None:
         try:
             state = yield Need("send-state", sid)
-        except FileNotFoundError:
-            state = {"subagents": [], "read": None}       # no state: nothing read, no subagents known
-        except Exception:  # noqa: BLE001 -- a link, someone else's, or garbled: the door is not provably closed
+        except Exception:  # noqa: BLE001 -- missing, a link, someone else's, or garbled: the door is unknown
             lost = True
-    if bare and isinstance(state, dict) and bare in state.get("subagents", ()):
+    # A " [ref]" picks one agent among several of a name; none is recorded, so
+    # an in-session match is exact: a ref'd name is another session's.
+    if to and isinstance(state, dict) and to in state.get("subagents", ()):
         return None
-    if bare and sid is not None:
+    if to and not _REF.search(to) and sid is not None:
         home = env.get("HOME") or ""
         try:
             team = yield Need("read", os.path.join(home, ".claude", "teams", f"session-{sid[:8]}", "config.json"))
-            if bare in _teammates(team):
+            if to in _teammates(team):
                 return None
         except Exception:  # noqa: BLE001 -- no team, or one this guard cannot read: no teammates known
             pass

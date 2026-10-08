@@ -22,8 +22,9 @@ RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the ol
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
 SEND_STATE = "languette-guard-cross-session-send."   # + session id, under $TMPDIR
 SEND_SUBAGENTS_MAX = 500            # names and ids kept per session; the oldest go first
-# What a failed write leaves: no subagents known, the door open.
-SEND_LOST = '{"subagents": [], "read": "an unknown tool (a state hook failed)"}'
+# What a failed write, or a first write that is not a session start, leaves:
+# no subagents known, the door open.
+SEND_LOST = '{"subagents": [], "read": "an unknown tool (this session\'s state was lost)"}'
 KINDS = frozenset("git gh-api read path cwd clock ruleset-cache ruleset-keep claim send-state send-keep".split())
 
 
@@ -135,9 +136,9 @@ class World:
     def _send_state(self, session):
         """guard-cross-session-send's state for `session`: {"subagents": [the
         names and ids of this session's subagents], "read": the tool that read
-        untrusted content in this session, or None}. Raises FileNotFoundError
-        when there is none, and OSError or ValueError when it is a link,
-        someone else's, open to others, or garbled."""
+        untrusted content in this session, or None}. Raises OSError or
+        ValueError when it is missing, a link, someone else's, open to others,
+        or garbled."""
         fd = os.open(self._send_file(session), os.O_RDONLY | os.O_NOFOLLOW)
         with os.fdopen(fd, encoding="utf-8") as f:
             _own(f)
@@ -149,12 +150,12 @@ class World:
         return st
 
     def _send_keep(self, session, op, arg):
-        """Update that state under an exclusive lock: op "clear" closes the door
-        (a new or cleared session), "read" opens it naming `arg`, "names"
-        records the subagent names and ids in `arg`. A link planted at the
-        path is removed, never written through. A write that fails leaves
-        SEND_LOST in its place where it can: a missing file reads as a closed
-        door, so a failed write must not leave none."""
+        """Update that state under an exclusive lock: op "clear" writes a closed
+        door (a new or cleared session), "read" opens it naming `arg`, "names"
+        records the subagent names and ids in `arg`. Only "clear" makes a
+        closed door: a file another op creates starts as SEND_LOST. A link
+        planted at the path is removed, never written through. A write that
+        fails leaves SEND_LOST in its place where it can."""
         path = self._send_file(session)
         try:
             if os.path.islink(path):
@@ -165,7 +166,7 @@ class World:
                 fcntl.flock(f, fcntl.LOCK_EX)
                 text = f.read()
                 try:
-                    st = json.loads(text) if text.strip() else {"subagents": [], "read": None}
+                    st = json.loads(text) if text.strip() else None
                 except ValueError:
                     st = None
                 if not isinstance(st, dict) or not isinstance(st.get("subagents"), list):

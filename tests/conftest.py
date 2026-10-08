@@ -640,6 +640,7 @@ def _speaks(ctx):
     assert ctx.verdict.stdout == "", f"UserPromptSubmit printed {ctx.verdict.stdout!r}"
 
 
+@given(parsers.parse('the session starts from "{source}"'))
 @when(parsers.parse('the session starts from "{source}"'))
 def _session_starts(ctx, source):
     ctx.run(json.dumps(ctx.moded({"hook_event_name": "SessionStart", "session_id": ctx.session, "source": source})))
@@ -706,6 +707,7 @@ def _send_state_open(ctx):
 def _send_state_link(ctx, target):
     victim = Path(ctx.expand(target))
     victim.write_text("keep")
+    _send_state_file(ctx).unlink(missing_ok=True)
     _send_state_file(ctx).symlink_to(victim)
 
 

@@ -4,7 +4,9 @@ Feature: guard-cross-session-send
   other Claude acts on, and no hook fires where it arrives. So the sender is
   checked: a session that has read untrusted content (anything fetched from
   the network) does not relay it unseen. The text stays in the session's
-  context, so the door stays open until a new or cleared session. Messages to
+  context, so the door stays open until a new or cleared session, and a
+  session whose start was not seen is unknown: denied where no prompt can
+  fire, asked about elsewhere. Messages to
   "main" and to the session's own subagents and teammates are ordinary and
   pass. Where a prompt can fire, the user sees the target and the first line
   and decides; in bypassPermissions, where none can, the send is denied once
@@ -12,8 +14,9 @@ Feature: guard-cross-session-send
 
   Background:
     Given the permission mode is "default"
+    And the session starts from "startup"
 
-  Scenario Outline: a message to one of this session's own subagents passes, by id, name or name with a ref
+  Scenario Outline: a message to one of this session's own subagents passes, by id or name
     When subagent "agent-abc123" starts
     And the agent spawns a subagent named "researcher", given id "a4d2c8f1"
     And the agent runs `gh issue view 12 -R o/r`
@@ -25,7 +28,13 @@ Feature: guard-cross-session-send
       | agent-abc123          |
       | researcher            |
       | a4d2c8f1              |
-      | researcher [3fa9c1]   |
+
+  # No ref is ever recorded, so a ref'd name may be a session the subagent's
+  # name would otherwise shadow: it is gated like any other session.
+  Scenario: a subagent's name with a " [ref]" is another session's
+    When the agent spawns a subagent named "researcher", given id "a4d2c8f1"
+    And the agent sends "researcher [3fa9c1]" the message `carry on`
+    Then the guard asks
 
   Scenario Outline: "main" passes, from a subagent or the main conversation
     Given the permission mode is "<mode>"
@@ -112,6 +121,8 @@ Feature: guard-cross-session-send
       | gh api -X GET repos/o/r/issues -f state=open     | gh api repos/o/r/issues |
       | curl -fsSL https://example.com/page              | curl                    |
       | wget -qO- https://example.com/page               | wget                    |
+      | fetch -o - https://example.com/page              | fetch                   |
+      | sudo fetch -o - https://example.com/page         | fetch                   |
       | /usr/bin/curl -s u \| head                       | curl                    |
       | cd /w && gh issue view 3 \| head                 | gh issue view           |
       | sh -c "gh issue view 3"                          | gh issue view           |
@@ -145,6 +156,8 @@ Feature: guard-cross-session-send
     Examples:
       | command                                   |
       | git status                                |
+      | git fetch origin main                     |
+      | git -C /w fetch --prune                   |
       | gh issue create -t t -b b                 |
       | gh pr comment 7 -b done                   |
       | gh api -X POST repos/o/r/issues -f title=t |
@@ -190,10 +203,35 @@ Feature: guard-cross-session-send
     And the agent sends "api-worker" the message `see above`
     Then the guard denies
 
-  Scenario: in bypassPermissions, no state file means nothing read: a message passes
-    Given the permission mode is "bypassPermissions"
+  Scenario Outline: a session whose start was not seen is unknown: deny in bypassPermissions, ask elsewhere
+    Given the session is "s9"
+    And the permission mode is "<mode>"
     When the agent sends "api-worker" the message `hello`
-    Then the guard is silent
+    Then the guard <verdict>
+
+    Examples:
+      | mode              | verdict |
+      | bypassPermissions | denies  |
+      | default           | asks    |
+
+  Scenario Outline: a resumed or compacted session with no state stays unknown
+    Given the session is "s9"
+    And the permission mode is "bypassPermissions"
+    When the session starts from "<source>"
+    And the agent sends "api-worker" the message `hello`
+    Then the guard denies, naming "cannot tell"
+
+    Examples:
+      | source  |
+      | resume  |
+      | compact |
+
+  Scenario: a subagent recorded in a session whose start was not seen leaves it unknown
+    Given the session is "s9"
+    And the permission mode is "bypassPermissions"
+    When subagent "agent-abc123" starts
+    And the agent sends "api-worker" the message `hello`
+    Then the guard denies, naming "state was lost"
 
   Scenario: a garbled state file is a door not provably closed
     Given the permission mode is "bypassPermissions"
