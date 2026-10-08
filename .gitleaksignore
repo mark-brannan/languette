@@ -1,2 +1,0 @@
-# Synthetic test fixtures, not credentials: one line per historical finding.
-141bebcf6c14142fe4bf9c5e6709e0a87da42a37:tests/test_record.py:curl-auth-user:55
