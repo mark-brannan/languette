@@ -39,7 +39,7 @@ try:
                                   guard_cross_session_send, guard_disk, guard_git_stacked_base, guard_git_work_loss,
                                   guard_host_availability, guard_infra, guard_permissions,
                                   guard_pipe_to_shell, guard_recursive_delete, guard_scheduled_jobs,
-                                  guard_unparsable, guard_worktrees)
+                                  guard_secrets, guard_unparsable, guard_worktrees)
     from languette import record
     from languette.verdict import ask, context, deny
     from languette.world import World
@@ -57,7 +57,7 @@ GUARDS = (
                                            guard_bypass_hooks, guard_infra, guard_bypass_labels,
                                            guard_bypass_ruleset, guard_permissions, guard_pipe_to_shell,
                                            guard_disk, guard_host_availability, guard_scheduled_jobs,
-                                           guard_git_stacked_base)),
+                                           guard_git_stacked_base, guard_secrets)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
     ("PreToolUse", re.compile(r"(?:Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree)\Z"), (guard_worktrees,)),
     ("PreToolUse", re.compile(r"SendMessage\Z"), (guard_cross_session_send,)),
