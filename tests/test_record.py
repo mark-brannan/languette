@@ -103,6 +103,26 @@ def test_a_failed_write_leaves_the_verdict_alone(tmp_path):
         run.respond(_payload(RM), _env(tmp_path, on=False), "guard-recursive-delete")
 
 
+def test_an_unreadable_payload_is_recorded_as_its_deny(tmp_path):
+    out = run.respond("not json", _env(tmp_path), None)
+    [rec] = _records(tmp_path)
+    assert json.loads(out) and rec["verdict"] == "deny" and rec["findings"] == []
+
+
+def test_an_open_record_directory_is_closed(tmp_path):
+    d = tmp_path / "state" / "languette"
+    d.mkdir(parents=True, mode=0o755)
+    run.respond(_payload("ls"), _env(tmp_path), None)
+    assert stat.S_IMODE(d.stat().st_mode) == 0o700
+
+
+def test_a_short_write_is_finished(tmp_path, monkeypatch):
+    real = os.write
+    monkeypatch.setattr(os, "write", lambda fd, b: real(fd, b[:7]))
+    World(_env(tmp_path), {}).keep({"n": 0, "pad": "x" * 50})
+    assert [r["n"] for r in _records(tmp_path)] == [0]
+
+
 def test_the_file_is_the_users_alone(tmp_path):
     run.respond(_payload("ls"), _env(tmp_path), None)
     f = tmp_path / "state" / "languette" / "decisions.jsonl"

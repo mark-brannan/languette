@@ -102,7 +102,7 @@ def _respond(stdin_text, env, only):
         if not isinstance(payload, dict):
             raise ValueError("payload is not an object")
     except Exception as e:  # noqa: BLE001 -- a gate fails closed on anything
-        return _out("PreToolUse", deny(f"languette: unreadable hook payload ({e})")), None
+        return _out("PreToolUse", deny(f"languette: unreadable hook payload ({e})")), (World(env, {}), {}, [])
     # The shell guards never read the event; a payload without one is judged
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"

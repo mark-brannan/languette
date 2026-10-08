@@ -137,6 +137,8 @@ class World:
             base = self.env.get("XDG_STATE_HOME") or os.path.join(self.env["HOME"], ".local", "state")
             d = os.path.join(base, "languette")
             os.makedirs(d, mode=0o700, exist_ok=True)
+            if os.stat(d).st_mode & 0o077:
+                os.chmod(d, 0o700)             # made before, by hand or an older umask
             path = os.path.join(d, RECORDS)
             line = (json.dumps(rec, separators=(",", ":")) + "\n").encode("utf-8", "surrogatepass")
             deadline = time.monotonic() + RECORDS_WAIT
@@ -162,7 +164,12 @@ class World:
                     if st.st_size + len(line) > RECORDS_MAX and st.st_size:
                         os.replace(path, path + ".1")
                         continue
-                    os.write(fd, line)
+                    done = 0
+                    try:
+                        while done < len(line):
+                            done += os.write(fd, line[done:])
+                    except OSError:
+                        os.ftruncate(fd, st.st_size)   # no half line for the next writer to join
                     return
                 finally:
                     os.close(fd)
