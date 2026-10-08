@@ -15,7 +15,10 @@ doors are watched:
 Both deny. The user's own terminal never reaches a hook, so the user keeps
 the bypass. When GitHub cannot answer (no gh, signed out, offline, a 10 s
 timeout, an error) or the destination cannot be read (a variable refspec,
-GIT_DIR, a detached HEAD), the guard asks, so the user decides. GitHub's
+GIT_DIR, a detached HEAD), the guard asks, so the user decides. A refspec
+whose only run-time part is `$NAME` is read when the same command line set
+NAME to a literal earlier, where the push is sure to see it, and is judged
+as if that literal were written in its place. GitHub's
 "upgrade to Pro" answer is not a failure: a private repo on a free plan
 cannot carry rules, so there is nothing to bypass.
 
@@ -31,19 +34,15 @@ or `gh alias`, and `push.default=matching` (a bare `git push origin` pushing
 every matching branch).
 """
 
-import json
 import os
 import re
-import subprocess
-import time
 from urllib.parse import quote
 
 from languette import scan as sw
-from languette.verdict import Refuse, ask, deny
+from languette.verdict import Need, Refuse, ask, deny
 
 NAME = "guard-bypass-ruleset"
 TTL = 3600
-GH_TIMEOUT = 10
 
 _GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 _GH = re.compile(r"(?:^|/)gh\Z")
@@ -59,6 +58,18 @@ _GITHUB = re.compile(r"github\.com(?::\d+)?[:/]+([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-
 # subshell or group, a pipe (the cd ran in a subshell), `||`, a backtick, or a lone `&`.
 _UNDOES_CD = re.compile(r"[)}|`]|(?<!&)&(?!&)")
 _FALLBACK = ("main", "master")
+# A refspec's one run-time part: $NAME or ${NAME}, nothing else.
+_VAR = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
+# Text that can set a variable without naming it literally, or change what an unquoted $NAME
+# expands to: ANSI and locale quoting, arithmetic, indirection, IFS, and the builtins that take a
+# variable's name as a value.
+_SETS_BLIND = re.compile(r"\$['\"]|\(\(|\$\{!|\[\[|\bIFS\b|(?<![\w./-])(?:eval|source|read|mapfile|readarray|"
+                         r"printf|getopts|let|declare|typeset|local|readonly|unset|trap|wait|alias|builtin|"
+                         r"command|enable|exec|coproc|function|shopt|set)(?![\w./-])")
+_RESERVED = frozenset("if then else elif fi case esac for select while until do done in ! time { } [[ ]] .".split())
+# Names the shell sets on its own, or will not let a script set.
+_SPECIAL = re.compile(r"\A(?:BASH\w*|COMP\w*|HIST\w*|PWD|OLDPWD|RANDOM|SRANDOM|SECONDS|LINENO|UID|EUID|PPID|"
+                      r"GROUPS|SHELLOPTS|PIPESTATUS|FUNCNAME|DIRSTACK|EPOCH\w*|REPLY|OPT\w*|SHLVL|_)\Z")
 HEAD, ALL, IMPLICIT = object(), object(), object()
 
 ADMIN = ("guard-bypass-ruleset: `gh pr merge --admin` merges past the PR's required reviews and checks on "
@@ -69,6 +80,63 @@ ADMIN = ("guard-bypass-ruleset: `gh pr merge --admin` merges past the PR's requi
 class _Push:
     def __init__(self, prog, here, remote, dsts):
         self.prog, self.here, self.remote, self.dsts = prog, here, remote, dsts
+
+
+class _Literals:
+    """The literal values a top-level command line gives its variables, for reading a refspec
+    like `HEAD:$B` after `B=lit;`. Only a plain `NAME=lit` (or `export NAME=lit`) segment
+    binds, and only when the push is sure to see it: NAME appears nowhere else in the
+    command, nothing can set it blindly, and only `;`, newlines and `&&` lie between."""
+
+    def __init__(self, s, raw):
+        self.s, self.raw, self.bind = s, raw, {}
+        self.off = bool(_SETS_BLIND.search(raw))
+        for a, b in s.segments():
+            if a > b:
+                continue
+            c = sw.seg_cmd(s, a, b)
+            if s.w[a] in _RESERVED or (c is not None and s.w[c] in _RESERVED):
+                self.off = True
+            words = range(a + 1, b + 1) if c == a and s.w[a] == "export" else range(a, b + 1) if c is None else ()
+            if words and all(s.k[i] == "w" and sw._ASSIGN.match(s.w[i]) for i in words):
+                for i in words:
+                    name, _, val = s.w[i].partition("=")
+                    # whitespace: an unquoted $NAME splits there into more than one refspec
+                    ok = val and not s.live[i] and not _UNREADABLE.search(val) and not re.search(r"[~\s]", val)
+                    self.bind[name] = (a, val if ok else None)
+            elif c is not None and s.w[c] == "export":
+                self.off = True
+
+    def _seps(self, lo, hi):
+        """The kinds of separator between word indexes lo and hi, ";" and "&&", or None for any other."""
+        kinds = set()
+        for i in range(lo, hi):
+            if self.s.k[i] == ";":
+                op = re.sub(r"\s", "", self.s.op[i])
+                if op not in ("", ";", "&&"):
+                    return None
+                kinds.add(op or ";")
+        return kinds
+
+    def word(self, j, start):
+        """Word j, in the segment that starts at start, with its one $NAME replaced by NAME's
+        literal, or None."""
+        w = self.s.w[j]
+        m = _VAR.search(w)
+        if self.off or self.s.k[j] != "w" or w.count("$") != 1 or "`" in w or not m:
+            return None
+        name = m.group(1) or m.group(2)
+        a, val = self.bind.get(name, (None, None))
+        if val is None or a >= start or _SPECIAL.match(name):
+            return None
+        reads = len(re.findall(r"\$\{%s\}|\$%s(?![A-Za-z0-9_])" % (name, name), self.raw))
+        if len(re.findall(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % name, self.raw)) != reads + 1:
+            return None                        # NAME is set, or named, somewhere else as well
+        before, between = self._seps(0, a), self._seps(a, start)
+        if before is None or between is None or not (before <= {";"} or between <= {"&&"}):
+            return None                        # the push may run when the assignment didn't
+        r = w[:m.start()] + val + w[m.end():]
+        return None if r.startswith("-") else r  # an option (--all, --delete), not a refspec
 
 
 def _resolve(base, target, live):
@@ -96,7 +164,7 @@ def _opt(x, full):
     return len(x) > 2 and x.startswith("--") and full.startswith(x)
 
 
-def _push(s, a, b, nested, here):
+def _push(s, a, b, nested, here, lits=None):
     g = sw.cmd_index(s, a, b, _GIT, nested)
     if g is None:
         return None
@@ -168,10 +236,10 @@ def _push(s, a, b, nested, here):
         return None if tags else _Push(prog, here, remote, [IMPLICIT])
     dsts = []
     for j in pos:
-        r = s.w[j].lstrip("+")
-        if s.live[j] or _UNREADABLE.search(r):
+        r = (lits and s.live[j] and lits.word(j, a)) or s.w[j]
+        if (s.live[j] and r is s.w[j]) or _UNREADABLE.search(r):
             raise Refuse(f"the refspec `{s.w[j]}` is built at run time, so where it lands can't be read")
-        src, _, dst = r.partition(":")
+        src, _, dst = r.lstrip("+").partition(":")
         if ":" in r and not src:
             continue                           # :branch deletes
         dst = dst or src
@@ -202,8 +270,18 @@ def _admin_merge(s, a, b, nested):
     if any(dyn):
         if admin:
             return True                        # a live subcommand beside a literal --admin
-        first = [k for k, x in enumerate(w) if not x.startswith("-")][:2]
-        if any(dyn[k] for k in first):
+        first, skip = [], False                # the group and its verb; a literal -R value is neither
+        for k, x in enumerate(w):
+            if skip:
+                skip = False
+                if dyn[k]:                     # a run-time -R value may split into `pr merge`
+                    first.append(k)
+            elif x.startswith("-"):
+                skip = x in ("-R", "--repo") or _opt(x, "--repo") and "=" not in x
+            elif len(first) < 2:
+                first.append(k)
+        # Only a run-time group, or a run-time verb under a literal `pr`, could spell `pr merge`.
+        if first and (dyn[first[0]] or (w[first[0]] == "pr" and len(first) > 1 and dyn[first[1]])):
             raise Refuse("the `gh` subcommand is built at run time and could be `pr merge --admin`")
     return False
 
@@ -214,6 +292,7 @@ def _walk(cmd, cwd):
     pushes, admin, refused = [], False, None
     for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
         s, here, moved = sw.Scan(text), cwd, False
+        lits = None if nested else _Literals(s, cmd)
         for a, b in s.segments():
             if a > b:
                 continue
@@ -226,7 +305,7 @@ def _walk(cmd, cwd):
             else:
                 try:
                     admin = admin or _admin_merge(s, a, b, nested)
-                    p = _push(s, a, b, nested, here)
+                    p = _push(s, a, b, nested, here, lits)
                 except Refuse as e:
                     refused = refused or e
                     continue
@@ -240,47 +319,20 @@ def _walk(cmd, cwd):
 def _git(p, env, *args):
     if p.here is None and p.prog == "git":
         return None
-    try:
-        r = subprocess.run([p.prog, *args], cwd=p.here or env.get("HOME") or "/", env=env,
-                           capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    out = r.stdout.strip()
-    return out if r.returncode == 0 and out else None
-
-
-def _api(path, env):
-    """(status, body) from `gh api path`, or (None, None) when gh can't answer."""
-    try:
-        r = subprocess.run(["gh", "api", path], env=env, capture_output=True, text=True,
-                           timeout=GH_TIMEOUT, stdin=subprocess.DEVNULL)
-        body = json.loads(r.stdout)
-    except (OSError, subprocess.SubprocessError, ValueError):
-        return None, None
-    if r.returncode == 0:
-        return 200, body
-    status = body.get("status") if isinstance(body, dict) else None
-    return (int(status), body) if isinstance(status, str) and status.isdigit() else (None, None)
+    return (yield Need("git", p.prog, p.here or env.get("HOME") or "/", *args))
 
 
 def _says(body, words):
     return isinstance(body, dict) and words in str(body.get("message", "")).lower()
 
 
-def _requires_pr(slug, branch, env):
+def _requires_pr(slug, branch):
     """"pr", "open", or None when GitHub can't answer."""
-    base = env.get("XDG_CACHE_HOME") or os.path.join(env.get("HOME") or "/", ".cache")
-    f = os.path.join(base, "languette", "rulesets", slug, quote(branch, safe=""))
-    try:
-        if time.time() - os.path.getmtime(f) < TTL:
-            with open(f) as fh:
-                got = fh.read().strip()
-            if got == "pr":
-                return got
-    except OSError:
-        pass
+    cached = yield Need("ruleset-cache", slug, branch)
+    if cached and cached[1] == "pr" and (yield Need("clock")) - cached[0] < TTL:
+        return "pr"
     b = quote(branch, safe="")
-    code, body = _api(f"repos/{slug}/rules/branches/{b}", env)
+    code, body = yield Need("gh-api", f"repos/{slug}/rules/branches/{b}")
     if code == 200 and isinstance(body, list) and any(isinstance(r, dict) and r.get("type") == "pull_request"
                                                       for r in body):
         got = "pr"
@@ -289,7 +341,7 @@ def _requires_pr(slug, branch, env):
     elif code != 200:
         return None
     else:
-        code, body = _api(f"repos/{slug}/branches/{b}/protection", env)
+        code, body = yield Need("gh-api", f"repos/{slug}/branches/{b}/protection")
         if code == 200 and isinstance(body, dict):
             got = "pr" if body.get("required_pull_request_reviews") else "open"
         elif code == 404 and (_says(body, "not protected") or _says(body, "branch not found")):
@@ -297,12 +349,7 @@ def _requires_pr(slug, branch, env):
         else:
             return None
     if got == "pr":
-        try:
-            os.makedirs(os.path.dirname(f), exist_ok=True)
-            with open(f, "w") as fh:
-                fh.write(got + "\n")
-        except OSError:
-            pass
+        yield Need("ruleset-keep", slug, branch, got)
     return got
 
 
@@ -311,7 +358,7 @@ def _judge(p, env):
     remote, dsts = p.remote, list(p.dsts)
     if IMPLICIT in dsts:
         dsts.remove(IMPLICIT)
-        up = _git(p, env, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{push}")
+        up = yield from _git(p, env, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{push}")
         if up and "/" in up:
             r, br = up.split("/", 1)
             remote = remote or r
@@ -320,18 +367,22 @@ def _judge(p, env):
             dsts.append(HEAD)
     if HEAD in dsts:
         dsts.remove(HEAD)
-        cur = _git(p, env, "symbolic-ref", "--short", "HEAD")
+        cur = yield from _git(p, env, "symbolic-ref", "--short", "HEAD")
         if cur is None:
             return ask(f"guard-bypass-ruleset: this {p.prog} push sends the current branch, and the hook can't "
                        "tell which branch that is (another directory, or a detached HEAD), so it can't check "
                        "whether the push goes around a rule that requires a pull request.")
         dsts.append(cur)
     if remote is None:
-        cur = _git(p, env, "symbolic-ref", "--short", "HEAD") or ""
-        remote = (_git(p, env, "config", f"branch.{cur}.pushRemote") or _git(p, env, "config", "remote.pushDefault")
-                  or _git(p, env, "config", f"branch.{cur}.remote") or "origin")
-    url = remote if ("/" in remote or ":" in remote) else _git(p, env, "remote", "get-url", "--push", remote)
-    head = _git(p, env, "symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD")
+        cur = (yield from _git(p, env, "symbolic-ref", "--short", "HEAD")) or ""
+        for key in (f"branch.{cur}.pushRemote", "remote.pushDefault", f"branch.{cur}.remote"):
+            remote = yield from _git(p, env, "config", key)
+            if remote:
+                break
+        remote = remote or "origin"
+    url = remote if ("/" in remote or ":" in remote) else (yield from _git(p, env, "remote", "get-url", "--push",
+                                                                           remote))
+    head = yield from _git(p, env, "symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD")
     defaults = list(_FALLBACK)
     if head and "/" in head and head.split("/", 1)[1] not in defaults:
         defaults.insert(0, head.split("/", 1)[1])
@@ -351,7 +402,7 @@ def _judge(p, env):
     slug = f"{m.group(1)}/{m.group(2)}"
     asked = None
     for branch in hits:
-        got = _requires_pr(slug, branch, env)
+        got = yield from _requires_pr(slug, branch)
         if got == "pr":
             return deny(f"guard-bypass-ruleset: `{branch}` on {slug} requires a pull request, and this push would go "
                         "around it on the user's bypass. Push a branch and open a PR. A direct push is the user's "
@@ -370,13 +421,13 @@ def check(payload, env=os.environ):
         return None
     cwd = payload.get("cwd")
     if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = os.getcwd()
+        cwd = yield Need("cwd")
     pushes, admin, refused = _walk(cmd.rstrip("\n"), cwd)
     if admin:
         return deny(ADMIN)
     asked = None
     for p in pushes:
-        v = _judge(p, env)
+        v = yield from _judge(p, env)
         if v and v["permissionDecision"] == "deny":
             return v
         asked = asked or v

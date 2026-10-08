@@ -9,8 +9,17 @@ a Bash command the parser refuses is a deny (guard-unparsable; the other guards
 skip it), and a guard that raises is a deny naming the guard. No guard
 matched, or none objected, is exit 0 with no output; a deny outranks an ask.
 Standard library only.
+
+The shape: a guard is a pure function of the payload and env. A fact it can't
+read from them (a git ref, GitHub's rules for a branch, a file, the clock, the
+user's approvals) it asks for: its check is then a generator that yields a
+languette.verdict.Need and gets the answer back, and returns its finding. This
+runner answers every Need through languette.world, the only module that does
+I/O, and throws world's exception into the guard when the fact can't be had.
+A guard whose check returns a finding directly needs no change.
 """
 
+import inspect
 import json
 import os
 import re
@@ -30,7 +39,9 @@ try:
                                   guard_disk, guard_host_availability, guard_infra, guard_permissions,
                                   guard_pipe_to_shell, guard_recursive_delete, guard_scheduled_jobs,
                                   guard_unparsable)
+    from languette import record
     from languette.verdict import ask, context, deny
+    from languette.world import World
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
                                          "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"}))
@@ -46,15 +57,52 @@ GUARDS = (
 )
 
 
+def _drive(r, world):
+    """A guard's finding: `r` itself, or what generator `r` returns once every Need it
+    yields is answered."""
+    if not inspect.isgenerator(r):
+        return r
+    answer, err = None, None
+    while True:
+        try:
+            need = r.throw(err) if err else r.send(answer)
+        except StopIteration as stop:
+            return stop.value
+        try:
+            answer, err = world.answer(need), None
+        except Exception as e:  # noqa: BLE001 -- the guard decides what a missing fact means
+            answer, err = None, e
+
+
 def respond(stdin_text, env, only=None):
     """The hook's whole stdout for one payload: "" (no objection) or one
-    JSON line. `env` is what the guards read in place of os.environ."""
+    JSON line. `env` is what the guards read in place of os.environ. With
+    record_decisions on, the call is recorded after the verdict (record.py)."""
+    out, judged = _respond(stdin_text, env, only)
+    if judged and record.wanted(env):
+        try:
+            world, payload, findings = judged
+            world.keep(record.build(payload, env, only, findings, _verdict(out)))
+        except Exception:  # noqa: BLE001 -- a record never changes the verdict
+            pass
+    return out
+
+
+def _verdict(out):
+    if not out:
+        return "silent"
+    hso = json.loads(out)["hookSpecificOutput"]
+    return hso.get("permissionDecision") or "context"
+
+
+def _respond(stdin_text, env, only):
+    """(stdout, (world, payload, [(guard, result, crashed)]) or None)."""
     try:
         payload = json.loads(stdin_text)
         if not isinstance(payload, dict):
             raise ValueError("payload is not an object")
     except Exception as e:  # noqa: BLE001 -- a gate fails closed on anything
-        return _out("PreToolUse", deny(f"languette: unreadable hook payload ({e})"))
+        return _out("PreToolUse", deny(f"languette: unreadable hook payload ({e})")), (World(env, {}), {}, [])
     # The shell guards never read the event; a payload without one is judged
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
@@ -73,12 +121,15 @@ def respond(stdin_text, env, only=None):
             unparsed = False
         if unparsed:
             guards = [g for g in guards if g is guard_unparsable]
-    reasons, asks, notes = [], [], []
+    world = World(env, payload)
+    reasons, asks, notes, findings = [], [], [], []
     for g in guards:
+        crashed = False
         try:
-            r = g.check(payload, env)
+            r = _drive(g.check(payload, env), world)
         except Exception as e:  # noqa: BLE001
-            r = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command")
+            r, crashed = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
+        findings.append((g.NAME, r, crashed))
         if not r:
             continue
         if r.get("permissionDecision") == "deny":
@@ -87,13 +138,14 @@ def respond(stdin_text, env, only=None):
             asks.append(r["permissionDecisionReason"])
         if r.get("additionalContext"):
             notes.append(r["additionalContext"])
+    judged = (world, payload, findings)
     if reasons:
-        return _out(event, deny("\n\n".join(reasons)))
+        return _out(event, deny("\n\n".join(reasons))), judged
     if asks:
-        return _out(event, ask("\n\n".join(asks)))
+        return _out(event, ask("\n\n".join(asks))), judged
     if notes:
-        return _out(event, context("\n\n".join(notes)))
-    return ""
+        return _out(event, context("\n\n".join(notes))), judged
+    return "", judged
 
 
 def main(argv):

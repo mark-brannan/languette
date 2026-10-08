@@ -112,6 +112,7 @@ class Ctx:
         self.arg = None                        # an extra CLI argument to the guard script
         self.session = "s1"                    # session_id in the payload, for guard-github-issues
         self._doordir = None
+        self.calls = 0                         # tool_use_id in the payload: one per call, as Claude Code gives
         self.stdin = self.verdict = self.scanned = None
         self._dirs = []
 
@@ -146,8 +147,9 @@ class Ctx:
     # --- running a guard -------------------------------------------------
 
     def payload(self, command):
+        self.calls += 1
         p = {"tool_name": "Bash", "tool_input": {"command": self.expand(command)}, "cwd": self.expand(self.cwd),
-             "session_id": self.session}
+             "session_id": self.session, "tool_use_id": f"toolu_call{self.calls}"}
         if self.proj:
             p["transcript_path"] = f"{self.proj}/t.jsonl"
         return json.dumps(p)
@@ -460,8 +462,52 @@ def hooks_json_prompt_command():
 # --- When ----------------------------------------------------------------
 
 # Greedy to the last backtick, so a command may hold backticks of its own.
+def _ran(ctx):
+    """Claude Code fires PostToolUse only for a call that ran: when this guard
+    let it through, spend the door as the post hook would. The verdict the
+    scenario judges stays the PreToolUse one."""
+    if ctx.guard != "guard-github-issues" or ctx.hook or ctx.verdict.decision == "deny":
+        return
+    pre, ctx.arg = ctx.verdict, "post"
+    ctx.run(ctx.stdin)
+    ctx.arg, ctx.verdict = None, pre
+
+
 @when(parsers.re(r"the agent runs `(?P<command>.*)`", flags=re.S))
 def _runs(ctx, command):
+    ctx.run(ctx.payload(command))
+    _ran(ctx)
+
+
+def _transcript(ctx):
+    if not ctx.proj:
+        ctx.proj = Path(ctx.mkdtemp())
+    (ctx.proj / "t.jsonl").touch()
+
+
+@when(parsers.re(r"another guard denies `(?P<command>.*)`", flags=re.S))
+def _denied_elsewhere(ctx, command):
+    # This guard's PreToolUse ran, the call did not: Claude Code records the
+    # deny as its result, and fires no PostToolUse.
+    _transcript(ctx)
+    ctx.run(ctx.payload(command))
+    _record_result(ctx, "guard-private-terms: denied")
+
+
+@when("that call ran, but its post hook never did")
+def _ran_unspent(ctx):
+    _record_result(ctx, "https://github.com/o/r/issues/9", is_error=False)
+
+
+@then(parsers.parse('"{target}" still holds "{content}"'))
+def _still_holds(ctx, target, content):
+    assert Path(ctx.expand(target)).read_text() == content
+
+
+@when(parsers.re(r"the agent starts `(?P<command>.*)`", flags=re.S))
+def _starts(ctx, command):
+    # PreToolUse ran and the call is still running: no result, no PostToolUse.
+    _transcript(ctx)
     ctx.run(ctx.payload(command))
 
 
@@ -472,7 +518,30 @@ def _runs_doc(ctx, docstring):
 
 @when("the agent runs it again")
 def _rerun(ctx):
-    ctx.run(ctx.stdin)
+    p = json.loads(ctx.stdin)
+    if "tool_use_id" in p:
+        ctx.calls += 1
+        p["tool_use_id"] = f"toolu_call{ctx.calls}"
+    ctx.run(json.dumps(p))
+
+
+def _record_result(ctx, content, is_error=True, **extra):
+    call = json.loads(ctx.stdin)["tool_use_id"]
+    rec = {"type": "user", "message": {"role": "user", "content": [
+        {"type": "tool_result", "tool_use_id": call, "content": content, "is_error": is_error}]}, **extra}
+    with (ctx.proj / "t.jsonl").open("a") as f:
+        f.write(json.dumps(rec) + "\n")
+
+
+@when(parsers.parse('Claude Code records that call\'s result as "{content}"'))
+def _call_result(ctx, content):
+    _record_result(ctx, content)
+
+
+@when("the user declines that call")
+def _call_declined(ctx):
+    _record_result(ctx, "The user doesn't want to proceed with this tool use. The tool use was rejected.",
+                   toolUseResult="User rejected tool use")
 
 
 @when("the human speaks, opening the door")
@@ -494,6 +563,7 @@ def _open_door_via_hooks_json(ctx):
 @when(parsers.re(r'the agent calls MCP tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
 def _mcp_call(ctx, tool, inp):
     ctx.run(json.dumps({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)}))
+    _ran(ctx)
 
 
 @when(parsers.re(r'the agent calls tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))

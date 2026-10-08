@@ -19,8 +19,7 @@ needs_shfmt = pytest.mark.skipif(not REAL and not os.environ.get("CI"), reason="
 @pytest.fixture(autouse=True)
 def fresh():
     def clear():                               # a test may have patched one out
-        for f in (scan.shfmt, scan._shfmt_tree, scan._bash_n, scan._ts_parser, scan._tree_sitter,
-                  scan._bashlex_mod, scan._bashlex):
+        for f in (scan.shfmt, scan._shfmt_tree, scan._bash_n, scan._ts_parser, scan._tree_sitter):
             getattr(f, "cache_clear", lambda: None)()
     clear()
     yield
@@ -132,7 +131,8 @@ def test_with_no_bash_the_awk_rung_reads(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize("command", ["echo \"it's\" # don't", "cat <<'EOF'\ndon't\nEOF", "cat <<EOF\nit's $(date)\nEOF",
                                      "echo a\\'b", "printf '%s' \"a'b\"",
-                                     "echo $'it\\'s'", "echo \\$'a' b"])
+                                     "echo $'it\\'s'", "echo \\$'a' b",
+                                     "echo $$'a\\'", "echo $$$'a\\'b'"])
 def test_the_awk_rung_refuses_no_closed_quote(monkeypatch, command):
     monkeypatch.setattr(scan, "RUNGS", ("awk",))
     assert scan.parse(command) == ("awk", None)
@@ -149,88 +149,46 @@ class Node:
 def fake_ts(monkeypatch, root):
     tree = type("Tree", (), {"root_node": root})()
     monkeypatch.setattr(scan, "_ts_parser", lambda: type("P", (), {"parse": lambda self, b: tree})())
-    monkeypatch.setattr(scan, "RUNGS", ("pip", "awk"))
 
 
-@pytest.mark.parametrize("root, found", [
-    (Node(children=[Node(), Node("ERROR", at=(0, 4), text=b"'unclosed")]), "1:5: cannot read `'unclosed`"),
-    (Node(children=[Node(children=[Node("MISSING", at=(1, 11), type=")")]), Node("ERROR")]), "2:12: missing `)`"),
+def refuse(monkeypatch, why="line 1: unexpected EOF"):
+    """bash -n, faked to refuse, so the column is the only thing under test."""
+    def bash_n(text):
+        raise scan.Unparseable(why)
+    monkeypatch.setattr(scan, "_bash_n", bash_n)
+    monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
+
+
+@pytest.mark.parametrize("root, at", [
+    (Node(children=[Node(), Node("ERROR", at=(0, 4), text=b" 'unclosed")]), "1:6"),
+    (Node(children=[Node("ERROR", at=(0, 0), text=b"case x in")]), "1:1"),
+    (Node(children=[Node(children=[Node("MISSING", at=(1, 11), type=")")]), Node("ERROR")]), "2:12"),
 ])
-def test_a_tree_sitter_error_or_missing_node_is_a_refusal(monkeypatch, root, found):
+def test_tree_sitter_adds_the_column_to_a_refusal_below_shfmt(monkeypatch, root, at):
     fake_ts(monkeypatch, root)
+    refuse(monkeypatch)
     with pytest.raises(scan.Unparseable) as e:
         scan.check("x")
-    assert (e.value.rung, str(e.value)) == ("tree-sitter-bash", found)
+    assert (e.value.rung, str(e.value)) == ("bash -n", f"line 1: unexpected EOF, at {at} per tree-sitter-bash")
 
 
-def test_a_tree_sitter_tree_with_no_error_reads(monkeypatch):
-    fake_ts(monkeypatch, Node(children=[Node()]))
-    assert scan.parse("echo 'unclosed")[0] == "tree-sitter-bash"
-    assert scan.Scan("rm -rf x").rung == "awk"               # only shfmt's tree maps to words
+def test_tree_sitter_never_decides(monkeypatch):
+    fake_ts(monkeypatch, Node(children=[Node("ERROR", at=(0, 0), text=b"x")]))
+    monkeypatch.setattr(scan, "RUNGS", ("awk",))
+    assert scan.parse("echo ok") == ("awk", None)            # an ERROR node, and the text still reads
 
 
-def test_a_crashing_tree_sitter_passes_the_text_down(monkeypatch):
-    def boom(self, b):
-        raise RuntimeError("boom")
-    monkeypatch.setattr(scan, "_ts_parser", lambda: type("P", (), {"parse": boom})())
-    monkeypatch.setattr(scan, "RUNGS", ("pip", "awk"))
-    assert scan.parse("echo ok") == ("awk", None)
-
-
-def fake_bashlex(monkeypatch, raises):
-    """A bashlex module whose parse raises `raises` (an instance, or None to read)."""
-    import types
-    errors, tokenizer = types.SimpleNamespace(), types.SimpleNamespace()
-
-    class ParsingError(Exception):
-        def __init__(self, message, s, position):
-            super().__init__(message)
-            self.message, self.s, self.position = message, s, position
-    errors.ParsingError = ParsingError
-    tokenizer.MatchedPairError = type("MatchedPairError", (ParsingError,), {})
-
-    def parse(text):
-        if raises:
-            raise raises(errors, tokenizer, text)
-    monkeypatch.setattr(scan, "_bashlex_mod", lambda: types.SimpleNamespace(parse=parse, errors=errors,
-                                                                            tokenizer=tokenizer))
-    monkeypatch.setattr(scan, "_ts_parser", lambda: None)
-    monkeypatch.setattr(scan, "RUNGS", ("pip", "awk"))
-
-
-@pytest.mark.parametrize("raises, found", [
-    (lambda e, t, s: t.MatchedPairError("unexpected EOF while looking for matching \"'\"", s, 5),
-     "1:6: unexpected EOF while looking for matching \"'\""),
-    (lambda e, t, s: e.ParsingError("unexpected EOF", s, 20), "2:7: unexpected EOF"),
+@pytest.mark.parametrize("parser", [
+    None,                                                    # not installed
+    type("P", (), {"parse": lambda self, b: 1 / 0})(),        # crashes
+    type("P", (), {"parse": lambda self, b: type("T", (), {"root_node": Node()})()})(),  # a clean tree
 ])
-def test_bashlex_refuses_an_open_pair_or_an_early_end(monkeypatch, raises, found):
-    fake_bashlex(monkeypatch, raises)
+def test_with_no_column_the_refusal_stands_as_its_rung_wrote_it(monkeypatch, parser):
+    monkeypatch.setattr(scan, "_ts_parser", lambda: parser)
+    refuse(monkeypatch)
     with pytest.raises(scan.Unparseable) as e:
-        scan.check("if true; then\necho x")
-    assert (e.value.rung, str(e.value)) == ("bashlex", found)
-
-
-@pytest.mark.parametrize("raises", [
-    lambda e, t, s: e.ParsingError("unexpected token '-f'", s, 3),             # [[ -f x ]]
-    lambda e, t, s: e.ParsingError("here-document at line 0 delimited by end-of-file", s, 22),
-    lambda e, t, s: NotImplementedError("arithmetic expansion"),
-    lambda e, t, s: RuntimeError("boom"),
-])
-def test_bashlex_passes_down_what_it_cannot_say(monkeypatch, raises):
-    fake_bashlex(monkeypatch, raises)
-    assert scan.parse("[[ -f x ]] && echo y") == ("awk", None)
-
-
-def test_bashlex_reads_after_tree_sitter_is_missing(monkeypatch):
-    fake_bashlex(monkeypatch, None)
-    assert scan.parse("echo ok") == ("bashlex", True)
-
-
-def test_with_no_pip_parser_the_pip_rung_passes_the_text_down(monkeypatch):
-    monkeypatch.setattr(scan, "_ts_parser", lambda: None)
-    monkeypatch.setattr(scan, "_bashlex_mod", lambda: None)
-    monkeypatch.setattr(scan, "RUNGS", ("pip", "awk"))
-    assert scan.parse("rm -rf x") == ("awk", None)
+        scan.check("x")
+    assert (e.value.rung, str(e.value)) == ("bash -n", "line 1: unexpected EOF")
 
 
 def feature_commands(files=None):

@@ -87,7 +87,35 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - The awk rung refuses only a quote left open at the end, read by the lexer's own rules after heredoc bodies are stripped Undo: drop _awk's raise in scan.py ([#74](https://github.com/mark-brannan/languette/pull/74))
 
 ### 20261007t193847z
-- A tree-sitter MISSING node is a refusal, like an ERROR node Undo: drop 'or n.is_missing' in scan._ts_error ([#75](https://github.com/mark-brannan/languette/pull/75))
+- A tree-sitter MISSING node gives a column, like an ERROR node Undo: drop 'or n.is_missing' in scan._ts_error ([#75](https://github.com/mark-brannan/languette/pull/75))
 
 ### 20261007t193848z
-- A tree-sitter crash or failed import passes the text down the ladder, as a crashed shfmt does Undo: raise in scan._tree_sitter's except ([#75](https://github.com/mark-brannan/languette/pull/75))
+- A tree-sitter crash or failed import adds no column; the refusal stands as its rung wrote it Undo: raise in scan._tree_sitter's except ([#75](https://github.com/mark-brannan/languette/pull/75))
+
+### 20261007t232120z
+- tree-sitter's in-process parse has no timeout, unlike shfmt and bash -n; it runs only on text a rung already refused. Measured: 0.4 s for 200,000 commands and 3 ms for 3,000 nested substitutions Undo: pass a progress_callback to parser.parse in scan._tree_sitter that stops it after a deadline ([#75](https://github.com/mark-brannan/languette/pull/75))
+
+### 20261008t000000z
+- The column reads `<rung's message>, at L:C per tree-sitter-bash`, after the deciding rung's own words, which keep bash's line Undo: reformat in scan.parse ([#75](https://github.com/mark-brannan/languette/pull/75))
+### 20261007t214340z
+- Facts the payload and env carry stay plain arguments to check, not Needs; only facts that need I/O are asked for. Undo: add an env Need kind answered in run.py and route guards' env reads through it ([#81](https://github.com/mark-brannan/languette/pull/81))
+
+### 20261007t223657z
+- A tool result the click parser does not recognise as a refusal counts as a call that ran, so its click stays spent; only a declined prompt, a hook error, the classifier or a languette guard's deny gives it back. Undo: widen the refusal pattern in languette/world.py, or treat every error other than 'Exit code N' as never ran ([#81](https://github.com/mark-brannan/languette/pull/81))
+- A payload without tool_use_id spends its click for good, as before this PR, rather than matching the call by its command in the transcript. Undo: find the call as the latest unanswered Bash tool_use whose command matches the payload's ([#81](https://github.com/mark-brannan/languette/pull/81))
+
+### 20261007t232027z
+- Smoke job pins bashlex 0.18, tree-sitter 0.26.0, tree-sitter-bash 0.25.1, the versions measured green Undo: drop the ==version pins in ci.yml's smoke job ([#73](https://github.com/mark-brannan/languette/pull/73))
+
+### 20261008t003728z
+- Redaction keeps the command and guards' reasons whole and masks only secret-looking values (credential-named variables and flags, URL passwords, token shapes, long random strings); raw mode masks nothing Undo: edit SECRETS in languette/record.py (mark-brannan/languette#82)
+- Records live at $XDG_STATE_HOME/languette/decisions.jsonl, rotated at 8 MiB keeping one .1 Undo: change RECORDS/RECORDS_MAX in languette/world.py (mark-brannan/languette#82)
+- Two opt-in booleans, record_decisions and record_raw_commands, as plugin options Undo: rename the keys in plugin.json and record.py (mark-brannan/languette#82)
+
+### 20261008t011048z
+- gitleaks' finding on the synthetic curl -u fixture is ignored by fingerprint in .gitleaksignore, not removed by rewriting the branch Undo: delete .gitleaksignore (once squash-merged, main never holds the commit it names) (mark-brannan/languette#89)
+
+### 20261008t011533z
+- A refspec $NAME is read as the literal export NAME=lit set; declare, typeset and local turn resolution off for the line Undo: widen _Literals in guard_bypass_ruleset.py ([#91](https://github.com/mark-brannan/languette/pull/91))
+- NAME=lit; git push (a ; not &&) is trusted though a readonly NAME inherited from the shell would make the set fail; shell-set names are excluded Undo: require && between the set and the push ([#91](https://github.com/mark-brannan/languette/pull/91))
+- A . in command position or any shell keyword on the line turns literal resolution off, stricter than needed Undo: narrow _RESERVED in guard_bypass_ruleset.py ([#91](https://github.com/mark-brannan/languette/pull/91))

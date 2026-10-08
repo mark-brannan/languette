@@ -77,6 +77,44 @@ Feature: guard-bypass-ruleset
       | git push git@gitlab.com:o/r.git main      | not on github.com                         |
       | echo git push origin main                 | text, not a push                          |
       | gh pr merge 5 --squash --auto             | a merge that waits for the rules          |
+      | gh api repos/$R/pulls/5                   | a run-time path under a literal api       |
+      | gh api -X POST repos/o/r/issues           | a method value is not a subcommand        |
+      | gh pr checks 5 -R $R                      | a run-time repo beside a literal pr       |
+      | gh issue $verb 5                          | a run-time word under issue, not pr       |
+      | gh -R o/r api repos/$R/pulls/5            | a literal repo before a literal api       |
+
+  Scenario Outline: a variable set to a literal earlier in the line is read as that literal
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                                                  | verdict                                   | note                                  |
+      | B=claude/x && git push -q origin HEAD:$B                 | is silent                                 | set, then &&                          |
+      | B=claude/x; git push origin "HEAD:$B"                    | is silent                                 | set, then ;                           |
+      | export B=claude/x; git push origin HEAD:${B}             | is silent                                 | exported, read in braces              |
+      | B=main; git push origin HEAD:$B                          | denies, naming "requires a pull request"  | main through a variable               |
+      | B=main && git push -u origin +HEAD:"$B"                  | denies, naming "requires a pull request"  | the same, forced                      |
+      | B=claude/x; B=$(gh pr view 32 --json headRefName -q .headRefName); git push origin HEAD:$B | asks | set again at run time |
+      | (B=claude/x); git push origin HEAD:$B                    | asks                                      | set in a subshell                     |
+      | B=claude/x \| cat; git push origin HEAD:$B               | asks                                      | set in a pipeline                     |
+      | false && B=claude/x; git push origin HEAD:$B             | asks                                      | the set may not run                   |
+      | B=claude/x git push origin HEAD:$B                       | asks                                      | a prefix set, read before it applies  |
+      | B=claude/x; eval "$c"; git push origin HEAD:$B           | asks                                      | eval may set it again                 |
+      | B=claude/x; git push origin HEAD:$B$C                    | asks                                      | a second run-time part                |
+      | B=claude/x; git push origin HEAD:$'B'                    | asks                                      | ANSI quoting, not a variable          |
+      | B=--all; git push origin $B                              | asks                                      | an option, not a refspec              |
+      | B=--mirror && git push origin $B                         | asks                                      | the same, --mirror                    |
+      | B=claude/x:main; git push origin $B                      | denies, naming "requires a pull request"  | a whole refspec, landing on main      |
+      | B=claude/x\ HEAD:main; git push origin HEAD:$B           | asks                                      | splits into a second refspec, on main |
+      | B=claude/x\ main && git push origin $B                   | asks                                      | the same, a bare second branch        |
+
+  Scenario: a variable set on an earlier line is read as that literal
+    When the agent runs:
+      """
+      B=main
+      git push origin HEAD:$B
+      """
+    Then the guard denies, naming "requires a pull request"
 
   Scenario Outline: on main itself, the branch's own push lands on main
     Given a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
@@ -142,6 +180,10 @@ Feature: guard-bypass-ruleset
       | git -c url.https://github.com/o/r.insteadOf=foo push foo main | a URL rewrite |
       | gh pr merge 5 "$flags"            | a flag built at run time              |
       | gh $p merge 5                     | a gh subcommand built at run time     |
+      | gh pr $v 5                        | a pr subcommand built at run time     |
+      | gh -R o/r $p merge 5              | a run-time group behind a repo flag   |
+      | gh --repo o/r pr $v 5             | a run-time verb behind a repo flag    |
+      | gh -R $R api x                    | a run-time repo value may split into a group |
       | export GIT_DIR=/x; git push origin main | another repository, exported       |
 
   Scenario Outline: a cd the shell may undo before the push asks

@@ -22,7 +22,8 @@ GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-ba
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"guard_worktrees"}
 # Options that are not a guard's on/off toggle: name -> type.
-OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string"}
+OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string",
+                 "record_decisions": "boolean", "record_raw_commands": "boolean"}
 # Per-rule switches inside one guard: boolean, on by default.
 RULE_OPTIONS = {f"guard_git_work_loss_{r}" for r in ("blanket_staging", "stash", "force_push", "discard", "branch_delete")} | {
     "guard_worktrees_checkout_home", "guard_worktrees_foreign"}
@@ -147,7 +148,7 @@ def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():
             and opt.get("description"), f"userConfig.{key}: want a titled, described boolean defaulting to {str(want).lower()}"
 
 
-# The parser ladder's pip rung (docs/decisions.md, "Runtime dependencies"):
+# The parser ladder's pip parsers (docs/decisions.md, "Runtime dependencies"):
 # optional, and imported only by scan.py, which reads on without them.
 LADDER = {"languette/scan.py": {"tree_sitter", "tree_sitter_bash", "bashlex"}}
 
@@ -159,6 +160,30 @@ def test_languette_imports_only_the_standard_library():
                      [node.module] if isinstance(node, ast.ImportFrom) and node.level == 0 else [])
            if n.split(".")[0] not in sys.stdlib_module_names | {"languette"}
            | LADDER.get(str(f.relative_to(ROOT)), set())]
+    assert_that(bad, empty())
+
+
+def _generators(tree):
+    return {f.name for f in tree.body if isinstance(f, ast.FunctionDef)
+            and any(isinstance(n, (ast.Yield, ast.YieldFrom)) for n in ast.walk(f))}
+
+
+def test_every_call_to_a_guard_generator_is_a_yield_from():
+    # A call without it hands the caller a generator object, truthy, in place of the
+    # answer, and nothing else fails: the ports' likeliest bug (#79).
+    files = sorted((ROOT / "languette" / "guards").glob("*.py"))
+    trees = {f.stem: ast.parse(f.read_text()) for f in files}
+    gens = {m: _generators(t) for m, t in trees.items()}
+    bad = []
+    for m, tree in trees.items():
+        mine = set(gens[m])
+        for node in tree.body:
+            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("languette.guards."):
+                mine |= {a.asname or a.name for a in node.names if a.name in gens.get(node.module.rsplit(".", 1)[1], ())}
+        wrapped = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.YieldFrom)}
+        bad += [f"{m}.py:{n.lineno}: {n.func.id}(...)" for n in ast.walk(tree)
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in mine
+                and id(n) not in wrapped]
     assert_that(bad, empty())
 
 
