@@ -57,20 +57,20 @@ Each guard checks for one kind of hazard:
 - [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
   `stash pop`, force-push, `reset --hard` and other moves that throw work away
 - [`guard-git-stacked-base`](features/guard-git-stacked-base.feature): deleting a
-  remote branch an open PR is based on (GitHub silently closes the PR)
+  remote branch an open PR is based on (GitHub closes the PR)
 - [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push to
   a branch GitHub says requires a pull request, or `gh pr merge --admin`; the
   agent holds your credentials, so it holds your bypass
 - [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub issue create, transfer
   or delete in one human turn, or any inside a loop
 - [`guard-private-terms`](#settings-for-guard-private-terms): a term from your
-  private list, posted to a public repo (off until you give it the list)
+  private list, posted to a public repo (off until it has the list)
 - [`guard-worktrees`](features/guard-worktrees-checkout-home.feature): opt-in; a branch switch in a `$HOME`
   that is a worktree, or a [reach into another session's worktree](features/guard-worktrees-foreign.feature)
-- [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): applying a
-  label that waives a CI gate, such as `churn-ok`
+- [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a label
+  that waives a CI gate, such as `churn-ok`
 - [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to another session: asks; in `bypassPermissions`, denies after a network read
-- [`guard-secrets`](languette/guards/guard_secrets.py): a credential
+- [`guard-secrets`](languette/guards/guard_secrets.py): a credential in the command
 - `guard-protected-paths`, `guard-database` (planned)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
@@ -304,20 +304,20 @@ to Claude Code, and every command goes through. One entry:
 
 ```
 git clone https://github.com/mark-brannan/languette && cd languette
-sudo apt install shfmt shellcheck
+sudo apt install shfmt jq shellcheck
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 python3 -m pytest                       # every scenario
+bash tests/guard-worktrees.test.sh      # and guard-private-terms: two bash suites, ~40 s
 python3 tests/readme_table.py           # regenerate the table
 shellcheck --severity=warning tests/stubs/* tests/*.test.sh   # as CI runs it
 ```
 
-Running the tests needs pytest, pytest-bdd and PyHamcrest; the hooks do not.
-
-The same run checks the shape of `hooks/hooks.json`, because
-`claude plugin validate --strict` passes a malformed one. The headless smoke
-test, which installs the plugin in a scratch project and confirms a recursive
-`rm` is really blocked, stays manual: it needs a model call and a login.
+The tests need pytest, pytest-bdd and PyHamcrest, the bash suites `jq`; the
+hooks need none of them. The same run checks the shape of `hooks/hooks.json`,
+because `claude plugin validate --strict` passes a malformed one. The headless
+smoke test, which installs the plugin in a scratch project and confirms a
+recursive `rm` is really blocked, stays manual: it needs a model call and a login.
 
 `features/` holds the contract as scenarios: a command in, tokens or a
 verdict out. The guards began as shell scripts copied from
