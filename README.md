@@ -67,9 +67,9 @@ Each guard checks for one kind of hazard:
   private list, posted to a public repo (off until you give it the list)
 - [`guard-worktrees`](features/guard-worktrees-checkout-home.feature): opt-in; a branch switch in a `$HOME`
   that is a worktree, or a [reach into another session's worktree](features/guard-worktrees-foreign.feature)
-- [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
-  applying a label that waives a CI gate, such as `churn-ok`
-- [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to another session after a web read
+- [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): applying a
+  label that waives a CI gate, such as `churn-ok`
+- [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to another session: asks; in `bypassPermissions`, denies after a network read
 - [`guard-secrets`](languette/guards/guard_secrets.py): a credential
 - `guard-protected-paths`, `guard-database` (planned)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
@@ -307,7 +307,7 @@ git clone https://github.com/mark-brannan/languette && cd languette
 sudo apt install shfmt shellcheck
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
-python3 -m pytest                       # every scenario, every engine
+python3 -m pytest                       # every scenario
 python3 tests/readme_table.py           # regenerate the table
 shellcheck --severity=warning tests/stubs/* tests/*.test.sh   # as CI runs it
 ```
