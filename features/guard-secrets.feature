@@ -65,6 +65,23 @@ Feature: guard-secrets
       | export API_KEY=S3cr3tPa55w0rdXy                                            | gitleaks:allow            |
       | psql postgres://app:S3cr3tPa55w0rdXy@db.example.com/app                    | URL password: gitleaks:allow |
       | curl -H "X-Api-Key: S3cr3tPa55w0rdXy" https://example.com                  | gitleaks:allow            |
+      | githubToken=Zq9kLm2pQ7rXv4Tn ./run                                          | camelCase key: gitleaks:allow |
+      | curl -u app:S3cr3tPa55w0rdXy https://example.com                           | user:password: gitleaks:allow |
+
+  Scenario Outline: an indented data line is read whole: indent, export and quotes set aside
+    When the agent runs:
+      """
+      cat <<'EOF' > config
+        <line>
+      EOF
+      """
+    Then the guard asks
+
+    Examples:
+      | line                            | note                  |
+      | password: Zq9kLm2pQ7rXv4Tn      | YAML: gitleaks:allow  |
+      | "password": "Zq9kLm2pQ7rXv4Tn", | JSON: gitleaks:allow  |
+      | export API_KEY=Zq9kLm2pQ7rXv4Tn | .env: gitleaks:allow  |
 
   Scenario Outline: no credential, no verdict
     When the agent runs `<command>`
@@ -82,6 +99,9 @@ Feature: guard-secrets
       | DB_PASSWORD=secret ./run                                       | too short to be judged                 |
       | export AUTH_TOKEN_FILE=/run/secrets/token                      | a path                                 |
       | docker login -u me --password-stdin < pw.txt                   | the safe way                           |
+      | sudo -u root ls                                                | -u names a user, no password           |
+      | bypass=Zq9kLm2pQ7rXv4Tn ./run                                  | ends in pass, not a key: gitleaks:allow |
+      | compass=Zq9kLm2pQ7rXv4Tn ./run                                 | ends in pass, not a key: gitleaks:allow |
       | echo done                                                      |                                        |
 
   Scenario: the project's own patterns extend the list
@@ -101,3 +121,12 @@ Feature: guard-secrets
       """
     When the agent runs `echo hello`
     Then the guard denies, naming "does not compile"
+
+  Scenario: a project pattern may not reuse a shipped rule's id
+    Given a project directory
+    And the file ".languette/secrets.json" holds:
+      """
+      {"patterns": [{"id": "github-pat", "regex": "acme_[a-z0-9]{24}"}]}
+      """
+    When the agent runs `echo hello`
+    Then the guard denies, naming "shipped rule"

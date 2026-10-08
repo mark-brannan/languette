@@ -126,3 +126,10 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - Any bashlex error that carries a position gives the column, not only an open pair or an early end; a bashlex grammar gap (`[[ ]]`, a quoted heredoc delimiter) can then point at a spot other than the rung's fault Undo: in scan._bashlex, return None unless the error is a MatchedPairError or 'unexpected EOF' ([#77](https://github.com/mark-brannan/languette/pull/77))
 - A bashlex crash, failed import, or error with no position adds no column; the refusal stands as its rung wrote it Undo: raise in scan._bashlex's except ([#77](https://github.com/mark-brannan/languette/pull/77))
 - bashlex's in-process parse has no timeout; it runs only on text a rung refused and tree-sitter left without a column. Measured, bashlex 0.18: 0.9 s for 20,000 commands (180 KB), 0 s for 3,000 nested substitutions (no column) Undo: run bashlex in a subprocess with a deadline, as bash -n runs ([#77](https://github.com/mark-brannan/languette/pull/77))
+
+### 20261008t034107z
+- guard-secrets: a context-only hit asks and a shape hit denies; the verdict layer can remap once #76 settles Undo: in guard_secrets.check, return deny for contexts too ([#97](https://github.com/mark-brannan/languette/pull/97))
+- guard-secrets: short options other than -u (-p and the rest) are not read as credentials; too many other meanings Undo: add the option to secrets._OPTS ([#97](https://github.com/mark-brannan/languette/pull/97))
+- secrets.redact masks the value, not the key: GITHUB_TOKEN=**** Undo: widen the Finding span to the whole word ([#97](https://github.com/mark-brannan/languette/pull/97))
+- guard-secrets: -u user:pass and --user user:pass are read as a credential; other short options still are not Undo: drop the _USER_OPTS branch in secrets._context ([#97](https://github.com/mark-brannan/languette/pull/97))
+- guard-secrets: a project pattern's regex is capped at 512 characters and may not reuse a shipped rule id; no backtracking bound beyond the hook's timeout Undo: drop the MAX_REGEX and _SHIPPED checks in guard_secrets._load ([#97](https://github.com/mark-brannan/languette/pull/97))

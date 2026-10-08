@@ -16,7 +16,9 @@ The project may extend the shipped list, in <project>/.languette/secrets.json
 
 No file is the shipped list alone. A file that does not parse or has another
 shape denies every Bash command until it is fixed: the guard cannot tell what
-it was meant to cover. The file is read through the runner (Need), so the
+it was meant to cover. A pattern may not reuse a shipped rule's id, and its
+regex is at most 512 characters. A project regex runs under Python's `re` with
+no time bound of its own; the hook's own timeout is the bound. The file is read through the runner (Need), so the
 guard, like the detector, is a pure function.
 """
 
@@ -30,6 +32,7 @@ from languette.verdict import Need, Refuse, ask, deny
 
 NAME = "guard-secrets"
 CONFIG = ".languette/secrets.json"
+MAX_REGEX = 512
 
 _WAY_OUT = ("Keep the value out of the command: read it from the environment (`\"$TOKEN\"`), a file "
             "(`--password-file`, `gh auth login --with-token < file`) or the tool's own credential store, so the "
@@ -54,6 +57,9 @@ def _config(payload, env):
     return None
 
 
+_SHIPPED = frozenset(r.id for r in secrets.secret_rules.RULES)
+
+
 def _load(path):
     """The project's rules, or Refuse naming what is wrong with the file."""
     try:
@@ -74,7 +80,11 @@ def _load(path):
                 raise Refuse(f"{where}.{key} must be a non-empty string")
         if p["id"] in seen:
             raise Refuse(f"{where}.id '{p['id']}' is a duplicate")
+        if p["id"] in _SHIPPED:
+            raise Refuse(f"{where}.id '{p['id']}' is a shipped rule's id")
         seen.add(p["id"])
+        if len(p["regex"]) > MAX_REGEX:
+            raise Refuse(f"{where}.regex is longer than {MAX_REGEX} characters")
         try:
             rx = re.compile(p["regex"])
         except re.error as e:
