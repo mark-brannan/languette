@@ -142,7 +142,7 @@ class World:
             path = os.path.join(d, RECORDS)
             line = (json.dumps(rec, separators=(",", ":")) + "\n").encode("utf-8", "surrogatepass")
             deadline = time.monotonic() + RECORDS_WAIT
-            for _ in range(3):
+            while True:
                 fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
                 try:
                     while True:
@@ -155,15 +155,18 @@ class World:
                             time.sleep(0.002)
                     st = os.fstat(fd)
                     try:
-                        if os.stat(path).st_ino != st.st_ino:
-                            continue               # rotated while we waited
+                        moved = os.stat(path).st_ino != st.st_ino   # rotated while we waited
                     except FileNotFoundError:
-                        continue                   # rotated, and the new file not made yet
+                        moved = True               # rotated, and the new file not made yet
+                    if moved:
+                        if time.monotonic() > deadline:
+                            return
+                        continue
                     if st.st_mode & 0o077:
                         os.fchmod(fd, 0o600)
                     if st.st_size + len(line) > RECORDS_MAX and st.st_size:
                         os.replace(path, path + ".1")
-                        continue
+                        continue               # to the new file, which this writer makes
                     done = 0
                     try:
                         while done < len(line):
