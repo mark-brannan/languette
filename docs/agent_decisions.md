@@ -119,3 +119,8 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - A refspec $NAME is read as the literal export NAME=lit set; declare, typeset and local turn resolution off for the line Undo: widen _Literals in guard_bypass_ruleset.py ([#91](https://github.com/mark-brannan/languette/pull/91))
 - NAME=lit; git push (a ; not &&) is trusted though a readonly NAME inherited from the shell would make the set fail; shell-set names are excluded Undo: require && between the set and the push ([#91](https://github.com/mark-brannan/languette/pull/91))
 - A . in command position or any shell keyword on the line turns literal resolution off, stricter than needed Undo: narrow _RESERVED in guard_bypass_ruleset.py ([#91](https://github.com/mark-brannan/languette/pull/91))
+
+### 20261008t012656z
+- Any bashlex error that carries a position gives the column, not only an open pair or an early end; a bashlex grammar gap (`[[ ]]`, a quoted heredoc delimiter) can then point at a spot other than the rung's fault Undo: in scan._bashlex, return None unless the error is a MatchedPairError or 'unexpected EOF' ([#77](https://github.com/mark-brannan/languette/pull/77))
+- A bashlex crash, failed import, or error with no position adds no column; the refusal stands as its rung wrote it Undo: raise in scan._bashlex's except ([#77](https://github.com/mark-brannan/languette/pull/77))
+- bashlex's in-process parse has no timeout; it runs only on text a rung refused and tree-sitter left without a column. Measured, bashlex 0.18: 0.9 s for 20,000 commands (180 KB), 0 s for 3,000 nested substitutions (no column) Undo: run bashlex in a subprocess with a deadline, as bash -n runs ([#77](https://github.com/mark-brannan/languette/pull/77))
