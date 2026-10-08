@@ -130,3 +130,12 @@ Feature: guard-secrets
       """
     When the agent runs `echo hello`
     Then the guard denies, naming "shipped rule"
+
+  Scenario: a project pattern that can backtrack for minutes is refused
+    Given a project directory
+    And the file ".languette/secrets.json" holds:
+      """
+      {"patterns": [{"id": "slow", "regex": "(a+)+$"}]}
+      """
+    When the agent runs `echo hello`
+    Then the guard denies, naming "nests one unbounded repeat"

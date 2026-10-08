@@ -142,3 +142,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - guard-secrets: a project pattern's regex is capped at 512 characters and may not reuse a shipped rule id; no backtracking bound beyond the hook's timeout Undo: drop the MAX_REGEX and _SHIPPED checks in guard_secrets._load ([#97](https://github.com/mark-brannan/languette/pull/97))
 ### 20261008t024021z
 - A failed parser run (RunFailed: timeout, signal, OS) gets no pip-parser column; the column belongs to a refusal of the text, and a retry message with one reads as a syntax fault Undo: drop the isinstance(e, RunFailed) test in scan.parse ([#93](https://github.com/mark-brannan/languette/pull/93))
+
+### 20261008t053753z
+- A project secret pattern that nests one unbounded repeat inside another is refused, read from the stdlib regex parser (re._parser, sre_parse before 3.11); a time budget was not added, Solace's choice. Undo: delete _nested_repeat and its check in guard_secrets._load ([#97](https://github.com/mark-brannan/languette/pull/97))

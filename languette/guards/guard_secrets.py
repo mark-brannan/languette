@@ -21,6 +21,8 @@ regex is at most 512 characters. A project regex runs under Python's `re` with
 no time bound of its own: a pattern that backtracks for long holds the hook
 until Claude Code's own timeout (600 s by default), and a timed-out hook does
 not block the call, so a slow project pattern fails OPEN, not closed. The
+classic shape, one unbounded repeat inside another (`(a+)+`), is refused; that
+is a check for the known hazard, not a proof the pattern is fast. The
 file is read through the runner (Need), so the guard, like the detector, is a
 pure function.
 """
@@ -28,6 +30,11 @@ pure function.
 import json
 import os
 import re
+
+try:
+    from re import _parser as _sre          # 3.11+
+except ImportError:                          # pragma: no cover -- 3.10 and before
+    import sre_parse as _sre
 
 from languette import scan as sw
 from languette import secrets
@@ -40,6 +47,34 @@ MAX_REGEX = 512
 _WAY_OUT = ("Keep the value out of the command: read it from the environment (`\"$TOKEN\"`), a file "
             "(`--password-file`, `gh auth login --with-token < file`) or the tool's own credential store, so the "
             "secret is not in the transcript or in what the command writes.")
+
+
+def _nested_repeat(pattern):
+    """Does pattern put an unbounded repeat inside another? `(a+)+`, `(a*)*`,
+    `(\\w+\\s?)+` are the shapes that backtrack for minutes on the wrong input.
+    Read from the stdlib's own parse of the pattern (a private module, so a
+    parse that fails here is no finding: re.compile judges the pattern)."""
+    def walk(items, inside):
+        for op, av in items:
+            if op in (_sre.MAX_REPEAT, _sre.MIN_REPEAT):
+                lo, hi, sub = av
+                unbounded = hi == _sre.MAXREPEAT
+                if (unbounded and inside) or walk(sub, inside or unbounded):
+                    return True
+            elif op == _sre.SUBPATTERN:
+                if walk(av[-1], inside):
+                    return True
+            elif op == _sre.BRANCH:
+                if any(walk(b, inside) for b in av[1]):
+                    return True
+            elif op in (_sre.ASSERT, _sre.ASSERT_NOT):
+                if walk(av[1], inside):
+                    return True
+        return False
+    try:
+        return walk(_sre.parse(pattern), False)
+    except Exception:  # noqa: BLE001 -- the parser's own refusal is re.compile's to report
+        return False
 
 
 def _config(payload, env):
@@ -92,6 +127,8 @@ def _load(path):
             rx = re.compile(p["regex"])
         except re.error as e:
             raise Refuse(f"{where}.regex does not compile ({e})")
+        if _nested_repeat(p["regex"]):
+            raise Refuse(f"{where}.regex nests one unbounded repeat inside another, which can backtrack for minutes")
         ent = p.get("entropy", 0.0)
         if not isinstance(ent, (int, float)) or isinstance(ent, bool) or ent < 0:
             raise Refuse(f"{where}.entropy must be a number >= 0")
