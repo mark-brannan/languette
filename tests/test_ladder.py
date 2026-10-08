@@ -19,7 +19,8 @@ needs_shfmt = pytest.mark.skipif(not REAL and not os.environ.get("CI"), reason="
 @pytest.fixture(autouse=True)
 def fresh():
     def clear():                               # a test may have patched one out
-        for f in (scan.shfmt, scan._shfmt_tree, scan._bash_n, scan._ts_parser, scan._tree_sitter):
+        for f in (scan.shfmt, scan._shfmt_tree, scan._bash_n, scan._ts_parser, scan._tree_sitter, scan._bashlex_mod,
+                  scan._bashlex):
             getattr(f, "cache_clear", lambda: None)()
     clear()
     yield
@@ -212,6 +213,7 @@ def test_tree_sitter_never_decides(monkeypatch):
 ])
 def test_with_no_column_the_refusal_stands_as_its_rung_wrote_it(monkeypatch, parser):
     monkeypatch.setattr(scan, "_ts_parser", lambda: parser)
+    monkeypatch.setattr(scan, "_bashlex_mod", lambda: None)
     refuse(monkeypatch)
     with pytest.raises(scan.Unparseable) as e:
         scan.check("x")
@@ -227,6 +229,72 @@ def test_a_failed_run_gets_no_column(monkeypatch):
     with pytest.raises(scan.RunFailed) as e:
         scan.check("x")
     assert str(e.value) == "bash took over 0.2 s; a busy machine can cause this, so retry"
+
+
+def fake_bashlex(monkeypatch, raises):
+    """A bashlex whose parse raises raises(text), or reads clean when raises is None."""
+    class ParsingError(Exception):
+        def __init__(self, message, s, position):
+            super().__init__(message)
+            self.message, self.s, self.position = message, s, position
+
+    def parse(text):
+        if raises:
+            raise raises(ParsingError, text)
+    monkeypatch.setattr(scan, "_bashlex_mod", lambda: type("M", (), {"parse": staticmethod(parse)}))
+
+
+@pytest.mark.parametrize("raises, at", [
+    (lambda E, s: E("unexpected EOF while looking for matching \"'\"", s, len(s)), "2:7"),
+    (lambda E, s: E("unexpected token '('", s, 3), "1:4"),
+    (lambda E, s: E("past the end", s, 99), "2:7"),
+])
+def test_bashlex_adds_the_column_when_tree_sitter_gives_none(monkeypatch, raises, at):
+    monkeypatch.setattr(scan, "_ts_parser", lambda: None)
+    fake_bashlex(monkeypatch, raises)
+    refuse(monkeypatch)
+    with pytest.raises(scan.Unparseable) as e:
+        scan.check("if true; then\necho x")
+    assert (e.value.rung, str(e.value)) == ("bash -n", f"line 1: unexpected EOF, at {at} per bashlex")
+
+
+def test_tree_sitter_answers_before_bashlex(monkeypatch):
+    fake_ts(monkeypatch, Node(children=[Node("ERROR", at=(0, 4), text=b" 'x")]))
+    fake_bashlex(monkeypatch, lambda E, s: E("unexpected EOF", s, 0))
+    refuse(monkeypatch)
+    with pytest.raises(scan.Unparseable) as e:
+        scan.check("x")
+    assert str(e.value).endswith(", at 1:6 per tree-sitter-bash")
+
+
+def test_bashlex_never_decides(monkeypatch):
+    fake_bashlex(monkeypatch, lambda E, s: E("unexpected token '-f'", s, 3))
+    monkeypatch.setattr(scan, "RUNGS", ("awk",))
+    assert scan.parse("[[ -f x ]] && echo y") == ("awk", None)
+
+
+@pytest.mark.parametrize("raises", [
+    None,                                                    # a clean parse
+    lambda E, s: NotImplementedError("arithmetic expansion"),  # unsupported: no position
+    lambda E, s: 1 / 0,                                      # crashes
+    lambda E, s: E("unexpected EOF", s, None),               # a position that is not one
+])
+def test_with_no_bashlex_column_the_refusal_stands(monkeypatch, raises):
+    monkeypatch.setattr(scan, "_ts_parser", lambda: None)
+    fake_bashlex(monkeypatch, raises)
+    refuse(monkeypatch)
+    with pytest.raises(scan.Unparseable) as e:
+        scan.check("x")
+    assert (e.value.rung, str(e.value)) == ("bash -n", "line 1: unexpected EOF")
+
+
+def test_with_no_bashlex_package_the_refusal_stands(monkeypatch):
+    monkeypatch.setattr(scan, "_ts_parser", lambda: None)
+    monkeypatch.setattr(scan, "_bashlex_mod", lambda: None)
+    refuse(monkeypatch)
+    with pytest.raises(scan.Unparseable) as e:
+        scan.check("x")
+    assert str(e.value) == "line 1: unexpected EOF"
 
 
 def feature_commands(files=None):

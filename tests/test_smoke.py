@@ -32,15 +32,14 @@ BAD = "echo 'unclosed"
 GOOD = "echo ok"
 
 # id -> (tools besides python3, env var naming the python3 to use, the rung the
-# deny names, the pip parser that adds its column, xfail reason). A pip parser
+# deny names, the column a pip parser adds to it, xfail reason). A pip parser
 # never decides (docs/decisions.md, "Parse check"): the rung below shfmt does.
 ENVS = {
     "shfmt": (("shfmt", "bash"), None, "shfmt", None, None),
     "bash -n": (("bash",), None, "bash -n", None, None),
     "lexer only": ((), None, "(?:awk|lexer)", None, None),
-    "bashlex": ((), "LANGUETTE_SMOKE_BASHLEX_PY", "(?:awk|lexer)", "bashlex",
-                "bashlex is installed and never asked for the column (#77)"),
-    "tree-sitter-bash": ((), "LANGUETTE_SMOKE_TREESITTER_PY", "(?:awk|lexer)", "tree-sitter-bash", None),
+    "bashlex": ((), "LANGUETTE_SMOKE_BASHLEX_PY", "(?:awk|lexer)", "1:15 per bashlex", None),
+    "tree-sitter-bash": ((), "LANGUETTE_SMOKE_TREESITTER_PY", "(?:awk|lexer)", "1:6 per tree-sitter-bash", None),
 }
 
 # The pip rows' venvs, proven outside the xfail: a strict xfail swallows any
@@ -113,7 +112,7 @@ def test_bad_command_is_denied_naming_its_parser(env, tmp_path):
     reason = hso["permissionDecisionReason"]
     assert re.search(r"\(" + rung + r"[: ]", reason), f"the deny does not name {rung!r} as its reader: {reason}"
     if column:
-        assert re.search(r"at 1:6 per " + column, reason), f"the deny has no column from {column}: {reason}"
+        assert f", at {column})" in reason, f"the deny has no column {column!r}: {reason}"
 
 
 @pytest.mark.parametrize("env", list(ENVS))

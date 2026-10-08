@@ -129,6 +129,10 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 ### 20261008t021218z
 - The nesting limit is 10,000 weight (~450 ms of shfmt at 0.25 CPU, 4x under its 2 s timeout); the length limit is 64 KB Undo: raise WEIGHT_MAX in scan.py ([#93](https://github.com/mark-brannan/languette/pull/93))
 - A nested text over the limit raises through Scan like RunFailed, never falls to awk Undo: let Scan catch TooBig and fall to awk ([#93](https://github.com/mark-brannan/languette/pull/93))
+### 20261008t012656z
+- Any bashlex error that carries a position gives the column, not only an open pair or an early end; a bashlex grammar gap (`[[ ]]`, a quoted heredoc delimiter) can then point at a spot other than the rung's fault Undo: in scan._bashlex, return None unless the error is a MatchedPairError or 'unexpected EOF' ([#77](https://github.com/mark-brannan/languette/pull/77))
+- A bashlex crash, failed import, or error with no position adds no column; the refusal stands as its rung wrote it Undo: raise in scan._bashlex's except ([#77](https://github.com/mark-brannan/languette/pull/77))
+- bashlex's in-process parse has no timeout; it runs only on text a rung refused and tree-sitter left without a column. Measured, bashlex 0.18: 0.9 s for 20,000 commands (180 KB), 0 s for 3,000 nested substitutions (no column) Undo: run bashlex in a subprocess with a deadline, as bash -n runs ([#77](https://github.com/mark-brannan/languette/pull/77))
 
 ### 20261008t024021z
 - A failed parser run (RunFailed: timeout, signal, OS) gets no pip-parser column; the column belongs to a refusal of the text, and a retry message with one reads as a syntax fault Undo: drop the isinstance(e, RunFailed) test in scan.parse ([#93](https://github.com/mark-brannan/languette/pull/93))
