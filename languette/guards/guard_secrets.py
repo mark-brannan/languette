@@ -18,8 +18,11 @@ No file is the shipped list alone. A file that does not parse or has another
 shape denies every Bash command until it is fixed: the guard cannot tell what
 it was meant to cover. A pattern may not reuse a shipped rule's id, and its
 regex is at most 512 characters. A project regex runs under Python's `re` with
-no time bound of its own; the hook's own timeout is the bound. The file is read through the runner (Need), so the
-guard, like the detector, is a pure function.
+no time bound of its own: a pattern that backtracks for long holds the hook
+until Claude Code's own timeout (600 s by default), and a timed-out hook does
+not block the call, so a slow project pattern fails OPEN, not closed. The
+file is read through the runner (Need), so the guard, like the detector, is a
+pure function.
 """
 
 import json
