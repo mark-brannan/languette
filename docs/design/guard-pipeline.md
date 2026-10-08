@@ -2,6 +2,7 @@
 
 The design behind epic #76. Present tense is the aim, not today's code;
 the ruling is in [decisions.md](../decisions.md).
+
 ## Purpose
 
 A guard's judgement is easy to read, test and trust only if it cannot touch
