@@ -45,6 +45,10 @@ _GH = re.compile(r"(?:^|/)gh\Z")
 # gh issue and gh pr subcommands that only write; every other one reads.
 _GH_WRITES = frozenset("create new edit close reopen delete transfer comment merge review ready lock unlock pin "
                        "unpin develop".split())
+# Other gh subcommands whose named verbs show what others wrote: a run's log
+# echoes PR text, a release or gist its body, a repo its README.
+_GH_VIEWS = {"run": ("view", "download"), "release": ("view", "download"), "gist": ("view",),
+             "repo": ("view",), "workflow": ("view",)}
 _API_METHOD = re.compile(r"(?:-X|--method=?)(.*)")
 _API_FIELDS = frozenset("-f -F --field --raw-field --input".split())
 _API_FIELDS_GLUED = ("-f", "-F", "--field=", "--raw-field=", "--input=")
@@ -64,7 +68,7 @@ _WAY_OUT = ("Ask the user to send it themselves, or from a session that has not 
 
 
 def _gh_reads(words):
-    """Does `gh <words>` read issue, PR, search or API content?"""
+    """Does `gh <words>` read issue, PR, search or API content, or view a run, release, gist, repo or workflow?"""
     i = 0
     while i < len(words) and words[i].startswith("-"):
         i += 2 if words[i] in ("-R", "--repo") else 1
@@ -73,10 +77,10 @@ def _gh_reads(words):
     sub, rest = words[i], words[i + 1:]
     if sub == "search":
         return True
-    if sub in ("issue", "pr"):
+    if sub in ("issue", "pr") or sub in _GH_VIEWS:
         verb = next((w for j, w in enumerate(rest) if not w.startswith("-")
                      and not (j and rest[j - 1] in ("-R", "--repo"))), None)
-        return verb not in _GH_WRITES
+        return verb not in _GH_WRITES if sub in ("issue", "pr") else verb in _GH_VIEWS[sub]
     if sub == "api":
         method = None
         for j, w in enumerate(rest):
@@ -174,13 +178,14 @@ def _teammates(text):
             for v in (m.get("name"), m.get("agentId"), m.get("agent_id")) if isinstance(v, str) and v}
 
 
-# Control characters and bidi overrides: either can make what the dialog shows
-# differ from what is sent.
-_UNSHOWN = re.compile(r"[\x00-\x1f\x7f-\x9f​-‏‪-‮⁦-⁩﻿]")
+# Control characters, invisible joiners and bidi overrides: each can make what
+# the dialog shows differ from what is sent. A backtick would end the target's
+# quoting in the dialog.
+_UNSHOWN = re.compile(r"[\x00-\x1f\x7f-\x9f\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]")
 
 
 def _shown(text):
-    text = _UNSHOWN.sub("?", text.strip())
+    text = _UNSHOWN.sub("?", text.strip()).replace("`", "'")
     return text if len(text) <= FIRST_LINE else text[:FIRST_LINE - 1].rstrip() + "…"
 
 
