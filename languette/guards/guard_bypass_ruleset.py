@@ -15,7 +15,10 @@ doors are watched:
 Both deny. The user's own terminal never reaches a hook, so the user keeps
 the bypass. When GitHub cannot answer (no gh, signed out, offline, a 10 s
 timeout, an error) or the destination cannot be read (a variable refspec,
-GIT_DIR, a detached HEAD), the guard asks, so the user decides. GitHub's
+GIT_DIR, a detached HEAD), the guard asks, so the user decides. A refspec
+whose only run-time part is `$NAME` is read when the same command line set
+NAME to a literal earlier, where the push is sure to see it, and is judged
+as if that literal were written in its place. GitHub's
 "upgrade to Pro" answer is not a failure: a private repo on a free plan
 cannot carry rules, so there is nothing to bypass.
 
@@ -55,6 +58,18 @@ _GITHUB = re.compile(r"github\.com(?::\d+)?[:/]+([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-
 # subshell or group, a pipe (the cd ran in a subshell), `||`, a backtick, or a lone `&`.
 _UNDOES_CD = re.compile(r"[)}|`]|(?<!&)&(?!&)")
 _FALLBACK = ("main", "master")
+# A refspec's one run-time part: $NAME or ${NAME}, nothing else.
+_VAR = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
+# Text that can set a variable without naming it literally, or change what an unquoted $NAME
+# expands to: ANSI and locale quoting, arithmetic, indirection, IFS, and the builtins that take a
+# variable's name as a value.
+_SETS_BLIND = re.compile(r"\$['\"]|\(\(|\$\{!|\[\[|\bIFS\b|(?<![\w./-])(?:eval|source|read|mapfile|readarray|"
+                         r"printf|getopts|let|declare|typeset|local|readonly|unset|trap|wait|alias|builtin|"
+                         r"command|enable|exec|coproc|function|shopt|set)(?![\w./-])")
+_RESERVED = frozenset("if then else elif fi case esac for select while until do done in ! time { } [[ ]] .".split())
+# Names the shell sets on its own, or will not let a script set.
+_SPECIAL = re.compile(r"\A(?:BASH\w*|COMP\w*|HIST\w*|PWD|OLDPWD|RANDOM|SRANDOM|SECONDS|LINENO|UID|EUID|PPID|"
+                      r"GROUPS|SHELLOPTS|PIPESTATUS|FUNCNAME|DIRSTACK|EPOCH\w*|REPLY|OPT\w*|SHLVL|_)\Z")
 HEAD, ALL, IMPLICIT = object(), object(), object()
 
 ADMIN = ("guard-bypass-ruleset: `gh pr merge --admin` merges past the PR's required reviews and checks on "
@@ -65,6 +80,63 @@ ADMIN = ("guard-bypass-ruleset: `gh pr merge --admin` merges past the PR's requi
 class _Push:
     def __init__(self, prog, here, remote, dsts):
         self.prog, self.here, self.remote, self.dsts = prog, here, remote, dsts
+
+
+class _Literals:
+    """The literal values a top-level command line gives its variables, for reading a refspec
+    like `HEAD:$B` after `B=lit;`. Only a plain `NAME=lit` (or `export NAME=lit`) segment
+    binds, and only when the push is sure to see it: NAME appears nowhere else in the
+    command, nothing can set it blindly, and only `;`, newlines and `&&` lie between."""
+
+    def __init__(self, s, raw):
+        self.s, self.raw, self.bind = s, raw, {}
+        self.off = bool(_SETS_BLIND.search(raw))
+        for a, b in s.segments():
+            if a > b:
+                continue
+            c = sw.seg_cmd(s, a, b)
+            if s.w[a] in _RESERVED or (c is not None and s.w[c] in _RESERVED):
+                self.off = True
+            words = range(a + 1, b + 1) if c == a and s.w[a] == "export" else range(a, b + 1) if c is None else ()
+            if words and all(s.k[i] == "w" and sw._ASSIGN.match(s.w[i]) for i in words):
+                for i in words:
+                    name, _, val = s.w[i].partition("=")
+                    # whitespace: an unquoted $NAME splits there into more than one refspec
+                    ok = val and not s.live[i] and not _UNREADABLE.search(val) and not re.search(r"[~\s]", val)
+                    self.bind[name] = (a, val if ok else None)
+            elif c is not None and s.w[c] == "export":
+                self.off = True
+
+    def _seps(self, lo, hi):
+        """The kinds of separator between word indexes lo and hi, ";" and "&&", or None for any other."""
+        kinds = set()
+        for i in range(lo, hi):
+            if self.s.k[i] == ";":
+                op = re.sub(r"\s", "", self.s.op[i])
+                if op not in ("", ";", "&&"):
+                    return None
+                kinds.add(op or ";")
+        return kinds
+
+    def word(self, j, start):
+        """Word j, in the segment that starts at start, with its one $NAME replaced by NAME's
+        literal, or None."""
+        w = self.s.w[j]
+        m = _VAR.search(w)
+        if self.off or self.s.k[j] != "w" or w.count("$") != 1 or "`" in w or not m:
+            return None
+        name = m.group(1) or m.group(2)
+        a, val = self.bind.get(name, (None, None))
+        if val is None or a >= start or _SPECIAL.match(name):
+            return None
+        reads = len(re.findall(r"\$\{%s\}|\$%s(?![A-Za-z0-9_])" % (name, name), self.raw))
+        if len(re.findall(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % name, self.raw)) != reads + 1:
+            return None                        # NAME is set, or named, somewhere else as well
+        before, between = self._seps(0, a), self._seps(a, start)
+        if before is None or between is None or not (before <= {";"} or between <= {"&&"}):
+            return None                        # the push may run when the assignment didn't
+        r = w[:m.start()] + val + w[m.end():]
+        return None if r.startswith("-") else r  # an option (--all, --delete), not a refspec
 
 
 def _resolve(base, target, live):
@@ -92,7 +164,7 @@ def _opt(x, full):
     return len(x) > 2 and x.startswith("--") and full.startswith(x)
 
 
-def _push(s, a, b, nested, here):
+def _push(s, a, b, nested, here, lits=None):
     g = sw.cmd_index(s, a, b, _GIT, nested)
     if g is None:
         return None
@@ -164,10 +236,10 @@ def _push(s, a, b, nested, here):
         return None if tags else _Push(prog, here, remote, [IMPLICIT])
     dsts = []
     for j in pos:
-        r = s.w[j].lstrip("+")
-        if s.live[j] or _UNREADABLE.search(r):
+        r = (lits and s.live[j] and lits.word(j, a)) or s.w[j]
+        if (s.live[j] and r is s.w[j]) or _UNREADABLE.search(r):
             raise Refuse(f"the refspec `{s.w[j]}` is built at run time, so where it lands can't be read")
-        src, _, dst = r.partition(":")
+        src, _, dst = r.lstrip("+").partition(":")
         if ":" in r and not src:
             continue                           # :branch deletes
         dst = dst or src
@@ -220,6 +292,7 @@ def _walk(cmd, cwd):
     pushes, admin, refused = [], False, None
     for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
         s, here, moved = sw.Scan(text), cwd, False
+        lits = None if nested else _Literals(s, cmd)
         for a, b in s.segments():
             if a > b:
                 continue
@@ -232,7 +305,7 @@ def _walk(cmd, cwd):
             else:
                 try:
                     admin = admin or _admin_merge(s, a, b, nested)
-                    p = _push(s, a, b, nested, here)
+                    p = _push(s, a, b, nested, here, lits)
                 except Refuse as e:
                     refused = refused or e
                     continue
