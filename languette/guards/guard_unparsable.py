@@ -18,21 +18,10 @@ from languette.verdict import deny
 NAME = "guard-unparsable"
 
 
-def refusal(command):
-    """What the ladder's top rung on hand found wrong with `command`, or None
-    when it reads."""
-    try:
-        scan.check(command)
-    except scan.Unparseable as e:
-        return f"{e.rung}: {e}"
-    return None
-
-
-def check(payload, env):
-    ti = payload.get("tool_input")
-    command = ti.get("command") if isinstance(ti, dict) else None
-    if not isinstance(command, str):
-        return None
+def judge(command):
+    """The deny for `command`, or None when it reads. The ladder runs once
+    here: a timeout or a kill need not repeat, so run.py reuses this verdict
+    rather than asking the parser twice."""
     try:
         scan.check(command)
     except scan.TooBig as e:
@@ -44,3 +33,9 @@ def check(payload, env):
         return deny(f"guard-unparsable: this command does not parse ({e.rung}: {e}). Nothing ran: "
                     "bad input is a deny; fix the syntax and run it again")
     return None
+
+
+def check(payload, env):
+    ti = payload.get("tool_input")
+    command = ti.get("command") if isinstance(ti, dict) else None
+    return judge(command) if isinstance(command, str) else None

@@ -111,7 +111,7 @@ def test_a_crashing_shfmt_drops_to_awk_and_denies_nothing(tmp_path, monkeypatch,
     assert verdict("rm -rf ~")["permissionDecision"] == "deny"
 
 
-@pytest.mark.parametrize("stall, why", [("sleep 5", "shfmt took over 0.2 s"),
+@pytest.mark.parametrize("stall, why", [("exec sleep 5", "shfmt took over 0.2 s"),
                                          ("kill -9 $$", "shfmt was killed by signal 9")])
 @pytest.mark.parametrize("probe", [False, True])
 def test_a_shfmt_run_that_fails_denies_and_never_passes_down(tmp_path, monkeypatch, stall, why, probe):
@@ -126,11 +126,22 @@ def test_a_shfmt_run_that_fails_denies_and_never_passes_down(tmp_path, monkeypat
         scan.Scan("ls")
 
 
+def test_a_shfmt_that_stalls_once_still_denies_the_whole_run(tmp_path, monkeypatch):
+    """run.py reads guard-unparsable's verdict once: a second parse that
+    finishes in time must not undo the deny the first one earned."""
+    monkeypatch.setattr(scan, "SHFMT_TIMEOUT", 0.2)
+    fake_shfmt(tmp_path, monkeypatch, '[ "$1" = --version ] && echo v3.12.0 && exit 0\n'
+               f'[ -e {tmp_path}/stalled ] || {{ touch {tmp_path}/stalled; exec sleep 5; }}\n'
+               'echo \'{"Type": "File", "Stmts": []}\'\n')
+    v = verdict("ls", guard=None)
+    assert v["permissionDecision"] == "deny" and "(shfmt: shfmt took over 0.2 s" in v["permissionDecisionReason"]
+
+
 def test_a_bash_n_past_its_timeout_denies(tmp_path, monkeypatch):
     monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
     monkeypatch.setattr(scan, "BASH_TIMEOUT", 0.2)
     f = tmp_path / "bash"
-    f.write_text("#!/bin/sh\nsleep 5\n")
+    f.write_text("#!/bin/sh\nexec sleep 5\n")
     f.chmod(0o755)
     monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
     with pytest.raises(scan.Unparseable) as e:
