@@ -147,7 +147,7 @@ def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():
             and opt.get("description"), f"userConfig.{key}: want a titled, described boolean defaulting to {str(want).lower()}"
 
 
-# The parser ladder's pip rung (docs/decisions.md, "Runtime dependencies"):
+# The parser ladder's pip parsers (docs/decisions.md, "Runtime dependencies"):
 # optional, and imported only by scan.py, which reads on without them.
 LADDER = {"languette/scan.py": {"tree_sitter", "tree_sitter_bash"}}
 
