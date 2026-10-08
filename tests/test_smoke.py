@@ -31,15 +31,16 @@ from languette import scan  # noqa: E402
 BAD = "echo 'unclosed"
 GOOD = "echo ok"
 
-# id -> (tools besides python3, env var naming the python3 to use, the rung the deny names, xfail reason)
+# id -> (tools besides python3, env var naming the python3 to use, the rung the
+# deny names, the pip parser that adds its column, xfail reason). A pip parser
+# never decides (docs/decisions.md, "Parse check"): the rung below shfmt does.
 ENVS = {
-    "shfmt": (("shfmt", "bash"), None, "shfmt", None),
-    "bash -n": (("bash",), None, "bash -n", None),
-    "lexer only": ((), None, "(?:awk|lexer)", None),
-    "bashlex": ((), "LANGUETTE_SMOKE_BASHLEX_PY", "bashlex",
-                "the pip rung is an empty slot (#4): bashlex is installed and never asked"),
-    "tree-sitter-bash": ((), "LANGUETTE_SMOKE_TREESITTER_PY", "tree-sitter-bash",
-                         "the pip rung is an empty slot (#4): tree-sitter-bash is installed and never asked"),
+    "shfmt": (("shfmt", "bash"), None, "shfmt", None, None),
+    "bash -n": (("bash",), None, "bash -n", None, None),
+    "lexer only": ((), None, "(?:awk|lexer)", None, None),
+    "bashlex": ((), "LANGUETTE_SMOKE_BASHLEX_PY", "(?:awk|lexer)", "bashlex",
+                "bashlex is installed and never asked for the column (#77)"),
+    "tree-sitter-bash": ((), "LANGUETTE_SMOKE_TREESITTER_PY", "(?:awk|lexer)", "tree-sitter-bash", None),
 }
 
 # The pip rows' venvs, proven outside the xfail: a strict xfail swallows any
@@ -97,25 +98,27 @@ def run_hook(path_dir, home, command):
 
 
 def params():
-    for name, (_, _, _, xfail) in ENVS.items():
+    for name, (*_, xfail) in ENVS.items():
         marks = [pytest.mark.xfail(strict=True, reason=xfail)] if xfail else []
         yield pytest.param(name, id=name, marks=marks)
 
 
 @pytest.mark.parametrize("env", list(params()))
 def test_bad_command_is_denied_naming_its_parser(env, tmp_path):
-    tools, var, rung, _ = ENVS[env]
+    tools, var, rung, column, _ = ENVS[env]
     out = run_hook(make_path(tmp_path, tools, python_for(var)), tmp_path, BAD)
     assert out is not None, "silent: the unparsable command would have run"
     hso = out["hookSpecificOutput"]
     assert hso["permissionDecision"] == "deny", hso
     reason = hso["permissionDecisionReason"]
     assert re.search(r"\(" + rung + r"[: ]", reason), f"the deny does not name {rung!r} as its reader: {reason}"
+    if column:
+        assert re.search(r"at 1:6 per " + column, reason), f"the deny has no column from {column}: {reason}"
 
 
 @pytest.mark.parametrize("env", list(ENVS))
 def test_good_command_is_silent(env, tmp_path):
-    tools, var, _, _ = ENVS[env]
+    tools, var, *_ = ENVS[env]
     assert run_hook(make_path(tmp_path, tools, python_for(var)), tmp_path, GOOD) is None
 
 
@@ -123,7 +126,7 @@ def test_good_command_is_silent(env, tmp_path):
 def test_pip_row_has_its_parser(env, tmp_path):
     """The venv a pip row names imports its parser through the PATH's python3,
     run as the hook runs it (-I), so an xfail row is red for the ladder's reason only."""
-    tools, var, _, _ = ENVS[env]
+    tools, var, *_ = ENVS[env]
     d = make_path(tmp_path, tools, python_for(var))
     r = subprocess.run([str(d / "python3"), "-I", "-c", f"import {IMPORTS[env]}"], capture_output=True, text=True,
                        env={"PATH": str(d), "HOME": str(tmp_path)}, timeout=20)
