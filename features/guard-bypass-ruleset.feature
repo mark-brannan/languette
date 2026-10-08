@@ -193,11 +193,15 @@ Feature: guard-bypass-ruleset
 
     Examples:
       | command                                   | note                              |
-      | (cd {TMP}/g && true); git push origin main | a subshell                       |
       | { cd {TMP}/g; }; git push origin main     | a group                           |
       | cd {TMP}/g \| cat; git push origin main   | a pipeline runs the cd in a subshell |
       | cd {TMP}/g \|\| exit 1; git push origin main | the cd may have failed        |
       | pushd {TMP}/g; popd; git push origin main | a popd                            |
+
+  Scenario: a subshell's cd ends with it, so the push is read where the line started
+    Given a clone of "https://gitlab.com/o/r.git" at "{TMP}/g" on branch "main"
+    When the agent runs `(cd {TMP}/g && true); git push origin main`
+    Then the guard denies, naming "requires a pull request"
 
   # The next scenarios start on main in {TMP}/m and move to claude/topic in {TMP}/repo,
   # so each verdict says where the push was read: silent in {TMP}/repo, a deny in
@@ -251,13 +255,21 @@ Feature: guard-bypass-ruleset
 
     Examples:
       | command                                                 | note                                     |
-      | (cd {TMP}/repo && git status) && git push origin HEAD   | the cd's subshell closes                 |
       | { cd {TMP}/repo; git status; } && git push origin HEAD  | the cd's group closes                    |
       | cd {TMP}/repo \| cat; git push origin HEAD              | the cd is in the pipeline                |
       | cd {TMP}/repo & git push origin HEAD                    | the cd is backgrounded                   |
       | cd {TMP}/repo && git status & git push origin HEAD      | the cd's and-or list is backgrounded     |
       | cd {TMP}/rep* && git push origin HEAD                   | a glob                                   |
       | cd ~other/repo && git push origin HEAD                  | another user's home                      |
+      | cd '~/repo' && git push origin HEAD                     | a quoted ~ is a directory named ~        |
+
+  Scenario: a subshell's cd never lends the push its branch
+    Given HOME is "{TMP}"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
+    And the working directory is "{TMP}/m"
+    When the agent runs `(cd {TMP}/repo && git status) && git push origin HEAD`
+    Then the guard denies, naming "requires a pull request"
 
   Scenario: the answer is cached
     When the agent runs `git push origin main`
