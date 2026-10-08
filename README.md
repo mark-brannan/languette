@@ -5,15 +5,17 @@
 ![Jacques Callot, Drill with halberds (NGV 32320, public domain)](assets/callot-drill-with-halberds.jpg)
 
 Before a coding agent runs a shell command, a languette guard reads it and
-answers: allow, ask, or deny. No model decides, and nothing is run to decide.
+answers: *allow*, *ask*, or **deny**.
 
-*Languette* is French for "little tongue". On a halberd it is the strip of
-iron that runs down the shaft from the head, so a stray blow can't cut through
-the pole. These guards are that strip, between an agent's sharp tools and
-your work.
+Nothing external like a cloud/web service decides, nor any ML or AI models.
+The critical execution path is [deterministic](https://en.wikipedia.org/wiki/Deterministic_algorithm), and even uses ["pure functions"](https://en.wikipedia.org/wiki/Pure_function) where possible.
 
-It's also a pun. Shell is a little language, and languette listens for the
-few words in it that can do damage. When it hears one, it tells the agent
+*Languette* is French for "little tongue". On a halberd the languette (or 'langet')
+it is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
+the pole. These guards are that strip: protecting your work, strengthening your tools, while holding back certain agentic hazards that could ruin your day.
+
+It's also a play on words: Shell is a little language, and languette listens for the
+few words in a shell command that can do damage. When it hears one, it tells the errant agent
 "hold your tongue!"
 
 > *"The wise speak only of what they know, Gríma son of Gálmód. A witless worm have you become. Therefore be silent, and keep your forked tongue behind your teeth. I have not passed through fire and death to bandy crooked words with a serving-man till the lightning falls."*
@@ -32,9 +34,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
 It needs:
 
-- `python3`, standard library only, for every `run.py` guard (`ask-first`,
-  `guard-bypass-hooks`, `guard-bypass-labels`, `guard-infra`, `guard-recursive-delete`,
-  `guard-unparsable`);
+- `python3`, standard library only, for every `run.py` guard;
 - `jq` and a POSIX `awk`, for the shell guards, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
 - `gh`, for `guard-git-stacked-base` and `guard-bypass-ruleset`.
@@ -73,6 +73,7 @@ Each guard checks for one kind of hazard:
   that is a worktree, or a [reach into another session's worktree](features/guard-worktrees-foreign.feature)
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
   applying a label that waives a CI gate, such as `churn-ok`
+- [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to another session: asks; in `bypassPermissions`, denies after a network read
 - `guard-secrets`, `guard-protected-paths`, `guard-database` (planned)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
@@ -262,15 +263,15 @@ guard reads beyond the command, it declares:
 | `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
+| `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
 | `guard-worktrees` | `$HOME` and what `git rev-parse --show-toplevel` resolves to; git, for where each path lands, and a record per session in `$TMPDIR` |
 | `prose-budget-commit` | the staged diff and, for a commit that reaches past the index, the named working-tree files, through `prose-budget` |
 
 A guard that cannot decide denies and says what it saw. A guard that crashes
 is a deny naming the guard; the runner holds that rule, so no guard has to.
 
-The contract is written as scenarios, in the words a person uses to state the
-rule, and every scenario runs against every engine a guard has, Python and
-shell alike:
+The contract is written as "[gherkin](https://en.wikipedia.org/wiki/Cucumber_(software)#Gherkin_language)" scenarios, in the words a person uses to state the
+rule.  These are still completely deterministic tests, they're just easy for non-technical folks to read.
 
 ```gherkin
 Scenario: a target the guard cannot resolve is denied on sight

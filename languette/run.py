@@ -36,9 +36,9 @@ def _out(event, fields):
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
     from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_bypass_ruleset,
-                                  guard_disk, guard_git_stacked_base, guard_git_work_loss,
-                                  guard_github_issues, guard_host_availability, guard_infra,
-                                  guard_permissions, guard_pipe_to_shell, guard_private_terms,
+                                  guard_cross_session_send, guard_disk, guard_git_stacked_base,
+                                  guard_git_work_loss, guard_github_issues, guard_host_availability,
+                                  guard_infra, guard_permissions, guard_pipe_to_shell, guard_private_terms,
                                   guard_recursive_delete, guard_scheduled_jobs, guard_unparsable,
                                   guard_worktrees, prose_budget_commit)
     from languette import record
@@ -50,7 +50,9 @@ except Exception as e:  # noqa: BLE001
     sys.exit(0)
 
 # (hook event, tool name pattern or None for an event with no tool, guards in
-# the order they judge).
+# the order they judge). guard-cross-session-send judges SendMessage; on the
+# other events it only keeps its per-session state, and never objects.
+_SEND_STATE_TOOLS = re.compile(r"(?:WebFetch|WebSearch|Bash|Agent|mcp__.+)\Z")
 GUARDS = (
     ("PreToolUse", re.compile(r"Bash\Z"), (guard_unparsable, guard_git_work_loss, guard_recursive_delete, ask_first,
                                            guard_bypass_hooks, guard_infra, guard_bypass_labels,
@@ -61,6 +63,11 @@ GUARDS = (
     ("PreToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
     ("PreToolUse", guard_private_terms.TOOLS, (guard_private_terms,)),
     ("PreToolUse", re.compile(r"(?:Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree)\Z"), (guard_worktrees,)),
+    ("PreToolUse", re.compile(r"SendMessage\Z"), (guard_cross_session_send,)),
+    ("PostToolUse", _SEND_STATE_TOOLS, (guard_cross_session_send,)),
+    ("PostToolUseFailure", _SEND_STATE_TOOLS, (guard_cross_session_send,)),
+    ("SubagentStart", None, (guard_cross_session_send,)),
+    ("SessionStart", None, (guard_cross_session_send,)),
     # guard-github-issues' door: a human turn opens it, a write that ran spends it.
     ("UserPromptSubmit", None, (guard_github_issues,)),
     ("PostToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
@@ -124,7 +131,8 @@ def _respond(stdin_text, env, only):
     event = payload.get("hook_event_name") or "PreToolUse"
     tool = payload.get("tool_name")
     # An opt-in guard (OPT_IN names its option) runs alone by name, or with the
-    # rest only when its option is exactly "true", as hooks.json runs it.
+    # rest only when its option is exactly "true", as hooks.json runs it. An
+    # entry with no tool pattern matches an event with no tool.
     guards = [g for ev, rx, gs in GUARDS if ev == event and (rx is None or isinstance(tool, str) and rx.match(tool))
               for g in gs if only == g.NAME or (only is None and _on(g, env))]
     ti = payload.get("tool_input")
@@ -163,7 +171,7 @@ def _respond(stdin_text, env, only):
         if r.get("additionalContext"):
             notes.append(r["additionalContext"])
     judged = (world, payload, findings)
-    if event != "PreToolUse":                  # the door's bookkeeping: nothing to decide
+    if event != "PreToolUse":                  # state-keeping events: nothing to decide
         return "", judged
     if reasons:
         return _out(event, deny("\n\n".join(reasons))), judged

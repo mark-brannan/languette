@@ -38,7 +38,6 @@ claim-stamp.sh's live or stale reading when it is usable, and a one-command
 recipe for the session's own worktree.
 """
 
-import glob
 import os
 import re
 
@@ -304,8 +303,9 @@ def _foreign_words(cmd):
 
 class _Session:
     """This session's own worktrees: the cwd's toplevel, its scratchpad, and
-    the per-session record. Every failure to read or write the record leaves
-    the rule as strict as the cwd alone."""
+    the per-session record, which World keeps (the `worktree` fact). Every
+    failure to read or write the record leaves the rule as strict as the cwd
+    alone."""
 
     def __init__(self, payload, env, own_top, home):
         self.env, self.own_top, self.home = env, own_top, home
@@ -318,104 +318,39 @@ class _Session:
                 tag += "." + re.sub(r"[^A-Za-z0-9_-]", "_", aid)
             self.rec = os.path.join(env.get("TMPDIR") or "/tmp", "languette-guard-worktrees." + tag)
 
-    @staticmethod
-    def mine(f):
-        """A regular file owned by this user, not a symlink."""
-        try:
-            st = os.lstat(f)
-        except OSError:
-            return False
-        return os.path.isfile(f) and not os.path.islink(f) and st.st_uid == os.geteuid()
-
-    @staticmethod
-    def inode(top):
-        try:
-            return os.stat(os.path.join(top, ".git")).st_ino
-        except OSError:
-            return None
-
     def under_scratch(self, d):
         return bool(self.sid) and f"/{self.sid}/" in f"/{d}/"
 
     def recorded(self, top):
-        if not self.rec or not self.mine(self.rec):
+        if not self.rec:
             return False
-        ino = self.inode(top)
-        if ino is None:
-            return False
-        try:
-            with open(self.rec, encoding="utf-8") as f:
-                return f"{top}\t{ino}" in f.read().splitlines()
-        except OSError:
-            return False
+        return (yield Need("worktree", "recorded", self.rec, top))
 
-    @staticmethod
-    def write_new(f, text):
-        """Create `f` afresh, private, never following a link left at that name."""
-        try:
-            os.unlink(f)
-        except FileNotFoundError:
-            pass
-        except OSError:
-            return
-        try:
-            fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-        except OSError:
-            return
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text + "\n")
+    def leave(self, text):
+        """What the next call may adopt as its own: `enter`, or the arrivals."""
+        if self.rec:
+            yield Need("worktree", "leave", self.rec, text)
 
     def arrive(self, own_linked):
         """Record the cwd's toplevel when this call reached it by a vouched
         route; consume the arrival the previous call left, exactly once."""
         if not self.rec:
             return
-        adopt = False
-        if not os.path.lexists(self.rec):
-            try:                               # O_EXCL: two first calls racing must not truncate each other
-                os.close(os.open(self.rec, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600))
-                adopt = True
-            except OSError:
-                pass
-        if not self.mine(self.rec):
+        usable, adopt = yield Need("worktree", "arrive", self.rec, self.own_top if own_linked else "")
+        if not usable:
             self.rec = None
             return
-        arrival = self.rec + ".arrive"
-        if not adopt and own_linked and self.mine(arrival):
-            try:
-                with open(arrival, encoding="utf-8") as f:
-                    for a in f.read().splitlines():
-                        if a == "enter" or (a and (a + "/").startswith(self.own_top + "/")):
-                            adopt = True
-            except OSError:
-                pass
-        try:
-            os.unlink(arrival)
-        except OSError:
-            pass
-        if adopt and own_linked and not self.under_scratch(self.own_top) and not self.recorded(self.own_top):
-            ino = self.inode(self.own_top)
-            if ino is not None:
-                try:
-                    with open(self.rec, "a", encoding="utf-8") as f:
-                        f.write(f"{self.own_top}\t{ino}\n")
-                except OSError:
-                    pass
+        if adopt and own_linked and not self.under_scratch(self.own_top) and not (yield from self.recorded(self.own_top)):
+            yield Need("worktree", "keep", self.rec, self.own_top)
 
     def scratchpad(self):
-        if self.sid:
-            for root in (self.env.get("CLAUDE_CODE_TMPDIR") or "/nonexistent", self.env.get("TMPDIR") or "/nonexistent",
-                         os.path.join(self.env.get("HOME") or "", ".local/state/claude-tmpdir")):
-                for d in sorted(glob.glob(os.path.join(glob.escape(root), "claude-*", "*", glob.escape(self.sid),
-                                                       "scratchpad"))):
-                    if os.path.isdir(d):
-                        return d
-        return "<scratchpad>"
+        d = (yield Need("worktree", "scratchpad", self.sid)) if self.sid else None
+        return d or "<scratchpad>"
 
 
 def _recipe(sess, d):
     gcd = yield from _git("/", "-C", d, "rev-parse", "--path-format=absolute", "--git-common-dir")
-    scratch = sess.scratchpad()
+    scratch = yield from sess.scratchpad()
     return f"git --git-dir={gcd or '<git-dir>'} worktree add {scratch}/<name> && cd {scratch}/<name>"
 
 
@@ -424,8 +359,9 @@ def _claim(env, ft):
     claim-stamp.sh read; anything unclear is unknown, never stale."""
     if env.get("GITHUB_ACTIONS") or env.get("CI") or env.get("CLAUDE_CLAIM_STAMP", "on") == "off":
         return "unknown", None
-    binary = env.get("CLAIM_STAMP_BIN") or (yield Need("which", "claim-stamp.sh"))
-    if not binary or not os.access(binary, os.X_OK) or not os.path.isfile(binary):
+    # `which` on a path with a directory part answers whether it is an executable file.
+    binary = yield Need("which", env.get("CLAIM_STAMP_BIN") or "claim-stamp.sh")
+    if not binary:
         return "unknown", None
     if not (yield Need("which", "gh")):
         return "unknown", None
@@ -518,14 +454,13 @@ def _foreign(payload, env):
         return
     own_top = (yield from _git("/", "-C", pcwd, "rev-parse", "--show-toplevel")) or ""
     sess = _Session(payload, env, own_top, home)
-    sess.arrive(bool(own_top) and (yield Need("path", "isfile", os.path.join(own_top, ".git"))))
+    yield from sess.arrive(bool(own_top) and (yield Need("path", "isfile", os.path.join(own_top, ".git"))))
     ti = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
 
     if tool == "EnterWorktree":
         p = ti.get("path")
-        if not p:
-            if sess.rec:                       # a fresh worktree of the session's making: the next cwd is own
-                sess.write_new(sess.rec + ".arrive", "enter")
+        if not p:                              # a fresh worktree of the session's making: the next cwd is own
+            yield from sess.leave("enter")
             return
         recipe = yield from _recipe(sess, p)
         raise Refuse(f"{NAME}: EnterWorktree(path=...) enters a worktree that already exists, with no check on whose "
@@ -541,7 +476,7 @@ def _foreign(payload, env):
         t = yield from _git("/", "-C", d, "rev-parse", "--show-toplevel")
         if not t or t == own_top or not (yield Need("path", "isfile", os.path.join(t, ".git"))):
             return None
-        if sess.under_scratch(t) or sess.recorded(t):
+        if sess.under_scratch(t) or (yield from sess.recorded(t)):
             return None
         return t
 
@@ -589,8 +524,8 @@ def _foreign(payload, env):
         else:
             vcwd = cd_dir
     # Allowed. Leave this command's arrivals for the next call to consume.
-    if sess.rec and arrivals:
-        sess.write_new(sess.rec + ".arrive", "\n".join(arrivals))
+    if arrivals:
+        yield from sess.leave("\n".join(arrivals))
 
 
 CONTROLS = (("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME", _checkout_home),

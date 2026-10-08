@@ -7,6 +7,7 @@ Standard library only.
 """
 
 import fcntl
+import glob
 import json
 import os
 import re
@@ -22,8 +23,14 @@ SPENT = ".languette-ask"            # appended to the transcript path
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
-KINDS = frozenset("git gh-api pr-list which read path cwd clock ruleset-cache ruleset-keep claim run door".split())
+KINDS = frozenset("git gh-api pr-list which read path cwd clock ruleset-cache ruleset-keep claim worktree run door "
+                  "send-state send-keep".split())
 DOOR = "languette-guard-github-issues."   # + the session id, under $TMPDIR
+SEND_STATE = "languette-guard-cross-session-send."   # + session id, under $TMPDIR
+SEND_SUBAGENTS_MAX = 500            # names and ids kept per session; the oldest go first
+# What a failed write, or a first write that is not a session start, leaves:
+# no subagents known, the door open.
+SEND_LOST = '{"subagents": [], "read": "an unknown tool (this session\'s state was lost)"}'
 
 
 class World:
@@ -172,6 +179,111 @@ class World:
         except OSError:
             pass                               # a cache that can't be written only costs a later ask
 
+    # --- guard-worktrees' per-session record -----------------------------
+    # ${TMPDIR:-/tmp}/languette-guard-worktrees.<session>[.<agent>] lists the
+    # toplevels this session reached by a vouched route, one "<top>\t<inode of
+    # top/.git>" per line; <record>.arrive is what the previous call left for
+    # this one. Every failure to read or write leaves the guard's rule as
+    # strict as the cwd alone.
+
+    def _worktree(self, op, *args):
+        if op not in ("arrive", "recorded", "keep", "leave", "scratchpad"):
+            raise ValueError(f"no worktree fact {op!r}")
+        return getattr(self, "_wt_" + op)(*args)
+
+    @staticmethod
+    def _wt_mine(f):
+        """A regular file owned by this user, not a symlink."""
+        try:
+            st = os.lstat(f)
+        except OSError:
+            return False
+        return os.path.isfile(f) and not os.path.islink(f) and st.st_uid == os.geteuid()
+
+    @staticmethod
+    def _wt_inode(top):
+        try:
+            return os.stat(os.path.join(top, ".git")).st_ino
+        except OSError:
+            return None
+
+    def _wt_arrive(self, rec, own_top):
+        """(usable, adopt): the record is this user's; and this call reached
+        `own_top` by a vouched route (the session's first call, or an arrival
+        the previous call left: `enter`, or a path under own_top). The arrival
+        is consumed exactly once."""
+        adopt = False
+        if not os.path.lexists(rec):
+            try:                               # O_EXCL: two first calls racing must not truncate each other
+                os.close(os.open(rec, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600))
+                adopt = True
+            except OSError:
+                pass
+        if not self._wt_mine(rec):
+            return False, False
+        arrival = rec + ".arrive"
+        if not adopt and own_top and self._wt_mine(arrival):
+            try:
+                with open(arrival, encoding="utf-8") as f:
+                    for a in f.read().splitlines():
+                        if a == "enter" or (a and (a + "/").startswith(own_top + "/")):
+                            adopt = True
+            except OSError:
+                pass
+        try:
+            os.unlink(arrival)
+        except OSError:
+            pass
+        return True, adopt
+
+    def _wt_recorded(self, rec, top):
+        if not self._wt_mine(rec):
+            return False
+        ino = self._wt_inode(top)
+        if ino is None:
+            return False
+        try:
+            with open(rec, encoding="utf-8") as f:
+                return f"{top}\t{ino}" in f.read().splitlines()
+        except OSError:
+            return False
+
+    def _wt_keep(self, rec, top):
+        ino = self._wt_inode(top)
+        if ino is None:
+            return None
+        try:
+            with open(rec, "a", encoding="utf-8") as f:
+                f.write(f"{top}\t{ino}\n")
+        except OSError:
+            pass
+
+    @staticmethod
+    def _wt_leave(rec, text):
+        """Create <rec>.arrive afresh, private, never following a link left at that name."""
+        f = rec + ".arrive"
+        try:
+            os.unlink(f)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            return
+        try:
+            fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        except OSError:
+            return
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text + "\n")
+
+    def _wt_scratchpad(self, sid):
+        """The session's scratchpad directory, or None."""
+        for root in (self.env.get("CLAUDE_CODE_TMPDIR") or "/nonexistent", self.env.get("TMPDIR") or "/nonexistent",
+                     os.path.join(self.env.get("HOME") or "", ".local/state/claude-tmpdir")):
+            for d in sorted(glob.glob(os.path.join(glob.escape(root), "claude-*", "*", glob.escape(sid), "scratchpad"))):
+                if os.path.isdir(d):
+                    return d
+        return None
+
     def _claim(self, wants):
         """Spend one approval per run for this tool call, atomically. `wants` is
         {approve_label: runs}. Returns ({label: approvals that are this call's or
@@ -203,6 +315,69 @@ class World:
                          for label, n in wants.items() for i in approved[label][:n]
                          if i not in spent)
             return approved, True
+
+    def _send_file(self, session):
+        base = self.env.get("TMPDIR") or "/tmp"
+        return os.path.join(base, SEND_STATE + re.sub(r"[^A-Za-z0-9_-]", "_", session))
+
+    def _send_state(self, session):
+        """guard-cross-session-send's state for `session`: {"subagents": [the
+        names and ids of this session's subagents], "read": the tool that read
+        untrusted content in this session, or None}. Raises OSError or
+        ValueError when it is missing, a link, someone else's, open to others,
+        or garbled."""
+        fd = os.open(self._send_file(session), os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(fd, encoding="utf-8") as f:
+            _own(f)
+            fcntl.flock(f, fcntl.LOCK_SH)
+            st = json.load(f)
+        if not (isinstance(st, dict) and isinstance(st.get("subagents"), list)
+                and (st.get("read") is None or isinstance(st.get("read"), str))):
+            raise ValueError("guard-cross-session-send state has the wrong shape")
+        return st
+
+    def _send_keep(self, session, op, arg):
+        """Update that state under an exclusive lock: op "clear" writes a closed
+        door with no subagents (a new or cleared session), "read" opens it naming `arg`, "names"
+        records the subagent names and ids in `arg`. Only "clear" makes a
+        closed door: a file another op creates starts as SEND_LOST. A link
+        planted at the path is removed, never written through. A write that
+        fails leaves SEND_LOST in its place where it can."""
+        path = self._send_file(session)
+        try:
+            if os.path.islink(path):
+                os.unlink(path)
+            fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "r+", encoding="utf-8") as f:
+                _own(f)
+                fcntl.flock(f, fcntl.LOCK_EX)
+                text = f.read()
+                try:
+                    st = json.loads(text) if text.strip() else None
+                except ValueError:
+                    st = None
+                if not isinstance(st, dict) or not isinstance(st.get("subagents"), list):
+                    st = json.loads(SEND_LOST)
+                if op == "clear":
+                    st = {"subagents": [], "read": None}   # a fresh context has no subagents yet
+                elif op == "read":
+                    st["read"] = arg
+                elif op == "names":
+                    st["subagents"] = ([s for s in st["subagents"] if s not in arg] + list(arg))[-SEND_SUBAGENTS_MAX:]
+                else:
+                    raise ValueError(f"no send-keep op {op!r}")
+                f.seek(0)
+                f.truncate()
+                f.write(json.dumps(st) + "\n")
+        except Exception:
+            try:
+                os.unlink(path)
+                fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                with os.fdopen(fd, "w") as f:
+                    f.write(SEND_LOST + "\n")
+            except OSError:
+                pass
+            raise
 
     # --- acts ------------------------------------------------------------
 
@@ -271,6 +446,14 @@ class World:
         if self._seen is None:
             self._seen = scan(self._transcript())
         return self._seen
+
+
+def _own(f):
+    """Refuse a state file another user made, or one others may write: on a
+    shared /tmp it could have been planted to say the door is closed."""
+    st = os.fstat(f.fileno())
+    if st.st_uid != os.geteuid() or st.st_mode & 0o022:
+        raise PermissionError("guard-cross-session-send state is not this user's alone")
 
 
 def _record(line):

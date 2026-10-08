@@ -573,16 +573,18 @@ class Scan:
         if tree is None:
             self._lex(text)
             self._emit()
-        del self._cur, self._have, self._quoted, self._skip, self._livecur
+        del self._cur, self._have, self._quoted, self._esc, self._skip, self._livecur
         self.shellseg = any(c is not None and self.w[c] in SHELL
                             for a, b in self.segments() for c in [seg_cmd(self, a, b)])
 
     def _reset(self):
         self.w, self.k, self.q, self.live = [], [], [], []
+        self.quoted = []                   # per word: any part of it quoted or backslash-escaped
         self.subs = []                     # bodies of $(...) and `...` inside double quotes
         self.op = []                       # per word: a separator's operator text, else ""
         self.pipes = set()                 # the separators that are a | or |&
         self._cur, self._have, self._quoted, self._skip, self._livecur = "", False, False, False, False
+        self._esc = False
 
     def _region(self, src, node, a, b):
         """Bytes a..b of src, whose Words are node's: each Word through its
@@ -686,8 +688,8 @@ class Scan:
                 self.w.append("$Q"); self.k.append("q"); self.q.append(self._cur)
             else:
                 self.w.append(self._cur); self.k.append("w"); self.q.append("")
-            self.live.append(self._livecur); self.op.append("")
-        self._cur, self._have, self._quoted, self._livecur = "", False, False, False
+            self.live.append(self._livecur); self.op.append(""); self.quoted.append(self._quoted or self._esc)
+        self._cur, self._have, self._quoted, self._livecur, self._esc = "", False, False, False, False
 
     def _sep(self, op=""):
         """A separator; `op` is the operator text that made it (`;`, `&&`, `|`, `)`, ...),
@@ -699,6 +701,7 @@ class Scan:
             self.op[-1] += op
             return
         self.w.append(";"); self.k.append(";"); self.q.append(""); self.live.append(False); self.op.append(op)
+        self.quoted.append(False)
 
     def _lex(self, b):
         """The awk lexer over b, carrying the word in progress across calls."""
@@ -711,7 +714,7 @@ class Scan:
                 i += 1
                 d = at(i)
                 if d not in ("\n", ""):
-                    self._cur += d; self._have = True
+                    self._cur += d; self._have = self._esc = True
                 i += 1
                 continue
             if c == "'":                           # literal to the next '
