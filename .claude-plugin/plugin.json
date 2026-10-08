@@ -1,6 +1,6 @@
 {
   "name": "languette",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, and commands that destroy infrastructure.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, commands that destroy infrastructure, and untrusted text relayed to another of your sessions.",
   "author": {
     "name": "Mark Brannan"
   },
@@ -146,6 +146,12 @@
       "title": "Private repos",
       "description": "Repos whose issue and PR text is never scanned, as owner/name, comma-separated. Empty by default: every repo is scanned.",
       "required": false
+    },
+    "guard_cross_session_send": {
+      "type": "boolean",
+      "title": "Check messages to your other sessions",
+      "description": "Ask before a session sends a message to another of your sessions, showing the target and the first line; in bypassPermissions, deny the send when the session read a web page, issue or PR body this turn. Messages to the session's own subagents pass. Leave on unless you want sessions to relay untrusted text to each other unseen.",
+      "default": true
     },
     "guard_bypass_labels": {
       "type": "boolean",

@@ -25,6 +25,8 @@ class Need:
         ruleset-keep  slug, branch, text  -> None, once written
         clock                             -> seconds since the epoch
         claim         {label: runs}       -> ({label: [AskUserQuestion ids]}, spent)
+        send-state    session             -> {"subagents": [ids], "read": tool or None}
+        send-keep     session, op, arg    -> None, once written (op: turn, read, subagent)
     """
 
     __slots__ = ("kind", "args")

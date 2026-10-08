@@ -20,7 +20,9 @@ SPENT = ".languette-ask"            # appended to the transcript path
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
-KINDS = frozenset("git gh-api read path cwd clock ruleset-cache ruleset-keep claim".split())
+SEND_STATE = "languette-guard-cross-session-send."   # + session id, under $TMPDIR
+SEND_SUBAGENTS_MAX = 500            # ids kept per session; the oldest go first
+KINDS = frozenset("git gh-api read path cwd clock ruleset-cache ruleset-keep claim send-state send-keep".split())
 
 
 class World:
@@ -123,6 +125,60 @@ class World:
                          for label, n in wants.items() for i in approved[label][:n]
                          if i not in spent)
             return approved, True
+
+    def _send_file(self, session):
+        base = self.env.get("TMPDIR") or "/tmp"
+        return os.path.join(base, SEND_STATE + re.sub(r"[^A-Za-z0-9_-]", "_", session))
+
+    def _send_state(self, session):
+        """guard-cross-session-send's state for `session`: {"subagents": [ids],
+        "read": the tool that read untrusted content this turn, or None}.
+        Raises OSError or ValueError when it is missing, a link, or garbled."""
+        fd = os.open(self._send_file(session), os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(fd, encoding="utf-8") as f:
+            fcntl.flock(f, fcntl.LOCK_SH)
+            st = json.load(f)
+        if not (isinstance(st, dict) and isinstance(st.get("subagents"), list)
+                and (st.get("read") is None or isinstance(st.get("read"), str))):
+            raise ValueError("guard-cross-session-send state has the wrong shape")
+        return st
+
+    def _send_keep(self, session, op, arg):
+        """Update that state under an exclusive lock: op "turn" closes the door
+        (UserPromptSubmit), "read" opens it naming `arg`, "subagent" records
+        the id `arg`. A link planted at the path is removed, never written
+        through. On a failed write the file is removed, so a reader finds no
+        state, which asks or denies, rather than a stale closed door."""
+        path = self._send_file(session)
+        try:
+            if os.path.islink(path):
+                os.unlink(path)
+            fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "r+", encoding="utf-8") as f:
+                fcntl.flock(f, fcntl.LOCK_EX)
+                try:
+                    st = json.loads(f.read() or "null")
+                except ValueError:
+                    st = None
+                if not isinstance(st, dict) or not isinstance(st.get("subagents"), list):
+                    st = {"subagents": [], "read": "an unknown tool (the state was lost)"}
+                if op == "turn":
+                    st["read"] = None
+                elif op == "read":
+                    st["read"] = arg
+                elif op == "subagent":
+                    st["subagents"] = ([s for s in st["subagents"] if s != arg] + [arg])[-SEND_SUBAGENTS_MAX:]
+                else:
+                    raise ValueError(f"no send-keep op {op!r}")
+                f.seek(0)
+                f.truncate()
+                f.write(json.dumps(st) + "\n")
+        except Exception:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+            raise
 
     # --- acts ------------------------------------------------------------
 

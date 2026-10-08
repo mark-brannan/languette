@@ -370,3 +370,24 @@ Feature: wiring
     And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES is "true"
     When the agent runs `git status`
     Then the guard denies
+
+  # guard-cross-session-send judges SendMessage, not Bash, so it has its own rows.
+  Scenario Outline: the hooks.json command for guard-cross-session-send judges a send and fails closed
+    Given the hook is the hooks.json command for "guard-cross-session-send"
+    And the permission mode is "default"
+    And <setup>
+    When the agent sends "api-worker" the message `hello`
+    Then the guard <verdict>
+
+    Examples:
+      | verdict   | setup                                                      |
+      | asks      | CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND is "true"    |
+      | is silent | CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND is "false"   |
+      | denies    | CLAUDE_PLUGIN_ROOT is "/nonexistent"                       |
+      | denies    | the plugin's script for "guard-cross-session-send" crashes |
+
+  Scenario: with python3 absent from PATH, guard-cross-session-send denies and says python3 is required
+    Given the hook is the hooks.json command for "guard-cross-session-send"
+    And PATH holds only "sh cat printf dirname"
+    When the agent sends "api-worker" the message `hello`
+    Then the guard denies, naming "python3 is required for guard-cross-session-send"
