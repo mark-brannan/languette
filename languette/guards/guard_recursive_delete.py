@@ -1,11 +1,63 @@
-"""guard-recursive-delete: the Python guard (it replaced hooks/guard-recursive-delete.sh).
+"""guard-recursive-delete: recursive `rm` and `find -delete` only on what is Claude's.
 
-Blocks recursive `rm` and `find ... -delete` unless every target, resolved
-against the payload's cwd and then through the filesystem, is Claude's to
-remove: under the scratchpad, an agent worktree or /tmp, or a generated
-directory (GENERATED_NAMES) that is not a direct child of $HOME or of /.
-A target this guard cannot resolve to one allowed path is denied on sight,
-with a reason naming what it saw.
+Blocks recursive `rm` (-r, -R, --recursive, or any short cluster containing
+r/R: -rf, -fr, -rfv, -Rf) and `find ... -delete` unless every target,
+resolved against the payload's cwd and then through the filesystem, is
+Claude's to remove.
+
+The scar: an agent ran `rm -rf examples` to sweep the untracked leftovers
+of a refactor and destroyed captures and a watch log the user was using
+as an ongoing download area. `git rm --cached` had already handled the
+tracked files; the `rm -rf` existed only to sweep the rest, and the rest
+was the user's.
+
+Allowlist, not a denylist. A target is allowed only when it is:
+  1. under the session scratchpad, an agent worktree, or /tmp -- these are
+     Claude's areas, nothing of the user's lives there;
+  2. a directory named in GENERATED_NAMES below (its final path component,
+     or an ancestor component -- so `dist` and `dist/sub` both pass), and
+     not a direct child of $HOME or of the filesystem root: ~/proj/dist and
+     /opt/proj/dist are build output, ~/dist and /dist are directories that
+     happen to share the name.
+Everything else is denied: any other directory under $HOME (a misc
+directory in the home tree is the user's by default, whatever it holds), any
+repo's tracked or working directories, `public/` included -- one project's
+generated `public/` is another's tracked source, so the name stays off the
+list. LANGUETTE_RM_ALLOW adds roots and names to the list; it never
+replaces them.
+
+Both the path as written and the path as the filesystem resolves it must be
+allowed: `rm -rf /tmp/x/` where /tmp/x is a symlink into a repo empties the
+repo directory (rm follows a trailing slash), so the physical path is
+checked too.
+
+A target this guard cannot resolve to one allowed path is not allowed, and
+is denied on sight with a reason naming what it saw: a glob (*, ?, [), a
+brace ({}), a shell variable or $(...) or `...`, a `..` segment, a `~`
+other than a leading one, a quoted string with whitespace in it, a
+control character, a target that resolves to / or $HOME, a relative
+target after a `cd` anywhere in the same command (the guard cannot follow
+the cd), and a recursive rm with NO visible target -- which is what
+`find ... -exec rm -rf {} +`, `xargs rm -rf` and `rm -rf {a,b}` look like
+once the scanner is done with them. In every one of those the fix is the
+same: run `rm -rf` on the resolved paths, spelled out.
+
+`rm` on a single file (no recursive flag) passes -- where the file is
+tracked that is `git rm`'s job, and looking at the target before deleting
+it is the agent's job otherwise. `git rm`, `yadm rm` and the other
+version-control `rm` subcommands (svn, hg, jj, gsutil) are untouched --
+there rm is a subcommand, not the command. Otherwise rm counts as the
+command wherever it stands in a segment (after find -exec, xargs, do,
+time ...), and the body of a quoted string with whitespace (`sh -c '...'`,
+`eval "..."`) is scanned as well, there by command position only.
+
+Out of scope, by design (this is an accident guard, not a sandbox): flags
+arriving through a variable (`rm $OPTS x`), `rmdir`, `rsync --delete`,
+deletion from inside python/node one-liners.
+
+Scanning is languette/scan.py's (read its docstring). This is a GATE, so it
+fails closed: an unreadable payload or a crash here is a deny (run.py), and
+the hooks.json wrapper denies when python3 or run.py is missing.
 """
 
 import json

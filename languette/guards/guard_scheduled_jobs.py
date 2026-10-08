@@ -1,7 +1,16 @@
-"""guard-scheduled-jobs: the Python guard (it replaced hooks/guard-scheduled-jobs.sh).
+"""guard-scheduled-jobs: `crontab -r`, the whole crontab gone with no undo.
 
-Blocks `crontab -r`, which deletes the whole crontab with no undo: at command
-position, behind a wrapper, and with r in a short-option cluster (`-ir`).
+Blocks it at command position, behind sudo, env, nohup ..., and with r in a
+short-option cluster (`crontab -ir`). Listing it (`-l`) and replacing it from
+a file pass.
+
+Out of scope, by design (an accident guard, not a sandbox): `crontab` fed an
+empty file, `systemctl disable` of a timer, `atrm`, and what a script or an
+interpreter one-liner does.
+
+Scanning is languette/scan.py's (read its docstring). This is a GATE, so it
+fails closed: an unreadable payload or a crash here is a deny (run.py), and
+the hooks.json wrapper denies when python3 or run.py is missing.
 """
 
 import json

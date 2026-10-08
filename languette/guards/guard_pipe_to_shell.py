@@ -1,12 +1,35 @@
-"""guard-pipe-to-shell: the Python guard (it replaced
-hooks/guard-pipe-to-shell.sh).
+"""guard-pipe-to-shell: a download that is run as it arrives.
 
-Blocks a download that is run as it arrives: curl, wget or fetch piped into
-an interpreter that reads its program from stdin (`curl u | sh`, `| sudo bash
--s`, `| python3 -`), a download handed over as a file (`sh <(curl u)`,
-`source <(curl u)`) and a download handed over as text (`eval "$(curl u)"`,
-`bash -c "$(curl u)"`). An interpreter given a script of its own (`| python3 -c
-...`, `| node -e ...`, `| sh install.sh`) is not reading the download as code.
+Blocks curl, wget or fetch output handed to an interpreter that reads its
+program from stdin. Three shapes, one reason (the script is run before
+anyone has seen it):
+  1. piped:       curl u | sh   curl u | sudo bash -s   wget -qO- u | python3 -
+                  (a download earlier in the same pipeline, `curl u | tee f | sh`
+                  included -- `curl u; sh` and `curl u && sh f` are not pipes)
+  2. as a file:   sh <(curl u)   source <(curl u)   . <(wget -qO- u)
+  3. as text:     eval "$(curl u)"   eval `curl u`   bash -c "$(curl u)"
+
+Interpreters: sh bash dash zsh ksh ash fish, python (python3, python3.12 ...),
+perl, node, ruby. One that is handed a program of its own is not reading the
+download as code and passes: `curl u | python3 -c ...`, `| python3 -m
+json.tool`, `| node -e ...`, `| perl -pe ...`, `| sh install.sh`, `| bash -c
+cat`. A shell reads stdin as its program with no operand or with -s; python,
+perl, node and ruby with no operand or a lone `-`.
+
+The denial names the safe way: download to a file, read it, run the file.
+
+Out of scope, by design (an accident guard, not a sandbox): a here-string
+(`bash <<< "$(curl u)"`), a download kept in a variable and then run
+(`x=$(curl u); eval "$x"`), a download by another tool (`aria2c`, `http`, a
+python or node one-liner), and a script that does the piping itself.
+
+A quoted string that mentions a pipe-to-shell as text (`git commit -m "..."`,
+`echo '...'`) is prose and passes, unless some segment of the command is a
+shell.
+
+Scanning is languette/scan.py's (read its docstring). This is a GATE, so it
+fails closed: an unreadable payload or a crash here is a deny (run.py), and
+the hooks.json wrapper denies when python3 or run.py is missing.
 """
 
 import json

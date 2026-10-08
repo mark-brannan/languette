@@ -1,8 +1,25 @@
-"""guard-host-availability: the Python guard (it replaced hooks/guard-host-availability.sh).
+"""guard-host-availability: the commands that take the machine down.
 
-Blocks the commands that take the machine down: shutdown, reboot, halt and
-poweroff, at command position or as the one-word script of `sh -c`, and the
-fork-bomb shape.
+No coding task has a use for any of them; a user who wants one runs it.
+
+Denied outright:
+  - shutdown, reboot, halt, poweroff -- at command position, behind sudo,
+    env, nohup ... and their options, and as the one-word script of `sh -c`
+  - the fork-bomb shape: a function that pipes itself into itself in the
+    background (`:(){ :|:& };:`, under any name)
+
+Out of scope, by design (an accident guard, not a sandbox): `systemctl
+reboot`, `init 6`, a power command behind a wrapper option that takes a
+value (`sudo -u root reboot`), and what a script or an interpreter one-liner
+does.
+
+The fork-bomb pattern reads raw text, so a quoted string that mentions it
+(`git commit -m "..."`, `echo '...'`) passes: it is read only in a text that
+has a segment not led by a prose consumer.
+
+Scanning is languette/scan.py's (read its docstring). This is a GATE, so it
+fails closed: an unreadable payload or a crash here is a deny (run.py), and
+the hooks.json wrapper denies when python3 or run.py is missing.
 """
 
 import json

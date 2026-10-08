@@ -1,10 +1,27 @@
-"""guard-disk: the Python guard (it replaced hooks/guard-disk.sh).
+"""guard-disk: the commands that overwrite a disk.
 
-Blocks the commands that overwrite a disk: `dd` with of= under /dev, mkfs*,
-wipefs and shred on anything but the agent's own area, and a redirection or
-tee onto a disk device. A target this guard cannot
-resolve to one allowed path is denied on sight, with a reason naming what it
-saw.
+No coding task has a use for any of them; a user who wants one runs it.
+
+Denied outright:
+  - `dd` with of= under /dev (except /dev/null, zero, full, stdout, stderr,
+    tty and /dev/fd/N), however the path is spelled: /dev/../dev/sda too
+  - a redirection or `tee` onto a disk device: /dev/sd*, hd*, vd*, xvd*,
+    nvme*, disk*, rdisk*, mmcblk*, mtdblock*, loop*, md*, dm-*, mapper/*, sr*
+Denied unless every target is the agent's own area (the scratchpad, an
+agent worktree or /tmp, resolved as guard-recursive-delete resolves a
+target, through symlinks too): mkfs and mkfs.* (mke2fs, mkswap, mkdosfs),
+wipefs and shred. An image file in /tmp passes; a device node does not. An
+unresolvable target -- a glob, brace, variable, `..`, a quoted string with
+whitespace, a relative path after a `cd` in the same command -- or no
+visible target at all is denied on sight, with a reason naming what it saw.
+
+Out of scope, by design (an accident guard, not a sandbox): `cp` or `cat`
+straight onto a device by argument, a symlink to a device that dd writes
+through, and what a script or an interpreter one-liner does.
+
+Scanning is languette/scan.py's (read its docstring). This is a GATE, so it
+fails closed: an unreadable payload or a crash here is a deny (run.py), and
+the hooks.json wrapper denies when python3 or run.py is missing.
 """
 
 import json
