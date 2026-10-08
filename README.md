@@ -23,8 +23,8 @@ few words in a shell command that can do damage. When it hears one, it tells the
 
 ## Install
 
-The guards run as `PreToolUse` hooks in Claude Code today (`guard-github-issues` also
-runs on `UserPromptSubmit`, which opens its door); other agent hosts
+The guards run as `PreToolUse` hooks in Claude Code today, on shell commands,
+`gh` and GitHub MCP calls, and messages to other sessions; other agent hosts
 are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
 ```
@@ -32,12 +32,8 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 /plugin install languette@languette
 ```
 
-It needs:
-
-- `python3`, standard library only, for every `run.py` guard;
-- `jq` and a POSIX `awk`, for the shell guards, until a real shell parser replaces them
-  ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
-- `gh`, for `guard-git-stacked-base` and `guard-bypass-ruleset`.
+It needs `python3`, standard library only. `shfmt` (the parser it trusts
+most) and `gh` (for the two guards that ask GitHub) are optional.
 
 Without the plugin system, see [Installing by hand](#installing-by-hand).
 
@@ -108,8 +104,8 @@ scenarios for a command run in `~/project`, and CI fails if the table drifts:
 <!-- /fixtures-table -->
 
 With `shfmt` 3.6 or later on `PATH`, the `guard-unparsable` guard denies a
-command that doesn't parse. Without `shfmt`, it falls back to the next parser
-it finds: tree-sitter-bash or bashlex, then `bash -n`, then its own lexer.
+command that doesn't parse. Without `shfmt`, `bash -n` decides; tree-sitter-bash
+or bashlex, if installed, only add the column; below both, its own lexer.
 In a replay of 101,671 agent commands, about 1 in 3,000 didn't parse, and
 each [would have broken](features/guard-unparsable.feature).
 Bash runs a broken command in part, the lines before the error or prose in
@@ -217,6 +213,9 @@ Without a terms file the guard is off.
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
 comma-separated; empty means `churn-ok,mixed-loops-ok`.
 
+`record_decisions`, off by default, keeps every verdict, with its command and
+secrets masked, in `$XDG_STATE_HOME/languette/decisions.jsonl`, readable only by you.
+
 <details>
 <summary>How Claude Code passes plugin settings to a hook (measured)</summary>
 
@@ -244,10 +243,11 @@ measured, which is why the guards treat unset as on.
 
 ## Strong guards
 
-A guard is a function, pure where it can be: the command and its context in,
-a verdict out. It asks no model and runs nothing. The verdict is **deny**
-with the reason, **ask**, a **warning**, or **nothing** (*allow*). What a
-guard reads beyond the command, it declares:
+A guard is a pure function of the command and the facts it asked for; it
+asks no model and runs nothing, and the runner fetches the facts ([the
+design](docs/design/guard-pipeline.md)). The verdict is **deny** with the
+reason, **ask**, a **warning**, or **nothing** (*allow*). What a guard asks
+for beyond the command, it declares:
 
 | Guard | Reads |
 |---|---|
@@ -302,13 +302,12 @@ to Claude Code, and every command goes through. One entry:
 
 ```
 git clone https://github.com/mark-brannan/languette && cd languette
-sudo apt install jq gawk mawk shellcheck
+sudo apt install shfmt shellcheck
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
-python3 -m pytest                       # every scenario, every engine
-AWK_PATH=/dir/with/an/awk python3 -m pytest
+python3 -m pytest                       # every scenario
 python3 tests/readme_table.py           # regenerate the table
-shellcheck --severity=warning hooks/*.sh tests/stubs/*   # as CI runs it
+shellcheck --severity=warning tests/stubs/* tests/*.test.sh   # as CI runs it
 ```
 
 Running the tests needs pytest, pytest-bdd and PyHamcrest; the hooks do not.
@@ -319,7 +318,6 @@ test, which installs the plugin in a scratch project and confirms a recursive
 `rm` is really blocked, stays manual: it needs a model call and a login.
 
 `features/` holds the contract as scenarios: a command in, tokens or a
-verdict out. The scanner (`hooks/lib-shell-words.awk`) and the guards began
-as copies of the ones in
-[mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles); this repo
-is where they are maintained now.
+verdict out. The guards began as shell scripts copied from
+[mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles); they run
+in Python now, and this repo is where they are maintained.

@@ -152,6 +152,8 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - checkout-home resolves a relative cd or -C that follows an earlier cd and judges where it lands; the shell denied it as unresolvable Undo: deny when the base is lost, as the shell did ([#96](https://github.com/mark-brannan/languette/pull/96))
 - the fail-open paths claude-review found on #96 (a --config-env or --attr-source value read as the subcommand; an unresolvable --git-dir allowed; checkout-home with git absent allows; foreign with no cwd or no $HOME allows) stay as the shell has them: parity is W2's bar Undo: close each with a feature row, in its own PR ([#96](https://github.com/mark-brannan/languette/pull/96))
 
+### 20261008t054436z
+- README lists guard-secrets and guard-cross-session-send before #94 and #97 merge, and records the verdict log as a paragraph under Configuration to stay inside the 325-line cap Undo: drop the two bullets and two Reads rows if either PR closes; give the record a heading once a cap-raise lands ([#101](https://github.com/mark-brannan/languette/pull/101))
 ### 20261008t035451z
 - W4 moves each deleted shell script's rationale into its feature file's description (ruling 1791421640d08e92b2 open) Undo: revert PR 100 ([#100](https://github.com/mark-brannan/languette/pull/100))
 - the test harness keeps a subprocess engine for the hooks.json wiring scenarios, renamed shell to hook, and drops the four no-jq-or-awk scenarios Undo: revert PR 100 ([#100](https://github.com/mark-brannan/languette/pull/100))
