@@ -107,6 +107,8 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 ### 20261007t232027z
 - Smoke job pins bashlex 0.18, tree-sitter 0.26.0, tree-sitter-bash 0.25.1, the versions measured green Undo: drop the ==version pins in ci.yml's smoke job ([#73](https://github.com/mark-brannan/languette/pull/73))
 
+### 20261008t004250z
+- Restore the six deleted shell headers' spec into the Python guards' docstrings, shell mechanics reworded Undo: git revert bca98fb ([#72](https://github.com/mark-brannan/languette/pull/72))
 ### 20261008t003728z
 - Redaction keeps the command and guards' reasons whole and masks only secret-looking values (credential-named variables and flags, URL passwords, token shapes, long random strings); raw mode masks nothing Undo: edit SECRETS in languette/record.py (mark-brannan/languette#82)
 - Records live at $XDG_STATE_HOME/languette/decisions.jsonl, rotated at 8 MiB keeping one .1 Undo: change RECORDS/RECORDS_MAX in languette/world.py (mark-brannan/languette#82)

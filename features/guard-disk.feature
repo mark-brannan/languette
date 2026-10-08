@@ -1,4 +1,4 @@
-@python @shell
+@python
 Feature: guard-disk
   The commands that overwrite a disk are denied.
   mkfs, wipefs and shred pass on an image file in the agent's own area

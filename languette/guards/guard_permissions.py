@@ -1,4 +1,4 @@
-"""guard-permissions: a port of hooks/guard-permissions.sh, whose header is the spec.
+"""guard-permissions: features/guard-permissions.feature is the spec.
 
 Blocks a recursive chown, chgrp or chmod (-R, --recursive, a short cluster
 holding R), `chmod 777`, and `find ... -exec chown|chgrp|chmod` unless every

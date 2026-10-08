@@ -1,4 +1,4 @@
-@python @shell
+@python
 Feature: guard-pipe-to-shell
   A download that is run as it arrives is denied: piped into an interpreter
   that reads its program from stdin, handed over as a file, or substituted

@@ -1,4 +1,4 @@
-@python @shell
+@python
 Feature: guard-recursive-delete
   Recursive rm and find -delete are denied unless every target is a generated
   directory or the agent's own area. The working directory is {HOME}/project
@@ -621,13 +621,6 @@ Feature: guard-recursive-delete
       | {HOME}   | rm build.log             | warns about "LANGUETTE_RM_ALLOW"    |
       | {HOME}   | git rm -r --cached build | warns about "LANGUETTE_RM_ALLOW"    |
       | {HOME}   | find /tmp/ok -delete     | denies, naming "LANGUETTE_RM_ALLOW" |
-
-  @shell_only
-  Scenario: with no jq or awk on PATH the guard denies
-    Given PATH holds only "sh cat printf dirname head cut readlink"
-    And the working directory is "/x"
-    When the agent runs `rm -rf node_modules`
-    Then the guard denies
 
   Scenario: a payload that does not parse is denied
     When the payload is:
