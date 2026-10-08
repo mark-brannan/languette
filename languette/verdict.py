@@ -27,6 +27,9 @@ class Need:
         ruleset-cache slug, branch        -> (mtime, text), or None
         ruleset-keep  slug, branch, text  -> None, once written
         clock                             -> seconds since the epoch
+        worktree      op, *args           -> guard-worktrees' per-session record: arrive rec, top
+                                             -> (usable, adopt); recorded rec, top -> bool; keep rec, top
+                                             and leave rec, text -> None; scratchpad sid -> dir, or None
         claim         {label: runs}       -> ({label: [AskUserQuestion ids]}, spent)
     """
 
