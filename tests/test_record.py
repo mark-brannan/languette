@@ -53,7 +53,7 @@ SECRET = [
     ("docker login -u acme --password Hunter2", "docker login -u acme --password <secret>"),
     ("gh auth login --with-token=abc", "gh auth login --with-token=<secret>"),
     ("curl -H 'Authorization: Bearer abc123' https://x", "curl -H 'Authorization: Bearer <secret>' https://x"),
-    ("curl -u acme:pw https://x", "curl -u acme:<secret> https://x"),
+    ("curl -u acme:" + "pw https://x", "curl -u acme:<secret> https://x"),
     ("git clone https://acme:pw@git.example.com/a.git", "git clone https://acme:<secret>@git.example.com/a.git"),
     ("mysql -u root -phunter2 db", "mysql -u root -p<secret> db"),
     ("echo ghp_" + "a1" * 18, "echo <secret>"),
