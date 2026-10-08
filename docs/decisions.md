@@ -37,6 +37,13 @@ interface is; this file says who decided it and why, one line each.
 - tree-sitter-bash refuses on an ERROR node; bashlex on an unclosed quote,
   bracket or unexpected end; the built-in lexer on an unclosed quote.
 
+## Parse check: Solace, 2026-10-07
+
+- shfmt is the critical path; below it, `bash -n` decides the parse check; a
+  pip parser, if installed, only adds the column.
+- This replaces the pip parsers' refusals in the ruling above: tree-sitter-bash
+  and bashlex no longer refuse.
+
 ## Runtime dependencies: Solace, 2026-10-06
 
 - Languette runs on python3 and its standard library plus the parser ladder
