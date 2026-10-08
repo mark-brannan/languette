@@ -198,10 +198,12 @@ def _admin_merge(s, a, b, nested):
     if any(dyn):
         if admin:
             return True                        # a live subcommand beside a literal --admin
-        first, skip = [], False                # the group and its verb; a -R value is neither
+        first, skip = [], False                # the group and its verb; a literal -R value is neither
         for k, x in enumerate(w):
             if skip:
                 skip = False
+                if dyn[k]:                     # a run-time -R value may split into `pr merge`
+                    first.append(k)
             elif x.startswith("-"):
                 skip = x in ("-R", "--repo") or _opt(x, "--repo") and "=" not in x
             elif len(first) < 2:

@@ -81,7 +81,7 @@ Feature: guard-bypass-ruleset
       | gh api -X POST repos/o/r/issues           | a method value is not a subcommand        |
       | gh pr checks 5 -R $R                      | a run-time repo beside a literal pr       |
       | gh issue $verb 5                          | a run-time word under issue, not pr       |
-      | gh -R $R api repos/o/r                    | a run-time repo before a literal api      |
+      | gh -R o/r api repos/$R/pulls/5            | a literal repo before a literal api       |
 
   Scenario Outline: on main itself, the branch's own push lands on main
     Given a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
@@ -150,6 +150,7 @@ Feature: guard-bypass-ruleset
       | gh pr $v 5                        | a pr subcommand built at run time     |
       | gh -R o/r $p merge 5              | a run-time group behind a repo flag   |
       | gh --repo o/r pr $v 5             | a run-time verb behind a repo flag    |
+      | gh -R $R api x                    | a run-time repo value may split into a group |
       | export GIT_DIR=/x; git push origin main | another repository, exported       |
 
   Scenario Outline: a cd the shell may undo before the push asks
