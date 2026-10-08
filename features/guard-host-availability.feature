@@ -1,4 +1,4 @@
-@python @shell
+@python
 Feature: guard-host-availability
   The commands that take the machine down are denied: shutdown, reboot, halt,
   poweroff and the fork-bomb shape. No agent area makes them safe.

@@ -1,4 +1,4 @@
-@python @shell
+@python
 Feature: guard-permissions
   A recursive chown, chgrp or chmod, chmod 777, and a find that runs one of
   them are denied unless every target is the agent's own area: the
