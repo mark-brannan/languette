@@ -1,4 +1,4 @@
-"""guard-disk: a port of hooks/guard-disk.sh, whose header is the spec.
+"""guard-disk: features/guard-disk.feature is the spec.
 
 Blocks the commands that overwrite a disk: `dd` with of= under /dev, mkfs*,
 wipefs and shred on anything but the agent's own area, and a redirection or

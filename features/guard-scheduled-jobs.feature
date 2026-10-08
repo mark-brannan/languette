@@ -1,4 +1,4 @@
-@python @shell
+@python
 Feature: guard-scheduled-jobs
   `crontab -r`, which deletes the whole crontab with no undo, is denied.
   Listing the crontab and replacing it from a file pass.
