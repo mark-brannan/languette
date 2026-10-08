@@ -109,3 +109,7 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - A refspec $NAME is read as the literal export NAME=lit set; declare, typeset and local turn resolution off for the line Undo: widen _Literals in guard_bypass_ruleset.py ([#91](https://github.com/mark-brannan/languette/pull/91))
 - NAME=lit; git push (a ; not &&) is trusted though a readonly NAME inherited from the shell would make the set fail; shell-set names are excluded Undo: require && between the set and the push ([#91](https://github.com/mark-brannan/languette/pull/91))
 - A . in command position or any shell keyword on the line turns literal resolution off, stricter than needed Undo: narrow _RESERVED in guard_bypass_ruleset.py ([#91](https://github.com/mark-brannan/languette/pull/91))
+
+### 20261008t014318z
+- A parser killed by a signal denies instead of falling to the next rung (kill -9 moved out of the crash test) Undo: drop the returncode < 0 check in scan._run ([#93](https://github.com/mark-brannan/languette/pull/93))
+- An OSError other than FileNotFoundError running a parser denies Undo: catch OSError with FileNotFoundError in scan._run ([#93](https://github.com/mark-brannan/languette/pull/93))
