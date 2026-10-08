@@ -12,7 +12,7 @@ The critical execution path is [deterministic](https://en.wikipedia.org/wiki/Det
 
 *Languette* is French for "little tongue". On a halberd the languette (or 'langet')
 it is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
-the pole. These guards are that strip: protecting your work, strengthening your tools, while holding back the agentic hazards that might sneak through the gates of your city.
+the pole. These guards are that strip: protecting your work, strengthening your tools, while holding back certain agentic hazards that could ruin your day.
 
 It's also a play on words: Shell is a little language, and languette listens for the
 few words in a shell command that can do damage. When it hears one, it tells the errant agent
