@@ -105,6 +105,8 @@ Feature: guard-bypass-ruleset
       | B=--all; git push origin $B                              | asks                                      | an option, not a refspec              |
       | B=--mirror && git push origin $B                         | asks                                      | the same, --mirror                    |
       | B=claude/x:main; git push origin $B                      | denies, naming "requires a pull request"  | a whole refspec, landing on main      |
+      | B=claude/x\ HEAD:main; git push origin HEAD:$B           | asks                                      | splits into a second refspec, on main |
+      | B=claude/x\ main && git push origin $B                   | asks                                      | the same, a bare second branch        |
 
   Scenario: a variable set on an earlier line is read as that literal
     When the agent runs:

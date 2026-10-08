@@ -101,7 +101,8 @@ class _Literals:
             if words and all(s.k[i] == "w" and sw._ASSIGN.match(s.w[i]) for i in words):
                 for i in words:
                     name, _, val = s.w[i].partition("=")
-                    ok = val and not s.live[i] and not _UNREADABLE.search(val) and "~" not in val
+                    # whitespace: an unquoted $NAME splits there into more than one refspec
+                    ok = val and not s.live[i] and not _UNREADABLE.search(val) and not re.search(r"[~\s]", val)
                     self.bind[name] = (a, val if ok else None)
             elif c is not None and s.w[c] == "export":
                 self.off = True
