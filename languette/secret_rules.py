@@ -74,7 +74,7 @@ RULES = (
     Rule("slack-app-token", "Detected a Slack App-level token, risking unauthorized access to Slack applications and workspace data.",
          re.compile(r"(?i)xapp-\d-[A-Z0-9]+-\d+-[a-z0-9]+"), 2.0),
     Rule("slack-webhook-url", "Discovered a Slack Webhook, which could lead to unauthorized message posting and data leakage in Slack channels.",
-         re.compile(r"(?:https?://)?hooks.slack.com/(?:services|workflows|triggers)/[A-Za-z0-9+/]{43,56}"), 0.0),
+         re.compile(r"(?:https?://)?hooks\.slack\.com/(?:services|workflows|triggers)/[A-Za-z0-9+/]{43,56}"), 0.0),
     Rule("stripe-access-token", "Found a Stripe Access Token, posing a risk to payment processing services and sensitive financial data.",
          re.compile(r"\b(?P<secret>(?:sk|rk)_(?:test|live|prod)_[a-zA-Z0-9]{10,99})" + _END), 2.0),
     Rule("openai-api-key", "Found an OpenAI API Key, posing a risk of unauthorized access to AI services and data manipulation.",
