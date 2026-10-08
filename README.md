@@ -74,7 +74,7 @@ Each guard checks for one kind of hazard:
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
   applying a label that waives a CI gate, such as `churn-ok`
 - [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message
-  to another session: asks; in `bypassPermissions`, denies after a web or issue read
+  to another session: asks; in `bypassPermissions`, denies after a network read
 - `guard-secrets`, `guard-protected-paths`, `guard-database` (planned)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
@@ -261,7 +261,7 @@ guard reads beyond the command, it declares:
 | `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
-| `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, and a record per session in `$TMPDIR` |
+| `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
 | `guard-worktrees` | `$HOME` and what `git rev-parse --show-toplevel` resolves to; git, for where each path lands, and a record per session in `$TMPDIR` |
 | `prose-budget-commit` | the staged diff and, for a commit that reaches past the index, the named working-tree files, through `prose-budget` |
 

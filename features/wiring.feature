@@ -392,8 +392,8 @@ Feature: wiring
     When the agent sends "api-worker" the message `hello`
     Then the guard denies, naming "python3 is required for guard-cross-session-send"
 
-  # Its state hooks never object; one that fails removes the session's state,
-  # which the send then reads as a door not provably closed.
+  # Its state hooks never object; one that fails leaves an open door in place
+  # of the session's state, since no state reads as a closed one.
   Scenario: the hooks.json PostToolUse command for guard-cross-session-send opens the door
     Given the hook is the hooks.json PostToolUse command for "guard-cross-session-send"
     And the cross-session state file holds `{"subagents": [], "read": null}`
@@ -401,17 +401,17 @@ Feature: wiring
     Then the guard is silent
     And the cross-session state file names "WebFetch"
 
-  Scenario Outline: a guard-cross-session-send state hook that fails removes the session's state
+  Scenario Outline: a guard-cross-session-send state hook that fails leaves the door open
     Given the hook is the hooks.json <event> command for "guard-cross-session-send"
     And the cross-session state file holds `{"subagents": [], "read": null}`
     And <setup>
     When Claude Code fires <event> for tool "WebFetch"
     Then the guard is silent
-    And the cross-session state file is gone
+    And the cross-session state file names "an unknown tool (a state hook failed)"
 
     Examples:
       | event            | setup                                                      |
       | PostToolUse      | the plugin's script for "guard-cross-session-send" crashes |
       | PostToolUse      | CLAUDE_PLUGIN_ROOT is "/nonexistent"                       |
-      | UserPromptSubmit | the plugin's script for "guard-cross-session-send" crashes |
+      | SessionStart     | the plugin's script for "guard-cross-session-send" crashes |
       | SubagentStart    | PATH holds only "sh cat printf dirname sed head rm"        |

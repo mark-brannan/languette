@@ -150,7 +150,7 @@
     "guard_cross_session_send": {
       "type": "boolean",
       "title": "Check messages to your other sessions",
-      "description": "Ask before a session sends a message to another of your sessions, showing the target and the first line; in bypassPermissions, deny the send when the session read a web page, issue or PR body this turn. Messages to the session's own subagents pass. Leave on unless you want sessions to relay untrusted text to each other unseen.",
+      "description": "Ask before a session sends a message to another of your sessions, showing the target and the first line; in bypassPermissions, deny the send once the session has read anything from the network. Messages to main and to the session's own subagents and teammates pass. Leave on unless you want sessions to relay untrusted text to each other unseen.",
       "default": true
     },
     "guard_bypass_labels": {

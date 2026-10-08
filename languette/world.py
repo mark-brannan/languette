@@ -21,7 +21,9 @@ RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
 SEND_STATE = "languette-guard-cross-session-send."   # + session id, under $TMPDIR
-SEND_SUBAGENTS_MAX = 500            # ids kept per session; the oldest go first
+SEND_SUBAGENTS_MAX = 500            # names and ids kept per session; the oldest go first
+# What a failed write leaves: no subagents known, the door open.
+SEND_LOST = '{"subagents": [], "read": "an unknown tool (a state hook failed)"}'
 KINDS = frozenset("git gh-api read path cwd clock ruleset-cache ruleset-keep claim send-state send-keep".split())
 
 
@@ -131,10 +133,11 @@ class World:
         return os.path.join(base, SEND_STATE + re.sub(r"[^A-Za-z0-9_-]", "_", session))
 
     def _send_state(self, session):
-        """guard-cross-session-send's state for `session`: {"subagents": [ids],
-        "read": the tool that read untrusted content this turn, or None}.
-        Raises OSError or ValueError when it is missing, a link, someone
-        else's, open to others, or garbled."""
+        """guard-cross-session-send's state for `session`: {"subagents": [the
+        names and ids of this session's subagents], "read": the tool that read
+        untrusted content in this session, or None}. Raises FileNotFoundError
+        when there is none, and OSError or ValueError when it is a link,
+        someone else's, open to others, or garbled."""
         fd = os.open(self._send_file(session), os.O_RDONLY | os.O_NOFOLLOW)
         with os.fdopen(fd, encoding="utf-8") as f:
             _own(f)
@@ -146,11 +149,12 @@ class World:
         return st
 
     def _send_keep(self, session, op, arg):
-        """Update that state under an exclusive lock: op "turn" closes the door
-        (UserPromptSubmit), "read" opens it naming `arg`, "subagent" records
-        the id `arg`. A link planted at the path is removed, never written
-        through. On a failed write the file is removed, so a reader finds no
-        state, which asks or denies, rather than a stale closed door."""
+        """Update that state under an exclusive lock: op "clear" closes the door
+        (a new or cleared session), "read" opens it naming `arg`, "names"
+        records the subagent names and ids in `arg`. A link planted at the
+        path is removed, never written through. A write that fails leaves
+        SEND_LOST in its place where it can: a missing file reads as a closed
+        door, so a failed write must not leave none."""
         path = self._send_file(session)
         try:
             if os.path.islink(path):
@@ -159,18 +163,19 @@ class World:
             with os.fdopen(fd, "r+", encoding="utf-8") as f:
                 _own(f)
                 fcntl.flock(f, fcntl.LOCK_EX)
+                text = f.read()
                 try:
-                    st = json.loads(f.read() or "null")
+                    st = json.loads(text) if text.strip() else {"subagents": [], "read": None}
                 except ValueError:
                     st = None
                 if not isinstance(st, dict) or not isinstance(st.get("subagents"), list):
-                    st = {"subagents": [], "read": "an unknown tool (the state was lost)"}
-                if op == "turn":
+                    st = json.loads(SEND_LOST)
+                if op == "clear":
                     st["read"] = None
                 elif op == "read":
                     st["read"] = arg
-                elif op == "subagent":
-                    st["subagents"] = ([s for s in st["subagents"] if s != arg] + [arg])[-SEND_SUBAGENTS_MAX:]
+                elif op == "names":
+                    st["subagents"] = ([s for s in st["subagents"] if s not in arg] + list(arg))[-SEND_SUBAGENTS_MAX:]
                 else:
                     raise ValueError(f"no send-keep op {op!r}")
                 f.seek(0)
@@ -179,6 +184,9 @@ class World:
         except Exception:
             try:
                 os.unlink(path)
+                fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                with os.fdopen(fd, "w") as f:
+                    f.write(SEND_LOST + "\n")
             except OSError:
                 pass
             raise

@@ -50,8 +50,7 @@ except Exception as e:  # noqa: BLE001
 # (hook event, tool name pattern or None for an event with no tool, guards in
 # the order they judge). guard-cross-session-send judges SendMessage; on the
 # other events it only keeps its per-session state, and never objects.
-_UNTRUSTED_READS = re.compile(r"(?:WebFetch|WebSearch|Bash|mcp__.+__(?:issue_read|pull_request_read|"
-                              r"get_file_contents|search_issues|search_code))\Z")
+_SEND_STATE_TOOLS = re.compile(r"(?:WebFetch|WebSearch|Bash|Agent|mcp__.+)\Z")
 GUARDS = (
     ("PreToolUse", re.compile(r"Bash\Z"), (guard_unparsable, guard_recursive_delete, ask_first, guard_bypass_hooks,
                                            guard_infra, guard_bypass_labels, guard_bypass_ruleset,
@@ -59,10 +58,10 @@ GUARDS = (
                                            guard_host_availability, guard_scheduled_jobs)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
     ("PreToolUse", re.compile(r"SendMessage\Z"), (guard_cross_session_send,)),
-    ("PostToolUse", _UNTRUSTED_READS, (guard_cross_session_send,)),
-    ("PostToolUseFailure", _UNTRUSTED_READS, (guard_cross_session_send,)),
+    ("PostToolUse", _SEND_STATE_TOOLS, (guard_cross_session_send,)),
+    ("PostToolUseFailure", _SEND_STATE_TOOLS, (guard_cross_session_send,)),
     ("SubagentStart", None, (guard_cross_session_send,)),
-    ("UserPromptSubmit", None, (guard_cross_session_send,)),
+    ("SessionStart", None, (guard_cross_session_send,)),
 )
 
 

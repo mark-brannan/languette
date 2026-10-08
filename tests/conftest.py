@@ -116,6 +116,7 @@ class Ctx:
         self.calls = 0                         # tool_use_id in the payload: one per call, as Claude Code gives
         self.stdin = self.verdict = self.scanned = None
         self._dirs = []
+        self.cleanups = []
 
     def mkdtemp(self):
         d = tempfile.mkdtemp(prefix="languette-", dir="/tmp")
@@ -142,6 +143,8 @@ class Ctx:
         return s
 
     def cleanup(self):
+        for f in self.cleanups:
+            f()
         for d in self._dirs:
             shutil.rmtree(d, ignore_errors=True)
 
@@ -635,6 +638,29 @@ def _speaks(ctx):
     ctx.run(json.dumps(ctx.moded({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
                                   "prompt": "go on"})))
     assert ctx.verdict.stdout == "", f"UserPromptSubmit printed {ctx.verdict.stdout!r}"
+
+
+@when(parsers.parse('the session starts from "{source}"'))
+def _session_starts(ctx, source):
+    ctx.run(json.dumps(ctx.moded({"hook_event_name": "SessionStart", "session_id": ctx.session, "source": source})))
+    assert ctx.verdict.stdout == "", f"SessionStart printed {ctx.verdict.stdout!r}"
+
+
+@when(parsers.parse('the agent spawns a subagent named "{name}", given id "{agent}"'))
+def _spawns(ctx, name, agent):
+    ctx.run(json.dumps(ctx.moded({"hook_event_name": "PostToolUse", "session_id": ctx.session, "tool_name": "Agent",
+                                  "tool_input": {"name": name, "prompt": "p", "description": "d"},
+                                  "tool_response": {"status": "async_launched", "agentId": agent}})))
+    assert ctx.verdict.stdout == "", f"PostToolUse printed {ctx.verdict.stdout!r}"
+
+
+@given(parsers.parse('the session\'s team config lists "{name}"'))
+def _team(ctx, name):
+    d = Path(os.environ["HOME"], ".claude", "teams", f"session-{ctx.session[:8]}")
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "config.json").write_text(json.dumps({"members": [{"name": "team-lead", "agentType": "team-lead"},
+                                                           {"name": name, "agentId": f"{name}@x"}]}))
+    ctx.cleanups.append(lambda: shutil.rmtree(d, ignore_errors=True))
 
 
 @when(parsers.parse('subagent "{agent}" starts'))
