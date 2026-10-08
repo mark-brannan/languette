@@ -1,5 +1,5 @@
 {
-  "lines": {"README.md": 325},
+  "lines": {"README.md": 325, "docs/design/guard-pipeline.md": 70},
   "sections": {"targets": ["README.md"], "max_words": 232, "exempt": ["Configuration"]},
   "delta": {"targets": ["README.md", "docs/**/*.md", "!docs/agent_decisions.md"], "max_words": 40},
   "narration": {
