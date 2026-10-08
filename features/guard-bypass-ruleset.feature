@@ -237,6 +237,13 @@ Feature: guard-bypass-ruleset
       """
     Then the guard is silent
 
+  Scenario: a cd after a command in its and-or list holds for the rest of that list
+    Given a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
+    And the working directory is "{TMP}/m"
+    When the agent runs `git status && cd {TMP}/repo && git push origin HEAD`
+    Then the guard is silent
+
   Scenario: a bare ~ is HOME
     Given HOME is "{TMP}/repo"
     And a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
@@ -262,6 +269,11 @@ Feature: guard-bypass-ruleset
       | cd {TMP}/rep* && git push origin HEAD                   | a glob                                   |
       | cd ~other/repo && git push origin HEAD                  | another user's home                      |
       | cd '~/repo' && git push origin HEAD                     | a quoted ~ is a directory named ~        |
+      | echo ~/repo; cd "~/repo"; git push origin HEAD          | the cd's own ~ is quoted, the echo's not |
+      | cd \\~/repo && git push origin HEAD                     | an escaped ~ is a directory named ~      |
+      | test -d {TMP}/x && cd {TMP}/repo; git push origin HEAD  | the test may skip the cd                 |
+      | git status \|\| cd {TMP}/repo && git push origin HEAD   | the push runs when the cd was skipped    |
+      | cd {TMP}/nope \|\| cd {TMP}/repo; git push origin HEAD  | the second cd may not run                |
 
   Scenario: a subshell's cd never lends the push its branch
     Given HOME is "{TMP}"
