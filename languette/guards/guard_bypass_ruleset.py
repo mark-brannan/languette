@@ -134,7 +134,8 @@ class _Literals:
         before, between = self._seps(0, a), self._seps(a, start)
         if before is None or between is None or not (before <= {";"} or between <= {"&&"}):
             return None                        # the push may run when the assignment didn't
-        return w[:m.start()] + val + w[m.end():]
+        r = w[:m.start()] + val + w[m.end():]
+        return None if r.startswith("-") else r  # an option (--all, --delete), not a refspec
 
 
 def _resolve(base, target, live):
