@@ -4,8 +4,7 @@ addopts = "--strict-markers"
 bdd_features_base_dir = "features"
 markers = [
   "python: run the scenario against languette/ in-process",
-  "shell: run the scenario against hooks/<guard>.sh",
-  "shell_only: run the scenario against the shell engine only",
+  "hook: run the scenario against a hooks/hooks.json command, by subprocess",
   "shfmt_only: run the scenario against the shfmt rung only",
   "python_only: run the scenario against the awk rung only",
   "no_shfmt: run the scenario on every engine but the shfmt rung, whose parse check denies it first",

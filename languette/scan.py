@@ -1,4 +1,4 @@
-"""Shell-text scanner: a port of hooks/lib-shell-words.awk, whose header is
+"""Shell-text scanner: a port of the retired lib-shell-words.awk (see git history), whose header was
 the spec. Nothing here decides anything; it turns the Bash tool's command
 string into words a guard judges, and every ambiguity resolves toward MORE
 words reaching the guard, never fewer.

@@ -1,9 +1,39 @@
-@python @shell
+@python
 Feature: guard-github-issues
   One GitHub issue create, transfer or delete per human turn. The human's
   own turn is the door: it opens on UserPromptSubmit and the first identifier
   write of that turn to run spends it. The door is named apart from the claude
   plugin's own copy of this hook, so the two never spend each other's.
+
+  Why. An issue number is an identifier things link to where no agent can
+  see, so minting or moving one is a one-way door (Solace, 2026-09-30): one
+  create, transfer or delete per human turn, never two in one call, never one
+  in a loop.
+
+  Claimed before the call, spent after it. PreToolUse claims the door by
+  renaming it to `<door>.held`, which only one call can win, and writes its
+  tool_use_id there; PostToolUse and PostToolUseFailure delete the claim once
+  the call has run. A claim whose call already has a result in the
+  transcript, but was never spent, belongs to a call another guard denied: it
+  never ran, so the next write takes the claim over. Each guard is its own
+  hook process and cannot see the others' verdicts; spending at PreToolUse
+  shut the door on a create another guard denied, with nothing posted. A
+  claim whose call has no result yet is still in flight, and a second write
+  is denied. The door is replaced, never followed: a symlink planted at the
+  door path must not be written through. After the call a deny has nothing
+  left to refuse, so an unreadable call fails closed by spending the door.
+
+  Counts as an identifier write: `gh issue create|new|transfer|delete`; a
+  `gh api` POST to repos/o/r/issues; a graphql createIssue, transferIssue or
+  deleteIssue; the MCP create_issue, transfer_issue, delete_issue, and
+  issue_write with method create. The command is read through the shell
+  scanner, so `sh -c`, `eval` and `xargs` bodies are seen; a script file is
+  not. The door is named apart from the claude plugin's own copy because the
+  same session_id can run both plugins, and a shared name would let one
+  plugin's UserPromptSubmit spend the other's door.
+
+  This is a gate, so it fails closed: a call that mentions an issue and
+  cannot be read is denied.
 
   Scenario Outline: never an identifier write, door shut or not
     When the agent runs `<command>`
@@ -170,11 +200,6 @@ Feature: guard-github-issues
     And the agent runs `gh issue create -t t -b b`
     Then the guard denies
 
-  @shell_only
-  Scenario: with no jq or awk on PATH, a call that mentions an issue is denied
-    Given PATH holds only "sh cat printf dirname head cut readlink"
-    When the agent runs `gh issue create -t t -b b`
-    Then the guard denies
 
   Scenario: the deny reason says what to do
     When the agent runs `gh issue create -t t -b b`

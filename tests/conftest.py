@@ -3,9 +3,9 @@
 Every scenario runs once per engine its feature is tagged with: @python runs
 languette/ in-process twice, as the "python" engine on the parser ladder's awk
 rung and as "shfmt" on its shfmt rung (skipped without a shfmt new enough,
-except under CI); @shell runs hooks/<guard>.sh by subprocess (under
-$AWK_PATH's awk when set). @shell_only narrows a scenario to the shell,
-@shfmt_only to the shfmt rung; @no_shfmt drops the shfmt rung, for a row its
+except under CI); @hook runs a hooks/hooks.json command by subprocess, the way
+Claude Code runs it (wiring.feature). @shfmt_only narrows a scenario to the
+shfmt rung; @no_shfmt drops the shfmt rung, for a row its
 parse check denies before any guard reads it. The feature's name is the guard's name, except
 guard-unparsable, which has its own guard. @python_only narrows a scenario to the
 awk rung.
@@ -30,16 +30,16 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from languette import run, scan  # noqa: E402
 
-ENGINES = ("python", "shfmt", "shell")
+ENGINES = ("python", "shfmt", "hook")
 IN_PROCESS = {"python": ("awk",), "shfmt": ("shfmt",)}   # engine -> scan.RUNGS
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "LANGUETTE_PERM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
-         "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH", "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND",
+         "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH", "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND",
          "CLAUDE_CODE_TMPDIR", "CLAIM_STAMP_BIN", "GH_RULES", "GH_PROTECTION", "XDG_CACHE_HOME")
 
 
 _REAL_HOME = os.environ.get("HOME")
-# The shell guard's CLI argument -> the hook event it stands for.
+# Ctx.arg -> the hook event it stands for.
 EVENTS = {"prompt": "UserPromptSubmit", "post": "PostToolUse"}
 
 
@@ -65,8 +65,6 @@ def pytest_unconfigure(config):
 def pytest_generate_tests(metafunc):
     marks = {m.name for m in metafunc.definition.iter_markers()}
     engines = [e for e in ENGINES if e in marks or (e == "shfmt" and "python" in marks)]
-    if "shell_only" in marks:
-        engines = ["shell"]
     if "python_only" in marks:
         engines = ["python"]
     if "shfmt_only" in marks:
@@ -94,14 +92,6 @@ def rungs(engine, monkeypatch):
     monkeypatch.setattr(scan, "RUNGS", IN_PROCESS[engine])
 
 
-def awk_path():
-    return os.environ.get("AWK_PATH") or ""
-
-
-def which_awk():
-    return shutil.which("awk", path=awk_path() + os.pathsep + os.environ["PATH"] if awk_path() else None)
-
-
 class Ctx:
     def __init__(self, engine):
         self.engine, self.guard = engine, None
@@ -111,7 +101,7 @@ class Ctx:
         self.project_env = True
         self.stubs = False
         self.hook = None                       # a hooks.json command, for wiring
-        self.arg = None                        # an extra CLI argument to the guard script
+        self.arg = None                        # the hook event, as Claude Code names it, for the guard to read
         self.session = "s1"                    # session_id in the payload, for guard-github-issues
         self._doordir = None
         self.calls = 0                         # tool_use_id in the payload: one per call, as Claude Code gives
@@ -169,37 +159,30 @@ class Ctx:
         self.stdin = stdin
         if self.engine in IN_PROCESS:
             # A hook command only shapes a subprocess; in-process it would do nothing.
-            assert not self.hook, "test setup: a hook command needs the shell engine (@shell_only)"
-            # TMPDIR as the shell engine has it, so a guard's per-session file
-            # starts fresh each scenario; PATH and the stub log as the stubs need.
+            assert not self.hook, "test setup: a hook command needs the hook engine (@hook)"
+            # TMPDIR fresh per scenario, so a guard's per-session file starts
+            # empty; PATH and the stub log as the stubs need.
             env = {"HOME": os.environ["HOME"], "TMPDIR": self.doordir(), **self.scenario_env()}
             if self.bare or self.stubs:
                 env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
             if self.stub_log:
                 env["LANGUETTE_STUB_LOG"] = self.stub_log
             if self.arg:
-                # The shell script's argument names the hook event, which a Python
-                # guard reads from the payload, as Claude Code sends it.
+                # The event is in the payload, as Claude Code sends it.
                 stdin = json.dumps({**json.loads(stdin), "hook_event_name": EVENTS[self.arg]})
             self.verdict = Verdict(run.respond(stdin, env, only=self.guard))
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
         path = env["PATH"]
-        if awk_path():
-            path = awk_path() + os.pathsep + path
         if self.stubs:
             path = str(ROOT / "tests/stubs") + os.pathsep + path
         if self.stub_log:
             env["LANGUETTE_STUB_LOG"] = self.stub_log
         env["PATH"] = self.bare or path
         env["TMPDIR"] = self.doordir()
-        if self.hook:
-            env["CLAUDE_PLUGIN_ROOT"] = str(ROOT)
-            argv = ["sh", "-c", self.hook]
-        else:
-            argv = ["sh", str(ROOT / f"hooks/{self.guard}.sh")]
-            if self.arg:
-                argv.append(self.arg)
+        assert self.hook, "test setup: the hook engine runs a hooks.json command"
+        env["CLAUDE_PLUGIN_ROOT"] = str(ROOT)
+        argv = ["sh", "-c", self.hook]
         env.update(self.scenario_env())
         try:
             r = subprocess.run(argv, input=stdin, env=env, capture_output=True, text=True, timeout=5)
@@ -290,7 +273,7 @@ def _setenv(ctx, var, value):
 
 @given("no engine is configured")
 def _no_engine(ctx):
-    ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = ctx.env["PROSE_BUDGET"] = None
+    ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = None
 
 
 @given(parsers.re(r"(?P<var>[A-Z][A-Z0-9_]*) is unset"))
@@ -399,9 +382,8 @@ def _remote_head(ctx, path, branch):
 
 
 def _engine(ctx, command):
-    # The prose_budget_command option names the engine; PROSE_BUDGET is how the
-    # shell script, still run by the shell engine, finds it.
-    ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = ctx.env["PROSE_BUDGET"] = command
+    # The prose_budget_command option names the engine.
+    ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = command
 
 
 @given('the stub "prose-budget" is the engine')
@@ -412,7 +394,7 @@ def _prose_budget_stub(ctx):
 
 @given('the stub "prose-budget" is the engine, at a relative path')
 def _prose_budget_stub_relative(ctx):
-    assert ctx.proj, "test setup: a relative PROSE_BUDGET needs a project directory"
+    assert ctx.proj, "test setup: a relative engine path needs a project directory"
     ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
     dest = ctx.proj / "prose-budget"
     shutil.copy(ROOT / "tests/stubs/prose-budget", dest)
@@ -430,7 +412,7 @@ def _prose_budget_stub_bare(ctx):
 def _bare_path(ctx, tools, gh):
     ctx.bare = ctx.mkdtemp()
     for t in tools.split():
-        p = which_awk() if t == "awk" else shutil.which(t)
+        p = shutil.which(t)
         assert p, f"test setup: no {t} on PATH"
         os.symlink(p, os.path.join(ctx.bare, t))
     if gh:
@@ -446,12 +428,9 @@ def _hooks_json(ctx, guard):
 @given(parsers.parse('the plugin\'s script for "{guard}" crashes'))
 def _crash(ctx, guard):
     root = Path(ctx.mkdtemp())
-    if "languette/run.py" in hooks_json_commands()[guard]:
-        (root / "languette").mkdir()
-        (root / "languette/run.py").write_text("raise SystemExit(3)\n")
-    else:
-        (root / "hooks").mkdir()
-        (root / f"hooks/{guard}.sh").write_text("exit 3\n")
+    assert "languette/run.py" in hooks_json_commands()[guard]
+    (root / "languette").mkdir()
+    (root / "languette/run.py").write_text("raise SystemExit(3)\n")
     ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
 
 
@@ -461,8 +440,8 @@ def hooks_json_commands():
     out = {}
     for entry in hj["hooks"]["PreToolUse"]:
         for h in entry["hooks"]:
-            m = re.search(r'/hooks/([a-z-]+)\.sh"|languette/run\.py" --guard ([a-z-]+)', h["command"])
-            out[m.group(1) or m.group(2)] = h["command"]
+            m = re.search(r'languette/run\.py" --guard ([a-z-]+)', h["command"])
+            out[m.group(1)] = h["command"]
     return out
 
 
@@ -616,17 +595,11 @@ def _scan_json(ctx, js):
 
 
 def scanned(ctx, mode):
-    if ctx.engine in IN_PROCESS:
-        if mode == "tokens":
-            s = scan.Scan(ctx.scanned)
-            assert s.rung == IN_PROCESS[ctx.engine][0], f"the {s.rung} rung read it"
-            return s.tokens()
-        return [("1:" if nested else "0:") + t for t, nested in scan.texts_of(scan.strip_heredocs(ctx.scanned + "\n"))]
-    lib, prog = ROOT / "hooks/lib-shell-words.awk", ROOT / "tests/scan_json.awk"
-    r = subprocess.run([which_awk(), "-v", f"mode={mode}", "-f", str(lib), "-f", str(prog)],
-                       input=ctx.scanned, capture_output=True, text=True, timeout=5)
-    assert r.returncode == 0, r.stderr
-    return json.loads(r.stdout)
+    if mode == "tokens":
+        s = scan.Scan(ctx.scanned)
+        assert s.rung == IN_PROCESS[ctx.engine][0], f"the {s.rung} rung read it"
+        return s.tokens()
+    return [("1:" if nested else "0:") + t for t, nested in scan.texts_of(scan.strip_heredocs(ctx.scanned + "\n"))]
 
 
 # --- Then ----------------------------------------------------------------

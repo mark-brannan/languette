@@ -1,10 +1,34 @@
-@python @shell
+@python
 Feature: prose-budget-commit
   Before a `git commit`, runs the prose-budget engine with --staged and
   denies on a finding. The engine is the command the prose_budget_command
   option names, else prose-budget on PATH; it is never bundled here, so every
   scenario stubs it. Without an engine the guard is silent -- it can only
   narrow what already passes, never widen it.
+
+  Why. Documentation bloat should be caught as it is written, not in CI. The
+  guard runs on a `git commit`: `--staged` checks the index, and a commit
+  that reaches past it (-a, a pathspec, an `add` in the same command, -p,
+  --pathspec-from-file) also runs `--file` on what it would commit. No engine,
+  no budgets config in the target repo, or an engine crash is a no-op; this
+  guard only narrows what already passes through it. Exit 1 is a finding and
+  denies; exit 2 (a bad budgets config, or an engine too old for
+  --staged/--file) denies and says so; any other exit is a no-op.
+
+  Fail closed: anything the guard cannot resolve (a `cd` or `-C` target, a
+  pathspec word, a directory pathspec, a failed `diff` or `ls-files`, a
+  second commit in a different directory, since one check cannot serve two
+  repositories) denies rather than skips. A directory, glob or magic
+  (`:`-led) pathspec names more than itself, so it widens the check to every
+  unstaged tracked change rather than being passed on as a literal --file
+  argument the engine would fail to find; an `add` by pattern (`-A`, `.`,
+  `*`) or an interactive commit can also pick up a brand new untracked file,
+  which a tracked-only diff cannot see. A relative engine path means relative
+  to the commit's own cwd, resolved before any `cd`; a bare name is a command
+  looked up on PATH. `yadm` is recognised as git's wrapper word only, as in
+  the other guards, and is never called unless the command named it; the
+  wrapper word is read for which CLI it names and never executed, being as
+  attacker-controlled as the rest of the command.
 
   Background:
     Given a project directory
@@ -311,11 +335,5 @@ Feature: prose-budget-commit
   Scenario: with no engine configured or on PATH the guard is silent
     Given no engine is configured
     And PATH holds only "sh jq awk cat cut dirname"
-    When the agent runs `git commit -m x`
-    Then the guard is silent
-
-  @shell_only
-  Scenario: with no jq on PATH the guard is silent
-    Given PATH holds only "sh awk cat cut dirname"
     When the agent runs `git commit -m x`
     Then the guard is silent
