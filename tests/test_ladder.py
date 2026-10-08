@@ -19,7 +19,7 @@ needs_shfmt = pytest.mark.skipif(not REAL and not os.environ.get("CI"), reason="
 @pytest.fixture(autouse=True)
 def fresh():
     def clear():                               # a test may have patched one out
-        for f in (scan.shfmt, scan._shfmt_tree, scan._bash_n):
+        for f in (scan.shfmt, scan._shfmt_tree, scan._bash_n, scan._ts_parser, scan._tree_sitter):
             getattr(f, "cache_clear", lambda: None)()
     clear()
     yield
@@ -138,9 +138,57 @@ def test_the_awk_rung_refuses_no_closed_quote(monkeypatch, command):
     assert scan.parse(command) == ("awk", None)
 
 
-def test_the_pip_rung_is_an_empty_slot(monkeypatch):
-    monkeypatch.setattr(scan, "RUNGS", ("pip", "awk"))
-    assert scan.Scan("rm -rf x").rung == "awk"
+class Node:
+    """Enough of a tree-sitter node for _tree_sitter: kind is "ok", "ERROR" or "MISSING"."""
+    def __init__(self, kind="ok", children=(), at=(0, 0), text=b"", type="program"):
+        self.is_error, self.is_missing = kind == "ERROR", kind == "MISSING"
+        self.children, self.start_point, self.text, self.type = list(children), at, text, type
+        self.has_error = self.is_error or self.is_missing or any(c.has_error for c in self.children)
+
+
+def fake_ts(monkeypatch, root):
+    tree = type("Tree", (), {"root_node": root})()
+    monkeypatch.setattr(scan, "_ts_parser", lambda: type("P", (), {"parse": lambda self, b: tree})())
+
+
+def refuse(monkeypatch, why="line 1: unexpected EOF"):
+    """bash -n, faked to refuse, so the column is the only thing under test."""
+    def bash_n(text):
+        raise scan.Unparseable(why)
+    monkeypatch.setattr(scan, "_bash_n", bash_n)
+    monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
+
+
+@pytest.mark.parametrize("root, at", [
+    (Node(children=[Node(), Node("ERROR", at=(0, 4), text=b" 'unclosed")]), "1:6"),
+    (Node(children=[Node("ERROR", at=(0, 0), text=b"case x in")]), "1:1"),
+    (Node(children=[Node(children=[Node("MISSING", at=(1, 11), type=")")]), Node("ERROR")]), "2:12"),
+])
+def test_tree_sitter_adds_the_column_to_a_refusal_below_shfmt(monkeypatch, root, at):
+    fake_ts(monkeypatch, root)
+    refuse(monkeypatch)
+    with pytest.raises(scan.Unparseable) as e:
+        scan.check("x")
+    assert (e.value.rung, str(e.value)) == ("bash -n", f"line 1: unexpected EOF, at {at} per tree-sitter-bash")
+
+
+def test_tree_sitter_never_decides(monkeypatch):
+    fake_ts(monkeypatch, Node(children=[Node("ERROR", at=(0, 0), text=b"x")]))
+    monkeypatch.setattr(scan, "RUNGS", ("awk",))
+    assert scan.parse("echo ok") == ("awk", None)            # an ERROR node, and the text still reads
+
+
+@pytest.mark.parametrize("parser", [
+    None,                                                    # not installed
+    type("P", (), {"parse": lambda self, b: 1 / 0})(),        # crashes
+    type("P", (), {"parse": lambda self, b: type("T", (), {"root_node": Node()})()})(),  # a clean tree
+])
+def test_with_no_column_the_refusal_stands_as_its_rung_wrote_it(monkeypatch, parser):
+    monkeypatch.setattr(scan, "_ts_parser", lambda: parser)
+    refuse(monkeypatch)
+    with pytest.raises(scan.Unparseable) as e:
+        scan.check("x")
+    assert (e.value.rung, str(e.value)) == ("bash -n", "line 1: unexpected EOF")
 
 
 def feature_commands(files=None):
