@@ -1,12 +1,14 @@
 """The decision record (#82): opt-in, redacted unless asked, never the verdict's
 business, whole lines under parallel hooks, 0600, rotated."""
 
+import fcntl
 import json
 import os
 import stat
+import time
 from concurrent.futures import ThreadPoolExecutor
 
-from languette import run, world
+from languette import record, run, world
 from languette.world import World
 
 RM = "rm -rf ~/secret-project && git push"
@@ -50,6 +52,12 @@ def test_a_command_every_guard_let_through_is_recorded(tmp_path):
     [rec] = _records(tmp_path)
     assert rec["verdict"] == "silent" and rec["rung"] and len(rec["findings"]) > 1
     assert {f["decision"] for f in rec["findings"]} == {"none"}
+
+
+def test_shell_keywords_are_not_programs():
+    assert record.programs('for f in *.py; do python3 "$f"; done') == ["python3"]
+    assert record.programs("if ! grep -q x f; then rm x; fi") == ["grep", "rm"]
+    assert record.programs("case $x in a) rm y;; esac") == ["rm"]
 
 
 def test_raw_keeps_the_command_and_the_reason(tmp_path):
@@ -99,3 +107,24 @@ def test_rotation_keeps_one_old_file(tmp_path, monkeypatch):
     d = tmp_path / "state" / "languette"
     assert sorted(p.name for p in d.iterdir()) == ["decisions.jsonl", "decisions.jsonl.1"]
     assert json.loads((d / "decisions.jsonl").read_text().splitlines()[-1])["n"] == 19
+
+
+def test_a_held_lock_drops_the_record_not_the_call(tmp_path, monkeypatch):
+    monkeypatch.setattr(world, "RECORDS_WAIT", 0.05)
+    w = World(_env(tmp_path), {})
+    w.keep({"n": 0})
+    f = tmp_path / "state" / "languette" / "decisions.jsonl"
+    with open(f, "a") as holder:
+        fcntl.flock(holder, fcntl.LOCK_EX)
+        t0 = time.monotonic()
+        w.keep({"n": 1})
+        assert time.monotonic() - t0 < 1
+    assert [r["n"] for r in _records(tmp_path)] == [0]
+
+
+def test_a_symlink_in_place_of_the_file_is_not_followed(tmp_path):
+    d = tmp_path / "state" / "languette"
+    d.mkdir(parents=True)
+    (d / "decisions.jsonl").symlink_to(tmp_path / "elsewhere")
+    World(_env(tmp_path), {}).keep({"n": 0})
+    assert not (tmp_path / "elsewhere").exists()

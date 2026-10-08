@@ -40,14 +40,24 @@ def _finding(guard, r, crashed, raw):
     return f
 
 
+# Shell words that lead a segment without being a program; past them is the program.
+KEYWORDS = frozenset("if then else elif fi while until do done !".split())
+# Words whose segment runs nothing: the rest of it is a name and a list (`for f in *.py`).
+HEADERS = frozenset("for select case esac".split())
+
+
 def programs(command):
-    """The command-position word of each top-level segment, as its basename."""
+    """The program each top-level segment runs, as its basename: the first word
+    after assignments and shell keywords."""
     s = scan.Scan(command)
     out = []
     for a, b in s.segments():
         c = scan.seg_cmd(s, a, b) if a <= b else None
-        if c is not None:
-            out.append(os.path.basename(s.w[c]) or s.w[c])
+        while c is not None and c <= b and s.k[c] == "w" and s.w[c] in KEYWORDS:
+            c += 1
+        if c is None or c > b or s.k[c] != "w" or s.w[c] in HEADERS:
+            continue
+        out.append(os.path.basename(s.w[c]) or s.w[c])
     return out
 
 
