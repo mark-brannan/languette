@@ -18,7 +18,13 @@ network read opens the door, and stays open for the session: the text is
 still in its context. SessionStart for a new or cleared session closes it, and
 no state file is a closed door. PostToolUse on Agent records the subagent's
 name and id (SubagentStart carries the id, not the name); SubagentStart
-records the id too. Teammates are read from the session's team config.
+records the id too. Teammates are read from the session's team config,
+~/.claude/teams/session-<first 8 of session_id>/config.json (the agent-teams
+docs' layout).
+
+Both files are ones the guarded agent can write, or delete, with an ordinary
+file tool: like guard-github-issues' door, this guards against an agent
+relaying by accident, not one working to get round it.
 """
 
 import json
