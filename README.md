@@ -34,9 +34,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
 It needs:
 
-- `python3`, standard library only, for every `run.py` guard (`ask-first`,
-  `guard-bypass-hooks`, `guard-bypass-labels`, `guard-infra`, `guard-recursive-delete`,
-  `guard-unparsable`);
+- `python3`, standard library only, for every `run.py` guard;
 - `jq` and a POSIX `awk`, for the shell guards, until a real shell parser replaces them
   ([#4](https://github.com/mark-brannan/languette/issues/4), planned);
 - `gh`, for `guard-git-stacked-base` and `guard-bypass-ruleset`.
@@ -75,6 +73,7 @@ Each guard checks for one kind of hazard:
   that is a worktree, or a [reach into another session's worktree](features/guard-worktrees-foreign.feature)
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
   applying a label that waives a CI gate, such as `churn-ok`
+- [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to another session: asks; in `bypassPermissions`, denies after a network read
 - `guard-secrets`, `guard-protected-paths`, `guard-database` (planned)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
@@ -264,6 +263,7 @@ guard reads beyond the command, it declares:
 | `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
+| `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
 | `guard-worktrees` | `$HOME` and what `git rev-parse --show-toplevel` resolves to; git, for where each path lands, and a record per session in `$TMPDIR` |
 | `prose-budget-commit` | the staged diff and, for a commit that reaches past the index, the named working-tree files, through `prose-budget` |
 

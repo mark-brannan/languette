@@ -367,3 +367,48 @@ Feature: wiring
     And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME is "false"
     When the agent runs `git checkout some-branch`
     Then the guard is silent
+
+  # guard-cross-session-send judges SendMessage, not Bash, so it has its own rows.
+  Scenario Outline: the hooks.json command for guard-cross-session-send judges a send and fails closed
+    Given the hook is the hooks.json command for "guard-cross-session-send"
+    And the permission mode is "default"
+    And <setup>
+    When the agent sends "api-worker" the message `hello`
+    Then the guard <verdict>
+
+    Examples:
+      | verdict   | setup                                                      |
+      | asks      | CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND is "true"    |
+      | is silent | CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND is "false"   |
+      | denies    | CLAUDE_PLUGIN_ROOT is "/nonexistent"                       |
+      | denies    | the plugin's script for "guard-cross-session-send" crashes |
+
+  Scenario: with python3 absent from PATH, guard-cross-session-send denies and says python3 is required
+    Given the hook is the hooks.json command for "guard-cross-session-send"
+    And PATH holds only "sh cat printf dirname"
+    When the agent sends "api-worker" the message `hello`
+    Then the guard denies, naming "python3 is required for guard-cross-session-send"
+
+  # Its state hooks never object; one that fails leaves an open door in place
+  # of the session's state, since no state reads as a closed one.
+  Scenario: the hooks.json PostToolUse command for guard-cross-session-send opens the door
+    Given the hook is the hooks.json PostToolUse command for "guard-cross-session-send"
+    And the cross-session state file holds `{"subagents": [], "read": null}`
+    When Claude Code fires PostToolUse for tool "WebFetch"
+    Then the guard is silent
+    And the cross-session state file names "WebFetch"
+
+  Scenario Outline: a guard-cross-session-send state hook that fails leaves the door open
+    Given the hook is the hooks.json <event> command for "guard-cross-session-send"
+    And the cross-session state file holds `{"subagents": [], "read": null}`
+    And <setup>
+    When Claude Code fires <event> for tool "WebFetch"
+    Then the guard is silent
+    And the cross-session state file names "an unknown tool (a state hook failed)"
+
+    Examples:
+      | event            | setup                                                      |
+      | PostToolUse      | the plugin's script for "guard-cross-session-send" crashes |
+      | PostToolUse      | CLAUDE_PLUGIN_ROOT is "/nonexistent"                       |
+      | SessionStart     | the plugin's script for "guard-cross-session-send" crashes |
+      | SubagentStart    | PATH holds only "sh cat printf dirname sed head rm"        |

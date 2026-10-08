@@ -115,6 +115,16 @@
             "statusMessage": "Checking for a branch switch in $HOME or a reach into another session's worktree"
           }
         ]
+      },
+      {
+        "matcher": "SendMessage",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-cross-session-send and was not found on PATH. This is a gate and fails closed: install python3, or set guard_cross_session_send=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-cross-session-send) is missing from the plugin directory or crashed, so a message to another session could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking a message to another session"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -125,6 +135,16 @@
             "type": "command",
             "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\" post; }; true",
             "statusMessage": "Spending the issue door for this turn"
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch|WebSearch|Bash|Agent|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { p=$(cat); o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send 2>/dev/null) && [ -z \"$o\" ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "statusMessage": "Noting a network read or a subagent for the cross-session guard"
           }
         ]
       }
@@ -139,6 +159,16 @@
             "statusMessage": "Spending the issue door for this turn"
           }
         ]
+      },
+      {
+        "matcher": "WebFetch|WebSearch|Bash|Agent|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { p=$(cat); o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send 2>/dev/null) && [ -z \"$o\" ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "statusMessage": "Noting a network read or a subagent for the cross-session guard"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -148,6 +178,28 @@
             "type": "command",
             "command": "h=\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh\"; [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"$h\" ] && sh \"$h\" prompt; }; true",
             "statusMessage": "Opening the issue door for this turn"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { p=$(cat); o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send 2>/dev/null) && [ -z \"$o\" ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "statusMessage": "Noting this session's subagent for the cross-session guard"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { p=$(cat); o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send 2>/dev/null) && [ -z \"$o\" ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "statusMessage": "Closing the cross-session door for a new session"
           }
         ]
       }

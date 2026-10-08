@@ -23,7 +23,12 @@ SPENT = ".languette-ask"            # appended to the transcript path
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
-KINDS = frozenset("git gh-api pr-list which read path cwd clock ruleset-cache ruleset-keep claim worktree".split())
+SEND_STATE = "languette-guard-cross-session-send."   # + session id, under $TMPDIR
+SEND_SUBAGENTS_MAX = 500            # names and ids kept per session; the oldest go first
+# What a failed write, or a first write that is not a session start, leaves:
+# no subagents known, the door open.
+SEND_LOST = '{"subagents": [], "read": "an unknown tool (this session\'s state was lost)"}'
+KINDS = frozenset("git gh-api pr-list which read path cwd clock ruleset-cache ruleset-keep claim worktree send-state send-keep".split())
 
 
 class World:
@@ -244,6 +249,69 @@ class World:
                          if i not in spent)
             return approved, True
 
+    def _send_file(self, session):
+        base = self.env.get("TMPDIR") or "/tmp"
+        return os.path.join(base, SEND_STATE + re.sub(r"[^A-Za-z0-9_-]", "_", session))
+
+    def _send_state(self, session):
+        """guard-cross-session-send's state for `session`: {"subagents": [the
+        names and ids of this session's subagents], "read": the tool that read
+        untrusted content in this session, or None}. Raises OSError or
+        ValueError when it is missing, a link, someone else's, open to others,
+        or garbled."""
+        fd = os.open(self._send_file(session), os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(fd, encoding="utf-8") as f:
+            _own(f)
+            fcntl.flock(f, fcntl.LOCK_SH)
+            st = json.load(f)
+        if not (isinstance(st, dict) and isinstance(st.get("subagents"), list)
+                and (st.get("read") is None or isinstance(st.get("read"), str))):
+            raise ValueError("guard-cross-session-send state has the wrong shape")
+        return st
+
+    def _send_keep(self, session, op, arg):
+        """Update that state under an exclusive lock: op "clear" writes a closed
+        door with no subagents (a new or cleared session), "read" opens it naming `arg`, "names"
+        records the subagent names and ids in `arg`. Only "clear" makes a
+        closed door: a file another op creates starts as SEND_LOST. A link
+        planted at the path is removed, never written through. A write that
+        fails leaves SEND_LOST in its place where it can."""
+        path = self._send_file(session)
+        try:
+            if os.path.islink(path):
+                os.unlink(path)
+            fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "r+", encoding="utf-8") as f:
+                _own(f)
+                fcntl.flock(f, fcntl.LOCK_EX)
+                text = f.read()
+                try:
+                    st = json.loads(text) if text.strip() else None
+                except ValueError:
+                    st = None
+                if not isinstance(st, dict) or not isinstance(st.get("subagents"), list):
+                    st = json.loads(SEND_LOST)
+                if op == "clear":
+                    st = {"subagents": [], "read": None}   # a fresh context has no subagents yet
+                elif op == "read":
+                    st["read"] = arg
+                elif op == "names":
+                    st["subagents"] = ([s for s in st["subagents"] if s not in arg] + list(arg))[-SEND_SUBAGENTS_MAX:]
+                else:
+                    raise ValueError(f"no send-keep op {op!r}")
+                f.seek(0)
+                f.truncate()
+                f.write(json.dumps(st) + "\n")
+        except Exception:
+            try:
+                os.unlink(path)
+                fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                with os.fdopen(fd, "w") as f:
+                    f.write(SEND_LOST + "\n")
+            except OSError:
+                pass
+            raise
+
     # --- acts ------------------------------------------------------------
 
     def keep(self, rec):
@@ -311,6 +379,14 @@ class World:
         if self._seen is None:
             self._seen = scan(self._transcript())
         return self._seen
+
+
+def _own(f):
+    """Refuse a state file another user made, or one others may write: on a
+    shared /tmp it could have been planted to say the door is closed."""
+    st = os.fstat(f.fileno())
+    if st.st_uid != os.geteuid() or st.st_mode & 0o022:
+        raise PermissionError("guard-cross-session-send state is not this user's alone")
 
 
 def _record(line):
