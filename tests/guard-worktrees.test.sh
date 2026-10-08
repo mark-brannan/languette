@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Tests for guard-worktrees-foreign.sh. Run: bash hooks/guard-worktrees.test.sh
-# Set AWK_PATH to a directory whose `awk` is another implementation (mawk,
-# nawk, busybox) to check portability; CI runs it under Ubuntu's mawk.
+# Tests for guard-worktrees' foreign-worktree check. Run: bash tests/guard-worktrees.test.sh
 #
 # The fixture is a throwaway repo with two linked worktrees, not this
 # machine's real ones: the hook asks git what a path is, so the checks are
@@ -9,14 +7,16 @@
 # sibling worktree that exists today would rot the moment it is archived.
 set -uo pipefail
 
-HOOK="$(cd "$(dirname "$0")" && pwd)/guard-worktrees-foreign.sh"
-[ -n "${AWK_PATH:-}" ] && PATH="$AWK_PATH:$PATH"
-
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 # `pwd -P` inside the hook resolves symlinks (/tmp is one on macOS), so the
 # fixture paths must be resolved here too or every comparison misses.
 TMP=$(cd "$TMP" && pwd -P)
+# The guard runs as hooks.json runs it, by an absolute python3, so a
+# bare-PATH case below still reaches the guard.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+HOOK="$TMP/hook"
+printf '#!/bin/sh\nexec "%s" -I "%s/languette/run.py" --guard guard-worktrees\n' "$(command -v python3)" "$ROOT" >"$HOOK"
 
 setup() (
   set -e
@@ -457,7 +457,7 @@ if printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"'
   pass=$((pass + 1))
 else
   fail=$((fail + 1))
-  printf 'FAIL: no jq/awk on PATH must fail closed with valid JSON\n  hook output: %s\n' "$out"
+  printf 'FAIL: nothing on PATH must fail closed with valid JSON\n  hook output: %s\n' "$out"
 fi
 
 # jq/awk/sed present, git absent -- this is the case the header's own
@@ -474,7 +474,7 @@ if printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"'
   pass=$((pass + 1))
 else
   fail=$((fail + 1))
-  printf 'FAIL: jq/awk/sed present but no git on PATH must fail closed\n  hook output: %s\n' "$out"
+  printf 'FAIL: no git on PATH must fail closed\n  hook output: %s\n' "$out"
 fi
 rm -rf "$no_git_dir"
 

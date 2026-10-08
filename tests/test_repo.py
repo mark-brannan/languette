@@ -12,17 +12,20 @@ from hamcrest import assert_that, contains_string, empty, equal_to, has_length, 
 
 import readme_table
 from conftest import hooks_json_commands, hooks_json_prompt_command
+from languette.guards import guard_github_issues, guard_private_terms
 
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
           "guard-private-terms", "prose-budget-commit", "guard-worktrees",
           "guard-bypass-labels", "guard-unparsable", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
           "guard-permissions", "guard-pipe-to-shell", "guard-disk",
-          "guard-host-availability", "guard-scheduled-jobs", "guard-cross-session-send"}
+          "guard-host-availability", "guard-scheduled-jobs", "guard-cross-session-send",
+          "guard-secrets"}
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"guard_worktrees"}
 # Options that are not a guard's on/off toggle: name -> type.
 OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string",
+                 "prose_budget_command": "string",
                  "record_decisions": "boolean", "record_raw_commands": "boolean"}
 # Per-rule switches inside one guard: boolean, on by default.
 RULE_OPTIONS = {f"guard_git_work_loss_{r}" for r in ("blanket_staging", "stash", "force_push", "discard", "branch_delete")} | {
@@ -77,9 +80,8 @@ def hooks_shape(text):
 def prompt_hooks_shape(text):
     """One line per way hooks.UserPromptSubmit is not what opens the guard-github-issues
     door: a non-empty array of entries, each with a non-empty `hooks` array of
-    `type: "command"` objects, one of which runs guard-github-issues.sh with the
-    argument `prompt`. Without that argument the script reads the payload as a
-    PreToolUse one, allows it, and the door never opens."""
+    `type: "command"` objects, one of which runs guard-github-issues. Without it
+    the door never opens, and every identifier write is denied."""
     try:
         ups = json.loads(text)["hooks"]["UserPromptSubmit"]
     except (ValueError, KeyError, TypeError):
@@ -95,10 +97,10 @@ def prompt_hooks_shape(text):
             if not isinstance(h, dict) or h.get("type") != "command" \
                     or not isinstance(h.get("command"), str) or not h["command"]:
                 bad.append(f'UserPromptSubmit[{i}].hooks[{j}] is not a {{"type": "command", "command": "..."}} object')
-            elif re.search(r'guard-github-issues\.sh".*sh "\$h" prompt\b', h["command"]):
+            elif re.search(r'languette/run\.py" --guard guard-github-issues\b', h["command"]):
                 door += 1
     if not door:
-        bad.append('no UserPromptSubmit command runs guard-github-issues.sh with the argument "prompt"')
+        bad.append("no UserPromptSubmit command runs guard-github-issues")
     return bad
 
 
@@ -194,14 +196,14 @@ def test_the_readme_table_is_the_scenarios_table():
 
 def test_the_prompt_hook_has_the_shape_that_opens_the_door():
     assert_that(prompt_hooks_shape((ROOT / "hooks/hooks.json").read_text()), empty())
-    assert_that(hooks_json_prompt_command(), contains_string('sh "$h" prompt'))
+    assert_that(hooks_json_prompt_command(), contains_string("--guard guard-github-issues"))
 
 
 def _prompt_hooks(*hooks):
     return json.dumps({"hooks": {"UserPromptSubmit": [{"hooks": list(hooks)}]}})
 
 
-_DOOR = 'h="${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh"; sh "$h" prompt'
+_DOOR = 'python3 -I "${CLAUDE_PLUGIN_ROOT}/languette/run.py" --guard guard-github-issues'
 
 
 @pytest.mark.parametrize("wrong", [
@@ -211,23 +213,29 @@ _DOOR = 'h="${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh"; sh "$h" prompt'
     _prompt_hooks({"command": _DOOR}),
     _prompt_hooks({"type": "prompt", "command": _DOOR}),
     _prompt_hooks({"type": "command", "command": ""}),
-    # The mutation this guards: the `prompt` argument dropped.
-    _prompt_hooks({"type": "command", "command": 'h="${CLAUDE_PLUGIN_ROOT}/hooks/guard-github-issues.sh"; sh "$h"'}),
+    # The mutation this guards: the prompt hook running some other guard.
+    _prompt_hooks({"type": "command", "command": 'python3 -I "${CLAUDE_PLUGIN_ROOT}/languette/run.py" --guard ask-first'}),
     "not json",
 ])
 def test_the_prompt_shape_check_rejects(wrong):
     assert_that(prompt_hooks_shape(wrong), is_not(empty()))
 
 
+def _mcp_suffixes(tools):
+    """The MCP tool-name tails in a guard's TOOLS pattern, `mcp__.*__(?:a|b)`."""
+    [alts] = re.findall(r"mcp__\.\*__\(\?:([\w|]+)\)", tools.pattern)
+    return set(alts.split("|"))
+
+
 def _guard_github_issues_matcher():
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("guard-github-issues.sh" in h["command"] for h in e["hooks"])]
+    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard guard-github-issues;" in h["command"] for h in e["hooks"])]
     return e["matcher"]
 
 
 def _mcp_tools_the_guard_handles():
-    # From the guard's own `case`, so a tool added there must be matched here.
-    suffixes = set(re.findall(r"mcp__\*__(\w+)", (ROOT / "hooks/guard-github-issues.sh").read_text()))
+    # From the guard's own TOOLS, so a tool added there must be matched here.
+    suffixes = _mcp_suffixes(guard_github_issues.TOOLS)
     assert suffixes >= {"create_issue", "transfer_issue", "delete_issue", "issue_write"}
     return sorted(f"{prefix}{s}" for s in suffixes for prefix in ("mcp__github__", "mcp__plugin_github_github__"))
 
@@ -244,14 +252,13 @@ def test_the_guard_github_issues_matcher_leaves_other_tools_alone(tool):
 
 def _guard_private_terms_matcher():
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("guard-private-terms.sh" in h["command"] for h in e["hooks"])]
+    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard guard-private-terms;" in h["command"] for h in e["hooks"])]
     return e["matcher"]
 
 
 def _mcp_tools_the_guard_private_terms_handles():
-    # From the guard's own `case`, so a tool added there must be matched here.
-    text = (ROOT / "hooks/guard-private-terms.sh").read_text()
-    suffixes = set(re.findall(r"mcp__\*__(\w+)", text))
+    # From the guard's own TOOLS, so a tool added there must be matched here.
+    suffixes = _mcp_suffixes(guard_private_terms.TOOLS)
     assert suffixes >= {"create_issue", "add_issue_comment", "create_pull_request", "pull_request_review_write"}
     return sorted(f"{prefix}{s}" for s in suffixes for prefix in ("mcp__github__", "mcp__plugin_github_github__"))
 

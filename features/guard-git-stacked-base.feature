@@ -1,9 +1,36 @@
-@python @shell
+@python
 Feature: guard-git-stacked-base
   Deleting a remote branch an open PR uses is denied. gh and timeout are
   stubs throughout, so no scenario reaches the network: the stub lists three
   open PRs, #1 stacked on claude/base-branch (the head of #2), and #3 headed
   by claude/lonely, the base of nothing.
+
+  Why. GitHub retargets a stacked PR only when its base branch disappears
+  because the base PR merged. A base branch deleted any other way (by hand,
+  by a cleanup pass, by a rebase that recreates it under a new name) closes
+  every PR based on it, silently; the diff then reads as conflicting and the
+  recovery is reopen-and-retarget, one PR at a time. Deleting the head branch
+  of an open PR closes that PR the same way. So the guard fires on
+  remote-branch deletion only and asks GitHub whether an open PR names the
+  branch as base or head. The safe path is never blocked: `gh pr merge
+  --delete-branch` names no branch, and a local `git branch -d` takes nothing
+  from a PR. Not a stack? Then there is nothing here to hit; small changes in
+  flight belong on parallel branches off main.
+
+  The verdicts are not symmetric. An open PR found is a deny: destructive and
+  known, not guessed. GitHub unreachable (no gh, no auth, an API error), a
+  repository other than the session's (`git -C`, `--git-dir`, `GIT_DIR=`),
+  or a gh call that hangs or cannot be bounded by timeout is an ask: a deny
+  there would refuse every remote deletion on a machine that can make them,
+  and an unbounded gh would stall the hook until the harness kills it, and a
+  killed hook is not a decision. A command that does not parse is a deny:
+  inspection failing is not inspection coming back empty.
+
+  What counts as a remote-branch deletion: `git push [<remote>] --delete|-d
+  <ref>...`, `git push <remote> :<ref>`, and `gh api -X DELETE
+  .../git/refs/heads/<ref>`, with `refs/heads/` stripped. Known gap,
+  deliberate: a deletion spelled through a variable resolves to a word the
+  guard cannot expand, so it routes to ask, not to a silent allow.
 
   Background:
     Given the stubs "gh" and "timeout" are first on PATH
@@ -90,7 +117,7 @@ Feature: guard-git-stacked-base
     Then the guard asks
 
   Scenario Outline: with no timeout or gtimeout on PATH it asks, and never runs gh unbounded
-    Given PATH holds only "sh jq awk cat dirname grep" and the stub "gh"
+    Given PATH holds only "sh" and the stub "gh"
     When the agent runs `<command>`
     Then the guard asks
     And the stub "gh" was not called

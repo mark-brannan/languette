@@ -49,28 +49,26 @@ Each guard checks for one kind of hazard:
   `chown`, `chgrp` or `chmod 777` outside agent-owned or
   `LANGUETTE_PERM_ALLOW` directories
 - [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`
-- [`guard-disk`](features/guard-disk.feature): `dd`, `mkfs`, `wipefs`,
-  `shred` onto disks
-- [`guard-host-availability`](features/guard-host-availability.feature):
-  shutdown, reboot, fork bomb
+- [`guard-disk`](features/guard-disk.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
+- [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
 - [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
   `stash pop`, force-push, `reset --hard` and other moves that throw work away
 - [`guard-git-stacked-base`](features/guard-git-stacked-base.feature): deleting a
-  remote branch an open PR is based on (GitHub closes the PR)
+  remote branch an open PR is based on (GitHub silently closes the PR)
 - [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push to
   a branch GitHub says requires a pull request, or `gh pr merge --admin`; the
   agent holds your credentials, so it holds your bypass
 - [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub issue create, transfer
   or delete in one human turn, or any inside a loop
 - [`guard-private-terms`](#settings-for-guard-private-terms): a term from your
-  private list, posted to a public repo (off until it has the list)
+  private list, posted to a public repo (off until given the list)
 - [`guard-worktrees`](features/guard-worktrees-checkout-home.feature): opt-in; a branch switch in a `$HOME`
   that is a worktree, or a [reach into another session's worktree](features/guard-worktrees-foreign.feature)
-- [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a label
-  that waives a CI gate, such as `churn-ok`
+- [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
+  applying a label that waives a CI gate, such as `churn-ok`
+- [`guard-secrets`](languette/guards/guard_secrets.py): a pasted credential
 - [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to another session: asks; in `bypassPermissions`, denies after a network read
-- [`guard-secrets`](languette/guards/guard_secrets.py): a credential in the command
 - `guard-protected-paths`, `guard-database` (planned)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run

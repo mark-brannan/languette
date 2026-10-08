@@ -1,4 +1,4 @@
-@python @shell
+@python
 Feature: scanner
   What the shared scanner makes of a command: its tokens ("w:" a word, "q:"
   the raw text of a quoted word holding whitespace, ";" a separator), and its

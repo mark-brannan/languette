@@ -1,6 +1,6 @@
 {
   "name": "languette",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, commands that destroy infrastructure, and untrusted text relayed to another of your sessions.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, commands that destroy infrastructure, untrusted text relayed to another of your sessions, and a credential pasted into a command.",
   "author": {
     "name": "Mark Brannan"
   },
@@ -117,6 +117,12 @@
       "description": "Deny --no-verify on git commit, push, merge, pull, rebase and am, -n on commit and am, and git -c core.hooksPath= until the user approves that one run through AskUserQuestion. Leave on unless you want agents to skip the repo's hooks unasked.",
       "default": true
     },
+    "guard_secrets": {
+      "type": "boolean",
+      "title": "Keep credentials out of commands",
+      "description": "Deny a Bash command holding a known token shape (a GitHub PAT, an AWS key id, a private key header, and more from gitleaks' list), and ask when a value is only named as a credential (DB_PASSWORD=..., --password ..., a URL with a password). The project may add patterns in .languette/secrets.json. Leave on unless you want secrets pasted into commands unchecked.",
+      "default": true
+    },
     "guard_infra": {
       "type": "boolean",
       "title": "Ask before destroying infrastructure",
@@ -169,8 +175,14 @@
     "prose_budget_commit": {
       "type": "boolean",
       "title": "Check staged prose against the repo's budgets before a commit",
-      "description": "Deny a git commit when mark-brannan/claude's prose-budget engine finds the staged diff over a repo's own budgets. A no-op where that engine isn't installed or the repo has no budgets config. Leave on unless you want staged prose through unchecked.",
+      "description": "Deny a git commit when the prose-budget engine (the prose_budget_command option) finds the staged diff over a repo's own budgets. A no-op where that engine isn't installed or the repo has no budgets config. Leave on unless you want staged prose through unchecked.",
       "default": true
+    },
+    "prose_budget_command": {
+      "type": "string",
+      "title": "Prose-budget engine",
+      "description": "The command prose_budget_commit runs as its engine, with --staged or --file: an absolute path, a path relative to the session's working directory (before any cd in the command), or a bare name looked up on PATH. Empty means prose-budget on PATH.",
+      "required": false
     },
     "guard_worktrees": {
       "type": "boolean",
