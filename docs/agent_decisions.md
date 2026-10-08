@@ -147,3 +147,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 ### 20261008t035451z
 - W4 moves each deleted shell script's rationale into its feature file's description (ruling 1791421640d08e92b2 open) Undo: revert PR 100 ([#100](https://github.com/mark-brannan/languette/pull/100))
 - the test harness keeps a subprocess engine for the hooks.json wiring scenarios, renamed shell to hook, and drops the four no-jq-or-awk scenarios Undo: revert PR 100 ([#100](https://github.com/mark-brannan/languette/pull/100))
+
+### 20261008t053443z
+- the two bash suites (guard-private-terms, guard-worktrees) stay, moved to tests/ and pointed at languette/run.py: about 200 of their ~306 cases have no feature scenario yet, and all but the obsolete no-awk case pass on the Python guards Undo: delete tests/*.test.sh and their CI steps once features/ holds the cases ([#100](https://github.com/mark-brannan/languette/pull/100))

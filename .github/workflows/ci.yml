@@ -40,14 +40,19 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-dev.txt
       # shfmt for the Python engine's shfmt rung: noble's is 3.8, past the 3.6 floor.
-      - name: Install shfmt
+      # jq for the two bash suites' payloads.
+      - name: Install shfmt and jq
         run: |
           set -euo pipefail
           sudo apt-get update -q
-          sudo apt-get install -y -q shfmt
+          sudo apt-get install -y -q shfmt jq
       - run: pip install -r requirements-dev.txt
       # test_smoke.py builds its own PATHs and venvs: the smoke job runs it.
       - run: python -m pytest -q --ignore=tests/test_smoke.py
+      # The long tail of shell shapes for two guards, until features/ holds
+      # them (~40 s: guard-worktrees builds a fixture repo with worktrees).
+      - run: bash tests/guard-private-terms.test.sh
+      - run: bash tests/guard-worktrees.test.sh
 
   # The parser ladder's promise end to end: guard-unparsable's hooks.json
   # command under PATHs holding only shfmt, only bash, only python3, or a
@@ -90,7 +95,7 @@ jobs:
       - run: |
           set -euo pipefail
           command -v shellcheck || (sudo apt-get update -q && sudo apt-get install -y -q shellcheck)
-          shellcheck --severity=warning tests/stubs/*
+          shellcheck --severity=warning tests/stubs/* tests/*.test.sh
 
   # Line, section and per-change word caps on the README, from
   # docs/budgets.json. Raising a cap is its own PR that says why.
