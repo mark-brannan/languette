@@ -193,11 +193,95 @@ Feature: guard-bypass-ruleset
 
     Examples:
       | command                                   | note                              |
-      | (cd {TMP}/g && true); git push origin main | a subshell                       |
       | { cd {TMP}/g; }; git push origin main     | a group                           |
       | cd {TMP}/g \| cat; git push origin main   | a pipeline runs the cd in a subshell |
       | cd {TMP}/g \|\| exit 1; git push origin main | the cd may have failed        |
       | pushd {TMP}/g; popd; git push origin main | a popd                            |
+
+  Scenario: a subshell's cd ends with it, so the push is read where the line started
+    Given a clone of "https://gitlab.com/o/r.git" at "{TMP}/g" on branch "main"
+    When the agent runs `(cd {TMP}/g && true); git push origin main`
+    Then the guard denies, naming "requires a pull request"
+
+  # The next scenarios start on main in {TMP}/m and move to claude/topic in {TMP}/repo,
+  # so each verdict says where the push was read: silent in {TMP}/repo, a deny in
+  # {TMP}/m, an ask when the directory was lost.
+
+  Scenario Outline: a push after a cd the shell keeps is read in the cd's directory
+    Given HOME is "{TMP}"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
+    And the working directory is "{TMP}/m"
+    When the agent runs `<command>`
+    Then the guard is silent
+
+    Examples:
+      | command | note |
+      | cd ~/repo && git commit -qm msg && git pull -q --rebase --autostash && git push -q origin HEAD && echo pushed | a ~/ path |
+      | cd ~/repo && git fetch -q origin main && git rebase origin/main \| tail -1 && git push -qu origin HEAD 2>&1 \| tail -1 | a ~/ path, then a pipe that is not the cd's |
+      | S={TMP}; git -C $S/repo add f && git -C $S/repo commit -qm msg && git -C $S/repo push -q -u origin HEAD 2>&1\|tail -2 | -C through a variable set to a literal |
+      | cd {TMP}/repo && git fetch -q origin main && git rebase origin/main 2>&1\|tail -1; git push -q -u origin HEAD 2>&1\|tail -2; git log --oneline -1 | a pipe that is not the cd's, then ; |
+      | cd {TMP}/repo && git add f && git commit -qm msg && git fetch -q origin main && git rebase -q origin/main && git push -q --force-with-lease 2>&1\|tail -1; git push -q --force-with-lease 2>&1\|tail -1 | no refspec, so @{push}, twice |
+
+  Scenario: a push after a cd across lines, past a heredoc and a pipe, is read in the cd's directory
+    Given a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
+    And the working directory is "{TMP}/m"
+    When the agent runs:
+      """
+      cd {TMP}/repo && python3 - <<'EOF'
+      print(1)
+      EOF
+      python3 t.py 2>&1 | tail -2
+      git add f && git commit -qm msg && git fetch -q origin main && git rebase origin/main 2>&1 | tail -1 && git push -q -u origin HEAD 2>&1 | tail -1
+      """
+    Then the guard is silent
+
+  Scenario: a cd after a command in its and-or list holds for the rest of that list
+    Given a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
+    And the working directory is "{TMP}/m"
+    When the agent runs `git status && cd {TMP}/repo && git push origin HEAD`
+    Then the guard is silent
+
+  Scenario: a bare ~ is HOME
+    Given HOME is "{TMP}/repo"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
+    And the working directory is "{TMP}/m"
+    When the agent runs `cd ~ && git push origin HEAD`
+    Then the guard is silent
+
+  Scenario Outline: a cd the shell undoes, or a directory it can't read, never lends the push its branch
+    Given HOME is "{TMP}"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
+    And the working directory is "{TMP}/m"
+    When the agent runs `<command>`
+    Then the guard asks
+
+    Examples:
+      | command                                                 | note                                     |
+      | { cd {TMP}/repo; git status; } && git push origin HEAD  | the cd's group closes                    |
+      | cd {TMP}/repo \| cat; git push origin HEAD              | the cd is in the pipeline                |
+      | cd {TMP}/repo & git push origin HEAD                    | the cd is backgrounded                   |
+      | cd {TMP}/repo && git status & git push origin HEAD      | the cd's and-or list is backgrounded     |
+      | cd {TMP}/rep* && git push origin HEAD                   | a glob                                   |
+      | cd ~other/repo && git push origin HEAD                  | another user's home                      |
+      | cd '~/repo' && git push origin HEAD                     | a quoted ~ is a directory named ~        |
+      | echo ~/repo; cd "~/repo"; git push origin HEAD          | the cd's own ~ is quoted, the echo's not |
+      | cd \\~/repo && git push origin HEAD                     | an escaped ~ is a directory named ~      |
+      | test -d {TMP}/x && cd {TMP}/repo; git push origin HEAD  | the test may skip the cd                 |
+      | git status \|\| cd {TMP}/repo && git push origin HEAD   | the push runs when the cd was skipped    |
+      | cd {TMP}/nope \|\| cd {TMP}/repo; git push origin HEAD  | the second cd may not run                |
+
+  Scenario: a subshell's cd never lends the push its branch
+    Given HOME is "{TMP}"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
+    And the working directory is "{TMP}/m"
+    When the agent runs `(cd {TMP}/repo && git status) && git push origin HEAD`
+    Then the guard denies, naming "requires a pull request"
 
   Scenario: the answer is cached
     When the agent runs `git push origin main`
