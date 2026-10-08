@@ -92,9 +92,10 @@ jobs:
       - name: Smoke test under each parser
         run: |
           set -euo pipefail
+          # Pinned: a row flips when its rung lands, never when upstream releases.
           v=$(mktemp -d)
-          python -m venv "$v/bashlex" && "$v/bashlex/bin/pip" install -q bashlex
-          python -m venv "$v/ts" && "$v/ts/bin/pip" install -q tree-sitter tree-sitter-bash
+          python -m venv "$v/bashlex" && "$v/bashlex/bin/pip" install -q bashlex==0.18
+          python -m venv "$v/ts" && "$v/ts/bin/pip" install -q tree-sitter==0.26.0 tree-sitter-bash==0.25.1
           LANGUETTE_SMOKE_BASHLEX_PY=$v/bashlex/bin/python \
           LANGUETTE_SMOKE_TREESITTER_PY=$v/ts/bin/python \
             python -m pytest -q -rxX tests/test_smoke.py

@@ -3,7 +3,18 @@
 # one call, never one in a loop. An issue number is an identifier things link
 # to where no agent can see, so minting or moving one is a one-way door
 # (Solace, 2026-09-30). `guard-github-issues.sh prompt` on UserPromptSubmit opens the
-# door; the next identifier write spends it.
+# door; the next identifier write that runs spends it.
+#
+# Claimed before the call, spent after it. PreToolUse claims the door by
+# renaming it to `<door>.held`, which only one call can win, and writes its
+# tool_use_id there; `guard-github-issues.sh post`, on PostToolUse and
+# PostToolUseFailure, deletes the claim once the call has run. A claim
+# whose call already has a result in the transcript, but was never spent,
+# belongs to a call another guard denied: it never ran, so the next write
+# takes the claim over. Each guard is its own hook process and cannot see
+# the others' verdicts; spending at PreToolUse shut the door on a create
+# another guard denied, with nothing posted. A claim whose call has no
+# result yet is still in flight, and a second write is denied.
 #
 # Counts as an identifier write: `gh issue create|new|transfer|delete`; `gh
 # api` POST to repos/o/r/issues; a graphql createIssue, transferIssue or
@@ -25,13 +36,18 @@ LIB="$(dirname "$0")/lib-shell-words.awk"
 p=$(cat)
 deny() { jq -cn --arg r "guard-github-issues: $1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'; exit 0; }
 if ! command -v jq >/dev/null 2>&1 || ! command -v awk >/dev/null 2>&1 || [ ! -r "$LIB" ]; then
+  [ "${1:-}" = post ] && exit 0
   case $p in *[Ii]ssue*) printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"guard-github-issues: jq, awk or lib-shell-words.awk is missing, so this call could not be checked"}}' ;; esac
   exit 0
 fi
 door="${TMPDIR:-/tmp}/languette-guard-github-issues.$(printf '%s' "$p" | jq -r '.session_id // "none"' | tr -c 'A-Za-z0-9_\n-' _)"
 # Replace, never follow: a symlink pre-planted at the door path must not be
 # truncated through. rm drops the link itself; noclobber refuses to open one.
-[ "${1:-}" = prompt ] && { rm -f "$door"; (set -C; : > "$door") 2>/dev/null; exit 0; }
+held="$door.held"
+[ "${1:-}" = prompt ] && { rm -f "$door" "$held"; (set -C; : > "$door") 2>/dev/null; exit 0; }
+# After the call, a deny has nothing left to refuse: an unreadable call fails
+# closed by spending the door instead.
+[ "${1:-}" = post ] && deny() { rm -f "$door" "$held"; exit 0; }
 
 loop=0
 case $(printf '%s' "$p" | jq -r '.tool_name // ""') in
@@ -114,6 +130,31 @@ case $(printf '%s' "$p" | jq -r '.tool_name // ""') in
   *) n=0 ;;
 esac
 [ "$n" -gt 0 ] || exit 0
+# The call ran (or tried to): spend the door whatever the verdict was, so a
+# failed create cannot be followed by a second in the same turn.
+[ "${1:-}" = post ] && { rm -f "$door" "$held"; exit 0; }
 [ "$n" -gt 1 ] && deny "$n issue creates, transfers or deletes in one call. One per human turn, never a batch."
 [ "$loop" = 1 ] && deny "an issue create, transfer or delete inside a loop. One per human turn, never a batch."
-rm "$door" 2>/dev/null || deny "the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or the human has not spoken since. Show the human the draft and wait for their yes."
+shut="the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or the human has not spoken since. Show the human the draft and wait for their yes."
+id=$(printf '%s' "$p" | jq -r '.tool_use_id // ""' | tr -cd 'A-Za-z0-9_-')
+# claim <file>: rename it to a name of this process's own (atomic: one
+# racer wins), then drop what was won and stamp this call's id in a file
+# made fresh: never opened through an existing path, so a link planted at
+# the door or the claim is removed, not written through.
+claim() {
+  mine="$door.claim.$$"; mv "$1" "$mine" 2>/dev/null || return 1
+  rm -f "$mine" "$held"; (set -C; printf '%s' "$id" > "$mine") 2>/dev/null && mv "$mine" "$held"
+}
+if [ -e "$door" ] || [ -L "$door" ]; then
+  claim "$door" || deny "an issue create, transfer or delete is already in flight this turn. $shut"
+elif [ -f "$held" ]; then
+  # The claimant ran if it was spent; still holding with an error result in
+  # the transcript means it was refused and never ran. No result yet: in
+  # flight. A result that is not an error ran, whatever its post hook did.
+  was=$(cat "$held" 2>/dev/null)
+  t=$(printf '%s' "$p" | jq -r '.transcript_path // ""')
+  [ -n "$was" ] && [ -r "$t" ] && grep -E "\"tool_use_id\": ?\"$was\"" "$t" | grep -Eq '"is_error": ?true' || deny "$shut"
+  claim "$held" || deny "$shut"
+else
+  deny "$shut"
+fi
