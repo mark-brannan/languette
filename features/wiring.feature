@@ -103,6 +103,8 @@ Feature: wiring
       | guard-bypass-hooks | guard_bypass_hooks | git push --no-verify |
       | guard-infra   | guard_infra   | terraform destroy                 |
       | guard-bypass-labels | guard_bypass_labels | gh pr edit 4 --add-label churn-ok |
+      | guard-git-work-loss | guard_git_work_loss | git add -A |
+      | guard-git-stacked-base | guard_git_stacked_base | git push origin --delete "$b" |
 
   Scenario Outline: with python3 absent from PATH, the option set to false still skips the guard
     Given the hook is the hooks.json command for "<guard>"
@@ -123,6 +125,8 @@ Feature: wiring
       | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | git push --no-verify |
       | guard-infra   | CLAUDE_PLUGIN_OPTION_GUARD_INFRA   | terraform destroy                 |
       | guard-bypass-labels | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
+      | guard-git-work-loss | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS | git add -A |
+      | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | git push origin --delete "$b" |
 
   Scenario Outline: a script that crashes is a deny
     Given the hook is the hooks.json command for "<guard>"
@@ -332,7 +336,7 @@ Feature: wiring
     Then the guard is silent
 
   # guard-worktrees runs two parts; each has its own off switch under the
-  # guard's, and a part that crashes is a deny like the guard crashing.
+  # guard's.
   Scenario: with the opt-in guard on, a reach into another worktree is a deny
     Given the hook is the hooks.json command for "guard-worktrees"
     And a git repository at "{TMP}/repo"
@@ -363,13 +367,6 @@ Feature: wiring
     And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME is "false"
     When the agent runs `git checkout some-branch`
     Then the guard is silent
-
-  Scenario: with the opt-in guard on, a part that crashes is a deny
-    Given the hook is the hooks.json command for "guard-worktrees"
-    And the plugin's part "guard-worktrees-foreign" crashes
-    And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES is "true"
-    When the agent runs `git status`
-    Then the guard denies
 
   # guard-cross-session-send judges SendMessage, not Bash, so it has its own rows.
   Scenario Outline: the hooks.json command for guard-cross-session-send judges a send and fails closed

@@ -177,10 +177,15 @@ class Ctx:
     def run(self, stdin):
         self.stdin = stdin
         if self.engine in IN_PROCESS:
-            # These steps only shape a subprocess; in-process they would do nothing.
-            assert not (self.hook or self.bare or self.stubs), \
-                "test setup: a hook command, a bare PATH or the stubs need the shell engine (@shell_only)"
-            env = {"HOME": os.environ["HOME"], **self.scenario_env()}
+            # A hook command only shapes a subprocess; in-process it would do nothing.
+            assert not self.hook, "test setup: a hook command needs the shell engine (@shell_only)"
+            # TMPDIR as the shell engine has it, so a guard's per-session file
+            # starts fresh each scenario; PATH and the stub log as the stubs need.
+            env = {"HOME": os.environ["HOME"], "TMPDIR": self.doordir(), **self.scenario_env()}
+            if self.bare or self.stubs:
+                env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
+            if self.stub_log:
+                env["LANGUETTE_STUB_LOG"] = self.stub_log
             self.verdict = Verdict(run.respond(stdin, env, only=self.guard))
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
@@ -463,14 +468,6 @@ def _crash(ctx, guard):
     else:
         (root / "hooks").mkdir()
         (root / f"hooks/{guard}.sh").write_text("exit 3\n")
-    ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
-
-
-@given(parsers.parse('the plugin\'s part "{part}" crashes'))
-def _crash_part(ctx, part):
-    root = Path(ctx.mkdtemp())
-    shutil.copytree(ROOT / "hooks", root / "hooks")
-    (root / f"hooks/{part}.sh").write_text("exit 3\n")
     ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
 
 

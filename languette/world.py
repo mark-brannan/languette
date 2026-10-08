@@ -7,15 +7,18 @@ Standard library only.
 """
 
 import fcntl
+import glob
 import json
 import os
 import re
+import shutil
 import subprocess
 import time
 from urllib.parse import quote
 
 GIT_TIMEOUT = 5
 GH_TIMEOUT = 10
+PR_LIST_TIMEOUT = 25                # past the `timeout 20` guard-git-stacked-base wraps gh pr list in
 SPENT = ".languette-ask"            # appended to the transcript path
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
@@ -25,7 +28,7 @@ SEND_SUBAGENTS_MAX = 500            # names and ids kept per session; the oldest
 # What a failed write, or a first write that is not a session start, leaves:
 # no subagents known, the door open.
 SEND_LOST = '{"subagents": [], "read": "an unknown tool (this session\'s state was lost)"}'
-KINDS = frozenset("git gh-api read path cwd clock ruleset-cache ruleset-keep claim send-state send-keep".split())
+KINDS = frozenset("git gh-api pr-list which read path cwd clock ruleset-cache ruleset-keep claim worktree send-state send-keep".split())
 
 
 class World:
@@ -61,12 +64,24 @@ class World:
         status = body.get("status") if isinstance(body, dict) else None
         return (int(status), body) if isinstance(status, str) and status.isdigit() else (None, None)
 
+    def _pr_list(self, cwd, *argv):
+        try:
+            r = subprocess.run(list(argv), cwd=cwd, env=self.env, capture_output=True, text=True,
+                               timeout=PR_LIST_TIMEOUT, stdin=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        out = r.stdout.strip()
+        return out if r.returncode == 0 and out else None
+
+    def _which(self, name):
+        return shutil.which(name, path=os.pathsep.join(os.get_exec_path(self.env)))
+
     def _read(self, path):
         with open(path, encoding="utf-8") as f:
             return f.read()
 
     def _path(self, op, path):
-        if op not in ("isdir", "lexists", "realpath"):
+        if op not in ("isdir", "isfile", "islink", "exists", "lexists", "realpath"):
             raise ValueError(f"no path fact {op!r}")
         return getattr(os.path, op)(path)
 
@@ -96,6 +111,111 @@ class World:
                 fh.write(text + "\n")
         except OSError:
             pass                               # a cache that can't be written only costs a later ask
+
+    # --- guard-worktrees' per-session record -----------------------------
+    # ${TMPDIR:-/tmp}/languette-guard-worktrees.<session>[.<agent>] lists the
+    # toplevels this session reached by a vouched route, one "<top>\t<inode of
+    # top/.git>" per line; <record>.arrive is what the previous call left for
+    # this one. Every failure to read or write leaves the guard's rule as
+    # strict as the cwd alone.
+
+    def _worktree(self, op, *args):
+        if op not in ("arrive", "recorded", "keep", "leave", "scratchpad"):
+            raise ValueError(f"no worktree fact {op!r}")
+        return getattr(self, "_wt_" + op)(*args)
+
+    @staticmethod
+    def _wt_mine(f):
+        """A regular file owned by this user, not a symlink."""
+        try:
+            st = os.lstat(f)
+        except OSError:
+            return False
+        return os.path.isfile(f) and not os.path.islink(f) and st.st_uid == os.geteuid()
+
+    @staticmethod
+    def _wt_inode(top):
+        try:
+            return os.stat(os.path.join(top, ".git")).st_ino
+        except OSError:
+            return None
+
+    def _wt_arrive(self, rec, own_top):
+        """(usable, adopt): the record is this user's; and this call reached
+        `own_top` by a vouched route (the session's first call, or an arrival
+        the previous call left: `enter`, or a path under own_top). The arrival
+        is consumed exactly once."""
+        adopt = False
+        if not os.path.lexists(rec):
+            try:                               # O_EXCL: two first calls racing must not truncate each other
+                os.close(os.open(rec, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600))
+                adopt = True
+            except OSError:
+                pass
+        if not self._wt_mine(rec):
+            return False, False
+        arrival = rec + ".arrive"
+        if not adopt and own_top and self._wt_mine(arrival):
+            try:
+                with open(arrival, encoding="utf-8") as f:
+                    for a in f.read().splitlines():
+                        if a == "enter" or (a and (a + "/").startswith(own_top + "/")):
+                            adopt = True
+            except OSError:
+                pass
+        try:
+            os.unlink(arrival)
+        except OSError:
+            pass
+        return True, adopt
+
+    def _wt_recorded(self, rec, top):
+        if not self._wt_mine(rec):
+            return False
+        ino = self._wt_inode(top)
+        if ino is None:
+            return False
+        try:
+            with open(rec, encoding="utf-8") as f:
+                return f"{top}\t{ino}" in f.read().splitlines()
+        except OSError:
+            return False
+
+    def _wt_keep(self, rec, top):
+        ino = self._wt_inode(top)
+        if ino is None:
+            return None
+        try:
+            with open(rec, "a", encoding="utf-8") as f:
+                f.write(f"{top}\t{ino}\n")
+        except OSError:
+            pass
+
+    @staticmethod
+    def _wt_leave(rec, text):
+        """Create <rec>.arrive afresh, private, never following a link left at that name."""
+        f = rec + ".arrive"
+        try:
+            os.unlink(f)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            return
+        try:
+            fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        except OSError:
+            return
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text + "\n")
+
+    def _wt_scratchpad(self, sid):
+        """The session's scratchpad directory, or None."""
+        for root in (self.env.get("CLAUDE_CODE_TMPDIR") or "/nonexistent", self.env.get("TMPDIR") or "/nonexistent",
+                     os.path.join(self.env.get("HOME") or "", ".local/state/claude-tmpdir")):
+            for d in sorted(glob.glob(os.path.join(glob.escape(root), "claude-*", "*", glob.escape(sid), "scratchpad"))):
+                if os.path.isdir(d):
+                    return d
+        return None
 
     def _claim(self, wants):
         """Spend one approval per run for this tool call, atomically. `wants` is
