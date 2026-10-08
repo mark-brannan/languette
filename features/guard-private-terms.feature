@@ -88,6 +88,18 @@ Feature: guard-private-terms
     When the agent runs `gh issue create -R o/r -t t -b "$(date)"`
     Then the guard denies
 
+  Scenario Outline: an id or number field built at run time carries no text, so it is not refused
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                                                                     | verdict   |
+      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id=$id           | is silent |
+      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id=${id}         | is silent |
+      | work-item brief c1 'gh api repos/o/r/issues/1/sub_issues -F sub_issue_id=$id' | is silent |
+      | gh api repos/o/r/issues/1/comments -f body=$x                               | denies    |
+      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id="$(cat f)"    | denies    |
+
   Scenario Outline: an MCP tool's text is judged the same as the gh CLI
     When the agent calls MCP tool "<tool>" with input `<input>`
     Then the guard <verdict>

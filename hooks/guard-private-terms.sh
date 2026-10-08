@@ -137,6 +137,10 @@ case "$tool" in
         key = v; sub(/=.*$/, "", key)
         sub(/^[^=]*=/, "", v)
         if (v ~ /^@/) { file(substr(v, 2)); return }
+        # An id or number field (sub_issue_id=$id, issue_number=$n) names a
+        # thing by its identifier; the API refuses prose there, so a run-time
+        # value carries no text to check.
+        if (key ~ /(^|_)(id|number)$/ && v ~ /^\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)$/) return
         if (key ~ /label/) lab(v)
         val(v, live)
       }
