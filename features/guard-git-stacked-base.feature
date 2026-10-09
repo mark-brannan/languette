@@ -157,6 +157,24 @@ Feature: guard-git-stacked-base
     When the agent runs `git push origin --delete claude/base-branch`
     Then the guard denies
 
+  # A push option's separate value is no remote and no ref: read as either, it
+  # costs a lookup of a branch that is not being deleted.
+  Scenario Outline: a push option's separate value is not looked up
+    When the agent runs `<command>`
+    Then the guard <verdict>
+    And the stub "gh" was not called with "<ghost>"
+
+    Examples:
+      | command                                                                | verdict   | ghost         | note                |
+      | git push -o ci.skip origin --delete claude/already-merged              | is silent | --base origin | -o                  |
+      | git push --push-option ci.skip origin --delete claude/already-merged   | is silent | --base origin | --push-option       |
+      | git push --repo origin origin --delete claude/already-merged           | is silent | --base origin | --repo              |
+      | git push --receive-pack /bin/x origin --delete claude/already-merged   | is silent | --base /bin/x | --receive-pack      |
+      | git push --exec /bin/x origin --delete claude/already-merged           | is silent | --base /bin/x | --exec, its alias   |
+      | git push --push-opt x origin --delete claude/already-merged            | is silent | --base x      | an unambiguous prefix |
+      | git push origin --delete claude/already-merged -o claude/base-branch   | is silent | --base claude/base-branch | the value after the ref |
+      | git push -o ci.skip origin --delete claude/base-branch                 | denies    | --base origin | a real base still denies |
+
   Scenario Outline: the safe deletions and the non-deletions pass silently
     When the agent runs `<command>`
     Then the guard is silent

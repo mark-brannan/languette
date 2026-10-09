@@ -187,6 +187,9 @@ def _checkout_home(payload, env):
     events = _home_events(cmd)
     if not events:
         return
+    if not (yield Need("which", "git")):
+        raise Refuse(f"{NAME}: git is missing, so a checkout/switch can't be checked against $HOME. This is a gate "
+                     "and fails closed.")
     home = (yield from _canon(env.get("HOME") or "")) or ""
     pcwd = payload.get("cwd")
     cwd = (yield from _canon(pcwd)) if isinstance(pcwd, str) and pcwd else None
@@ -228,17 +231,23 @@ def _checkout_home(payload, env):
         else:
             if not home:
                 raise Refuse(f"{NAME}: $HOME does not resolve, so a git checkout/switch can't be checked against it.")
-            bases, blind, pinned = cands, lost, False
+            bases, blind, pinned, unpinned = cands, lost, False, False
             for tk, tv in env_targets + ev[1]:
                 if tk == "C":
                     bases, miss = yield from _resolve_all(tv, bases, home)
                     blind = blind or miss or not bases
                     continue
                 pinned = True
-                res, _ = yield from _resolve_all(tv, bases, home)
+                res, miss = yield from _resolve_all(tv, bases, home)
+                # A value that does not resolve (or is relative to a directory that doesn't) pins nothing.
+                unpinned = unpinned or miss or not res or (blind and not _HOMEISH.match(tv))
                 for r in res:
                     if (tk == "GITDIR" and (yield from gitdir_is_home(r))) or (tk == "WORKTREE" and r == home):
                         raise _generic("git")
+            if unpinned:
+                raise Refuse(f"{NAME}: can't tell which repository or work tree this git checkout/switch runs "
+                             "against (a --git-dir or --work-tree that doesn't resolve), so it can't be checked "
+                             "against $HOME. Use an absolute path.")
             # -C, --git-dir or --work-tree pin where the command resolves.
             if pinned:
                 continue
@@ -408,10 +417,12 @@ def _foreign(payload, env):
     tool = payload.get("tool_name")
     pcwd = payload.get("cwd")
     if not isinstance(pcwd, str) or not pcwd:
-        return
+        raise Refuse(f"{NAME}: the payload names no working directory, so worktree ownership cannot be checked. "
+                     "This is a gate and fails closed.")
     home = yield from _canon(env.get("HOME") or "")
     if not home:
-        return
+        raise Refuse(f"{NAME}: $HOME does not resolve, so worktree ownership cannot be checked. This is a gate "
+                     "and fails closed.")
     own_top = (yield from _git("/", "-C", pcwd, "rev-parse", "--show-toplevel")) or ""
     sess = _Session(payload, env, own_top, home)
     yield from sess.arrive(bool(own_top) and (yield Need("path", "isfile", os.path.join(own_top, ".git"))))
