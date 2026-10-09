@@ -227,3 +227,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t070923z
 - guard-review-threads does not see a resolve whose query it cannot read (a variable, @file); the gap is named in the feature Undo: deny any gh api graphql call whose query is unreadable and that names a PRRT_ id ([#118](https://github.com/mark-brannan/languette/pull/118))
+
+### 20261009t070926z
+- guard-review-threads' deny names a ruling, decision record or issue as the record, not cards or hand-over lines, since the repo's CLAUDE.md names nothing from the host's own workflow Undo: edit DO in guard_review_threads.py ([#118](https://github.com/mark-brannan/languette/pull/118))
