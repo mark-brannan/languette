@@ -14,9 +14,10 @@ Both checks' warnings arrive together: the commit is not blocked, so there is
 no retry to show the second.
 
 Silent on what it cannot resolve: a `cd`/`-C` target, a pathspec word, a
-directory pathspec, a failed `diff`/`ls-files`, a second commit in a different
-directory. `yadm` is recognised as git's wrapper word, and is run only when
-the command named it.
+directory pathspec, a second commit in a different directory. A failed
+`rev-parse`/`diff`/`ls-files` adds no files to the `--file` run; the files
+already gathered are still checked. `yadm` is recognised as git's wrapper
+word, and is run only when the command named it.
 """
 
 import re
@@ -241,32 +242,7 @@ def check(payload, env):
 
     files = list(c.paths)
     if c.allflag or c.allnew:
-        # -a and a pattern add stage repo-wide, so these listings are anchored to the
-        # repo root. The wrapper word is the command's own and may be anyone's: only
-        # which CLI it names is trusted, found fresh on PATH.
-        binary = yield Need("which", "yadm" if re.search(r"(?:^|/)yadm\Z", c.cbin) else "git")
-        if not binary:
-            return _done(notes)
-        try:
-            rc, out, _ = yield Need("run", d, GIT_TIMEOUT, binary, "rev-parse", "--show-toplevel")
-        except Exception:  # noqa: BLE001
-            rc, out = None, ""
-        if rc != 0:
-            return _done(notes)
-        root = out.rstrip("\n")
-        listings = []
-        if c.allflag:
-            listings.append(["diff", "-z", "--name-only", "--diff-filter=d"])          # unstaged tracked changes
-        if c.allnew:
-            listings.append(["ls-files", "-z", "--others", "--exclude-standard"])      # new untracked files
-        for argv in listings:
-            try:
-                rc, out, _ = yield Need("run", root, GIT_TIMEOUT, binary, *argv)
-            except Exception:  # noqa: BLE001
-                rc, out = None, ""
-            if rc != 0 or "\n" in out:    # a failed listing, or a name with a newline that cannot reach the engine
-                return _done(notes)
-            files += [root + "/" + f for f in out.split("\0") if f]
+        files += yield from _unstaged(c, d)
     files = ["./" + f if f.startswith("-") else f for f in files if f]
     if not files:
         return _done(notes)
@@ -282,6 +258,39 @@ def check(payload, env):
                                f"an engine too old for --file):\n{out}\nA bad config fails CI too; fix it, or "
                                "update the engine, before the push."))
     return _done(notes)
+
+
+def _unstaged(c, d):
+    """The files a commit that reaches past the index would add, as far as git can
+    list them: a step that fails ends the listing, and what it had gathered stands."""
+    # -a and a pattern add stage repo-wide, so these listings are anchored to the
+    # repo root. The wrapper word is the command's own and may be anyone's: only
+    # which CLI it names is trusted, found fresh on PATH.
+    binary = yield Need("which", "yadm" if re.search(r"(?:^|/)yadm\Z", c.cbin) else "git")
+    if not binary:
+        return []
+    try:
+        rc, out, _ = yield Need("run", d, GIT_TIMEOUT, binary, "rev-parse", "--show-toplevel")
+    except Exception:  # noqa: BLE001
+        rc, out = None, ""
+    if rc != 0:
+        return []
+    root = out.rstrip("\n")
+    listings = []
+    if c.allflag:
+        listings.append(["diff", "-z", "--name-only", "--diff-filter=d"])          # unstaged tracked changes
+    if c.allnew:
+        listings.append(["ls-files", "-z", "--others", "--exclude-standard"])      # new untracked files
+    found = []
+    for argv in listings:
+        try:
+            rc, out, _ = yield Need("run", root, GIT_TIMEOUT, binary, *argv)
+        except Exception:  # noqa: BLE001
+            rc, out = None, ""
+        if rc != 0 or "\n" in out:    # a failed listing, or a name with a newline that cannot reach the engine
+            break
+        found += [root + "/" + f for f in out.split("\0") if f]
+    return found
 
 
 def _run_engine(engine, d, args):

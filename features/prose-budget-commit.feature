@@ -270,6 +270,26 @@ Feature: prose-budget-commit
     Then the guard is silent
     And the stub "prose-budget" was called with "README.md"
 
+  Scenario: a repo root git cannot find still leaves the files the commit names to be checked
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    And the project directory is not a git repository
+    When the agent runs `git commit -am x README.md`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "--file README.md"
+
+  Scenario: a failed listing still leaves the files the commit names to be checked
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    And the project's git index is corrupt
+    When the agent runs `git commit -am x README.md`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "--file README.md"
+
   Scenario: a plain commit with nothing outside the index is not also checked by path
     When the agent runs `git commit -m x`
     Then the guard is silent
