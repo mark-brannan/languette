@@ -64,6 +64,26 @@ interface is; this file says who decided it and why, one line each.
   `guard-private-terms`; config keys follow, with underscores. The rest are
   renamed as reached.
 
+## Approved guard names: Solace, 2026-10-07 and 2026-10-09
+
+- Only these names are approved. A new guard fits under one of them, or it
+  is not approved.
+
+| Guard | Concept | Under the umbrella |
+|---|---|---|
+| `guard-recursive-delete` | directory trees | recursive `rm`, `find -delete` |
+| `guard-permissions` | file modes and ownership | recursive `chmod`, `chown`, `chgrp`; `chmod 777` |
+| `guard-host-availability` | the host and its services staying up | shutdown, reboot, fork bombs, stopping a service |
+| `guard-scheduled-jobs` | scheduled work | wiping cron entries or timers |
+| `guard-pipe-to-shell` | downloaded code run unseen | `curl u \| sh`, `sh <(curl ..)`, `eval "$(wget ..)"` |
+| `guard-worktrees` | worktree isolation | a branch switch in a `$HOME` worktree; reaching into another session's worktree |
+| `guard-infra` | live infrastructure | destroying or applying it without the user's approval |
+| `guard-github-issues` | GitHub issues | creating, transferring or deleting them |
+| `guard-private-terms` | private words | a listed term posted to a public repo |
+| `guard-secrets` | credentials | one committed, printed into the transcript, or posted |
+| `ask-first` | commands the repo lists as costly | each runs only after the user approves that run |
+| `guard-protected-paths` | paths the repo lists | any agent write to them |
+
 ## Three concerns: Solace, 2026-10-07
 
 - Parse reads the command into parts. Guards are pure functions reporting
