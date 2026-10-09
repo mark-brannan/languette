@@ -104,8 +104,26 @@ jobs:
       contents: read
     uses: mark-brannan/.github/.github/workflows/prose-budget.yml@main
 
+  # A guard a pull request adds must take a name from the approved table in
+  # docs/decisions.md, as the base has it. Guards already there are not checked.
+  new-guard-names:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: New guards take an approved name
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch -q --depth=1 origin "$BASE"
+          python3 tests/new_guard_names.py "$BASE"
+
   ci-gate:
-    needs: [nonempty, tests, smoke, shellcheck, prose-budget]
+    needs: [nonempty, tests, smoke, shellcheck, prose-budget, new-guard-names]
     if: always()
     permissions: {}
     uses: mark-brannan/.github/.github/workflows/ci-gate.yml@main
