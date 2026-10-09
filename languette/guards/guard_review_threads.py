@@ -29,6 +29,8 @@ SHA = re.compile(r"(?<![0-9A-Za-z])(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{
 LINK = re.compile(r"https://\S+|(?<![\w./-])[\w.-]+/[\w.-]+#[0-9]+\b")
 GRAPHQL = re.compile(r"(?:https?://[^/]+)?/*(?:api/v3/)?graphql")
 QUERY_FIELD = re.compile(r"(?:-[fF]|--(?:raw-)?field=)?query=")
+# Any field read from a file: the value gh sends is not in the command.
+FILE_FIELD = re.compile(r"(?:-[fF]|--(?:raw-)?field=)?[A-Za-z_][A-Za-z0-9_]*=@")
 VAR = re.compile(r"\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])|\$\([^)]*\)|`[^`]*`")
 ENDPOINTS = ("graphql", "/graphql", "https://api.github.com/graphql")
 
@@ -99,7 +101,7 @@ def _resolves(command):
             body = "\n".join(words) + ("\n" + hd if src == "-" else "")
             live = any(s.live[i] for i in range(g + 1, b + 1))
             query = [i for i in range(g + 1, b + 1) if s.k[i] in ("w", "q") and QUERY_FIELD.match(_wv(s, i))]
-            if (any(s.live[i] or QUERY_FIELD.sub("", _wv(s, i)).startswith("@") for i in query)
+            if (any(s.live[i] for i in query) or any(FILE_FIELD.match(w) for w in words)
                     or src is not None and (src != "-" or "HEREDOC" not in words)):   # scan's mark for a heredoc fed to gh
                 unreadable = True
                 continue
@@ -159,7 +161,7 @@ def _thread(cwd, tid):
 
 def check(payload, env=None):
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if not isinstance(cmd, str) or "api" not in cmd:
+    if not isinstance(cmd, str):
         return None
     ids, unreadable = _resolves(cmd)
     if unreadable:

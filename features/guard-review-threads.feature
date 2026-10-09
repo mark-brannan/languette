@@ -162,6 +162,8 @@ Feature: guard-review-threads
       | command                                                                                                       | note                    |
       | gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}' -f id="$T" | the id built at run time |
       | gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}'            | no id at all            |
+      | gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}' -F id=@ids.txt | the id read from a file |
+      | gh api graphql -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}' --field=note=@n.txt | another field from a file |
 
   Scenario: a bot's own login replying with the fix may resolve its thread
     Given GH_LOGIN is "claude"
@@ -209,6 +211,13 @@ Feature: guard-review-threads
       echo '{"query":"mutation{resolveReviewThread(input:{threadId:\"PRRT_t1\"}){thread{id}}}"}' | gh api graphql --input -
       """
     Then the guard denies, naming "cannot tell which review thread"
+
+  Scenario: quotes inside the api word do not hide the call
+    Given review thread "PRRT_t1" holds:
+      | author       | body                |
+      | coderabbitai | Consider a rename.  |
+    When the agent runs `gh a''pi graphql -f id=PRRT_t1 -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}'`
+    Then the guard denies, naming "no reply from me after"
 
   Scenario Outline: the graphql endpoint by its path or its URL is read
     Given review thread "PRRT_t1" holds:
