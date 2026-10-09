@@ -200,3 +200,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t041510z
 - a protected_services value the user sets replaces the default list, as bypass_labels does, so a power user can drop sshd without turning the guard off Undo: in protected(), return DEFAULT plus the set patterns, and flip the feature row 'a set list replaces the defaults' ([#116](https://github.com/mark-brannan/languette/pull/116))
+
+### 20261009t043310z
+- guard-protected-services: ssh, the network, the display manager and getty move from guard-host-availability to the new guard's default list; dbus, logind, login sessions and run-level targets stay Undo: move names between _CORE and DEFAULT with their feature rows ([#116](https://github.com/mark-brannan/languette/pull/116))
