@@ -185,6 +185,31 @@ Feature: guard-review-threads
       | gh api graphql -F query=@m.graphql -f id="$ID"                                                                | a file, the id run-time   |
       | gh api graphql --input payload.json                                                                           | everything in a file      |
       | gh api graphql -f query=@q.graphql -F owner=o                                                                 | a file, whatever it holds |
+      | gh api graphql --input=m.json -f id=PRRT_t1                                                                   | --input=, a file          |
+      | gh api /graphql --input m.json                                                                                | the /graphql path         |
+      | gh api https://api.github.com/graphql --input m.json                                                          | the endpoint's full URL   |
+
+  Scenario: a heredoc fed to another command does not make --input FILE readable
+    When the agent runs:
+      """
+      git commit -F - <<'EOF'
+      notes
+      EOF
+      gh api graphql --input m.json -f id=PRRT_t1
+      """
+    Then the guard denies, naming "cannot tell which review thread"
+
+  Scenario Outline: the graphql endpoint by its path or its URL is read
+    Given review thread "PRRT_t1" holds:
+      | author       | body                |
+      | coderabbitai | Consider a rename.  |
+    When the agent runs `gh api <endpoint> -f id=PRRT_t1 -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}'`
+    Then the guard denies, naming "no reply from me after"
+
+    Examples:
+      | endpoint                         |
+      | /graphql                         |
+      | https://api.github.com/graphql   |
 
   Scenario: a readable query with a run-time field resolves nothing, and is not this guard's
     When the agent runs `gh api graphql -f query='query($n:Int!){viewer{login}}' -F n="$N"`

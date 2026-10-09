@@ -25,6 +25,7 @@ THREAD = re.compile(r"PRRT_[A-Za-z0-9_-]+")
 BOTS = frozenset("coderabbitai claude copilot-pull-request-reviewer github-actions".split())
 SHA = re.compile(r"(?<![0-9A-Za-z])(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}(?![0-9A-Za-z])", re.I)
 LINK = re.compile(r"https://\S+|(?<![\w./-])[\w.-]+/[\w.-]+#[0-9]+\b")
+GRAPHQL = re.compile(r"(?:https?://[^/]+)?/*(?:api/v3/)?graphql")
 QUERY_FIELD = re.compile(r"(?:-[fF]|--(?:raw-)?field=)?query=")
 TIMEOUT = 10
 # The last 100 comments: the bot's last word and every reply after it.
@@ -36,6 +37,16 @@ DO = ("Reply on the thread with the fix commit, or with a link to the ruling, de
 
 def _wv(s, i):
     return s.q[i] if s.k[i] == "q" else s.w[i]
+
+
+def _input(words):
+    """The --input value among gh's words ("-" is stdin), or None."""
+    for j, w in enumerate(words):
+        if w == "--input":
+            return words[j + 1] if j + 1 < len(words) else ""
+        if w.startswith("--input="):
+            return w[len("--input="):]
+    return None
 
 
 def _resolves(command):
@@ -54,13 +65,14 @@ def _resolves(command):
             if g is None:
                 continue
             words = [_wv(s, i) for i in range(g + 1, b + 1) if s.k[i] in ("w", "q")]
-            if "api" not in words or "graphql" not in words:
+            if "api" not in words or not any(GRAPHQL.fullmatch(w) for w in words):
                 continue
-            body = "\n".join(words) + ("\n" + hd if "--input" in words else "")
+            src = _input(words)
+            body = "\n".join(words) + ("\n" + hd if src == "-" else "")
             live = any(s.live[i] for i in range(g + 1, b + 1))
             query = [i for i in range(g + 1, b + 1) if s.k[i] in ("w", "q") and QUERY_FIELD.match(_wv(s, i))]
             if (any(s.live[i] or QUERY_FIELD.sub("", _wv(s, i)).startswith("@") for i in query)
-                    or "--input" in words and not hd):
+                    or src is not None and (src != "-" or not hd)):
                 unreadable = True
                 continue
             if not RESOLVE.search(body):
