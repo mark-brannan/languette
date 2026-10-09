@@ -81,8 +81,7 @@ interface is; this file says who decided it and why, one line each.
 
 ## Gather reads only: Solace, 2026-10-09
 
-- No Need writes, runs a host-named program, or reads another workflow's
-  state. Scar: #107.
+- No Need writes or runs a host-named program. Scar: #107.
 - The readable set is the read kinds in `KINDS` in `languette/world.py`.
 - Whether `prose-budget-commit` keeps running the engine `prose_budget_bin`
   names is unruled.
