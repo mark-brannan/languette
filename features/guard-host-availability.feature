@@ -1,8 +1,10 @@
 @python
 Feature: guard-host-availability
   The commands that take the machine down are denied: shutdown, reboot, halt,
-  poweroff, the fork-bomb shape, and a systemctl verb that stops a host service
-  or the host itself. No agent area makes them safe.
+  poweroff, the fork-bomb shape, and a systemctl verb that takes the host down
+  or stops a service the user's session runs on: ssh, login, dbus, the network
+  or the display manager. No agent area makes them safe. Any other service is
+  the agent's to stop.
 
   Scenario Outline: the fork-bomb shape and a power command are denied
     When the agent runs `<command>`
@@ -25,31 +27,30 @@ Feature: guard-host-availability
       | sh -c "reboot"                  | reboot                    | nested text                                    |
       | echo done; reboot               | reboot                    | after a ;                                      |
 
-  Scenario Outline: stopping or restarting a host service is denied
+  Scenario Outline: taking the host down, or a service the session runs on, with systemctl is denied
     When the agent runs `<command>`
     Then the guard denies, naming "<naming>"
 
     Examples:
-      | command                                  | naming                  | note                                  |
-      | systemctl stop nginx                     | systemctl stop          |                                       |
-      | sudo systemctl stop nginx.service        | systemctl stop          | behind sudo                           |
-      | systemctl restart sshd                   | systemctl restart       |                                       |
-      | /usr/bin/systemctl restart docker        | systemctl restart       | by path                               |
-      | systemctl --now stop nginx               | systemctl stop          | an option before the verb             |
-      | sudo -n systemctl restart sshd           | systemctl restart       | behind sudo with an option            |
-      | echo done; systemctl stop nginx          | systemctl stop          | after a ;                             |
-      | sh -c "systemctl stop nginx"             | systemctl stop          | nested text                           |
-      | systemctl stop a b                       | systemctl stop          | several units                         |
-      | systemctl --root /x stop nginx           | systemctl stop          | an option's value before the verb     |
-      | systemctl --kill-whom main stop nginx    | systemctl stop          | an option's value before the verb     |
-      | systemctl --job-mode replace stop nginx  | systemctl stop          | an option's value before the verb     |
-      | systemctl -T stop nginx                  | systemctl stop          | a flag that takes no value            |
-      | systemctl --what status stop nginx       | systemctl stop          | an unknown option before a read verb  |
-      | systemctl try-restart nginx              | systemctl try-restart   | a restart by another name             |
-      | systemctl kill nginx                     | systemctl kill          |                                       |
-      | systemctl reboot                         | systemctl reboot        | the host itself                       |
-      | systemctl poweroff                       | systemctl poweroff      | the host itself                       |
-      | systemctl isolate rescue.target          | systemctl isolate       | stops every unit the target lacks     |
+      | command                                  | naming                         | note                                  |
+      | systemctl reboot                         | systemctl reboot               | the host itself                       |
+      | systemctl poweroff                       | systemctl poweroff             | the host itself                       |
+      | /usr/bin/systemctl halt                  | systemctl halt                 | by path                               |
+      | systemctl isolate rescue.target          | systemctl isolate              | stops every unit the target lacks     |
+      | systemctl rescue                         | systemctl rescue               |                                       |
+      | systemctl stop sshd                      | systemctl stop sshd            |                                       |
+      | sudo systemctl restart ssh.service       | systemctl restart ssh.service  | behind sudo                           |
+      | sudo -n systemctl restart sshd           | systemctl restart sshd         | behind sudo with an option            |
+      | systemctl stop nginx NetworkManager      | systemctl stop NetworkManager  | among several units                   |
+      | systemctl kill systemd-logind            | systemctl kill systemd-logind  |                                       |
+      | systemctl try-restart gdm                | systemctl try-restart gdm      | a restart by another name             |
+      | systemctl disable --now dbus             | systemctl disable dbus         | disable that also stops               |
+      | echo done; systemctl stop sshd           | systemctl stop sshd            | after a ;                             |
+      | sh -c "systemctl stop display-manager"   | systemctl stop display-manager | nested text                           |
+      | systemctl --root /x reboot               | systemctl reboot               | an option's value before the verb     |
+      | systemctl --job-mode replace stop sshd   | systemctl stop sshd            | an option's value before the verb     |
+      | systemctl -T reboot                      | systemctl reboot               | a flag that takes no value            |
+      | systemctl --what status reboot           | systemctl reboot               | an unknown option before a read verb  |
 
   Scenario: a fork bomb on a later line is still seen
     When the agent runs:
@@ -83,6 +84,10 @@ Feature: guard-host-availability
       | systemctl --user stop foo                        | the user's own manager, not the host           |
       | echo systemctl stop nginx                        | prose that names a command is not it           |
       | git commit -m "systemctl restart sshd"           |                                                |
+      | echo systemctl reboot                            |                                                |
       | systemctl start nginx                            | starting adds availability                     |
-      | systemctl list-units stop                        | an argument to another verb                    |
-      | systemctl -t service status restart              | an argument to another verb                    |
+      | systemctl list-units reboot                      | an argument to another verb                    |
+      | systemctl -t service status reboot               | an argument to another verb                    |
+      | systemctl stop nginx                             | not a service the session runs on              |
+      | systemctl restart myapp.service                  | not a service the session runs on              |
+      | systemctl disable sshd                           | disable without --now stops nothing            |
