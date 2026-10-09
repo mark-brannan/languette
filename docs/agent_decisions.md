@@ -188,3 +188,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t040047z
 - Door open and spend became acts too, though the brief named four primitives; only claim and take were held back Undo: yield Need door again and restore _door's two ops ([#115](https://github.com/mark-brannan/languette/pull/115))
+
+### 20261009t040049z
+- Acts run after every verdict, deny included: a deny skipping worktree-keep would lose a session's first-call adoption Undo: skip world.act in respond() on a deny ([#115](https://github.com/mark-brannan/languette/pull/115))
