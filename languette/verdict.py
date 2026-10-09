@@ -82,3 +82,33 @@ def context(text):
 def allow(updated_input):
     """Let the call run with its input rewritten to `updated_input`."""
     return {"permissionDecision": "allow", "updatedInput": updated_input}
+
+
+def verdict(event, findings):
+    """The one decision for a call, from every guard's finding: the fields of
+    hookSpecificOutput, or None for silence. `findings` is [(guard name, result,
+    crashed)] in the order the guards judged. A deny outranks an ask, an ask a
+    rewrite; the first rewrite wins, since two cannot both apply."""
+    if event != "PreToolUse":                  # state-keeping events: nothing to decide
+        return None
+    reasons, asks, notes, rewrites = [], [], [], []
+    for _, r, _ in findings:
+        if not r:
+            continue
+        if r.get("permissionDecision") == "deny":
+            reasons.append(r["permissionDecisionReason"])
+        if r.get("permissionDecision") == "ask":
+            asks.append(r["permissionDecisionReason"])
+        if r.get("permissionDecision") == "allow" and "updatedInput" in r:
+            rewrites.append(r["updatedInput"])
+        if r.get("additionalContext"):
+            notes.append(r["additionalContext"])
+    if reasons:
+        return deny("\n\n".join(reasons))
+    if asks:
+        return ask("\n\n".join(asks))
+    if rewrites:
+        return {**allow(rewrites[0]), **(context("\n\n".join(notes)) if notes else {})}
+    if notes:
+        return context("\n\n".join(notes))
+    return None
