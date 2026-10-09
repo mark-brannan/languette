@@ -209,3 +209,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t055700z
 - guard-protected-services: ssh, sshd, NetworkManager, systemd-networkd, the network targets, the display managers and getty move from guard-host-availability to the new guard's default list; dbus, logind, login sessions and run-level targets stay Undo: move names between _CORE and DEFAULT with their feature rows ([#116](https://github.com/mark-brannan/languette/pull/116))
+
+### 20261009t055703z
+- protected_services: a set list replaces the default list, as bypass_labels does, instead of adding to it as issue #113 said Undo: protected() returns DEFAULT plus the set patterns ([#116](https://github.com/mark-brannan/languette/pull/116))
