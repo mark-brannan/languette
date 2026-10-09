@@ -314,3 +314,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t220047z
 - run.py: a --guard name no registered guard has is a deny, not a silent pass, so a hook entry left on a renamed guard fails closed Undo: drop the unknown-name check in _respond and its test ([#140](https://github.com/mark-brannan/languette/pull/140))
+
+### 20261009t220935z
+- smoke: only the doctor's shell parser row is asserted per environment; the Claude Code row is ✗ in an empty HOME and ignored Undo: assert more rows in test_doctor_names_the_parser_in_use ([#142](https://github.com/mark-brannan/languette/pull/142))
