@@ -308,3 +308,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t210003z
 - approved guard names: after ask-first and deny-always, the guard- names sort alphabetically, not grouped by domain Undo: regroup the rows by domain ([#130](https://github.com/mark-brannan/languette/pull/130))
+
+### 20261009t211657z
+- README install: planned platform blocks point at the epic #102, not per-rung issues, until those exist Undo: repoint each (planned: …) marker at its own issue ([#102](https://github.com/mark-brannan/languette/issues/102)) (no PR, branch claude/languette-epic-scope-48cff1)
