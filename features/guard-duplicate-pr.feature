@@ -39,6 +39,7 @@ Feature: guard-duplicate-pr
       | gh pr new -t t -b "Closes #114"                                 | gh's alias new               |
       | sh -c 'gh pr create -t t -b "Closes #114"'                      | nested in sh -c              |
       | gh api repos/o/r/pulls -f title=t -f head=h -f base=main -f body='Closes #114' | the REST spelling |
+      | gh api repos/{owner}/{repo}/pulls -f title=t -f body='Closes #114' | gh's placeholders, the cwd's repo |
 
   Scenario: the body from a heredoc command substitution is read
     Given GH_TIMELINE is "open-pr"

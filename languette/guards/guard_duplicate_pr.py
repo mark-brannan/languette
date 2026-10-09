@@ -177,10 +177,11 @@ def _api(s, g, hi):
             path = t
         i += 1
     p = re.sub(r"^/+", "", re.sub(r"^https?://[^/]+/", "", path, count=1), count=1)
-    m = re.fullmatch(rf"repos/({_NAME})/({_NAME})/pulls/?", p)
+    m = re.fullmatch(rf"repos/({_NAME}|\{{owner\}})/({_NAME}|\{{repo\}})/pulls/?", p)
     if not m or method in ("GET", "HEAD") or (method == "" and not fields):
         return None
-    post.repo = f"{m.group(1)}/{m.group(2)}"
+    # gh fills {owner}/{repo} from the cwd's repo: None sends _slug to git.
+    post.repo = None if "{" in m.group(1) + m.group(2) else f"{m.group(1)}/{m.group(2)}"
     return post
 
 
