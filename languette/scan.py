@@ -703,6 +703,16 @@ class Scan:
         self.w.append(";"); self.k.append(";"); self.q.append(""); self.live.append(False); self.op.append(op)
         self.quoted.append(False)
 
+    def _in_find_exec(self):
+        """True when the segment so far holds find's -exec, -execdir, -ok or
+        -okdir, whose {} ends the command it runs."""
+        j = len(self.w) - 1
+        while j >= 0 and self.k[j] == "w":
+            if self.w[j] in ("-exec", "-execdir", "-ok", "-okdir"):
+                return True
+            j -= 1
+        return False
+
     def _lex(self, b):
         """The awk lexer over b, carrying the word in progress across calls."""
         L = len(b)
@@ -773,6 +783,11 @@ class Scan:
                 i += 1
                 continue
             if c in ("{", "}") and not self._have:
+                if c == "{" and at(i + 1) == "}" and at(i + 2) in ("", " ", "\t", "\n", ";", "|", "&", ")", "<", ">") \
+                        and not self._in_find_exec():
+                    self._cur += "{}"; self._have = True   # a bare {} is a word (xargs -I{}); find's stays a separator
+                    i += 2
+                    continue
                 self._sep(c); i += 1
                 continue
             if c == "$":
