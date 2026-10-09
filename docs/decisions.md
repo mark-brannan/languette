@@ -85,3 +85,21 @@ interface is; this file says who decided it and why, one line each.
 - The readable set is the read kinds in `KINDS` in `languette/world.py`.
 - Whether `prose-budget-commit` keeps running the engine `prose_budget_bin`
   names is unruled.
+
+## New guards: Solace, 2026-10-09
+
+- A guard enters languette through an issue, never straight from a miss.
+  The issue carries the incident, its root cause, why the hazard clears the
+  README's bar, the concept it belongs to (a setting of an existing guard, or
+  a new one) and its name under the naming ruling above. Scar: #125.
+- Root cause first, guard second. A miss is often a workflow gap, and a
+  guard at most a backstop for it.
+- No prototypes here, not even as drafts; a closed PR is residue. A quick
+  fix lands in the author's own hook layer, or an unstable sibling repo, and
+  comes here once the issue is ruled `ready`.
+- If prototyping outside is hard because the parser and engine live here,
+  the fix is to expose those interfaces, not to admit the prototype.
+- Whether guards that watch an agent's conduct on GitHub (#118, #119, #125)
+  are one concept or several is unruled; the concept is refined before
+  any of them lands.
+- Prose now; a check with teeth once the gate's shape is settled.
