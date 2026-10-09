@@ -3,12 +3,12 @@
 Usage: python3 tests/new_guard_names.py <base-ref>
 
 A guard is new when its NAME is in the working tree's languette/guards/ but
-not in the base's. The approved names are the first table under a heading
-"Approved guard names" in any markdown file under docs/, read from the base,
-so a change cannot approve its own guard and the table can move files.
-Guards that already exist are not checked. The first cell of a table row
-must be exactly one backticked name, `| `name` | ...`; anything else is not
-read as a name. Standard library only."""
+not in the base's; an existing guard renamed counts. The approved names are
+the first table under a heading "Approved guard names" in any markdown file
+under docs/, read from the base, so a change cannot approve its own guard and
+the table can move files. Names that already exist are not checked. The first
+cell of a table row must be exactly one backticked name, `| `name` | ...`;
+anything else is not read as a name. Standard library only."""
 
 import ast
 import re
@@ -18,7 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = "languette/guards"
-HEADING = re.compile(r"^#+ approved guard names", re.M | re.I)
+HEADING = re.compile(r"^#+ approved guard names[ \t]*$", re.M | re.I)
 ANY_HEADING = re.compile(r"^#+ ", re.M)
 TABLE = re.compile(r"(?:^\|.*\n?)+", re.M)
 ROW = re.compile(r"^\| `([^`]+)` \|", re.M)
@@ -59,8 +59,13 @@ def _names(src):
     return out
 
 
+def _paths_at(base, under):
+    # -z: a path with a space or a non-ASCII character comes back whole, unquoted.
+    return [p for p in _git("ls-tree", "-r", "-z", "--name-only", base, "--", under).split("\0") if p]
+
+
 def base_guard_paths(base):
-    return _git("ls-tree", "-r", "--name-only", base, "--", f"{GUARDS}/").split()
+    return _paths_at(base, f"{GUARDS}/")
 
 
 def names_at(base):
@@ -73,27 +78,29 @@ def names_at(base):
 
 
 def names_here(base):
-    # A nameless module is an error only when it is new: an existing helper
-    # module (say guards/_util.py) is not this PR's doing.
+    # Every module is read, so an existing guard renamed to an unapproved NAME
+    # is caught. A nameless module is an error only when it is new: an existing
+    # helper (say guards/_util.py) is not this PR's doing. A bad NAME is always
+    # this PR's: the base's modules all parse, or names_at fails the job.
     existing = set(base_guard_paths(base))
     out, errors = set(), []
     for p in sorted((ROOT / GUARDS).rglob("*.py")):
         rel = p.relative_to(ROOT).as_posix()
-        if p.name == "__init__.py" or rel in existing:
+        if p.name == "__init__.py":
             continue
         try:
             found = _names(p.read_text())
         except BadName as e:
             errors.append(f"::error file={rel}::{e}.")
             continue
-        if not found:
+        if not found and rel not in existing:
             errors.append(f"::error file={rel}::Guard module defines no NAME.")
         out |= found
     return out, errors
 
 
 def approved(base):
-    for path in _git("ls-tree", "-r", "--name-only", base, "--", "docs/").split():
+    for path in _paths_at(base, "docs/"):
         if not path.endswith(".md"):
             continue
         text = _git("show", f"{base}:{path}")
