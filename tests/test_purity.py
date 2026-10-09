@@ -7,6 +7,7 @@ A list of known ways out, not a proof: it catches the slip a well-meaning
 author makes, not a deliberate escape (`eval`, a name built at run time)."""
 
 import ast
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -51,22 +52,23 @@ CALLS = {"open", "io.open", "builtins.open", "input", "breakpoint", "datetime.da
     f"os.path.{n}" for n in (
         "exists lexists isdir isfile islink ismount isjunction realpath samefile sameopenfile "
         "getsize getmtime getatime getctime").split()}
+BUILTINS = {"open", "input", "breakpoint"}
 # Methods that do I/O on whatever they are called on: Path's, a file's.
 METHODS = {"read_text", "read_bytes", "write_text", "write_bytes", "iterdir", "rglob", "touch", "unlink", "rmdir",
            "mkdir", "is_dir", "is_file", "is_symlink", "samefile", "readlink", "symlink_to",
            "hardlink_to", "lstat", "chmod", "exists", "stat"}
 
-# Escapes at HEAD, file -> calls, each to become a Need. Remove a line when its
-# guard yields instead; the test fails while a listed escape is gone, so the
-# list only shrinks.
+# Escapes at HEAD, file -> one entry per occurrence, each to become a Need.
+# Remove an entry when its guard yields instead; the tests fail on one more or
+# one fewer, so the list only shrinks.
 KNOWN = {
-    "guards/guard_bypass_labels.py": {"os.open", "os.fstat", "os.close", "os.fdopen"},
-    "guards/guard_disk.py": {"os.getcwd"},
-    "guards/guard_permissions.py": {"os.getcwd"},
-    "guards/guard_recursive_delete.py": {"os.path.lexists", "os.path.realpath", "os.getcwd"},
-    "paths.py": {"os.path.lexists", "os.path.realpath"},
+    "guards/guard_bypass_labels.py": ["os.open", "os.fstat", "os.close", "os.fdopen"],
+    "guards/guard_disk.py": ["os.getcwd"],
+    "guards/guard_permissions.py": ["os.getcwd"],
+    "guards/guard_recursive_delete.py": ["os.path.lexists", "os.path.realpath", "os.getcwd"],
+    "paths.py": ["os.path.lexists", "os.path.realpath"],
     # The parser ladder's shfmt rung (docs/decisions.md, "Runtime dependencies").
-    "scan.py": {"import shutil", "import subprocess", "subprocess.run", "shutil.which"},
+    "scan.py": ["import shutil", "import subprocess", "subprocess.run", "subprocess.TimeoutExpired", "shutil.which"],
 }
 
 
@@ -107,32 +109,36 @@ def escapes(source):
     out = [(n.lineno, f"import {m}") for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom))
            for m in ([a.name for a in n.names] if isinstance(n, ast.Import) else
                      [n.module] if n.level == 0 and n.module else []) if _barred(m)]
+    # Any reference, called or not: `map(open, xs)` and `f = os.getcwd` escape too.
+    inner = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
     for n in ast.walk(tree):
-        if not isinstance(n, ast.Call):
-            continue
-        name = _dotted(n.func, names)
-        if name and _barred(name):
-            out.append((n.lineno, name))
-        elif isinstance(n.func, ast.Attribute) and n.func.attr in METHODS and not (name or "").startswith("os.path."):
+        if isinstance(n, (ast.Attribute, ast.Name)) and id(n) not in inner and isinstance(n.ctx, ast.Load):
+            name = _dotted(n, names)
+            if name and _barred(name) and (not isinstance(n, ast.Name) or n.id in names or n.id in BUILTINS):
+                out.append((n.lineno, name))
+        elif isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in METHODS \
+                and not (_dotted(n.func, names) or "").startswith("os."):
             out.append((n.lineno, f".{n.func.attr}()"))
-    return sorted(set(out))
+    return sorted(out)
 
 
 def _found():
-    return {str(f.relative_to(ROOT / "languette")): {w for _, w in escapes(f.read_text())} for f in PURE}
+    return {str(f.relative_to(ROOT / "languette")): escapes(f.read_text()) for f in PURE}
 
 
 def test_no_guard_and_not_the_verdict_reaches_past_the_process():
-    bad = [f"languette/{rel}:{line}: {what}" for f in PURE
-           for rel in [str(f.relative_to(ROOT / "languette"))]
-           for line, what in escapes(f.read_text()) if what not in KNOWN.get(rel, set())]
+    bad = []
+    for rel, found in _found().items():
+        extra = Counter(w for _, w in found) - Counter(KNOWN.get(rel, []))
+        bad += [f"languette/{rel}:{line}: {what}" for line, what in found if what in extra]
     assert_that(bad, empty())
 
 
 def test_every_known_escape_is_still_there():
     found = _found()
-    assert_that({rel: calls - found.get(rel, set()) for rel, calls in KNOWN.items() if calls - found.get(rel, set())},
-                equal_to({}))
+    gone = {rel: sorted((Counter(calls) - Counter(w for _, w in found.get(rel, []))).elements())
+            for rel, calls in KNOWN.items()}
+    assert_that({rel: g for rel, g in gone.items() if g}, equal_to({}))
 
 
 @pytest.mark.parametrize("source", [
@@ -144,6 +150,9 @@ def test_every_known_escape_is_still_there():
     "import os\nos.makedirs('x')",
     "import os\nos.replace('a', 'b')",
     "import os\nos.execvp('a', [])",
+    "list(map(open, xs))",
+    "import os\nf = os.getcwd\nf()",
+    "import os\nsorted(xs, key=os.path.getmtime)",
     "import subprocess",
     "import subprocess as sp\nsp.run(['ls'])",
     "from subprocess import run",
