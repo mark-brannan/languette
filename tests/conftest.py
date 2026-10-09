@@ -35,7 +35,7 @@ IN_PROCESS = {"python": ("awk",), "shfmt": ("shfmt",)}   # engine -> scan.RUNGS
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "LANGUETTE_PERM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
          "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH", "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND",
-         "CLAUDE_CODE_TMPDIR", "CLAIM_STAMP_BIN", "GH_RULES", "GH_PROTECTION", "XDG_CACHE_HOME")
+         "CLAUDE_CODE_TMPDIR", "GH_RULES", "GH_PROTECTION", "XDG_CACHE_HOME")
 
 
 _REAL_HOME = os.environ.get("HOME")

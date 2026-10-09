@@ -147,18 +147,13 @@ Feature: guard-worktrees
     Then the guard denies
 
   # Couplings are optional: the scratchpad comes from CLAUDE_CODE_TMPDIR, then
-  # TMPDIR, then the state-dir fallback; claim-stamp.sh from CLAIM_STAMP_BIN.
+  # TMPDIR, then the state-dir fallback.
   Scenario: the deny names the recipe, with the scratchpad from CLAUDE_CODE_TMPDIR
     Given the session is "aaaaaaaa-1111-4222-8333-444444444444"
     And the directory "{TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad"
     And CLAUDE_CODE_TMPDIR is "{TMP}/scratch/claude-tmpdir"
     When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
     Then the guard denies, naming "git --git-dir={TMP}/repo/.git worktree add {TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/<name>"
-
-  Scenario: with no claim-stamp.sh at all, the deny is the strict one
-    Given CLAIM_STAMP_BIN is "/nonexistent/claim-stamp.sh"
-    When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
-    Then the guard denies
 
   # dotfiles#455: a session that ran one cd into another repo was denied every
   # call naming its own worktree, even the cd back.
