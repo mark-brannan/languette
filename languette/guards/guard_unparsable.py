@@ -6,7 +6,9 @@ then the awk lexer, which refuses only a quote that never closes. The deny
 names the rung that refused and what it found, with the position when the
 rung gives one or a pip parser adds it, since an agent that is told only
 "syntax error" guesses at the fix. A command over the size or nesting limit
-(scan.TooBig) is denied before any rung reads it, with what to change.
+(scan.TooBig) is denied before any rung reads it, with what to change, and
+so is one holding more nested shell strings than the guards read
+(scan.TooMany): the guards would pass the ones past the cap unread.
 
 The other guards skip a command that does not parse (run.py), rather than
 deny it a second time on a weaker reading.
@@ -24,6 +26,12 @@ def judge(command):
     rather than asking the parser twice."""
     try:
         scan.check(command)
+        scan.texts_of(scan.strip_heredocs(command + "\n"))
+    except scan.TooMany as e:
+        return deny(f"guard-unparsable: this command is too big to check: {e}. Nothing ran. "
+                    "Every quoted string that may run as shell, and every $( ) inside double quotes, "
+                    "is one; the guards read only so many. Split it into several smaller commands, "
+                    "or put the script in a file and run that")
     except scan.TooBig as e:
         return deny(f"guard-unparsable: this command is too big to check: {e}. Nothing ran. "
                     "Every $( ), ( ), { }, backtick, if, case and do adds the depth it stands at, "

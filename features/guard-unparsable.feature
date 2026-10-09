@@ -122,6 +122,28 @@ Feature: guard-unparsable
       | if x; then {}; fi | 141 | its nesting weighs 10,152, over the limit | nested ifs                        |
       | echo {}{}      | 14  | bytes, over the limit of 65,536           | 98 KB of plain words                 |
 
+  Scenario Outline: a command with more nested shell strings than the guards read is denied
+    # The guards read the command and 64 strings in it that may run as shell;
+    # one past that could be the rm -rf, so the cap denies rather than skip it.
+    When the agent runs `<head>`, `<filler>` <n> times, then `<tail>`
+    Then the guard denies, naming "more than 64 nested shell strings"
+
+    Examples:
+      | head         | filler    | n  | tail                  | note                                   |
+      | eval         | "true x"  | 63 | "rm -rf examples"     | quoted strings an eval runs            |
+      | echo note    | "$(true)" | 63 | "$(rm -rf examples)"  | substitutions in a prose-led echo      |
+      | bash -c      | "true x"  | 70 | "rm -rf examples"     | well past the cap                      |
+
+  Scenario: nested quoted substitutions reach the cap by 8 deep
+    # Each level is read again inside the one around it, so the count grows
+    # faster than the depth: 6 deep is 29 to 47 strings, 7 deep 42 or past the cap.
+    When the agent nests `echo "$({})"` 8 deep
+    Then the guard denies, naming "more than 64 nested shell strings"
+
+  Scenario: a command at the cap reads as usual
+    When the agent runs `eval`, `"true x"` 63 times, then `true`
+    Then the guard is silent
+
   Scenario Outline: a command under the limits reads as usual
     When the agent nests `<template>` <n> deep
     Then the guard is silent
@@ -129,4 +151,4 @@ Feature: guard-unparsable
     Examples:
       | template          | n   | note                                          |
       | echo $({})        | 139 | just under the nesting limit                  |
-      | echo "$({})"      | 20  | quoted substitutions weigh as unquoted ones   |
+      | echo "$({})"      | 6   | quoted substitutions weigh as unquoted ones   |

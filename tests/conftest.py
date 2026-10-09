@@ -530,6 +530,11 @@ def _nests(ctx, template, n):
     ctx.run(ctx.payload(command.replace("{}", "x")))
 
 
+@when(parsers.re(r"the agent runs `(?P<head>.*)`, `(?P<filler>.*)` (?P<n>\d+) times, then `(?P<tail>.*)`"))
+def _repeats(ctx, head, filler, n, tail):
+    ctx.run(ctx.payload(" ".join([head] + [filler] * int(n) + [tail])))
+
+
 def _transcript(ctx):
     if not ctx.proj:
         ctx.proj = Path(ctx.mkdtemp())
