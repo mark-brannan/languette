@@ -342,11 +342,14 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens_and_operato
             differ.append(c)
     # guard-unparsable's deny rows are refused by design, and so is a heredoc
     # opener alone in an Examples cell, whose body is the scenario's next
-    # lines. Otherwise, a GraphQL query: never run as a command.
+    # lines. Otherwise, a GraphQL query file: never run as a command.
     by_design = set(feature_commands([ROOT / "features/guard-unparsable.feature"]))
     refused = [c for c in refused if c not in by_design and not re.fullmatch(r"[^\n]*<<'?EOF'?[^\n]*", c)]
-    assert refused == ["mutation { addLabelsToLabelable(input:{labelableId:\"x\",labelIds:[\"y\"]}) "
-                       "{ clientMutationId } }"]
+    assert sorted(refused) == sorted([
+        "mutation { addLabelsToLabelable(input:{labelableId:\"x\",labelIds:[\"y\"]}) { clientMutationId } }",
+        "mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}",
+        "mutation($id:ID!,$b:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$b})"
+        "{comment{url}}}"])
     # A ' in a heredoc body: the awk lexer, reading the raw command, opens a
     # quote to the end; the shfmt rung resumes at the next Word. Every guard
     # strips heredoc bodies first, so neither reading reaches one. A " inside

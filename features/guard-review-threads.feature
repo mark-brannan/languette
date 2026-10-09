@@ -5,12 +5,14 @@ Feature: guard-review-threads
   `resolveReviewThread` mutation), the guard reads that thread from GitHub
   and denies unless both hold: the current gh login replied after the
   bot's last comment, and that reply names a commit (7 to 40 hex
-  characters, at least one a digit and one a letter) or a link (an
-  `https://` URL, or `owner/repo#n`). A thread no bot commented on is not
-  this guard's. A graphql query the guard cannot read (built at run time,
-  from a file, or stdin with no heredoc), a thread it cannot identify, or
-  GitHub that cannot be read, is a deny that says so: a thread left open
-  costs a click, one closed unread hides a finding.
+  characters) or a link (an `https://` URL, or `owner/repo#n`). A thread
+  no bot commented on is not this guard's. A query that opens with `{` or
+  `query` is a read, whatever run-time values fill it. A file a `-F` field
+  or `--input` names is read, when gh runs alone in the call. A graphql
+  query the guard cannot read otherwise (built at run time, a file it
+  cannot open, stdin with no heredoc) or a thread it cannot identify is a
+  deny that says so; GitHub that cannot be read is an ask, as for the
+  other guards that ask GitHub.
 
   Why. An agent reversed an instruction it had been given; the review bot
   flagged it, and the agent replied that the replacement was intended,
@@ -49,6 +51,7 @@ Feature: guard-review-threads
       | Fixed in 3f2a9c1e0b7d4a6c8e2f1b3d5a7c9e0f2b4d6a8c.              | a full sha               |
       | Kept: https://github.com/o/r/blob/main/docs/decisions.md#scope | a link to a decision     |
       | Out of scope here; tracked in o/r#12.                          | an owner/repo#n issue    |
+      | Fixed in 1234567.                                              | a sha may be all digits  |
 
   Scenario Outline: a reply with nothing behind it is denied
     Given review thread "PRRT_t1" holds:
@@ -64,8 +67,6 @@ Feature: guard-review-threads
       | The replacement is intended.        | the agent's own word                |
       | Not fixing: see #12.                | a bare #n names no repository       |
       | See http://example.com/ruling.      | not https                           |
-      | Fixed in 1234567.                   | all digits is a number, not a sha   |
-      | The finding is effaced.             | all letters is a word, not a sha    |
       | Fixed in 3f2a9c.                    | six hex characters is too short     |
 
   Scenario Outline: no reply from this login after the bot's last comment is denied
@@ -165,14 +166,20 @@ Feature: guard-review-threads
       | gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}' -F id=@ids.txt | the id read from a file |
       | gh api graphql -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}' --field=note=@n.txt | another field from a file |
 
-  Scenario: a bot's own login replying with the fix may resolve its thread
-    Given GH_LOGIN is "claude"
+  Scenario Outline: a bot's own login replying with the fix may resolve its thread
+    Given GH_LOGIN is "<viewer>"
     And review thread "PRRT_t1" holds:
-      | author       | body                |
-      | coderabbitai | Consider a rename.  |
-      | claude       | Fixed in 3f2a9c1.   |
+      | type | author       | body                |
+      | Bot  | coderabbitai | Consider a rename.  |
+      | Bot  | <author>     | Fixed in 3f2a9c1.   |
     When the agent runs `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=PRRT_t1`
     Then the guard is silent
+
+    Examples:
+      | viewer         | author        | note                                          |
+      | claude         | claude        | the same login                                |
+      | gh-agent[bot]  | gh-agent      | an app's token, which GraphQL gives no [bot]  |
+      | gh-agent       | gh-agent[bot] | the other way round                           |
 
   Scenario Outline: a graphql call whose query cannot be read is denied
     When the agent runs `<command>`
@@ -183,11 +190,14 @@ Feature: guard-review-threads
       | command                                                                                                      | note                      |
       | echo '{"query":"mutation{resolveReviewThread(input:{threadId:\"PRRT_t1\"}){thread{id}}}"}' \| gh api graphql --input - | piped stdin, no heredoc |
       | Q='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}'; gh api graphql -f query="$Q"       | the query in a variable   |
-      | gh api graphql -f query=@m.graphql -f id=PRRT_t1                                                              | the query in a file       |
+      | gh api graphql -F query=@m.graphql -f id=PRRT_t1                                                              | the query in a missing file |
       | gh api graphql --input m.json -f id=PRRT_t1                                                                   | the payload in a file     |
       | gh api graphql -F query=@m.graphql -f id="$ID"                                                                | a file, the id run-time   |
       | gh api graphql --input payload.json                                                                           | everything in a file      |
-      | gh api graphql -f query=@q.graphql -F owner=o                                                                 | a file, whatever it holds |
+      | gh api graphql -F query=@q.graphql -F owner=o                                                                 | a missing file, whatever it holds |
+      | gh api graphql -f query="mutation{addComment(input:{subjectId:\"$S\",body:\"x\"}){clientMutationId}}"    | a mutation built at run time |
+      | gh api graphql -f query="query Q{viewer{login}} $M" -f operationName=M                                     | a run-time read that names its operation |
+      | gh api graphql -f "$K=mutation{resolveReviewThread(input:{threadId:\"PRRT_t1\"}){thread{id}}}"             | a field name built at run time |
       | gh api graphql --input=m.json -f id=PRRT_t1                                                                   | --input=, a file          |
       | gh api /graphql --input m.json                                                                                | the /graphql path         |
       | gh api https://api.github.com/graphql --input m.json                                                          | the endpoint's full URL   |
@@ -227,9 +237,10 @@ Feature: guard-review-threads
     Then the guard denies, naming "no reply from me after"
 
     Examples:
-      | endpoint                         |
-      | /graphql                         |
-      | https://api.github.com/graphql   |
+      | endpoint                              |
+      | /graphql                              |
+      | https://api.github.com/graphql        |
+      | https://ghe.example.com/api/graphql   |
 
   Scenario: a JSON escape in the --input heredoc does not hide the mutation
     Given review thread "PRRT_t1" holds:
@@ -252,6 +263,10 @@ Feature: guard-review-threads
       | E=graphql; gh api "$E" -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}' |
       | E=graph; gh api "${E}ql" -f id=PRRT_t1                                                           |
       | gh api -X POST "$URL" -f body=x                                                                  |
+      | gh api "$BASE/graphql" -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}' |
+      | gh api "https://$HOST/api/graphql" -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}' |
+      | gh api "${BASE}/v4/graphql" -f id=PRRT_t1                                                        |
+      | gh "$S" graphql -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}'  |
 
   Scenario Outline: a REST path built at run time is not this guard's
     When the agent runs `<command>`
@@ -271,7 +286,7 @@ Feature: guard-review-threads
   Scenario Outline: GitHub that cannot be read is a deny that says so
     Given <setup>
     When the agent runs `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=PRRT_t9`
-    Then the guard denies, naming "GitHub could not be read"
+    Then the guard asks, naming "GitHub could not be read"
 
     Examples:
       | setup                                  | note                                  |
@@ -291,4 +306,47 @@ Feature: guard-review-threads
       | gh api graphql -f query='mutation{addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:"PRRT_t1",body:"x"}){comment{id}}}' | a reply |
       | echo 'gh api graphql -f query=resolveReviewThread -f id=PRRT_t1'                                                | text, not a call              |
       | git commit -m 'guard resolveReviewThread on PRRT_t1'                                                            | a commit message              |
+      | gh api graphql -f query="{repository(owner:\"o\",name:\"$R\"){pullRequest(number:$N){id}}}"               | a read filled at run time     |
+      | gh api graphql -f query="query{node(id:\"$T\"){id}}" --jq .data                                            | a named read filled at run time |
+      | gh api graphql -f query=@m.graphql -f id=PRRT_t1                                                                | -f sends @m.graphql as text   |
+      | gh api graphql -f query='mutation($id:ID!,$b:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$b}){comment{url}}}' -f id=PRRT_t1 -f b='resolveReviewThread is guarded now' | a reply that names the mutation |
       | gh pr view 5                                                                                                    | another gh call               |
+
+  Scenario Outline: a file a field or --input names is read, when gh runs alone
+    Given a project directory
+    And the working directory is "{PROJ}"
+    And review thread "PRRT_t1" holds:
+      | author       | body                |
+      | coderabbitai | Consider a rename.  |
+    And review thread "PRRT_ok" holds:
+      | author       | body                |
+      | coderabbitai | Consider a test.    |
+      | me           | Fixed in 3f2a9c1.   |
+    And the file "resolve.graphql" holds:
+      """
+      mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}
+      """
+    And the file "reply.graphql" holds:
+      """
+      mutation($id:ID!,$b:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$b}){comment{url}}}
+      """
+    And the file "ids.txt" holds:
+      """
+      PRRT_t1
+      """
+    And the file "resolve.json" holds:
+      """
+      {"query": "mutation { resolveReviewThread(input: {threadId: \"PRRT_t1\"}) { thread { id } } }"}
+      """
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                                                                                         | verdict                                          | note                       |
+      | gh api graphql -F query=@reply.graphql -f id=PRRT_t1 -F b=@ids.txt                             | is silent                                        | a reply from a file        |
+      | gh api graphql -F query=@resolve.graphql -f id=PRRT_t1                                         | denies, naming "no reply from me after"          | a resolve from a file      |
+      | gh api graphql --input resolve.json                                                            | denies, naming "no reply from me after"          | a resolve from --input     |
+      | gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}} # PRRT_ok' -F id=@ids.txt | denies, naming "PRRT_t1" | the id from a file, past a decoy |
+      | cd sub && gh api graphql -F query=@../resolve.graphql -f id=PRRT_t1                            | denies, naming "cannot tell which review thread" | a cd moves the file        |
+      | echo x > resolve.graphql; gh api graphql -F query=@resolve.graphql -f id=PRRT_t1               | denies, naming "cannot tell which review thread" | another command could rewrite it |
+      | gh api graphql -F query=@reply.graphql -f id="$T" -F b=@ids.txt                                | is silent                                        | a reply, whatever its id   |
