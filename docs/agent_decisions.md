@@ -179,3 +179,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t024221z
 - The purity check also walks the languette modules the guards import, beyond the design doc's guards and the verdict Undo: drop _pure()'s import walk ([#111](https://github.com/mark-brannan/languette/pull/111))
+
+### 20261009t024224z
+- HEAD's purity escapes are a shrink-only KNOWN list in the test, not fixed in the test-only PR Undo: delete KNOWN once each escape is a Need ([#111](https://github.com/mark-brannan/languette/pull/111))
