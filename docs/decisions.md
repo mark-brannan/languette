@@ -109,6 +109,6 @@ interface is; this file says who decided it and why, one line each.
 - `require-well-formed` replaces `guard-unparsable`. Well-formed means
   parsed whole, within the size and depth bounds.
 - `ask-first` and `deny-always` stand, in pen for now; config's form may
-  change them, as may one guard for both.
+  change them, or merge them into one guard.
 - These name what happens, outside the `guard-<concept>` scheme. The
   suffix `-first` is not reserved.
