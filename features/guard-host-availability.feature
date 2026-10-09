@@ -1,7 +1,8 @@
 @python
 Feature: guard-host-availability
   The commands that take the machine down are denied: shutdown, reboot, halt,
-  poweroff and the fork-bomb shape. No agent area makes them safe.
+  poweroff, the fork-bomb shape, and stopping or restarting a host service
+  with systemctl. No agent area makes them safe.
 
   Scenario Outline: the fork-bomb shape and a power command are denied
     When the agent runs `<command>`
@@ -24,6 +25,22 @@ Feature: guard-host-availability
       | sh -c "reboot"                  | reboot                    | nested text                                    |
       | echo done; reboot               | reboot                    | after a ;                                      |
 
+  Scenario Outline: stopping or restarting a host service is denied
+    When the agent runs `<command>`
+    Then the guard denies, naming "<naming>"
+
+    Examples:
+      | command                                  | naming                  | note                                  |
+      | systemctl stop nginx                     | systemctl stop          |                                       |
+      | sudo systemctl stop nginx.service        | systemctl stop          | behind sudo                           |
+      | systemctl restart sshd                   | systemctl restart       |                                       |
+      | /usr/bin/systemctl restart docker        | systemctl restart       | by path                               |
+      | systemctl --now stop nginx               | systemctl stop          | an option before the verb             |
+      | sudo -n systemctl restart sshd           | systemctl restart       | behind sudo with an option            |
+      | echo done; systemctl stop nginx          | systemctl stop          | after a ;                             |
+      | sh -c "systemctl stop nginx"             | systemctl stop          | nested text                           |
+      | systemctl stop a b                       | systemctl stop          | several units                         |
+
   Scenario: a fork bomb on a later line is still seen
     When the agent runs:
       """
@@ -36,7 +53,7 @@ Feature: guard-host-availability
     When the agent runs `reboot`
     Then the guard denies, naming "say what you need and hand them the exact command"
 
-  Scenario Outline: prose that names a power command, and a function that does not fork itself, pass
+  Scenario Outline: prose that names a power command, a read-only or user-level systemctl, and a function that does not fork itself, pass
     When the agent runs `<command>`
     Then the guard is silent
 
@@ -51,3 +68,10 @@ Feature: guard-host-availability
       | f(){ echo hi; }; f                               | a function that does not fork itself           |
       | echo ':(){ :\|:& };:'                            | a quoted mention of the fork bomb              |
       | git commit -m "the bomb :(){ :\|:& };: is denied" |                                               |
+      | systemctl status nginx                           | a read, not a stop                             |
+      | systemctl restart --user foo                     | the user's own manager, not the host           |
+      | systemctl --user stop foo                        | the user's own manager, not the host           |
+      | echo systemctl stop nginx                        | prose that names a command is not it           |
+      | git commit -m "systemctl restart sshd"           |                                                |
+      | systemctl start nginx                            | starting adds availability                     |
+      | systemctl list-units stop                        | an argument to another verb                    |
