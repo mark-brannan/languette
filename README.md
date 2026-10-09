@@ -48,7 +48,8 @@ Each guard checks for one kind of hazard:
 - [`guard-permissions`](features/guard-permissions.feature): recursive `chmod`,
   `chown`, `chgrp` or `chmod 777` outside agent-owned or
   `LANGUETTE_PERM_ALLOW` directories
-- [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`
+- [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`, `sh <(curl ..)`,
+  `eval "$(wget ..)"`
 - [`guard-disk`](features/guard-disk.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
 - [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
