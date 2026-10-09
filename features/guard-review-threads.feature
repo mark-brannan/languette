@@ -242,10 +242,17 @@ Feature: guard-review-threads
       | command                                                                                          |
       | E=graphql; gh api "$E" -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}' |
       | E=graph; gh api "${E}ql" -f id=PRRT_t1                                                           |
+      | gh api -X POST "$URL" -f body=x                                                                  |
 
-  Scenario: a REST call with a run-time path is not this guard's
-    When the agent runs `gh api "repos/$R/pulls/5"`
+  Scenario Outline: a REST path built at run time is not this guard's
+    When the agent runs `<command>`
     Then the guard is silent
+
+    Examples:
+      | command                        |
+      | gh api "repos/$R/pulls/5"      |
+      | gh api repos/o/r/pulls/$N      |
+      | gh api "user/$X"               |
 
   Scenario: a readable query with a run-time field resolves nothing, and is not this guard's
     When the agent runs `gh api graphql -f query='query($n:Int!){viewer{login}}' -F n="$N"`

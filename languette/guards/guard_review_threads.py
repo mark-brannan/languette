@@ -29,7 +29,17 @@ SHA = re.compile(r"(?<![0-9A-Za-z])(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{
 LINK = re.compile(r"https://\S+|(?<![\w./-])[\w.-]+/[\w.-]+#[0-9]+\b")
 GRAPHQL = re.compile(r"(?:https?://[^/]+)?/*(?:api/v3/)?graphql")
 QUERY_FIELD = re.compile(r"(?:-[fF]|--(?:raw-)?field=)?query=")
-VAR = re.compile(r"\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])|\$\([^)]*\)|`[^`]*`|[\"']")
+VAR = re.compile(r"\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])|\$\([^)]*\)|`[^`]*`")
+ENDPOINTS = ("graphql", "/graphql", "https://api.github.com/graphql")
+
+
+def _maybe_graphql(word):
+    """A word built at run time could spell the graphql endpoint: its literal
+    text before the first expansion starts some spelling of it, and the text
+    after the last ends `graphql`."""
+    pieces = VAR.split(re.sub(r"[\"']", "", word))
+    head, tail = pieces[0], pieces[-1]
+    return any(e.startswith(head) or head.startswith("https://") for e in ENDPOINTS) and "graphql".endswith(tail)
 TIMEOUT = 10
 # The last 100 comments: the bot's last word and every reply after it.
 QUERY = ("query($id: ID!) { viewer { login } node(id: $id) { ... on PullRequestReviewThread { "
@@ -82,7 +92,7 @@ def _resolves(command):
             if not any(GRAPHQL.fullmatch(w) for w in words):
                 # A run-time word that could spell the endpoint cannot be shown not to be graphql.
                 unreadable = unreadable or any(
-                    s.live[i] and "graphql".endswith(VAR.sub("", _wv(s, i)).rsplit("/", 1)[-1])
+                    s.live[i] and _maybe_graphql(_wv(s, i))
                     for i in range(g + 1, b + 1) if s.k[i] in ("w", "q"))
                 continue
             src = _input(words)
