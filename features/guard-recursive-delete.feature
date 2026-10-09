@@ -628,3 +628,7 @@ Feature: guard-recursive-delete
       not json
       """
     Then the guard denies
+
+  Scenario: the last nested string under the cap is read
+    When the agent runs `eval`, `"true x"` 62 times, then `"rm -rf examples"`
+    Then the guard denies, naming "rm -r examples"

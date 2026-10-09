@@ -60,6 +60,10 @@ _GITHUB = re.compile(r"github\.com(?::\d+)?[:/]+([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-
 # The operators a separator's text is made of, as Scan piles them up (`;}&&` for `; } &&`).
 _OPS = re.compile(r"\|\||&&|\|&|\||&|;|\n|\(|\)|\{|\}|`")
 _PIPE = ("|", "|&")
+# Keywords that may lead a segment before its command; the openers among them, and the closers.
+_LEADS = frozenset("if then else elif do while until ! time".split())
+_OPEN = {"if": False, "while": True, "until": True, "for": True, "select": True}   # keyword -> a loop
+_CLOSE = frozenset("fi done".split())
 _FALLBACK = ("main", "master")
 # A refspec's one run-time part: $NAME or ${NAME}, nothing else.
 _VAR = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
@@ -308,6 +312,38 @@ def _admin_merge(s, a, b, nested):
     return False
 
 
+def _compound(s, a, b):
+    """(the command word's index or None, the compounds opened, a close): segment a..b read
+    past the keywords leading it. `for` and `select` open a loop whose own words are no command."""
+    i, opens = a, []
+    while i <= b and s.k[i] == "w" and not s.quoted[i] and s.w[i] in _LEADS:
+        if s.w[i] in _OPEN:
+            opens.append(_OPEN[s.w[i]])
+        i += 1
+    if i <= b and s.k[i] == "w" and not s.quoted[i]:
+        if s.w[i] in ("for", "select"):
+            return None, opens + [True], False
+        if s.w[i] in _CLOSE:
+            return None, opens, True
+    return (sw.seg_cmd(s, i, b) if i <= b else None), opens, False
+
+
+def _loops_moved(s, segs):
+    """The segments that open a loop with a cd anywhere in it, to its done or the text's end."""
+    stack, out = [], set()
+    for n, (c, opens, close) in enumerate(segs):
+        stack += [[n, loop, False] for loop in opens]
+        if c is not None and _CD.match(s.w[c]):
+            for f in stack:
+                f[2] = True
+        if close and stack:
+            f = stack.pop()
+            if f[1] and f[2]:
+                out.add(f[0])
+    out.update(f[0] for f in stack if f[1] and f[2])
+    return out
+
+
 def _walk(cmd, cwd, home=None):
     """(pushes, whether an admin merge was seen, the first Refuse). A Refuse ends only its own
     command, so an admin merge or a push on PR-only main later in the line still denies.
@@ -316,7 +352,9 @@ def _walk(cmd, cwd, home=None):
     around it closes (back to the directory before the subshell), a group around it closes,
     it is an element of a pipeline, its and-or list is backgrounded or carries on past `||`,
     it follows `||`, a command before it in its and-or list may have skipped it and the list
-    ends, or a backtick follows. The last seven leave the directory unknown."""
+    ends, or a backtick follows. The last seven leave the directory unknown. A cd behind
+    `then`, `else`, `do` or `!` is seen; past the `else` or `elif` that follows it and past the `fi`
+    or `done` that closes it, the directory is unknown, and through a whole loop that holds one, since a later pass starts where it left."""
     pushes, admin, refused = [], False, None
     for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
         s, here, moved = sw.Scan(text), cwd, False
@@ -349,9 +387,19 @@ def _walk(cmd, cwd, home=None):
                     list_cd = list_cmd = cond_cd = False
 
         ops("".join(re.findall(r"[({]", re.match(r"[\s({]*", text).group())))
-        for a, b in s.segments():
-            c = sw.seg_cmd(s, a, b) if a <= b else None
+        segs = [_compound(s, a, b) if a <= b else (None, [], False) for a, b in s.segments()]
+        loops, kw = _loops_moved(s, segs), []  # kw: each open if or loop, and whether a cd ran in it
+        for n, (a, b) in enumerate(s.segments()):
+            c, opens, close = segs[n]
+            kw += [False] * len(opens)
+            if n in loops:
+                here = None                    # a later pass starts wherever the cd left it
+            if close and kw and kw.pop():
+                here = None                    # the cd inside may not have run
+            if kw and a <= b and s.k[a] == "w" and not s.quoted[a] and s.w[a] in ("else", "elif") and kw[-1]:
+                here = None                    # a branch that did not run left no cd behind it
             if c is not None and _CD.match(s.w[c]):
+                kw = [True] * len(kw)
                 prev = _ops(s.op[a - 1]) if a > 0 else []
                 nxt = _ops(s.op[b + 1]) if b + 1 < len(s) else []
                 if (prev and prev[-1] in _PIPE + ("||",)) or (nxt and nxt[0] in _PIPE) or s.w[c] == "popd" or c + 1 > b:
