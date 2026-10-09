@@ -278,3 +278,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t073202z
 - guard-signed-comments denies an unreadable graphql query when any field besides query, or an --input payload, travels with it (supersedes the body-field-only call): -f text=... bound to body:$text posted unsigned; a read query with variables and an unreadable query is now denied too Undo: deny only when a body or [body] field or an --input travels with the unreadable query ([#119](https://github.com/mark-brannan/languette/pull/119))
+
+### 20261009t073952z
+- README keeps its existing guard-list wording as on main and omits guard-signed-comments' bullet, since even its bare name puts the section over the 232-word cap (supersedes the README-trims call); the reads table keeps its row Undo: raise the 'The guards' section cap to 236 in its own PR, then add the bullet ': unsigned agent comments' ([#119](https://github.com/mark-brannan/languette/pull/119#discussion_r4227758381)) ([#119](https://github.com/mark-brannan/languette/pull/119))
