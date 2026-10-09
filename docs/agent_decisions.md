@@ -191,3 +191,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t040049z
 - Acts run after every verdict, deny included: a deny skipping worktree-keep would lose a session's first-call adoption Undo: skip world.act in respond() on a deny ([#115](https://github.com/mark-brannan/languette/pull/115))
+
+### 20261009t040051z
+- The writes_in_acts fixture gates OS write calls during respond, not only World's act methods Undo: wrap only the ACTS methods ([#115](https://github.com/mark-brannan/languette/pull/115))
