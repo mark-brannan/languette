@@ -230,3 +230,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t070926z
 - guard-review-threads' deny names a ruling, decision record or issue as the record, not cards or hand-over lines, since the repo's CLAUDE.md names nothing from the host's own workflow Undo: edit DO in guard_review_threads.py ([#118](https://github.com/mark-brannan/languette/pull/118))
+
+### 20261009t070929z
+- README gets guard-review-threads only in the Reads table: The guards section is at its 232-word cap and a bullet needs the cap raised in its own PR Undo: raise the cap in its own PR, then add the bullet ([#118](https://github.com/mark-brannan/languette/pull/118))
