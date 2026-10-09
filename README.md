@@ -10,6 +10,12 @@ answers: *allow*, *ask*, or **deny**.
 Nothing external like a cloud/web service decides, nor any ML or AI models.
 The critical execution path is [deterministic](https://en.wikipedia.org/wiki/Deterministic_algorithm), and even uses ["pure functions"](https://en.wikipedia.org/wiki/Pure_function) where possible.
 
+**Whose guard is it.** The agent's vendor ships safeguards of its own. Those are a
+product decision, made in a large AI company's interest, changed in any release,
+and read by nobody outside it. We don't take that company's word for your safety,
+and you shouldn't have to. languette is the guard you can read, run and keep.
+A vendor that copies it is welcome; that would be the point.
+
 *Languette* is French for "little tongue". On a halberd the languette (or 'langet')
 it is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
 the pole. These guards are that strip: protecting your work, strengthening your tools, while holding back certain agentic hazards that could ruin your day.
