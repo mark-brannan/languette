@@ -302,3 +302,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t192906z
 - new-guard-names: CI job, not pre-commit; table read from the PR base, found by its heading anywhere under docs/; a renamed NAME counts as new Undo: drop or edit the new-guard-names job in ci.yml ([#132](https://github.com/mark-brannan/languette/pull/132))
+
+### 20261009t205348z
+- require-well-formed's Concept and Under the umbrella wording in docs/approved-guard-names.md is the agent's Undo: edit the row (no PR, branch claude/base-case-guard-names)
