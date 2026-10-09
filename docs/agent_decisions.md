@@ -275,3 +275,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t073153z
 - guard-signed-comments checks the signature's eight hex against the payload's session_id[:8] when the payload carries a hex one, shape only otherwise (supersedes the shape-only call): the CI review bot signed its re-review of #119 with this PR's example hex, not its own Undo: go back to shape only: drop the hexid comparison in check() ([#119](https://github.com/mark-brannan/languette/pull/119))
+
+### 20261009t073202z
+- guard-signed-comments denies an unreadable graphql query when any field besides query, or an --input payload, travels with it (supersedes the body-field-only call): -f text=... bound to body:$text posted unsigned; a read query with variables and an unreadable query is now denied too Undo: deny only when a body or [body] field or an --input travels with the unreadable query ([#119](https://github.com/mark-brannan/languette/pull/119))
