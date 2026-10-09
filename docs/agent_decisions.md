@@ -233,3 +233,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t070929z
 - README gets guard-review-threads only in the Reads table: The guards section is at its 232-word cap and a bullet needs the cap raised in its own PR Undo: raise the cap in its own PR, then add the bullet ([#118](https://github.com/mark-brannan/languette/pull/118))
+
+### 20261009t070933z
+- guard-review-threads reads GitHub through the existing run Need, not a new gather kind Undo: add a gh-graphql read kind to world.KINDS and yield it from _thread ([#118](https://github.com/mark-brannan/languette/pull/118))
