@@ -7,7 +7,7 @@ except under CI); @hook runs a hooks/hooks.json command by subprocess, the way
 Claude Code runs it (wiring.feature). @shfmt_only narrows a scenario to the
 shfmt rung; @no_shfmt drops the shfmt rung, for a row its
 parse check denies before any guard reads it. The feature's name is the guard's name, except
-guard-unparsable, which has its own guard. @python_only narrows a scenario to the
+require-well-formed, which has its own guard. @python_only narrows a scenario to the
 awk rung.
 """
 
@@ -270,7 +270,7 @@ def ctx(engine):
 
 
 def pytest_bdd_before_scenario(request, feature, scenario):
-    request.getfixturevalue("ctx").guard = None if feature.name == "guard-unparsable" else feature.name
+    request.getfixturevalue("ctx").guard = None if feature.name == "require-well-formed" else feature.name
 
 
 # --- Given ---------------------------------------------------------------

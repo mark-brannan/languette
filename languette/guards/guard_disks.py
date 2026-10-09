@@ -1,4 +1,4 @@
-"""guard-disk: features/guard-disk.feature is the spec.
+"""guard-disks: features/guard-disks.feature is the spec.
 
 Blocks the commands that overwrite a disk: `dd` with of= under /dev, mkfs*,
 wipefs and shred on anything but the agent's own area, and a redirection or
@@ -15,7 +15,7 @@ from languette import paths
 from languette import scan as sw
 from languette.verdict import Need, Refuse, deny
 
-NAME = "guard-disk"
+NAME = "guard-disks"
 
 _DD = re.compile(r"(?:^|/)dd\Z")
 _MKFS = re.compile(r"(?:^|/)(?:mkfs(?:\.[A-Za-z0-9]+)?|mke2fs|mkswap|mkdosfs)\Z")
@@ -207,21 +207,21 @@ def check(payload, env=os.environ):
         cwd = yield Need("cwd")
     home = env.get("HOME", "")
     if not home.startswith("/"):
-        return deny("guard-disk: $HOME is not an absolute path, cannot resolve targets")
+        return deny("guard-disks: $HOME is not an absolute path, cannot resolve targets")
 
     judge = _Judge(cwd, home)
     try:
         judge.run(cmd + "\n")
     except Refuse as e:
-        return deny(f"guard-disk: {e}")
+        return deny(f"guard-disks: {e}")
 
     roots = yield from paths.own_roots(home)
     for abs_, what, raw in judge.targets:
         if not paths.under(abs_, roots):
             kind = "a device node" if abs_.startswith("/dev/") else "outside the scratchpad, /tmp and agent worktrees"
-            return deny(f"guard-disk: `{what} {raw}` is blocked: {abs_} is {kind}. {_WAY_OUT}")
+            return deny(f"guard-disks: `{what} {raw}` is blocked: {abs_} is {kind}. {_WAY_OUT}")
         phys = yield from paths.physical(abs_)
         if phys != abs_ and not paths.under(phys, roots):
-            return deny(f"guard-disk: `{what} {raw}` is blocked: {abs_} resolves through a symlink to {phys}, "
+            return deny(f"guard-disks: `{what} {raw}` is blocked: {abs_} resolves through a symlink to {phys}, "
                         f"which is not the scratchpad, /tmp or an agent worktree. {_WAY_OUT}")
     return None

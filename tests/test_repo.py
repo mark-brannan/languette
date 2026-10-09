@@ -17,8 +17,8 @@ from languette.guards import guard_github_issues, guard_private_terms
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
           "guard-private-terms", "prose-budget-commit", "guard-worktrees",
-          "guard-bypass-labels", "guard-unparsable", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
-          "guard-permissions", "guard-pipe-to-shell", "guard-disk",
+          "guard-bypass-labels", "require-well-formed", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
+          "guard-permissions", "guard-pipe-to-shell", "guard-disks",
           "guard-host-availability", "guard-scheduled-jobs", "guard-cross-session-send",
           "guard-secrets"}
 # Guards that are off unless the user turns them on: their option defaults to false.
