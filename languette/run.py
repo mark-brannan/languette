@@ -38,7 +38,7 @@ def _out(event, fields):
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
     from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_bypass_ruleset,
-                                  guard_cross_session_send, guard_disks, guard_git_stacked_base,
+                                  guard_cross_session_send, guard_disks, guard_duplicate_pr, guard_git_stacked_base,
                                   guard_git_work_loss, guard_github_issues, guard_host_availability,
                                   guard_infra, guard_permissions, guard_pipe_to_shell, guard_private_terms,
                                   guard_recursive_delete, guard_scheduled_jobs, guard_secrets, require_well_formed,
@@ -64,6 +64,7 @@ GUARDS = (
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
     ("PreToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
     ("PreToolUse", guard_private_terms.TOOLS, (guard_private_terms,)),
+    ("PreToolUse", guard_duplicate_pr.TOOLS, (guard_duplicate_pr,)),
     ("PreToolUse", re.compile(r"(?:Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree)\Z"), (guard_worktrees,)),
     ("PreToolUse", re.compile(r"SendMessage\Z"), (guard_cross_session_send,)),
     ("PostToolUse", _SEND_STATE_TOOLS, (guard_cross_session_send,)),

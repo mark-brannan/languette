@@ -1,6 +1,6 @@
 {
   "name": "languette",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, commands that destroy infrastructure, untrusted text relayed to another of your sessions, and a credential pasted into a command.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a second PR on an issue an open PR already references, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, commands that destroy infrastructure, untrusted text relayed to another of your sessions, and a credential pasted into a command.",
   "author": {
     "name": "Mark Brannan"
   },
@@ -97,6 +97,12 @@
       "type": "boolean",
       "title": "Block deleting a stacked base branch",
       "description": "Deny deleting a remote branch that an open pull request is based on or headed from. Leave on unless you want remote branch deletions through unchecked.",
+      "default": true
+    },
+    "guard_duplicate_pr": {
+      "type": "boolean",
+      "title": "Block a second PR on an issue",
+      "description": "Deny opening a PR that closes an issue an open PR already references, unless the body says it supersedes that PR; ask when GitHub can't say. Leave on unless you want parallel sessions able to open duplicate PRs.",
       "default": true
     },
     "guard_bypass_ruleset": {
