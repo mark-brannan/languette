@@ -290,3 +290,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t080904z
 - guard-review-threads lets a graphql query that opens with { or query pass whatever run-time values fill it (GraphQL runs no mutation from it without operationName), reads a file a -F field or --input names through gather when gh runs alone, and looks for the mutation only in the query; reads denied over 30 days of transcripts fall from 121 to at most 42 of 2603 graphql calls. Supersedes the deny-every-out-of-sight-query entry above Undo: make every run-time query and every @file or --input file unreadable again in _calls ([#118](https://github.com/mark-brannan/languette/pull/118))
+
+### 20261009t093543z
+- guard-bypass-labels' file read uses the existing read kind, extended with a byte cap, a non-blocking open and a regular-file check, not a new kind Undo: add a separate read kind and restore read to a plain open ([#114](https://github.com/mark-brannan/languette/issues/114)) (no PR, branch claude/pickup-1791538208011dbc62-7f6ea6)
