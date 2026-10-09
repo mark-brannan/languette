@@ -25,9 +25,15 @@ def _pure():
         if f in seen:
             continue
         seen.add(f)
+        pkg = ".".join(f.relative_to(ROOT).parent.parts)
         for n in ast.walk(ast.parse(f.read_text())):
+            if isinstance(n, ast.ImportFrom):
+                # `from . import x` / `from ..paths import y`, made absolute against f's package.
+                base = ".".join(pkg.split(".")[:len(pkg.split(".")) - n.level + 1] + ([n.module] if n.module else [])) \
+                    if n.level else n.module
             mods = [a.name for a in n.names] if isinstance(n, ast.Import) else \
-                [n.module] + [f"{n.module}.{a.name}" for a in n.names] if isinstance(n, ast.ImportFrom) and n.module else []
+                ([base] if n.module else []) + [f"{base}.{a.name}" for a in n.names] \
+                if isinstance(n, ast.ImportFrom) and base else []
             todo += [ROOT / (m.replace(".", "/") + ".py") for m in mods
                      if m.startswith("languette.") and (ROOT / (m.replace(".", "/") + ".py")).is_file()]
     return sorted(seen)
@@ -46,7 +52,7 @@ CALLS = {"open", "io.open", "builtins.open", "input", "breakpoint", "datetime.da
     f"os.{n}" for n in (
         "open fdopen read write close pipe dup dup2 system popen fork forkpty kill killpg getcwd getcwdb chdir "
         "stat lstat fstat statvfs access listdir scandir walk fwalk readlink "
-        "remove unlink rmdir removedirs mkdir makedirs mkfifo mknod rename renames replace "
+        "getlogin remove unlink rmdir removedirs mkdir makedirs mkfifo mknod rename renames replace "
         "link symlink chmod chown lchown utime truncate ftruncate sync fsync startfile").split()} | {
     f"os.{p}{n}" for p in ("exec", "spawn", "posix_spawn") for n in ("", "l", "le", "lp", "lpe", "v", "ve", "vp", "vpe", "p")} | {
     f"os.path.{n}" for n in (
@@ -56,7 +62,7 @@ BUILTINS = {"open", "input", "breakpoint"}
 # Methods that do I/O on whatever they are called on: Path's, a file's.
 METHODS = {"read_text", "read_bytes", "write_text", "write_bytes", "iterdir", "rglob", "touch", "unlink", "rmdir",
            "mkdir", "is_dir", "is_file", "is_symlink", "samefile", "readlink", "symlink_to",
-           "hardlink_to", "lstat", "chmod", "exists", "stat"}
+           "hardlink_to", "lstat", "chmod", "exists", "stat", "open", "glob"}
 
 # Escapes at HEAD, file -> one entry per occurrence, each to become a Need.
 # Remove an entry when its guard yields instead; the tests fail on one more or
@@ -96,7 +102,8 @@ def _dotted(node, names):
 
 
 def _barred(name):
-    return name in CALLS or any(name == m or name.startswith(m + ".") for m in MODULES)
+    """`name` is barred, or hangs off one: `pathlib.Path.cwd` off `pathlib.Path`."""
+    return any(name == m or name.startswith(m + ".") for m in CALLS | MODULES)
 
 
 def escapes(source):
@@ -162,6 +169,10 @@ def test_every_known_escape_is_still_there():
     "import datetime\ndatetime.datetime.now()",
     "from datetime import date\ndate.today()",
     "from pathlib import Path\nPath('x')",
+    "from pathlib import Path\nPath.cwd()",
+    "import pathlib\npathlib.Path.home()",
+    "p.open()",
+    "p.glob('*')",
     "p.read_text()",
     "p.exists()",
     "def f(:\n",
