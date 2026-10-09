@@ -123,7 +123,5 @@ interface is; this file says who decided it and why, one line each.
 
 ## Trust and licence riders: Solace, 2026-10-09
 
-- No licence rider against AI companies, dcg-style. AGPL answers hosting;
-  nothing in a licence answers training; a clean-room copy by a vendor would be
-  a win, not a loss. The distrust is stated in the README as a position, not a
-  condition.
+- No licence rider against AI companies: AGPL answers hosting, and no licence
+  answers training. The README states the distrust as a position, not a condition.

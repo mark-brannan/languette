@@ -10,12 +10,14 @@ answers: *allow*, *ask*, or **deny**.
 Nothing external like a cloud/web service decides, nor any ML or AI models.
 The critical execution path is [deterministic](https://en.wikipedia.org/wiki/Deterministic_algorithm), and even uses ["pure functions"](https://en.wikipedia.org/wiki/Pure_function) where possible.
 
-**Whose guard is it.** A big AI company's safeguards are its product decision,
-changed in any release. We don't take that on trust. languette is the guard you
-can read, run and keep; copying it is welcome.
+**Whose is this for?** You, assuming you are a real human being. A big AI
+vendor's safeguards are its product decision, changed at their whim. We
+don't accept that trust blindly, and you shouldn't have to either. `languette`
+is a guard you can read and understand for yourself: **trust, but verify**. Any
+vendor that copies it is welcome.
 
 *Languette* is French for "little tongue". On a halberd the languette (or 'langet')
-it is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
+is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
 the pole. These guards are that strip: protecting your work, strengthening your tools, while holding back certain agentic hazards that could ruin your day.
 
 It's also a play on words: Shell is a little language, and languette listens for the
