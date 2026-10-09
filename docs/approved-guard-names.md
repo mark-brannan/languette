@@ -4,6 +4,7 @@ A countable thing is plural (`guard-secrets`); an act or a mass noun is singular
 
 | Guard | Concept | Under the umbrella |
 |---|---|---|
+| `require-well-formed` | commands the guards can read whole | a command that does not parse, or is too big, too deep or too slow to parse |
 | `guard-recursive-delete` | directory trees | recursive `rm`, `find -delete` |
 | `guard-permissions` | file modes and ownership | recursive `chmod`, `chown`, `chgrp`; `chmod 777` |
 | `guard-host-availability` | the host staying up | shutdown, reboot, fork bombs, service stops |

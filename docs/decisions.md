@@ -103,3 +103,12 @@ interface is; this file says who decided it and why, one line each.
 - Whether guards that watch an agent's conduct on GitHub (#118, #119, #125)
   are one concept or several is unruled.
 - Prose now; a check with teeth once the gate's shape is settled.
+
+## Base-case guard names: Solace, 2026-10-09
+
+- `require-well-formed` replaces `guard-unparsable`. Well-formed means
+  parsed whole, within the size and depth bounds.
+- `ask-first` and `deny-always` stand, in pen for now; config's form may
+  change them, as may one guard for both.
+- These name what happens, outside the `guard-<concept>` scheme. The
+  suffix `-first` is not reserved.
