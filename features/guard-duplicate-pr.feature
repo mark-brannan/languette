@@ -11,8 +11,9 @@ Feature: guard-duplicate-pr
   `owner/repo#N` or an issue URL) is looked up in the issue's timeline; a
   cross-reference from an open pull request is an open PR already on it.
   A body that says `Supersedes` or `Replaces` that PR, in the same forms,
-  passes. GitHub that cannot answer asks, as the other guards that ask
-  GitHub do; a body the guard cannot read is denied, with the fix.
+  passes. GitHub that cannot answer, or a page of timeline it fills with
+  no open PR on it, asks, as the other guards that ask GitHub do; a body
+  the guard cannot read is denied, with the fix.
 
   gh is a stub throughout: its timeline is empty unless GH_TIMELINE names
   what cross-references the issue. The clone's origin is github.com/o/r.
@@ -200,6 +201,11 @@ Feature: guard-duplicate-pr
       | command                                      |
       | gh pr create -t t -b "Closes #114"           |
       | gh pr create -t t -b "Fixes other/repo#7"    |
+
+  Scenario: a full page of timeline with no open PR on it asks, since an older one may sit past it
+    Given GH_TIMELINE is "full"
+    When the agent runs `gh pr create -t t -b "Closes #114"`
+    Then the guard asks, naming "a timeline past 100 events"
 
   Scenario: GitHub that cannot answer asks for the MCP tool too
     Given GH_FAIL is "1"

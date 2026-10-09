@@ -20,8 +20,9 @@ already on that issue: deny, naming both, unless this body says
 a bare `#N` is --repo/-R, GH_REPO=, or the MCP owner/repo; failing those,
 the origin of the cwd, unless the command runs a `cd`.
 
-GitHub that cannot answer (gh missing, signed out, offline, an error) or a
-repo that cannot be told asks, as the other guards that ask GitHub do. A
+GitHub that cannot answer (gh missing, signed out, offline, an error), a
+timeline page filled with no open PR on it (an older one may sit past it),
+or a repo that cannot be told asks, as the other guards that ask GitHub do. A
 body the guard cannot read (built at run time, a file it cannot open or
 past MAX_READ, stdin with no heredoc) is a deny that says why.
 """
@@ -39,6 +40,7 @@ TOOLS = re.compile(r"(?:Bash|mcp__.*__(?:create_pull_request))\Z")
 _MCP = re.compile(r"mcp__.*__create_pull_request\Z")
 GH = re.compile(r"(?:^|/)gh\Z")
 MAX_READ = 1 << 20
+PAGE = 100                                     # timeline events per lookup; one page is read
 _CREATE = frozenset("create new".split())
 # gh pr create's flags that take a value, so the value is never read as a flag.
 _VALUED = frozenset("-a --assignee -B --base -H --head -l --label -m --milestone -p --project -r --reviewer "
@@ -271,8 +273,9 @@ def _slug(repo, cd, cwd):
 
 def _open_prs(slug, n):
     """[(owner/name, M, title)] of the open PRs cross-referenced on issue n,
-    or None when GitHub can't answer."""
-    code, body = yield Need("gh-api", f"repos/{slug}/issues/{n}/timeline?per_page=100")
+    or None when GitHub can't answer, or fills the page with none: an older
+    one may sit past it."""
+    code, body = yield Need("gh-api", f"repos/{slug}/issues/{n}/timeline?per_page={PAGE}")
     if code != 200 or not isinstance(body, list):
         return None
     out = []
@@ -290,7 +293,7 @@ def _open_prs(slug, n):
         pr = (norm_repo(r), iss["number"], str(iss.get("title") or ""))
         if pr[:2] not in [p[:2] for p in out]:
             out.append(pr)
-    return out
+    return out if out or len(body) < PAGE else None
 
 
 def _judge(text, slug):
@@ -310,7 +313,8 @@ def _judge(text, slug):
         prs = yield from _open_prs(repo, n)
         if prs is None:
             asked = asked or ask(f"{NAME}: this PR would close {repo}#{n}, and GitHub couldn't say whether an open PR "
-                                 "already references it (gh missing, signed out, offline or an error):\n"
+                                 "already references it (gh missing, signed out, offline, an error, or a "
+                                 f"timeline past {PAGE} events):\n"
                                  f"  gh api repos/{repo}/issues/{n}/timeline\n"
                                  "Read the issue before opening a second PR on it.")
             continue
