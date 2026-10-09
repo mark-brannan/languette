@@ -185,3 +185,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t024227z
 - scan.py's shfmt run is a listed known escape, not an exemption Undo: exempt it in the test ([#111](https://github.com/mark-brannan/languette/pull/111))
+
+### 20261009t040047z
+- Door open and spend became acts too, though the brief named four primitives; only claim and take were held back Undo: yield Need door again and restore _door's two ops ([#115](https://github.com/mark-brannan/languette/pull/115))
