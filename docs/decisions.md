@@ -73,10 +73,10 @@ interface is; this file says who decided it and why, one line each.
 |---|---|---|
 | `guard-recursive-delete` | directory trees | recursive `rm`, `find -delete` |
 | `guard-permissions` | file modes and ownership | recursive `chmod`, `chown`, `chgrp`; `chmod 777` |
-| `guard-host-availability` | the host and its services staying up | shutdown, reboot, fork bombs, stopping a service |
+| `guard-host-availability` | the host staying up | shutdown, reboot, fork bombs, service stops |
 | `guard-scheduled-jobs` | scheduled work | wiping cron entries or timers |
 | `guard-pipe-to-shell` | downloaded code run unseen | `curl u \| sh`, `sh <(curl ..)`, `eval "$(wget ..)"` |
-| `guard-worktrees` | worktree isolation | a branch switch in a `$HOME` worktree; reaching into another session's worktree |
+| `guard-worktrees` | worktree isolation | a branch switch in a `$HOME` worktree; another session's worktree |
 | `guard-infra` | live infrastructure | destroying or applying it without the user's approval |
 | `guard-github-issues` | GitHub issues | creating, transferring or deleting them |
 | `guard-private-terms` | private words | a listed term posted to a public repo |
