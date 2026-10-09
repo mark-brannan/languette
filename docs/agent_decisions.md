@@ -263,3 +263,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t071412z
 - README trims 'for one kind of' and 'the other guards' and joins the ask-first bullet so the new guard's line fits the section and line caps Undo: restore the three README lines and raise the caps in docs/budgets.json in a PR of its own ([#119](https://github.com/mark-brannan/languette/pull/119))
+
+### 20261009t071702z
+- guard-review-threads denies every gh api graphql call whose query is out of sight (run-time, @file, --input with no heredoc), even a read; a run-time value in another field does not count. Supersedes the narrower rule above Undo: restore the names-a-thread condition on the hidden clause in _resolves ([#118](https://github.com/mark-brannan/languette/pull/118))
