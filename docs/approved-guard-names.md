@@ -1,5 +1,7 @@
 # Approved guard names
 
+A countable thing is plural (`guard-secrets`); an act or a mass noun is singular (`guard-infra`).
+
 | Guard | Concept | Under the umbrella |
 |---|---|---|
 | `guard-recursive-delete` | directory trees | recursive `rm`, `find -delete` |
@@ -14,4 +16,8 @@
 | `guard-secrets` | credentials | one committed, printed into the transcript, or posted |
 | `ask-first` | commands the repo lists as costly | each runs only after the user approves that run |
 | `guard-protected-paths` | paths the repo lists | any agent write to them |
-| `guard-database` | stored data | SQL or NoSQL drops, unbounded deletes, migration resets, restores |
+| `guard-databases` | stored data | SQL or NoSQL drops, unbounded deletes, migration resets, restores |
+| `deny-always` | commands the repo forbids | each listed command, denied every time |
+| `guard-sudo` | acting as root | `sudo`, `su`, `doas`, `pkexec` |
+| `guard-disks` | disks and volumes | `dd`, `mkfs`, `wipefs`, `shred` onto a device; partitioning; pool removal |
+| `guard-commits` | the repo's commit policy | a commit that fails a check the repo lists |
