@@ -272,3 +272,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t072022z
 - guard-signed-comments gates discussion comments too (addDiscussionComment, updateDiscussionComment), past the brief's list Undo: drop addDiscussionComment and updateDiscussionComment from _MUTATION ([#119](https://github.com/mark-brannan/languette/pull/119#discussion_r4227669039))
+
+### 20261009t073153z
+- guard-signed-comments checks the signature's eight hex against the payload's session_id[:8] when the payload carries a hex one, shape only otherwise (supersedes the shape-only call): the CI review bot signed its re-review of #119 with this PR's example hex, not its own Undo: go back to shape only: drop the hexid comparison in check() ([#119](https://github.com/mark-brannan/languette/pull/119))
