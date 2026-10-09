@@ -352,3 +352,9 @@ test, which installs the plugin in a scratch project and confirms a recursive
 verdict out. The guards began as shell scripts copied from
 [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles); they run
 in Python now, and this repo is where they are maintained.
+
+## License
+
+Markdown files are [CC BY-SA 4.0](LICENSE-CC-BY-SA); everything else is
+[AGPL-3.0-or-later](LICENSE), except where a file carries its own notice.
+Copyright 2026 Solace (Mark) Brannan. Credit "Solace Brannan" and link this repository.
