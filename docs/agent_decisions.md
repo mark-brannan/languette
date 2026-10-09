@@ -296,3 +296,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t093545z
 - guard-recursive-delete drops its private physical and roots list for paths.physical and paths.own_roots Undo: restore the private copies, converted to Needs ([#114](https://github.com/mark-brannan/languette/issues/114)) (no PR, branch claude/pickup-1791538208011dbc62-7f6ea6)
+
+### 20261009t191154z
+- approved guard names: the Concept and Under the umbrella wording is the agent's, drawn from the README and the rename draft Undo: edit the row ([#130](https://github.com/mark-brannan/languette/pull/130))
