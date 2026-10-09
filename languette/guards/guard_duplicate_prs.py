@@ -1,5 +1,5 @@
-"""guard-duplicate-pr: a second open PR on an issue an open PR already
-references is denied. The spec is features/guard-duplicate-pr.feature.
+"""guard-duplicate-prs: a second open PR on an issue an open PR already
+references is denied. The spec is features/guard-duplicate-prs.feature.
 
 Two sessions working one issue each open a PR for it, minutes apart, and
 neither reads the issue first: the work is done twice and the review is
@@ -34,7 +34,7 @@ from languette import scan as sw
 from languette.guards.guard_private_terms import norm_repo, writes
 from languette.verdict import Need, Refuse, ask, deny
 
-NAME = "guard-duplicate-pr"
+NAME = "guard-duplicate-prs"
 # The tools hooks.json wires this guard to; the MCP one by its name's tail.
 TOOLS = re.compile(r"(?:Bash|mcp__.*__(?:create_pull_request))\Z")
 _MCP = re.compile(r"mcp__.*__create_pull_request\Z")

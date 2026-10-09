@@ -99,7 +99,7 @@
       "description": "Deny deleting a remote branch that an open pull request is based on or headed from. Leave on unless you want remote branch deletions through unchecked.",
       "default": true
     },
-    "guard_duplicate_pr": {
+    "guard_duplicate_prs": {
       "type": "boolean",
       "title": "Block a second PR on an issue",
       "description": "Deny opening a PR that closes an issue an open PR already references, unless the body says it supersedes that PR; ask when GitHub can't say. Leave on unless you want parallel sessions able to open duplicate PRs.",

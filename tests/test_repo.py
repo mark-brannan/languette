@@ -12,7 +12,7 @@ from hamcrest import assert_that, contains_string, empty, equal_to, has_length, 
 
 import readme_table
 from conftest import hooks_json_commands, hooks_json_prompt_command
-from languette.guards import guard_duplicate_pr, guard_github_issues, guard_private_terms
+from languette.guards import guard_duplicate_prs, guard_github_issues, guard_private_terms
 
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
@@ -20,7 +20,7 @@ GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-ba
           "guard-bypass-labels", "require-well-formed", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
           "guard-permissions", "guard-pipe-to-shell", "guard-disks",
           "guard-host-availability", "guard-scheduled-jobs", "guard-cross-session-send",
-          "guard-secrets", "guard-duplicate-pr"}
+          "guard-secrets", "guard-duplicate-prs"}
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"guard_worktrees"}
 # Options that are not a guard's on/off toggle: name -> type.
@@ -293,11 +293,11 @@ def test_the_guard_bypass_labels_matcher_leaves_other_tools_alone(tool):
 
 def _guard_duplicate_pr_matcher():
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard guard-duplicate-pr;" in h["command"] for h in e["hooks"])]
+    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard guard-duplicate-prs;" in h["command"] for h in e["hooks"])]
     return e["matcher"]
 
 
-@pytest.mark.parametrize("tool", ["Bash"] + sorted(f"{prefix}{s}" for s in _mcp_suffixes(guard_duplicate_pr.TOOLS)
+@pytest.mark.parametrize("tool", ["Bash"] + sorted(f"{prefix}{s}" for s in _mcp_suffixes(guard_duplicate_prs.TOOLS)
                                                    for prefix in ("mcp__github__", "mcp__plugin_github_github__")))
 def test_the_guard_duplicate_pr_matcher_covers_the_tool(tool):
     assert_that(re.fullmatch(_guard_duplicate_pr_matcher(), tool), is_not(None))

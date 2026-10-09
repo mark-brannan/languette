@@ -87,7 +87,7 @@ Each guard checks for one kind of hazard:
   `stash pop`, force-push, `reset --hard` and other moves that throw work away
 - [`guard-git-stacked-base`](features/guard-git-stacked-base.feature): deleting a
   remote branch an open PR is based on (GitHub silently closes the PR)
-- [`guard-duplicate-pr`](features/guard-duplicate-pr.feature): a second open PR on one issue
+- [`guard-duplicate-prs`](features/guard-duplicate-prs.feature): a second open PR on one issue
 - [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push to
   a branch GitHub says requires a pull request, or `gh pr merge --admin`; the
   agent holds your credentials, so it holds your bypass
@@ -291,7 +291,7 @@ for beyond the command, it declares:
 | `guard-secrets` | the repo's `.languette/secrets.json`, when it has one |
 | `guard-infra` | the transcript, the approvals spent |
 | `guard-git-stacked-base` | GitHub, through `gh` |
-| `guard-duplicate-pr` | the issue's timeline on GitHub, through `gh`, a `--body-file` it posts, and the checkout's `git remote` |
+| `guard-duplicate-prs` | the issue's timeline on GitHub, through `gh`, a `--body-file` it posts, and the checkout's `git remote` |
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
 | `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |

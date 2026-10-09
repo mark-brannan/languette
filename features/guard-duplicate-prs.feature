@@ -1,5 +1,5 @@
 @python
-Feature: guard-duplicate-pr
+Feature: guard-duplicate-prs
   A second open PR that closes an issue an open PR already references is
   denied. Two sessions working one issue each open a PR for it, minutes
   apart, and neither reads the issue first: the work is done twice and the
