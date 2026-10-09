@@ -8,9 +8,8 @@ thread from GitHub, through `gh api graphql`, and denies unless the current
 gh login replied after the bot's last comment, and that reply names a commit
 or a link. It checks that a record is named, not that the commit exists. A
 thread no bot commented on passes. A `gh api graphql` whose query it cannot
-read (a run-time word, a file, stdin with no heredoc) and that names a thread
-or a resolve, an id it cannot read, or GitHub that cannot answer, is a deny
-that says so.
+read (a run-time word, a file, stdin with no heredoc), an id it cannot read,
+or GitHub that cannot answer, is a deny that says so.
 """
 
 import json
@@ -26,6 +25,7 @@ THREAD = re.compile(r"PRRT_[A-Za-z0-9_-]+")
 BOTS = frozenset("coderabbitai claude copilot-pull-request-reviewer github-actions".split())
 SHA = re.compile(r"(?<![0-9A-Za-z])(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}(?![0-9A-Za-z])", re.I)
 LINK = re.compile(r"https://\S+|(?<![\w./-])[\w.-]+/[\w.-]+#[0-9]+\b")
+QUERY_FIELD = re.compile(r"(?:-[fF]|--(?:raw-)?field=)?query=")
 TIMEOUT = 10
 # The last 100 comments: the bot's last word and every reply after it.
 QUERY = ("query($id: ID!) { viewer { login } node(id: $id) { ... on PullRequestReviewThread { "
@@ -40,12 +40,12 @@ def _wv(s, i):
 
 def _resolves(command):
     """(thread ids, unreadable): the PRRT_ ids each resolving gh call in
-    `command` names, in order; unreadable when one names none, builds a word
-    at run time, or a graphql call that names a thread or a resolve reads its
-    query from somewhere the guard cannot see."""
+    `command` names, in order; unreadable when one names none or builds a
+    word at run time, or when any graphql call's query is out of sight (built
+    at run time, read from a file, or stdin with no heredoc), since that
+    query cannot be shown not to resolve a thread."""
     buf = command + "\n"
     hd = "\n".join(sw.heredoc_bodies(buf))
-    named = bool(RESOLVE.search(command))
     ids, unreadable = [], False
     for text, nested in sw.texts_of(sw.strip_heredocs(buf)):
         s = sw.Scan(text)
@@ -58,9 +58,12 @@ def _resolves(command):
                 continue
             body = "\n".join(words) + ("\n" + hd if "--input" in words else "")
             live = any(s.live[i] for i in range(g + 1, b + 1))
+            query = [i for i in range(g + 1, b + 1) if s.k[i] in ("w", "q") and QUERY_FIELD.match(_wv(s, i))]
+            if (any(s.live[i] or QUERY_FIELD.sub("", _wv(s, i)).startswith("@") for i in query)
+                    or "--input" in words and not hd):
+                unreadable = True
+                continue
             if not RESOLVE.search(body):
-                hidden = live or any(w.startswith("query=@") for w in words) or ("--input" in words and not hd)
-                unreadable = unreadable or hidden and (named or bool(THREAD.search(body)))
                 continue
             found = THREAD.findall(body)
             ids += found
@@ -120,10 +123,10 @@ def check(payload, env=None):
         return None
     ids, unreadable = _resolves(cmd)
     if unreadable:
-        return deny(f"{NAME}: this may resolve a review thread, and the guard cannot tell which review thread (the "
-                    "query or the id is built at run time, read from a file or stdin, or not in the command), so it "
-                    "cannot check that a bot's finding was answered. Put the query and the thread's PRRT_ id in the "
-                    f"command literally. {DO}")
+        return deny(f"{NAME}: this graphql call may resolve a review thread, and the guard cannot tell which review "
+                    "thread (the query or the id is built at run time, read from a file or stdin, or not in the "
+                    "command), so it cannot check that a bot's finding was answered. Put the query and any thread's "
+                    f"PRRT_ id in the command literally. {DO}")
     if not ids:
         return None
     cwd = payload.get("cwd")

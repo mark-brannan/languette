@@ -7,9 +7,10 @@ Feature: guard-review-threads
   bot's last comment, and that reply names a commit (7 to 40 hex
   characters, at least one a digit and one a letter) or a link (an
   `https://` URL, or `owner/repo#n`). A thread no bot commented on is not
-  this guard's. A thread the guard cannot identify, or GitHub that cannot
-  be read, is a deny that says so: a thread left open costs a click, one
-  closed unread hides a finding.
+  this guard's. A graphql query the guard cannot read (built at run time,
+  from a file, or stdin with no heredoc), a thread it cannot identify, or
+  GitHub that cannot be read, is a deny that says so: a thread left open
+  costs a click, one closed unread hides a finding.
 
   Why. An agent reversed an instruction it had been given; the review bot
   flagged it, and the agent replied that the replacement was intended,
@@ -170,7 +171,7 @@ Feature: guard-review-threads
     When the agent runs `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=PRRT_t1`
     Then the guard is silent
 
-  Scenario Outline: a graphql call whose query cannot be read, naming a thread or a resolve, is denied
+  Scenario Outline: a graphql call whose query cannot be read is denied
     When the agent runs `<command>`
     Then the guard denies, naming "cannot tell which review thread"
     And the stub "gh" was not called
@@ -181,10 +182,14 @@ Feature: guard-review-threads
       | Q='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}'; gh api graphql -f query="$Q"       | the query in a variable   |
       | gh api graphql -f query=@m.graphql -f id=PRRT_t1                                                              | the query in a file       |
       | gh api graphql --input m.json -f id=PRRT_t1                                                                   | the payload in a file     |
+      | gh api graphql -F query=@m.graphql -f id="$ID"                                                                | a file, the id run-time   |
+      | gh api graphql --input payload.json                                                                           | everything in a file      |
+      | gh api graphql -f query=@q.graphql -F owner=o                                                                 | a file, whatever it holds |
 
-  Scenario: a graphql read from a file that names no thread is not this guard's
-    When the agent runs `gh api graphql -f query=@q.graphql -F owner=o`
+  Scenario: a readable query with a run-time field resolves nothing, and is not this guard's
+    When the agent runs `gh api graphql -f query='query($n:Int!){viewer{login}}' -F n="$N"`
     Then the guard is silent
+    And the stub "gh" was not called
 
   Scenario Outline: GitHub that cannot be read is a deny that says so
     Given <setup>
