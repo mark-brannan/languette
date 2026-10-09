@@ -88,9 +88,12 @@ class World:
         is past `limit` bytes, is a ValueError naming why, and one that is not
         UTF-8 the UnicodeDecodeError."""
         fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
-        if not stat.S_ISREG(os.fstat(fd).st_mode):
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise ValueError("is not a regular file")
+        except BaseException:
             os.close(fd)
-            raise ValueError("is not a regular file")
+            raise
         with os.fdopen(fd, "rb") as f:
             data = f.read(-1 if limit is None else limit + 1)
         if limit is not None and len(data) > limit:
