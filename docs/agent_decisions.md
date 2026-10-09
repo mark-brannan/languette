@@ -305,3 +305,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t205348z
 - require-well-formed's Concept and Under the umbrella wording in docs/approved-guard-names.md is the agent's Undo: edit the row (no PR, branch claude/base-case-guard-names)
+
+### 20261009t210003z
+- approved guard names: after ask-first and deny-always, the guard- names sort alphabetically, not grouped by domain Undo: regroup the rows by domain ([#130](https://github.com/mark-brannan/languette/pull/130))
