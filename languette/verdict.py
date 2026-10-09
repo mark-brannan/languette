@@ -3,7 +3,8 @@ and the facts a guard may ask for.
 
 A guard's check returns deny(reason), ask(reason), context(text), allow(input)
 or None; or it is a generator that yields Needs and Acts and returns one of those.
-Refuse is how a guard's internals say "deny, for this reason" from deep inside
+A plan / judge guard instead lists its Needs up front (plan) and gets every
+answer at once (judge), keyed by the Need. Refuse is how a guard's internals say "deny, for this reason" from deep inside
 a walk; check catches it and returns deny. Standard library only.
 """
 
@@ -25,6 +26,8 @@ class Need:
                                              when it is not regular or past limit bytes
         path          op, path            -> os.path.<op>(path): isdir, isfile, islink, exists,
                                              lexists, realpath; or executable
+        physical      path                -> the longest existing prefix of path resolved through
+                                             symlinks, the rest appended as written; "" for /
         cwd                               -> the hook process's own directory
         ruleset-cache slug, branch        -> (mtime, text), or None
         clock                             -> seconds since the epoch
@@ -46,6 +49,12 @@ class Need:
 
     def __init__(self, kind, *args):
         self.kind, self.args = kind, args
+
+    def __eq__(self, other):
+        return type(other) is type(self) and (other.kind, other.args) == (self.kind, self.args)
+
+    def __hash__(self):
+        return hash((type(self), self.kind, self.args))
 
     def __repr__(self):
         return f"{type(self).__name__}({self.kind!r}{''.join(', ' + repr(a) for a in self.args)})"
