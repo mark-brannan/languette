@@ -172,3 +172,9 @@ def test_a_symlink_in_place_of_the_file_is_not_followed(tmp_path):
     (d / "decisions.jsonl").symlink_to(tmp_path / "elsewhere")
     World(_env(tmp_path), {}).keep({"n": 0})
     assert not (tmp_path / "elsewhere").exists()
+
+
+def test_a_guard_name_nothing_has_is_a_deny(tmp_path):
+    out = json.loads(run.respond(_payload("echo hi"), _env(tmp_path, on=False), "guard-disk"))
+    assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "no guard is named guard-disk" in out["hookSpecificOutput"]["permissionDecisionReason"]

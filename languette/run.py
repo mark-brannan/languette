@@ -142,6 +142,12 @@ def _respond(stdin_text, env, only):
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
     tool = payload.get("tool_name")
+    # A hook entry that names no guard here, say one renamed since it was
+    # copied, would otherwise judge nothing and pass every command.
+    if only is not None and only not in {g.NAME for _, _, gs in GUARDS for g in gs}:
+        return _out("PreToolUse", deny(f"languette: no guard is named {only}, so this hook checks nothing. "
+                                       "This is a gate and fails closed: reinstall the plugin, or copy the "
+                                       "entry again from hooks/hooks.json")), (World(env, payload), payload, [], [])
     # An opt-in guard (OPT_IN names its option) runs alone by name, or with the
     # rest only when its option is exactly "true", as hooks.json runs it. An
     # entry with no tool pattern matches an event with no tool.
