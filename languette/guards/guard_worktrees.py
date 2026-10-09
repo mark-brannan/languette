@@ -33,9 +33,8 @@ when reached by a route this guard vouches for (the session's first call, the
 call after EnterWorktree(name=...), a cd into a path that did not exist yet).
 Each record line carries the inode of the worktree's `.git`; a record not
 owned by this user, or a symlink, is ignored. EnterWorktree(path=...) is
-denied outright. Redirection targets are not seen. The deny names
-claim-stamp.sh's live or stale reading when it is usable, and a one-command
-recipe for the session's own worktree.
+denied outright. Redirection targets are not seen. The deny names a
+one-command recipe for the session's own worktree.
 """
 
 import os
@@ -354,48 +353,9 @@ def _recipe(sess, d):
     return f"git --git-dir={gcd or '<git-dir>'} worktree add {scratch}/<name> && cd {scratch}/<name>"
 
 
-def _claim(env, ft):
-    """("live", line), ("stale", None) or ("unknown", None), from one
-    claim-stamp.sh read; anything unclear is unknown, never stale."""
-    if env.get("GITHUB_ACTIONS") or env.get("CI") or env.get("CLAUDE_CLAIM_STAMP", "on") == "off":
-        return "unknown", None
-    # `which` on a path with a directory part answers whether it is an executable file.
-    binary = yield Need("which", env.get("CLAIM_STAMP_BIN") or "claim-stamp.sh")
-    if not binary:
-        return "unknown", None
-    if not (yield Need("which", "gh")):
-        return "unknown", None
-    out = yield Need("git", "sh", "/", binary, "read", "-C", ft)
-    if not out or out == "no card" or out.startswith("unverified"):
-        return "unknown", None
-    rows = [line.split("\t") for line in out.splitlines()]
-    live = next(("\t".join(r) for r in rows if r[0] == "live"), None)
-    if live:
-        return "live", live
-    return ("stale", None) if any(r[0] == "stale" for r in rows) else ("unknown", None)
-
-
 def _deny_path(sess, env, word, ft):
     branch = yield from _git("/", "-C", ft, "symbolic-ref", "-q", "--short", "HEAD")
-    state, live = (yield from _claim(env, ft)) if branch else ("unknown", None)
     head = f"{NAME}: `{word}` is inside {ft}, a git worktree this session does not own."
-    if state == "live":
-        f = live.split("\t")
-        who = f"session `{f[1] if len(f) > 1 else ''}` on `{f[2] if len(f) > 2 else ''}`, claimed {f[3] if len(f) > 3 else ''} ago"
-        raise Refuse(f"{head} {who} -- another session is live in there (claim-stamp.sh); it may be archived out "
-                     "from under you mid-turn if you reach in (an agent once lost a worktree that way).\n"
-                     f"To read that branch, stay here: `git log/diff/show {branch}`, `git show {branch}:<path>` -- "
-                     "worktrees of a repo share objects and refs.\nReport it and stop. Do not take the worktree away "
-                     "from them.")
-    if state == "stale":
-        raise Refuse(f"{head} claim-stamp.sh finds no live claim on `{branch}` -- the session that held this "
-                     "worktree looks dead, not merely between turns.\nThat does not make it yours to clear: reaching "
-                     "in and archiving it out from under an owner who turns out to still be there is how an agent "
-                     "once lost a worktree. Report this to the user with the cleanup command: "
-                     f"`git worktree remove {ft}` (run from a worktree other than this one) -- git itself refuses if "
-                     "anything uncommitted is left inside, and the branch survives the removal either way, so nothing "
-                     "is lost if the stale read was wrong.\nTo read that branch meanwhile, stay here: "
-                     f"`git log/diff/show {branch}`, `git show {branch}:<path>`.")
     recipe = yield from _recipe(sess, ft)
     raise Refuse(f"{head} A hand-off carries a branch, an issue and a PR -- never a directory; another session may "
                  "still be running in there, and it may be archived out from under you mid-turn (an agent once lost "
