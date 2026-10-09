@@ -170,3 +170,8 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 - the PR 98 review's three findings (whole-command HOME rewrite, allow skipping the permission prompt, engine failures as no-ops) stay as the shell has them: parity is W3's bar Undo: close each with a feature row, in its own PR ([#98](https://github.com/mark-brannan/languette/pull/98))
 ### 20261008t184358z
 - guard-secrets: a credential key=value inside a word (after =, ?, &, ;, comma, { or a space) is read as context, its value ending at the next &, comma, ;, } or space Undo: drop the _INNER loop in secrets._context ([#97](https://github.com/mark-brannan/languette/pull/97))
+
+### 20261009t000619z
+- scanner: past the 64-text nested-string cap, texts_of raises and guard-unparsable denies, rather than read 64 and pass the rest Undo: return out in texts_of where add raises ([#105](https://github.com/mark-brannan/languette/pull/105))
+- guard-bypass-ruleset: a loop that holds a cd leaves the directory unknown from its top, so a push in it asks Undo: drop the n in loops clause in _walk ([#105](https://github.com/mark-brannan/languette/pull/105))
+- guard-bypass-ruleset: an else or elif after a branch that holds a cd leaves the directory unknown, so a push in it asks Undo: drop the else/elif clause in _walk ([#105](https://github.com/mark-brannan/languette/pull/105))

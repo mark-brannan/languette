@@ -180,6 +180,12 @@ class TooBig(Unparseable):
     timeout, gives the same answer on every machine. Scan re-raises it."""
 
 
+class TooMany(TooBig):
+    """The text holds more nested shell strings than texts_of reads
+    (NESTED_CAP texts, the command itself among them): one past the cap
+    could be the one that runs."""
+
+
 LENGTH_MAX = 64 * 1024                         # bytes
 WEIGHT_MAX = 10_000                            # ~450 ms of shfmt on a quarter CPU, 4x under its timeout
 _KEYWORD_CLOSER = {"if": "fi", "case": "esac", "do": "done"}
@@ -825,22 +831,27 @@ def texts_of(text, prose=PROSE):
     quotes runs whoever leads the segment, so its body is queued alone,
     heredocs stripped, even where the words around it are prose. `prose`
     widens the consumer set for a guard whose command names also appear as
-    arguments (pkill -f). Capped so a pathological command cannot spin."""
+    arguments (pkill -f). Past NESTED_CAP texts it raises TooMany rather
+    than read some and pass the rest unread, so a pathological command can
+    neither spin nor hide its last string."""
     out = [(text, False)]
+
+    def add(t):
+        if len(out) >= NESTED_CAP:
+            raise TooMany(f"it holds more than {NESTED_CAP - 1} nested shell strings", "limit")
+        out.append((t, True))
     x = 0
-    while x < len(out) and len(out) < NESTED_CAP:
+    while x < len(out):
         s = Scan(out[x][0])
         for a, b in s.segments():
             c = seg_cmd(s, a, b)
             ex = s.shellseg or any(s.k[j] == "w" and s.w[j] in EXEC for j in range(a, b + 1))
             if ex or c is None or s.w[c] not in prose:
                 for j in range(a, b + 1):
-                    if len(out) >= NESTED_CAP:
-                        break
                     if s.k[j] == "q":
-                        out.append((s.q[j], True))
-        for t in s.subs[:NESTED_CAP - len(out)]:
-            out.append((strip_heredocs(t), True))
+                        add(s.q[j])
+        for t in s.subs:
+            add(strip_heredocs(t))
         x += 1
     return out
 
