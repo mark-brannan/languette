@@ -21,7 +21,7 @@ so the two never spend each other's (languette.world.DOOR).
 import re
 
 from languette import scan as sw
-from languette.verdict import Need, deny
+from languette.verdict import Act, Need, deny
 
 NAME = "guard-github-issues"
 # The tools hooks.json wires this guard to; the MCP ones by their name's tail.
@@ -178,10 +178,7 @@ def check(payload, env):
     event = payload.get("hook_event_name") or "PreToolUse"
     session = _session(payload)
     if event == "UserPromptSubmit":
-        try:
-            yield Need("door", "open", session)
-        except Exception:  # noqa: BLE001 -- a door that cannot open stays shut
-            pass
+        yield Act("door-open", session)        # a door that cannot open stays shut
         return None
     if event in ("PostToolUse", "PostToolUseFailure"):
         # The call ran (or tried to): spend the door whatever the verdict was, so a
@@ -192,10 +189,7 @@ def check(payload, env):
         except Exception:  # noqa: BLE001
             n = 1
         if n:
-            try:
-                yield Need("door", "spend", session)
-            except Exception:  # noqa: BLE001
-                pass
+            yield Act("door-spend", session)
         return None
     try:
         n, loop = _writes(payload)
