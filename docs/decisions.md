@@ -78,3 +78,11 @@ interface is; this file says who decided it and why, one line each.
 - A guard splits into plan and judge when its questions are known after
   the parse.
 - Design: [docs/design/guard-pipeline.md](design/guard-pipeline.md).
+
+## Gather reads only: Solace, 2026-10-09
+
+- Gather reads only: no Need writes, runs a program the host names, or reads
+  another workflow's state; the scar is #107, where guard-worktrees had grown
+  a `claim-stamp.sh` read and a per-session record written before the
+  verdict. Open gap, not a decision: `prose-budget-commit` still runs the
+  engine `prose_budget_bin` names, and whether it stays is unruled.
