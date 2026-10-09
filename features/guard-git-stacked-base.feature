@@ -170,6 +170,7 @@ Feature: guard-git-stacked-base
       | git push --push-option ci.skip origin --delete claude/already-merged   | is silent | --base origin | --push-option       |
       | git push --repo origin origin --delete claude/already-merged           | is silent | --base origin | --repo              |
       | git push --receive-pack /bin/x origin --delete claude/already-merged   | is silent | --base /bin/x | --receive-pack      |
+      | git push -fo ci.skip origin --delete claude/already-merged           | is silent | --base origin | -o ending a cluster |
       | git push --exec /bin/x origin --delete claude/already-merged           | is silent | --base /bin/x | --exec, its alias   |
       | git push --push-opt x origin --delete claude/already-merged            | is silent | --base x      | an unambiguous prefix |
       | git push origin --delete claude/already-merged -o claude/base-branch   | is silent | --base claude/base-branch | the value after the ref |

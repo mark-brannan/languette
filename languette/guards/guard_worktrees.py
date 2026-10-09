@@ -240,6 +240,7 @@ def _checkout_home(payload, env):
                 pinned = True
                 res, miss = yield from _resolve_all(tv, bases, home)
                 # A value that does not resolve (or is relative to a directory that doesn't) pins nothing.
+                # any miss denies: one candidate base that fails to resolve is enough
                 unpinned = unpinned or miss or not res or (blind and not _HOMEISH.match(tv))
                 for r in res:
                     if (tk == "GITDIR" and (yield from gitdir_is_home(r))) or (tk == "WORKTREE" and r == home):
