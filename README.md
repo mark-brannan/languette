@@ -33,7 +33,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 ```
 
 It needs `python3`, standard library only. `shfmt` (the parser it trusts
-most) and `gh` (for the two guards that ask GitHub) are optional.
+most) and `gh` (for the guards that ask GitHub) are optional.
 
 Without the plugin system, see [Installing by hand](#installing-by-hand).
 
@@ -260,6 +260,7 @@ for beyond the command, it declares:
 | `guard-secrets` | the repo's `.languette/secrets.json`, when it has one |
 | `guard-infra` | the transcript, the approvals spent |
 | `guard-git-stacked-base` | GitHub, through `gh` |
+| `guard-review-threads` | each thread a call resolves, and the gh login, from GitHub through `gh` |
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
 | `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
