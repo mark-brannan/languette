@@ -317,3 +317,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t220935z
 - smoke: only the doctor's shell parser row is asserted per environment; the Claude Code row is ✗ in an empty HOME and ignored Undo: assert more rows in test_doctor_names_the_parser_in_use ([#142](https://github.com/mark-brannan/languette/pull/142))
+
+### 20261009t220938z
+- smoke: the bashlex and tree-sitter-bash doctor rows are strict xfails, since the doctor does not name a pip parser; no doctor change here Undo: name the pip parser in the doctor's row and drop the two DOCTOR xfail reasons ([#142](https://github.com/mark-brannan/languette/pull/142))
