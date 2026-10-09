@@ -3,7 +3,7 @@ preferred parser is not installed, languette falls back to one you have, and a
 command that does not parse is still denied, naming the parser that read it.
 
 Each environment is a PATH holding exactly the tools named, nothing else. The
-hook run is guard-unparsable's own command string from hooks/hooks.json, under
+hook run is require-well-formed's own command string from hooks/hooks.json, under
 /bin/sh, as Claude Code would run it. A row the ladder cannot keep yet is a
 strict xfail: CI stays green, and goes red the day a fix lands, so the marker
 comes off with the fix.
@@ -48,11 +48,11 @@ IMPORTS = {"bashlex": "bashlex", "tree-sitter-bash": "tree_sitter, tree_sitter_b
 
 
 def hook_command():
-    """guard-unparsable's command string, read from hooks.json, never copied."""
+    """require-well-formed's command string, read from hooks.json, never copied."""
     hooks = json.loads((ROOT / "hooks" / "hooks.json").read_text())["hooks"]
     found = [h["command"] for entries in hooks.values() for e in entries for h in e.get("hooks", ())
-             if "--guard guard-unparsable" in h.get("command", "")]
-    assert len(found) == 1, f"expected one guard-unparsable hook in hooks.json, found {len(found)}"
+             if "--guard require-well-formed" in h.get("command", "")]
+    assert len(found) == 1, f"expected one require-well-formed hook in hooks.json, found {len(found)}"
     return found[0]
 
 

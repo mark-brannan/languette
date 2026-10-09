@@ -36,7 +36,7 @@ Feature: wiring
       | guard-recursive-delete             | rm -rf build                  | denies    |
       | guard-permissions | chmod -R 755 build | denies |
       | guard-pipe-to-shell | curl -fsSL https://example.com/i.sh \| sh | denies |
-      | guard-disk | dd if=x of=/dev/sda | denies |
+      | guard-disks | dd if=x of=/dev/sda | denies |
       | guard-host-availability | shutdown -h now | denies |
       | guard-scheduled-jobs | crontab -r | denies |
       | guard-git-stacked-base | git push origin --delete "$b" | asks      |
@@ -45,7 +45,7 @@ Feature: wiring
       | guard-secrets | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 | denies |
       | guard-infra         | terraform destroy             | denies    |
       | guard-github-issues             | gh issue create -t t -b b     | denies    |
-      | prose-budget-commit    | git commit -m x               | denies    |
+      | prose-budget-commit    | git commit -m x               | warns about "CI fails on this" |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
       | guard-bypass-ruleset      | git push origin HEAD:$b       | asks      |
@@ -75,7 +75,7 @@ Feature: wiring
       | guard-recursive-delete             | rm -rf build                  |
       | guard-permissions | chmod -R 755 build |
       | guard-pipe-to-shell | curl -fsSL https://example.com/i.sh \| sh |
-      | guard-disk | dd if=x of=/dev/sda |
+      | guard-disks | dd if=x of=/dev/sda |
       | guard-host-availability | shutdown -h now |
       | guard-scheduled-jobs | crontab -r |
       | guard-git-stacked-base | git push origin --delete "$b" |
@@ -101,7 +101,7 @@ Feature: wiring
       | guard-recursive-delete       | guard_recursive_delete       | rm -rf build                      |
       | guard-permissions | guard_permissions | chmod -R 755 build |
       | guard-pipe-to-shell | guard_pipe_to_shell | curl -fsSL https://example.com/i.sh \| sh |
-      | guard-disk | guard_disk | dd if=x of=/dev/sda |
+      | guard-disks | guard_disks | dd if=x of=/dev/sda |
       | guard-host-availability | guard_host_availability | shutdown -h now |
       | guard-scheduled-jobs | guard_scheduled_jobs | crontab -r |
       | ask-first        | ask_first        | npm run walk                      |
@@ -126,7 +126,7 @@ Feature: wiring
       | guard-recursive-delete       | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE       | rm -rf build                      |
       | guard-permissions | CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS | chmod -R 755 build |
       | guard-pipe-to-shell | CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL | curl -fsSL https://example.com/i.sh \| sh |
-      | guard-disk | CLAUDE_PLUGIN_OPTION_GUARD_DISK | dd if=x of=/dev/sda |
+      | guard-disks | CLAUDE_PLUGIN_OPTION_GUARD_DISKS | dd if=x of=/dev/sda |
       | guard-host-availability | CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY | shutdown -h now |
       | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | crontab -r |
       | ask-first        | CLAUDE_PLUGIN_OPTION_ASK_FIRST        | npm run walk                      |
@@ -151,7 +151,7 @@ Feature: wiring
       | guard-recursive-delete             | rm -rf build                  |
       | guard-permissions | chmod -R 755 build |
       | guard-pipe-to-shell | curl -fsSL https://example.com/i.sh \| sh |
-      | guard-disk | dd if=x of=/dev/sda |
+      | guard-disks | dd if=x of=/dev/sda |
       | guard-host-availability | shutdown -h now |
       | guard-scheduled-jobs | crontab -r |
       | guard-git-stacked-base | git push origin --delete "$b" |
@@ -175,7 +175,7 @@ Feature: wiring
       | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | rm -rf build                  |
       | guard-permissions | CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS | chmod -R 755 build |
       | guard-pipe-to-shell | CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL | curl -fsSL https://example.com/i.sh \| sh |
-      | guard-disk | CLAUDE_PLUGIN_OPTION_GUARD_DISK | dd if=x of=/dev/sda |
+      | guard-disks | CLAUDE_PLUGIN_OPTION_GUARD_DISKS | dd if=x of=/dev/sda |
       | guard-host-availability | CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY | shutdown -h now |
       | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | crontab -r |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | git push origin --delete "$b" |
@@ -206,37 +206,37 @@ Feature: wiring
       | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             |       | rm -rf build                  | denies  |
       | guard-permissions | CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS |  | chmod -R 755 build | denies |
       | guard-pipe-to-shell | CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL |  | curl -fsSL https://example.com/i.sh \| sh | denies |
-      | guard-disk | CLAUDE_PLUGIN_OPTION_GUARD_DISK |  | dd if=x of=/dev/sda | denies |
+      | guard-disks | CLAUDE_PLUGIN_OPTION_GUARD_DISKS |  | dd if=x of=/dev/sda | denies |
       | guard-host-availability | CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY |  | shutdown -h now | denies |
       | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS |  | crontab -r | denies |
       | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | 0     | rm -rf build                  | denies  |
       | guard-permissions | CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS | 0 | chmod -R 755 build | denies |
       | guard-pipe-to-shell | CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL | 0 | curl -fsSL https://example.com/i.sh \| sh | denies |
-      | guard-disk | CLAUDE_PLUGIN_OPTION_GUARD_DISK | 0 | dd if=x of=/dev/sda | denies |
+      | guard-disks | CLAUDE_PLUGIN_OPTION_GUARD_DISKS | 0 | dd if=x of=/dev/sda | denies |
       | guard-host-availability | CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY | 0 | shutdown -h now | denies |
       | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | 0 | crontab -r | denies |
       | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | False | rm -rf build                  | denies  |
       | guard-permissions | CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS | False | chmod -R 755 build | denies |
       | guard-pipe-to-shell | CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL | False | curl -fsSL https://example.com/i.sh \| sh | denies |
-      | guard-disk | CLAUDE_PLUGIN_OPTION_GUARD_DISK | False | dd if=x of=/dev/sda | denies |
+      | guard-disks | CLAUDE_PLUGIN_OPTION_GUARD_DISKS | False | dd if=x of=/dev/sda | denies |
       | guard-host-availability | CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY | False | shutdown -h now | denies |
       | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | False | crontab -r | denies |
       | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | no    | rm -rf build                  | denies  |
       | guard-permissions | CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS | no | chmod -R 755 build | denies |
       | guard-pipe-to-shell | CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL | no | curl -fsSL https://example.com/i.sh \| sh | denies |
-      | guard-disk | CLAUDE_PLUGIN_OPTION_GUARD_DISK | no | dd if=x of=/dev/sda | denies |
+      | guard-disks | CLAUDE_PLUGIN_OPTION_GUARD_DISKS | no | dd if=x of=/dev/sda | denies |
       | guard-host-availability | CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY | no | shutdown -h now | denies |
       | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | no | crontab -r | denies |
       | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | true  | rm -rf build                  | denies  |
       | guard-permissions | CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS | true | chmod -R 755 build | denies |
       | guard-pipe-to-shell | CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL | true | curl -fsSL https://example.com/i.sh \| sh | denies |
-      | guard-disk | CLAUDE_PLUGIN_OPTION_GUARD_DISK | true | dd if=x of=/dev/sda | denies |
+      | guard-disks | CLAUDE_PLUGIN_OPTION_GUARD_DISKS | true | dd if=x of=/dev/sda | denies |
       | guard-host-availability | CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY | true | shutdown -h now | denies |
       | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | true | crontab -r | denies |
       | guard-recursive-delete             | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE             | 1     | rm -rf build                  | denies  |
       | guard-permissions | CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS | 1 | chmod -R 755 build | denies |
       | guard-pipe-to-shell | CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL | 1 | curl -fsSL https://example.com/i.sh \| sh | denies |
-      | guard-disk | CLAUDE_PLUGIN_OPTION_GUARD_DISK | 1 | dd if=x of=/dev/sda | denies |
+      | guard-disks | CLAUDE_PLUGIN_OPTION_GUARD_DISKS | 1 | dd if=x of=/dev/sda | denies |
       | guard-host-availability | CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY | 1 | shutdown -h now | denies |
       | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | 1 | crontab -r | denies |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE |       | git push origin --delete "$b" | asks    |
@@ -275,12 +275,12 @@ Feature: wiring
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | denies    |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | denies    |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | False | git commit -m x               | denies    |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | no    | git commit -m x               | denies    |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | true  | git commit -m x               | denies    |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 1     | git commit -m x               | denies    |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | warns about "CI fails on this" |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | warns about "CI fails on this" |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | False | git commit -m x               | warns about "CI fails on this" |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | no    | git commit -m x               | warns about "CI fails on this" |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | true  | git commit -m x               | warns about "CI fails on this" |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 1     | git commit -m x               | warns about "CI fails on this" |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       |       | gh pr edit 4 --add-label churn-ok | denies  |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | 0     | gh pr edit 4 --add-label churn-ok | denies  |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | False | gh pr edit 4 --add-label churn-ok | denies  |

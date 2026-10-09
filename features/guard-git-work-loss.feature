@@ -368,3 +368,17 @@ Feature: guard-git-work-loss
       | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_STASH      | git push --force origin foo && git stash pop  |
       | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_DISCARD    | git reset --hard && git branch -D foo         |
       | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_FORCE_PUSH | bash -c 'git push --force origin foo; git add -A' |
+
+  # A global option's separate value is not the subcommand: --config-env and
+  # --attr-source take one as -c and -C do.
+  Scenario Outline: a global option with a separate value does not hide the subcommand
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | command                                      | note                          |
+      | git --config-env a=B reset --hard            | --config-env, separate        |
+      | git --attr-source HEAD reset --hard          | --attr-source, separate       |
+      | git --config-env a=B add -A                  | the same, another rule        |
+      | git --attr-source HEAD push --force origin x | the same, another rule        |
+      | git --config-env=a=B reset --hard            | attached, which already held  |

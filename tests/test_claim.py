@@ -65,7 +65,7 @@ def test_the_same_call_claims_once(tmp_path):
     _result("toolu_B1", "The user doesn't want to proceed with this tool use. The tool use was rejected.",
             tur="User rejected tool use"),
     _result("toolu_B1", "PreToolUse:Bash hook error: `dd` is blocked."),
-    _result("toolu_B1", "guard-disk: dd onto /dev/sda overwrites a whole disk."),
+    _result("toolu_B1", "guard-disks: dd onto /dev/sda overwrites a whole disk."),
     _result("toolu_B1", "Permission for this action was denied by the Claude Code auto mode classifier."),
 ], ids=["declined", "hook-error", "guard-deny", "classifier"])
 def test_a_call_that_never_ran_gives_its_click_back(tmp_path, result):

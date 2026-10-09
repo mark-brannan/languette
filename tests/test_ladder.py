@@ -46,29 +46,29 @@ def verdict(command, guard="guard-recursive-delete"):
 
 @needs_shfmt
 def test_a_command_shfmt_refuses_is_denied_not_read_by_awk():
-    v = verdict("echo 'unclosed", guard="guard-unparsable")
+    v = verdict("echo 'unclosed", guard="require-well-formed")
     assert v["permissionDecision"] == "deny"
     assert "shfmt: 1:6" in v["permissionDecisionReason"]
     assert verdict("echo 'unclosed") is None       # the other guards skip it
 
 
 @needs_shfmt
-def test_with_guard_unparsable_off_the_other_guards_read_an_unparseable_command():
+def test_with_require_well_formed_off_the_other_guards_read_an_unparseable_command():
     command = "rm -rf / 'unclosed"
     env = {"HOME": os.environ["HOME"]}
     assert run.respond(payload(command), env, only="guard-recursive-delete") == ""
-    v = json.loads(run.respond(payload(command), {**env, "CLAUDE_PLUGIN_OPTION_GUARD_UNPARSABLE": "false"},
+    v = json.loads(run.respond(payload(command), {**env, "CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED": "false"},
                                only="guard-recursive-delete"))["hookSpecificOutput"]
     assert v["permissionDecision"] == "deny"
 
 
 @pytest.mark.parametrize("option", [None, "false"])
-@pytest.mark.parametrize("guard", ["guard-unparsable", "guard-recursive-delete"])
+@pytest.mark.parametrize("guard", ["require-well-formed", "guard-recursive-delete"])
 def test_a_parser_crash_is_a_deny(monkeypatch, guard, option):
     def boom(text, words=False):
         raise RuntimeError("boom")
     monkeypatch.setattr(scan, "parse", boom)
-    env = {"HOME": os.environ["HOME"], **({"CLAUDE_PLUGIN_OPTION_GUARD_UNPARSABLE": option} if option else {})}
+    env = {"HOME": os.environ["HOME"], **({"CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED": option} if option else {})}
     out = run.respond(payload("echo hi"), env, only=guard)
     v = json.loads(out)["hookSpecificOutput"]
     assert v["permissionDecision"] == "deny" and "crashed" in v["permissionDecisionReason"]
@@ -118,7 +118,7 @@ def test_a_shfmt_run_that_fails_denies_and_never_passes_down(tmp_path, monkeypat
     monkeypatch.setattr(scan, "SHFMT_TIMEOUT", 0.2)
     body = f"{stall}\n" if probe else f'[ "$1" = --version ] && echo v3.12.0 && exit 0\n{stall}\n'
     fake_shfmt(tmp_path, monkeypatch, body)
-    v = verdict("ls", guard="guard-unparsable")
+    v = verdict("ls", guard="require-well-formed")
     assert v["permissionDecision"] == "deny" and f"(shfmt: {why}" in v["permissionDecisionReason"]
     with pytest.raises(scan.Unparseable):      # a failed run is not cached as a pass
         scan.check("ls")
@@ -127,7 +127,7 @@ def test_a_shfmt_run_that_fails_denies_and_never_passes_down(tmp_path, monkeypat
 
 
 def test_a_shfmt_that_stalls_once_still_denies_the_whole_run(tmp_path, monkeypatch):
-    """run.py reads guard-unparsable's verdict once: a second parse that
+    """run.py reads require-well-formed's verdict once: a second parse that
     finishes in time must not undo the deny the first one earned."""
     monkeypatch.setattr(scan, "SHFMT_TIMEOUT", 0.2)
     fake_shfmt(tmp_path, monkeypatch, '[ "$1" = --version ] && echo v3.12.0 && exit 0\n'
@@ -151,7 +151,7 @@ def test_a_bash_n_past_its_timeout_denies(tmp_path, monkeypatch):
 
 def test_without_shfmt_bash_n_refuses_and_its_tree_is_not_mapped(monkeypatch):
     monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
-    v = verdict('echo "unclosed', guard="guard-unparsable")
+    v = verdict('echo "unclosed', guard="require-well-formed")
     assert v["permissionDecision"] == "deny" and "(bash -n: " in v["permissionDecisionReason"]
     assert scan.parse("rm -rf x") == ("bash -n", True)
     calls = []
@@ -340,10 +340,10 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens_and_operato
         monkeypatch.undo()
         if s.rung != "shfmt" or (s.tokens(), s.live, s.op) != (a.tokens(), a.live, a.op):
             differ.append(c)
-    # guard-unparsable's deny rows are refused by design, and so is a heredoc
+    # require-well-formed's deny rows are refused by design, and so is a heredoc
     # opener alone in an Examples cell, whose body is the scenario's next
     # lines. Otherwise, a GraphQL query: never run as a command.
-    by_design = set(feature_commands([ROOT / "features/guard-unparsable.feature"]))
+    by_design = set(feature_commands([ROOT / "features/require-well-formed.feature"]))
     refused = [c for c in refused if c not in by_design and not re.fullmatch(r"[^\n]*<<'?EOF'?[^\n]*", c)]
     assert refused == ["mutation { addLabelsToLabelable(input:{labelableId:\"x\",labelIds:[\"y\"]}) "
                        "{ clientMutationId } }"]

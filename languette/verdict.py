@@ -4,7 +4,8 @@ and the facts a guard may ask for.
 A guard's check returns deny(reason), ask(reason), context(text), allow(input)
 or None; or it is a generator that yields Needs and Acts and returns one of those.
 A plan / judge guard instead lists its Needs up front (plan) and gets every
-answer at once (judge), keyed by the Need. Refuse is how a guard's internals say "deny, for this reason" from deep inside
+answer at once (judge), keyed by the Need.
+Refuse is how a guard's internals say "deny, for this reason" from deep inside
 a walk; check catches it and returns deny. Standard library only.
 """
 

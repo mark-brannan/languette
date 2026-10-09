@@ -5,7 +5,7 @@ registered for its hook event and tool, print one decision.
 
 --guard restricts the run to one guard (the hooks.json wiring runs each
 Python guard alone this way). Fails closed: an unreadable payload is a deny,
-a Bash command the parser refuses is a deny (guard-unparsable; the other guards
+a Bash command the parser refuses is a deny (require-well-formed; the other guards
 skip it), and a guard that raises is a deny naming the guard. No guard
 matched, or none objected, is exit 0 with no output; a deny outranks an ask.
 Standard library only.
@@ -46,10 +46,10 @@ def _out(event, fields):
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
     from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_bypass_ruleset,
-                                  guard_cross_session_send, guard_disk, guard_git_stacked_base,
+                                  guard_cross_session_send, guard_disks, guard_git_stacked_base,
                                   guard_git_work_loss, guard_github_issues, guard_host_availability,
                                   guard_infra, guard_permissions, guard_pipe_to_shell, guard_private_terms,
-                                  guard_recursive_delete, guard_scheduled_jobs, guard_secrets, guard_unparsable,
+                                  guard_recursive_delete, guard_scheduled_jobs, guard_secrets, require_well_formed,
                                   guard_worktrees, prose_budget_commit)
     from languette import record
     from languette.verdict import Act, Need, allow, ask, context, deny
@@ -64,10 +64,10 @@ except Exception as e:  # noqa: BLE001
 # other events it only keeps its per-session state, and never objects.
 _SEND_STATE_TOOLS = re.compile(r"(?:WebFetch|WebSearch|Bash|Agent|mcp__.+)\Z")
 GUARDS = (
-    ("PreToolUse", re.compile(r"Bash\Z"), (guard_unparsable, guard_git_work_loss, guard_recursive_delete, ask_first,
+    ("PreToolUse", re.compile(r"Bash\Z"), (require_well_formed, guard_git_work_loss, guard_recursive_delete, ask_first,
                                            guard_bypass_hooks, guard_infra, guard_bypass_labels,
                                            guard_bypass_ruleset, guard_permissions, guard_pipe_to_shell,
-                                           guard_disk, guard_host_availability, guard_scheduled_jobs,
+                                           guard_disks, guard_host_availability, guard_scheduled_jobs,
                                            guard_git_stacked_base, guard_secrets, prose_budget_commit)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
     ("PreToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
@@ -173,6 +173,12 @@ def _respond(stdin_text, env, only):
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
     tool = payload.get("tool_name")
+    # A hook entry that names no guard here, say one renamed since it was
+    # copied, would otherwise judge nothing and pass every command.
+    if only is not None and only not in {g.NAME for _, _, gs in GUARDS for g in gs}:
+        return _out("PreToolUse", deny(f"languette: no guard is named {only}, so this hook checks nothing. "
+                                       "This is a gate and fails closed: reinstall the plugin, or copy the "
+                                       "entry again from hooks/hooks.json")), (World(env, payload), payload, [], [])
     # An opt-in guard (OPT_IN names its option) runs alone by name, or with the
     # rest only when its option is exactly "true", as hooks.json runs it. An
     # entry with no tool pattern matches an event with no tool.
@@ -180,27 +186,27 @@ def _respond(stdin_text, env, only):
               for g in gs if only == g.NAME or (only is None and _on(g, env))]
     ti = payload.get("tool_input")
     command = ti.get("command") if tool == "Bash" and isinstance(ti, dict) else None
-    judged_once = None   # guard-unparsable's verdict, when this reading got one
+    judged_once = None   # require-well-formed's verdict, when this reading got one
     if (guards and event == "PreToolUse" and isinstance(command, str)
-            and env.get("CLAUDE_PLUGIN_OPTION_GUARD_UNPARSABLE") != "false"):
-        # A command that does not parse is guard-unparsable's to deny; the others
-        # would only read it again through a weaker parser. With guard-unparsable
+            and env.get("CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED") != "false"):
+        # A command that does not parse is require-well-formed's to deny; the others
+        # would only read it again through a weaker parser. With require-well-formed
         # off, nothing would deny it, so the others read it on the awk rung.
-        # guard-unparsable's verdict is this one reading, never a second parse:
+        # require-well-formed's verdict is this one reading, never a second parse:
         # a parser that timed out here may finish there, and pass what it denied.
         try:
-            judged_once = (guard_unparsable.judge(command),)
-        except Exception:  # noqa: BLE001 -- guard-unparsable's own run reports the crash
+            judged_once = (require_well_formed.judge(command),)
+        except Exception:  # noqa: BLE001 -- require-well-formed's own run reports the crash
             pass
         if judged_once and judged_once[0]:
-            guards = [g for g in guards if g is guard_unparsable]
+            guards = [g for g in guards if g is require_well_formed]
     world = World(env, payload)
     filled = _with_cwd(payload, world) if any(hasattr(g, "plan") for g in guards) else payload
     reasons, asks, notes, rewrites, findings, acts = [], [], [], [], [], []
     for g in guards:
         crashed = False
         try:
-            if judged_once and g is guard_unparsable:
+            if judged_once and g is require_well_formed:
                 r = judged_once[0]
             elif hasattr(g, "plan"):
                 r = _plan_judge(g, filled, env, world)

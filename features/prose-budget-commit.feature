@@ -1,24 +1,28 @@
 @python
 Feature: prose-budget-commit
   Before a `git commit`, runs the prose-budget engine with --staged and
-  denies on a finding. The engine is the command the prose_budget_command
-  option names, else prose-budget on PATH; it is never bundled here, so every
-  scenario stubs it. Without an engine the guard is silent -- it can only
-  narrow what already passes, never widen it.
+  warns on a finding; the commit still runs, because CI is the gate. The
+  engine is the command the prose_budget_command option names, else
+  prose-budget on PATH; it is never bundled here, so every scenario stubs it.
+  Without an engine the guard is silent -- it only ever adds a note to a call
+  that already passes.
 
-  Why. Documentation bloat should be caught as it is written, not in CI. The
-  guard runs on a `git commit`: `--staged` checks the index, and a commit
-  that reaches past it (-a, a pathspec, an `add` in the same command, -p,
-  --pathspec-from-file) also runs `--file` on what it would commit. No engine,
-  no budgets config in the target repo, or an engine crash is a no-op; this
-  guard only narrows what already passes through it. Exit 1 is a finding and
-  denies; exit 2 (a bad budgets config, or an engine too old for
-  --staged/--file) denies and says so; any other exit is a no-op.
+  Why. Documentation bloat should be caught as it is written, not at the
+  push. The guard runs on a `git commit`: `--staged` checks the index, and a
+  commit that reaches past it (-a, a pathspec, an `add` in the same command,
+  -p, --pathspec-from-file) also runs `--file` on what it would commit. No
+  engine, no budgets config in the target repo, or an engine crash is a
+  no-op. Exit 1 is a finding and warns, naming the file, the number and that
+  CI fails on it; exit 2 (a bad budgets config, or an engine too old for
+  --staged/--file) warns and says so; any other exit is a no-op. A commit
+  that reaches past the index gets both checks' warnings together, since
+  nothing is blocked and so nothing is retried.
 
-  Fail closed: anything the guard cannot resolve (a `cd` or `-C` target, a
-  pathspec word, a directory pathspec, a failed `diff` or `ls-files`, a
-  second commit in a different directory, since one check cannot serve two
-  repositories) denies rather than skips. A directory, glob or magic
+  Silent on what it cannot resolve: anything the guard cannot read (a `cd` or
+  `-C` target, a pathspec word, a directory pathspec, a failed `diff` or
+  `ls-files`, a second commit in a different directory, since one check
+  cannot serve two repositories) allows with no message and runs no engine
+  for that part. A directory, glob or magic
   (`:`-led) pathspec names more than itself, so it widens the check to every
   unstaged tracked change rather than being passed on as a literal --file
   argument the engine would fail to find; an `add` by pattern (`-A`, `.`,
@@ -38,7 +42,7 @@ Feature: prose-budget-commit
   Scenario Outline: a commit is judged, and detected however it is spelled
     Given PROSE_BUDGET_FAIL is "1"
     When the agent runs `<command>`
-    Then the guard denies
+    Then the guard warns about "CI fails on this; fix before the push."
 
     Examples:
       | command                                  | note                     |
@@ -85,26 +89,46 @@ Feature: prose-budget-commit
       | 127  |
       | 139  |
 
-  Scenario: the deny reason carries the engine's findings and the retry instruction
+  Scenario: the warning carries the engine's findings and says CI is the gate
     Given PROSE_BUDGET_FAIL is "1"
     When the agent runs `git commit -m x`
-    Then the guard denies, naming "sections.max_words"
-    And the guard denies, naming "not a judgment call"
+    Then the guard warns about "README.md:3: sections.max_words"
+    And the guard warns about "CI fails on this; fix before the push."
 
-  Scenario Outline: a working directory this guard cannot resolve is denied, not skipped
+  Scenario Outline: a working directory this guard cannot resolve is silent, and the engine does not run
     Given PROSE_BUDGET_FAIL is "1"
     When the agent runs `<command>`
-    Then the guard denies, naming "could not be resolved"
+    Then the guard is silent
+    And the stub "prose-budget" was not called
 
     Examples:
       | command                               | note                        |
       | cd nonexistent-dir-xyz && git commit -m x | an unresolvable cd target |
       | git -C nonexistent-dir-xyz commit -m x    | an unresolvable -C target |
 
-  Scenario: exit 2, a bad budgets config, denies and says so
+  Scenario: exit 2, a bad budgets config, warns and says so
     Given PROSE_BUDGET_CRASH is "2"
     When the agent runs `git commit -m x`
-    Then the guard denies, naming "bad budgets config"
+    Then the guard warns about "bad budgets config"
+
+  Scenario: exit 2 from the --file check warns too
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    And PROSE_BUDGET_CRASH is "2"
+    When the agent runs `git commit -m x README.md`
+    Then the guard warns about "engine too old for --file"
+
+  Scenario: a commit that reaches past the index warns for both checks
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    And PROSE_BUDGET_FAIL is "1"
+    When the agent runs `git commit -m x README.md`
+    Then the guard warns about "prose-budget --staged found"
+    And the guard warns about "checked those files directly"
 
   Scenario Outline: each cd and -C is folded onto the one before it
     Given the file "a/b/keep" holds:
@@ -113,7 +137,7 @@ Feature: prose-budget-commit
       """
     And PROSE_BUDGET_FAIL is "1"
     When the agent runs `<command>`
-    Then the guard denies, naming "sections.max_words"
+    Then the guard warns about "sections.max_words"
 
     Examples:
       | command                          | note                     |
@@ -126,13 +150,13 @@ Feature: prose-budget-commit
     Given the stub "prose-budget" is the engine, at a relative path
     And PROSE_BUDGET_FAIL is "1"
     When the agent runs `cd sub && git commit -m x`
-    Then the guard denies, naming "sections.max_words"
+    Then the guard warns about "sections.max_words"
 
   Scenario: a bare-name engine command is looked up on PATH, not under the project
     Given the stub "prose-budget" is the engine, by bare name on PATH
     And PROSE_BUDGET_FAIL is "1"
     When the agent runs `git commit -m x`
-    Then the guard denies, naming "sections.max_words"
+    Then the guard warns about "sections.max_words"
 
   Scenario Outline: a commit that reaches outside the staged index also checks those paths directly
     Given the file "README.md" holds:
@@ -227,9 +251,10 @@ Feature: prose-budget-commit
     Then the guard is silent
     And the stub "prose-budget" was called with "--file ./--staged"
 
-  Scenario: a pathspec that is a directory on disk is denied, not silently dropped
+  Scenario: a pathspec that is a directory on disk is silent, and the engine does not run
     When the agent runs `git commit -m x sub`
-    Then the guard denies, naming "is a directory"
+    Then the guard is silent
+    And the stub "prose-budget" was not called
 
   Scenario: an `add` flag this guard doesn't recognize widens rather than narrows
     Given the file "README.md" holds:
@@ -245,14 +270,35 @@ Feature: prose-budget-commit
     Then the guard is silent
     And the stub "prose-budget" was called with "README.md"
 
+  Scenario: a repo root git cannot find still leaves the files the commit names to be checked
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    And the project directory is not a git repository
+    When the agent runs `git commit -am x README.md`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "--file README.md"
+
+  Scenario: a failed listing still leaves the files the commit names to be checked
+    Given the file "README.md" holds:
+      """
+      x
+      """
+    And the project's git index is corrupt
+    When the agent runs `git commit -am x README.md`
+    Then the guard is silent
+    And the stub "prose-budget" was called with "--file README.md"
+
   Scenario: a plain commit with nothing outside the index is not also checked by path
     When the agent runs `git commit -m x`
     Then the guard is silent
     And the stub "prose-budget" was called 1 times
 
-  Scenario: a pathspec this guard cannot resolve is denied, not skipped
+  Scenario: a pathspec this guard cannot resolve is silent, and the engine does not run
     When the agent runs `git commit -m x "a file.md"`
-    Then the guard denies, naming "could not be resolved"
+    Then the guard is silent
+    And the stub "prose-budget" was not called
 
   Scenario Outline: a `--pathspec-from-file` commit reaches past the index, so every unstaged tracked change is checked
     Given the file "README.md" holds:
@@ -322,9 +368,11 @@ Feature: prose-budget-commit
       | git commit -m a && git add README.md && git commit -m b  | an add after the first commit |
       | git merge --continue && git commit -m b README.md        | after finishing a merge       |
 
-  Scenario Outline: a second commit in a different directory is denied, since one check cannot serve two repositories
+  Scenario Outline: a second commit in a different directory is silent, since one check cannot serve two repositories
+    Given PROSE_BUDGET_FAIL is "1"
     When the agent runs `<command>`
-    Then the guard denies, naming "two different directories"
+    Then the guard is silent
+    And the stub "prose-budget" was not called
 
     Examples:
       | command                                      | note                 |

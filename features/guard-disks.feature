@@ -1,5 +1,5 @@
 @python
-Feature: guard-disk
+Feature: guard-disks
   The commands that overwrite a disk are denied.
   mkfs, wipefs and shred pass on an image file in the agent's own area
   (the scratchpad, an agent worktree, /tmp); the rest have no such area.
