@@ -182,3 +182,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t024224z
 - HEAD's purity escapes are a shrink-only KNOWN list in the test, not fixed in the test-only PR Undo: delete KNOWN once each escape is a Need ([#111](https://github.com/mark-brannan/languette/pull/111))
+
+### 20261009t024227z
+- scan.py's shfmt run is a listed known escape, not an exemption Undo: exempt it in the test ([#111](https://github.com/mark-brannan/languette/pull/111))
