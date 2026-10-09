@@ -46,10 +46,12 @@ PURE = _pure()
 # Whole modules whose every call reaches past the process.
 MODULES = {"subprocess", "socket", "ssl", "time", "shutil", "glob", "tempfile", "fcntl", "select", "selectors",
            "asyncio", "multiprocessing", "pty", "urllib.request", "http.client", "ftplib", "smtplib", "sqlite3",
-           "webbrowser", "random", "uuid", "secrets", "pwd", "grp", "getpass"}
+           "webbrowser", "random", "uuid", "secrets", "pwd", "grp", "getpass", "linecache", "fileinput", "zipfile",
+           "tarfile", "platform", "signal", "threading", "ctypes", "importlib"}
 # Calls by dotted name. os.path is pure but for the ones that stat the disk or
 # fold in the cwd or $HOME; os.environ passes, the env is an input.
-CALLS = {"open", "io.open", "builtins.open", "input", "breakpoint", "sys.stdin", "datetime.datetime.now",
+CALLS = {"open", "io.open", "builtins.open", "input", "breakpoint", "sys.stdin", "logging.FileHandler",
+         "datetime.datetime.now",
          "datetime.datetime.utcnow", "datetime.datetime.today", "datetime.date.today",
          "pathlib.Path", "pathlib.PosixPath", "pathlib.WindowsPath"} | {
     f"os.{n}" for n in (
@@ -57,16 +59,18 @@ CALLS = {"open", "io.open", "builtins.open", "input", "breakpoint", "sys.stdin",
         "stat lstat fstat statvfs access listdir scandir walk fwalk readlink "
         "getlogin remove unlink rmdir removedirs mkdir makedirs mkfifo mknod rename renames replace "
         "link symlink chmod chown lchown utime truncate ftruncate sync fsync startfile "
-        "getpid getppid getuid geteuid getgid getegid urandom").split()} | {
+        "getpid getppid getuid geteuid getgid getegid urandom uname getloadavg cpu_count times "
+        "pread pwrite lseek sendfile fchmod fchown umask waitpid").split()} | {
     f"os.{p}{n}" for p in ("exec", "spawn", "posix_spawn") for n in ("", "l", "le", "lp", "lpe", "v", "ve", "vp", "vpe", "p")} | {
     f"os.path.{n}" for n in (
         "exists lexists isdir isfile islink ismount isjunction realpath samefile sameopenfile "
         "getsize getmtime getatime getctime abspath relpath expanduser").split()}
 # The Need constructor, and the kinds or (kind, op) pairs the world answers with
 # a write: an approval spent, a record kept, a door taken. Act owns those.
-NEED = {"Need", "languette.verdict.Need"}
-WRITES = {"claim", "ruleset-keep", "send-keep", ("door", "open"), ("door", "spend"), ("door", "take"),
-          ("worktree", "arrive"), ("worktree", "keep"), ("worktree", "leave")}
+NEED = ("Need", "verdict.Need")
+# Door claim takes the door when it stands, a rename and a write (world._take).
+WRITES = {"claim", "ruleset-keep", "send-keep", ("door", "open"), ("door", "spend"), ("door", "claim"),
+          ("door", "take"), ("worktree", "arrive"), ("worktree", "keep"), ("worktree", "leave")}
 BUILTINS = {"open", "input", "breakpoint"}
 # Methods that do I/O on whatever they are called on: Path's, a file's.
 METHODS = {"read_text", "read_bytes", "write_text", "write_bytes", "iterdir", "rglob", "touch", "unlink", "rmdir",
@@ -81,7 +85,7 @@ KNOWN = {
     "guards/ask_first.py": ["Need claim"],
     "guards/guard_bypass_ruleset.py": ["Need ruleset-keep"],
     "guards/guard_cross_session_send.py": ["Need send-keep"],
-    "guards/guard_github_issues.py": ["Need door open", "Need door spend", "Need door take"],
+    "guards/guard_github_issues.py": ["Need door open", "Need door spend", "Need door claim", "Need door take"],
     "guards/guard_worktrees.py": ["Need worktree leave", "Need worktree arrive", "Need worktree keep"],
     "guards/guard_bypass_labels.py": ["os.open", "os.fstat", "os.close", "os.fdopen"],
     "guards/guard_disk.py": ["os.getcwd"],
@@ -100,9 +104,10 @@ def _imports(tree):
         if isinstance(n, ast.Import):
             for a in n.names:
                 names[a.asname or a.name.split(".")[0]] = a.name if a.asname else a.name.split(".")[0]
-        elif isinstance(n, ast.ImportFrom) and n.level == 0 and n.module:
+        elif isinstance(n, ast.ImportFrom):
+            # A relative import keeps its tail: `from ..verdict import Need as N` -> verdict.Need.
             for a in n.names:
-                names[a.asname or a.name] = f"{n.module}.{a.name}"
+                names[a.asname or a.name] = f"{n.module}.{a.name}" if n.module else a.name
     return names
 
 
@@ -131,6 +136,9 @@ def escapes(source):
     out = [(n.lineno, f"import {m}") for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom))
            for m in ([a.name for a in n.names] if isinstance(n, ast.Import) else
                      [n.module] if n.level == 0 and n.module else []) if _barred(m)]
+    # A star import hides every name behind it.
+    out += [(n.lineno, "import *") for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)
+            if any(a.name == "*" for a in n.names)]
     # Any reference, called or not: `map(open, xs)` and `f = os.getcwd` escape too.
     inner = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
     for n in ast.walk(tree):
@@ -141,7 +149,7 @@ def escapes(source):
         elif isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in METHODS \
                 and not (_dotted(n.func, names) or "").startswith("os."):
             out.append((n.lineno, f".{n.func.attr}()"))
-        elif isinstance(n, ast.Call) and _dotted(n.func, names) in NEED \
+        elif isinstance(n, ast.Call) and (_dotted(n.func, names) or "").endswith(NEED) \
                 and n.args and isinstance(n.args[0], ast.Constant):
             kind = n.args[0].value
             op = n.args[1].value if len(n.args) > 1 and isinstance(n.args[1], ast.Constant) else ""
@@ -205,6 +213,12 @@ def test_every_known_escape_is_still_there():
     "from languette.verdict import Need\nyield Need('claim', {})",
     "from languette import verdict\nyield verdict.Need('worktree', 'keep', r, t)",
     "yield Need('door', 'take', s, c)",
+    "yield Need('door', 'claim', s, c)",
+    "from ..verdict import Need as N\nyield N('claim', {})",
+    "from os import *",
+    "import os\nos.uname()",
+    "import platform",
+    "import logging\nlogging.FileHandler('x')",
     "def f(:\n",
 ])
 def test_the_check_catches(source):
@@ -224,8 +238,9 @@ def test_the_check_catches(source):
     "d.get('exists')",
     "from languette import secrets\nsecrets.findings(s, [])",
     "yield Need('which', 'git')",
-    "yield Need('door', 'claim', s, c)",
     "yield Need('worktree', 'recorded', r)",
+    "import logging\nlogging.getLogger('x')",
+    "from .. import paths\npaths.physical(x)",
 ])
 def test_the_check_passes(source):
     assert_that(escapes(source), empty())
