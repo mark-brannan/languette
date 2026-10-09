@@ -8,10 +8,21 @@
 # pull_request rule when unset, "none" an empty list, "upgrade" the 403 a
 # free private repo gets. For `api .../protection`, GH_PROTECTION "reviews"
 # is protection with required reviews; unset is 404 "Branch not protected".
+# For `api graphql ... id=<id>` it answers as GH_LOGIN with the review thread
+# in $GH_THREADS/<id>.json, or GitHub's not-found error when there is none.
 printf '%s\n' "$*" >> "${LANGUETTE_STUB_LOG:?}/gh"
 [ -n "${GH_FAIL:-}" ] && exit 1
 upgrade='{"message":"Upgrade to GitHub Pro or make this repository public to enable this feature.","status":"403"}'
 case "$*" in
+  api\ graphql*)
+    id=$(printf '%s\n' "$@" | sed -n 's/^id=//p' | head -n 1)
+    f="${GH_THREADS:-/nonexistent}/$id.json"
+    if [ -n "$id" ] && [ -f "$f" ]; then
+      printf '{"data":{"viewer":{"login":"%s"},"node":' "${GH_LOGIN:-me}"; cat "$f"; echo '}}'
+      exit 0
+    fi
+    echo "{\"data\":{\"node\":null},\"errors\":[{\"type\":\"NOT_FOUND\",\"message\":\"Could not resolve to a node with the global id of '$id'\"}]}"
+    exit 1 ;;
   api*/rules/branches/*)
     case "${GH_RULES:-pr}" in
       none) echo '[]' ;;

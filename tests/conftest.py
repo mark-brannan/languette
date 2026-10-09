@@ -36,7 +36,7 @@ IN_PROCESS = {"python": ("awk",), "shfmt": ("shfmt",)}   # engine -> scan.RUNGS
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "LANGUETTE_PERM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
          "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH", "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND",
-         "CLAUDE_CODE_TMPDIR", "GH_RULES", "GH_PROTECTION", "XDG_CACHE_HOME")
+         "CLAUDE_CODE_TMPDIR", "GH_RULES", "GH_PROTECTION", "GH_LOGIN", "GH_THREADS", "XDG_CACHE_HOME")
 
 
 _REAL_HOME = os.environ.get("HOME")
@@ -420,6 +420,22 @@ def _gh_stub_python(ctx):
     ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
     ctx.env["PATH"] = str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
     ctx.env["LANGUETTE_STUB_LOG"] = ctx.stub_log
+
+
+@given(parsers.parse('review thread "{tid}" holds:'))
+def _review_thread(ctx, tid, datatable):
+    # What the gh stub answers for this thread id, as GitHub's GraphQL shapes
+    # it: an author column, an optional type (User unless it says Bot), a body.
+    # A blank author is a deleted account, which GitHub gives no author.
+    head, *rows = datatable
+    if "GH_THREADS" not in ctx.env:
+        ctx.env["GH_THREADS"] = ctx.mkdtemp()
+    nodes = []
+    for n, row in enumerate(rows):
+        r = dict(zip(head, row))
+        author = {"login": r["author"], "__typename": r.get("type") or "User"} if r["author"] else None
+        nodes.append({"author": author, "body": r["body"], "createdAt": f"2026-10-08T00:00:{n:02d}Z"})
+    Path(ctx.env["GH_THREADS"], f"{tid}.json").write_text(json.dumps({"comments": {"nodes": nodes}}))
 
 
 @given(parsers.parse('a clone of "{url}" at "{path}" on branch "{branch}"'))

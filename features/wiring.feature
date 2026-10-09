@@ -379,6 +379,62 @@ Feature: wiring
     When the agent runs `git checkout some-branch`
     Then the guard is silent
 
+  # guard-review-threads is opt-in too: what a dismissal must point at is a
+  # convention a workflow sets, so it runs only when its option is exactly "true".
+  Scenario: the opt-in review-threads guard judges when its option is true
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard denies
+
+  Scenario: the opt-in review-threads guard stays silent when its option is unset
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is unset
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard is silent
+
+  Scenario Outline: the opt-in review-threads guard stays silent for any value but true
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "<value>"
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard is silent
+
+    Examples:
+      | value |
+      | false |
+      |       |
+      | 0     |
+      | True  |
+      | 1     |
+      | yes   |
+
+  Scenario: with the opt-in review-threads guard on, a script missing from the plugin directory is a deny
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
+    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard denies
+
+  Scenario: with the opt-in review-threads guard on, a script that crashes is a deny
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And the plugin's script for "guard-review-threads" crashes
+    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard denies
+
+  Scenario: with the opt-in review-threads guard on and python3 absent from PATH, the deny says python3 is required
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
+    And PATH holds only "sh cat printf dirname"
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard denies, naming "python3 is required for guard-review-threads"
+
+  Scenario: with the opt-in review-threads guard off, a missing script is silent
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard is silent
+
   # guard-cross-session-send judges SendMessage, not Bash, so it has its own rows.
   Scenario Outline: the hooks.json command for guard-cross-session-send judges a send and fails closed
     Given the hook is the hooks.json command for "guard-cross-session-send"

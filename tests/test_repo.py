@@ -20,9 +20,9 @@ GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-ba
           "guard-bypass-labels", "guard-unparsable", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
           "guard-permissions", "guard-pipe-to-shell", "guard-disk",
           "guard-host-availability", "guard-scheduled-jobs", "guard-cross-session-send",
-          "guard-secrets"}
+          "guard-secrets", "guard-review-threads"}
 # Guards that are off unless the user turns them on: their option defaults to false.
-OPT_IN = {"guard_worktrees"}
+OPT_IN = {"guard_worktrees", "guard_review_threads"}
 # Options that are not a guard's on/off toggle: name -> type.
 OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string",
                  "prose_budget_command": "string",

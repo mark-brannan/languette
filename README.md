@@ -33,7 +33,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 ```
 
 It needs `python3`, standard library only. `shfmt` (the parser it trusts
-most) and `gh` (for the two guards that ask GitHub) are optional.
+most) and `gh` (for the guards that ask GitHub) are optional.
 
 Without the plugin system, see [Installing by hand](#installing-by-hand).
 
@@ -151,8 +151,8 @@ meant. Spent approvals are kept beside the session transcript, in
 
 ## Configuration
 
-Every guard is on by default except `guard-worktrees`, which is opt-in. Turn
-one off (or that one on) with
+Every guard is on by default except `guard-worktrees` and
+`guard-review-threads`, which are opt-in. Turn one off (or those on) with
 `/plugin configure languette@languette`,
 or at install, by its name with underscores:
 
@@ -162,10 +162,10 @@ claude plugin install languette@languette --config guard_recursive_delete=false
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
-`guard_worktrees` is the reverse: it runs only when its setting is exactly
-`true`, so a misconfiguration leaves it off. Its two controls,
-`guard_worktrees_checkout_home` and `guard_worktrees_foreign`, are each on
-unless set to `false`.
+`guard_worktrees` and `guard_review_threads` are the reverse: each runs only
+when its setting is exactly `true`, so a misconfiguration leaves it off. The
+first's two controls, `guard_worktrees_checkout_home` and
+`guard_worktrees_foreign`, are each on unless set to `false`.
 
 ### One setting per `guard-git-work-loss` rule
 
@@ -260,6 +260,7 @@ for beyond the command, it declares:
 | `guard-secrets` | the repo's `.languette/secrets.json`, when it has one |
 | `guard-infra` | the transcript, the approvals spent |
 | `guard-git-stacked-base` | GitHub, through `gh` |
+| `guard-review-threads` | the files a graphql call reads; each thread it resolves, and the gh login, from GitHub through `gh` |
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
 | `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
