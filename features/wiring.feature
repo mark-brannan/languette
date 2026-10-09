@@ -47,7 +47,6 @@ Feature: wiring
       | guard-github-issues             | gh issue create -t t -b b     | denies    |
       | prose-budget-commit    | git commit -m x               | denies    |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-signed-comments     | gh pr comment 3 -R o/r -b Done | denies  |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
       | guard-bypass-ruleset      | git push origin HEAD:$b       | asks      |
 
@@ -56,10 +55,6 @@ Feature: wiring
     When the agent calls MCP tool "mcp__github__update_issue" with input `{"owner":"o","repo":"r","issue_number":3,"labels":["churn-ok"]}`
     Then the guard denies
 
-  Scenario: the hooks.json command for guard-signed-comments judges an MCP call
-    Given the hook is the hooks.json command for "guard-signed-comments"
-    When the agent calls MCP tool "mcp__plugin_github_github__add_reply_to_pull_request_comment" with input `{"owner":"o","repo":"r","pullNumber":4,"commentId":9,"body":"Replacement is the intent"}`
-    Then the guard denies
 
   # The prompt hook is the only thing that opens the door. Dropped or
   # mis-argumented in hooks.json, the PreToolUse hook would deny every create.
@@ -90,7 +85,6 @@ Feature: wiring
       | guard-infra         | terraform destroy             |
       | guard-github-issues             | gh issue create -t t -b b     |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-signed-comments     | gh pr comment 3 -R o/r -b Done |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
@@ -119,7 +113,6 @@ Feature: wiring
       | guard-git-stacked-base | guard_git_stacked_base | git push origin --delete "$b" |
       | guard-github-issues | guard_github_issues | gh issue create -t t -b b |
       | guard-private-terms | guard_private_terms | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-signed-comments | guard_signed_comments | gh pr comment 3 -R o/r -b Done |
       | prose-budget-commit | prose_budget_commit | git commit -m x |
 
   Scenario Outline: with python3 absent from PATH, the option set to false still skips the guard
@@ -145,7 +138,6 @@ Feature: wiring
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | git push origin --delete "$b" |
       | guard-github-issues | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES | gh issue create -t t -b b |
       | guard-private-terms | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-signed-comments | CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS | gh pr comment 3 -R o/r -b Done |
       | prose-budget-commit | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT | git commit -m x |
 
   Scenario Outline: a script that crashes is a deny
@@ -169,7 +161,6 @@ Feature: wiring
       | guard-infra         | terraform destroy             |
       | guard-github-issues             | gh issue create -t t -b b     |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-signed-comments     | gh pr comment 3 -R o/r -b Done |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
@@ -194,7 +185,6 @@ Feature: wiring
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | terraform destroy             |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | gh issue create -t t -b b     |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-signed-comments     | CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS     | gh pr comment 3 -R o/r -b Done |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | git commit -m x               |
 
@@ -281,17 +271,11 @@ Feature: wiring
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | true  | gh issue create -t t -b b     | denies  |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | 1     | gh issue create -t t -b b     | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     |       | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-signed-comments     | CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS     |       | gh pr comment 3 -R o/r -b Done | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 0     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-signed-comments     | CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS     | 0     | gh pr comment 3 -R o/r -b Done | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | False | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-signed-comments     | CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS     | False | gh pr comment 3 -R o/r -b Done | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-signed-comments     | CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS     | no    | gh pr comment 3 -R o/r -b Done | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-signed-comments     | CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS     | true  | gh pr comment 3 -R o/r -b Done | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-signed-comments     | CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS     | 1     | gh pr comment 3 -R o/r -b Done | denies  |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | denies    |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | denies    |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | False | git commit -m x               | denies    |
@@ -394,6 +378,68 @@ Feature: wiring
     And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES is "true"
     And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME is "false"
     When the agent runs `git checkout some-branch`
+    Then the guard is silent
+
+  # guard-signed-comments is opt-in too: its signature is a convention a
+  # workflow sets, so it runs only when its option is exactly "true".
+  Scenario: the opt-in signed-comments guard judges when its option is true
+    Given the hook is the hooks.json command for "guard-signed-comments"
+    And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "true"
+    When the agent runs `gh pr comment 3 -R o/r -b Done`
+    Then the guard denies
+
+  Scenario: with the opt-in signed-comments guard on, the hooks.json command judges an MCP call
+    Given the hook is the hooks.json command for "guard-signed-comments"
+    And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "true"
+    When the agent calls MCP tool "mcp__plugin_github_github__add_reply_to_pull_request_comment" with input `{"owner":"o","repo":"r","pullNumber":4,"commentId":9,"body":"Replacement is the intent"}`
+    Then the guard denies
+
+  Scenario: the opt-in signed-comments guard stays silent when its option is unset
+    Given the hook is the hooks.json command for "guard-signed-comments"
+    And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is unset
+    When the agent runs `gh pr comment 3 -R o/r -b Done`
+    Then the guard is silent
+
+  Scenario Outline: the opt-in signed-comments guard stays silent for any value but true
+    Given the hook is the hooks.json command for "guard-signed-comments"
+    And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "<value>"
+    When the agent runs `gh pr comment 3 -R o/r -b Done`
+    Then the guard is silent
+
+    Examples:
+      | value |
+      | false |
+      |       |
+      | 0     |
+      | True  |
+      | 1     |
+      | yes   |
+
+  Scenario: with the opt-in signed-comments guard on, a script missing from the plugin directory is a deny
+    Given the hook is the hooks.json command for "guard-signed-comments"
+    And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "true"
+    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
+    When the agent runs `gh pr comment 3 -R o/r -b Done`
+    Then the guard denies
+
+  Scenario: with the opt-in signed-comments guard on, a script that crashes is a deny
+    Given the hook is the hooks.json command for "guard-signed-comments"
+    And the plugin's script for "guard-signed-comments" crashes
+    And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "true"
+    When the agent runs `gh pr comment 3 -R o/r -b Done`
+    Then the guard denies
+
+  Scenario: with the opt-in signed-comments guard on and python3 absent from PATH, the deny says python3 is required
+    Given the hook is the hooks.json command for "guard-signed-comments"
+    And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "true"
+    And PATH holds only "sh cat printf dirname"
+    When the agent runs `gh pr comment 3 -R o/r -b Done`
+    Then the guard denies, naming "python3 is required for guard-signed-comments"
+
+  Scenario: with the opt-in signed-comments guard off, a missing script is silent
+    Given the hook is the hooks.json command for "guard-signed-comments"
+    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
+    When the agent runs `gh pr comment 3 -R o/r -b Done`
     Then the guard is silent
 
   # guard-cross-session-send judges SendMessage, not Bash, so it has its own rows.

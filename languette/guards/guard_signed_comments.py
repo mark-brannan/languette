@@ -10,9 +10,11 @@ Fires on Bash `gh pr comment`, `gh issue comment`, `gh pr review` with a body,
 `gh pr|issue close|reopen --comment`, `gh api` writing a body to a path with a
 comments or reviews segment, and `gh api graphql` whose query adds, edits or
 submits a comment, review or thread reply; and on the GitHub MCP tools that
-post one, where every `body` in the input is judged. The body is read where it is written: --body/-b, --body-file/-F,
-a gh api body field (literal or -F @file), --input JSON, a heredoc in the
-command, `$(cat <<EOF)` around one, or a $VAR this command assigns from one.
+post one, where every `body` in the input is judged. The body is read where it
+is written: --body/-b, --body-file/-F, a gh api body field (literal or -F
+@file), --input JSON, a heredoc in the command, `$(cat <<EOF)` around one, or
+a $VAR this command assigns from one. Off by default: the signature is a
+convention a workflow sets, so the guard runs only when its option is true.
 Anything else built at run time is a deny, read as guard-private-terms reads
 it, with the fix in the reason.
 """
