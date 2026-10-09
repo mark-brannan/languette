@@ -151,8 +151,8 @@ meant. Spent approvals are kept beside the session transcript, in
 
 ## Configuration
 
-Every guard is on by default except `guard-worktrees`, which is opt-in. Turn
-one off (or that one on) with
+Every guard is on by default except `guard-worktrees` and
+`guard-review-threads`, which are opt-in. Turn one off (or those on) with
 `/plugin configure languette@languette`,
 or at install, by its name with underscores:
 
@@ -162,10 +162,10 @@ claude plugin install languette@languette --config guard_recursive_delete=false
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
-`guard_worktrees` is the reverse: it runs only when its setting is exactly
-`true`, so a misconfiguration leaves it off. Its two controls,
-`guard_worktrees_checkout_home` and `guard_worktrees_foreign`, are each on
-unless set to `false`.
+`guard_worktrees` and `guard_review_threads` are the reverse: each runs only
+when its setting is exactly `true`, so a misconfiguration leaves it off. The
+first's two controls, `guard_worktrees_checkout_home` and
+`guard_worktrees_foreign`, are each on unless set to `false`.
 
 ### One setting per `guard-git-work-loss` rule
 

@@ -40,7 +40,6 @@ Feature: wiring
       | guard-host-availability | shutdown -h now | denies |
       | guard-scheduled-jobs | crontab -r | denies |
       | guard-git-stacked-base | git push origin --delete "$b" | asks      |
-      | guard-review-threads | gh api graphql -f query=resolveReviewThread -f id="$t" | denies      |
       | ask-first              | npm run walk                  | denies    |
       | guard-bypass-hooks | git push --no-verify | denies |
       | guard-secrets | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 | denies |
@@ -80,7 +79,6 @@ Feature: wiring
       | guard-host-availability | shutdown -h now |
       | guard-scheduled-jobs | crontab -r |
       | guard-git-stacked-base | git push origin --delete "$b" |
-      | guard-review-threads | gh api graphql -f query=resolveReviewThread -f id="$t" |
       | ask-first              | npm run walk                  |
       | guard-bypass-hooks | git push --no-verify |
       | guard-infra         | terraform destroy             |
@@ -112,7 +110,6 @@ Feature: wiring
       | guard-bypass-labels | guard_bypass_labels | gh pr edit 4 --add-label churn-ok |
       | guard-git-work-loss | guard_git_work_loss | git add -A |
       | guard-git-stacked-base | guard_git_stacked_base | git push origin --delete "$b" |
-      | guard-review-threads | guard_review_threads | gh api graphql -f query=resolveReviewThread -f id="$t" |
       | guard-github-issues | guard_github_issues | gh issue create -t t -b b |
       | guard-private-terms | guard_private_terms | gh issue comment 3 -R o/r -b Wanderlust |
       | prose-budget-commit | prose_budget_commit | git commit -m x |
@@ -138,7 +135,6 @@ Feature: wiring
       | guard-bypass-labels | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
       | guard-git-work-loss | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS | git add -A |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | git push origin --delete "$b" |
-      | guard-review-threads | CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS | gh api graphql -f query=resolveReviewThread -f id="$t" |
       | guard-github-issues | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES | gh issue create -t t -b b |
       | guard-private-terms | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS | gh issue comment 3 -R o/r -b Wanderlust |
       | prose-budget-commit | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT | git commit -m x |
@@ -159,7 +155,6 @@ Feature: wiring
       | guard-host-availability | shutdown -h now |
       | guard-scheduled-jobs | crontab -r |
       | guard-git-stacked-base | git push origin --delete "$b" |
-      | guard-review-threads | gh api graphql -f query=resolveReviewThread -f id="$t" |
       | ask-first              | npm run walk                  |
       | guard-bypass-hooks | git push --no-verify |
       | guard-infra         | terraform destroy             |
@@ -184,7 +179,6 @@ Feature: wiring
       | guard-host-availability | CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY | shutdown -h now |
       | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | crontab -r |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | git push origin --delete "$b" |
-      | guard-review-threads | CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS | gh api graphql -f query=resolveReviewThread -f id="$t" |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | npm run walk                  |
       | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | git push --no-verify |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | terraform destroy             |
@@ -246,17 +240,11 @@ Feature: wiring
       | guard-host-availability | CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY | 1 | shutdown -h now | denies |
       | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | 1 | crontab -r | denies |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE |       | git push origin --delete "$b" | asks    |
-      | guard-review-threads | CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS |       | gh api graphql -f query=resolveReviewThread -f id="$t" | denies    |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | 0     | git push origin --delete "$b" | asks    |
-      | guard-review-threads | CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS | 0     | gh api graphql -f query=resolveReviewThread -f id="$t" | denies    |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | False | git push origin --delete "$b" | asks    |
-      | guard-review-threads | CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS | False | gh api graphql -f query=resolveReviewThread -f id="$t" | denies    |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | no    | git push origin --delete "$b" | asks    |
-      | guard-review-threads | CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS | no    | gh api graphql -f query=resolveReviewThread -f id="$t" | denies    |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | true  | git push origin --delete "$b" | asks    |
-      | guard-review-threads | CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS | true  | gh api graphql -f query=resolveReviewThread -f id="$t" | denies    |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | 1     | git push origin --delete "$b" | asks    |
-      | guard-review-threads | CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS | 1     | gh api graphql -f query=resolveReviewThread -f id="$t" | denies    |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              |       | npm run walk                  | denies  |
       | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS |  | git push --no-verify | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | 0     | npm run walk                  | denies  |
@@ -389,6 +377,62 @@ Feature: wiring
     And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES is "true"
     And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME is "false"
     When the agent runs `git checkout some-branch`
+    Then the guard is silent
+
+  # guard-review-threads is opt-in too: what a dismissal must point at is a
+  # convention a workflow sets, so it runs only when its option is exactly "true".
+  Scenario: the opt-in review-threads guard judges when its option is true
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard denies
+
+  Scenario: the opt-in review-threads guard stays silent when its option is unset
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is unset
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard is silent
+
+  Scenario Outline: the opt-in review-threads guard stays silent for any value but true
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "<value>"
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard is silent
+
+    Examples:
+      | value |
+      | false |
+      |       |
+      | 0     |
+      | True  |
+      | 1     |
+      | yes   |
+
+  Scenario: with the opt-in review-threads guard on, a script missing from the plugin directory is a deny
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
+    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard denies
+
+  Scenario: with the opt-in review-threads guard on, a script that crashes is a deny
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And the plugin's script for "guard-review-threads" crashes
+    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard denies
+
+  Scenario: with the opt-in review-threads guard on and python3 absent from PATH, the deny says python3 is required
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
+    And PATH holds only "sh cat printf dirname"
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
+    Then the guard denies, naming "python3 is required for guard-review-threads"
+
+  Scenario: with the opt-in review-threads guard off, a missing script is silent
+    Given the hook is the hooks.json command for "guard-review-threads"
+    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
+    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
     Then the guard is silent
 
   # guard-cross-session-send judges SendMessage, not Bash, so it has its own rows.

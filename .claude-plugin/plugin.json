@@ -102,8 +102,8 @@
     "guard_review_threads": {
       "type": "boolean",
       "title": "Block resolving an unanswered bot review thread",
-      "description": "Deny resolving a review thread a bot commented on unless your reply after the bot's last comment names the fix commit or links the record the dismissal rests on. Leave on unless you want threads resolved unchecked.",
-      "default": true
+      "description": "Opt-in, off by default. Deny resolving a review thread a bot commented on unless your reply after the bot's last comment names the fix commit or links the record the dismissal rests on. Turn on if review bots comment on your pull requests and a dismissal should point at a record.",
+      "default": false
     },
     "guard_bypass_ruleset": {
       "type": "boolean",
