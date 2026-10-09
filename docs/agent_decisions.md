@@ -254,3 +254,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t071350z
 - guard-signed-comments denies a relative --body-file after a cd in the same command rather than replaying the cd Undo: replay the cd with guard-private-terms' _Replay ([#119](https://github.com/mark-brannan/languette/pull/119))
+
+### 20261009t071358z
+- guard-signed-comments passes an empty body (gh refuses an empty comment; an approve with --body "" posts no text) and trailing whitespace on the signature line Undo: drop the body.strip() skip and the rstrip() in check ([#119](https://github.com/mark-brannan/languette/pull/119))
