@@ -44,6 +44,7 @@ Feature: guard-host-availability
       | systemctl --kill-whom main stop nginx    | systemctl stop          | an option's value before the verb     |
       | systemctl --job-mode replace stop nginx  | systemctl stop          | an option's value before the verb     |
       | systemctl -T stop nginx                  | systemctl stop          | a flag that takes no value            |
+      | systemctl --what status stop nginx       | systemctl stop          | an unknown option before a read verb  |
       | systemctl try-restart nginx              | systemctl try-restart   | a restart by another name             |
       | systemctl kill nginx                     | systemctl kill          |                                       |
       | systemctl reboot                         | systemctl reboot        | the host itself                       |

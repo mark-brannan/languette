@@ -24,6 +24,12 @@ _CTL_DOWN = {"stop", "restart", "try-restart", "reload-or-restart", "try-reload-
 # Options that take a separate value; the value is not the verb. A missing one only fails closed.
 _CTL_ARG = {"-t", "--type", "-p", "--property", "-s", "--signal", "-n", "--lines", "-o", "--output",
             "--root", "--state", "--job-mode", "--kill-whom", "--kill-who", "--preset-mode", "--timestamp"}
+# Options that take no value. Any option in neither set, before the verb, means the verb cannot be
+# known, so a read verb after it does not clear the segment.
+_CTL_FLAG = {"-a", "--all", "-l", "--full", "-q", "--quiet", "-r", "--recursive", "-f", "--force", "-i",
+             "-T", "--show-transaction", "--now", "--no-pager", "--no-legend", "--no-block", "--no-wall",
+             "--no-ask-password", "--failed", "--system", "--reverse", "--after", "--before", "--plain",
+             "--value", "--dry-run", "--wait", "--global", "--runtime"}
 # Verbs whose own arguments may be any word, so a later `stop` is a unit or pattern, not a verb.
 _CTL_READ = {"status", "show", "cat", "help", "list-units", "list-unit-files", "list-sockets", "list-timers",
              "list-jobs", "list-dependencies", "list-automounts", "list-paths", "list-machines",
@@ -49,8 +55,17 @@ def _service_stop(s, a, b):
     words = [s.w[i] for i in range(g + 1, b + 1) if s.k[i] == "w"]
     if any(w in _CTL_OTHER or w.startswith(("--host=", "--machine=")) for w in words):
         return None
-    pos = [w for i, w in enumerate(words) if not w.startswith("-") and (i == 0 or words[i - 1] not in _CTL_ARG)]
-    if pos and pos[0] in _CTL_READ:
+    pos, skip, known = [], False, True
+    for w in words:
+        if skip:
+            skip = False
+        elif w in _CTL_ARG:
+            skip = True
+        elif w.startswith("-"):
+            known = known and (w in _CTL_FLAG or ("=" in w and w.startswith("--")) or bool(pos))
+        else:
+            pos.append(w)
+    if known and pos and pos[0] in _CTL_READ:
         return None
     # The verb is the first word past the options, but an option's value looks like a word too
     # (`--root /x stop`), so any down verb in the segment counts unless a read verb leads.
