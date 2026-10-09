@@ -1,7 +1,9 @@
 """The purity check (docs/design/guard-pipeline.md): every guard and the
 verdict, read as source and never run, may not open a file, start a program,
 open a connection, read the clock or ask the disk about a path. What a guard
-needs from the world it yields as a Need; languette.world answers it.
+needs from the world it yields as a Need; languette.world answers it. A Need
+reads only (docs/decisions.md, "Gather reads only"): a kind the world answers
+with a write is an escape too, the shape #107 had.
 
 A list of known ways out, not a proof: it catches the slip a well-meaning
 author makes, not a deliberate escape (`eval`, a name built at run time)."""
@@ -44,20 +46,27 @@ PURE = _pure()
 # Whole modules whose every call reaches past the process.
 MODULES = {"subprocess", "socket", "ssl", "time", "shutil", "glob", "tempfile", "fcntl", "select", "selectors",
            "asyncio", "multiprocessing", "pty", "urllib.request", "http.client", "ftplib", "smtplib", "sqlite3",
-           "webbrowser"}
-# Calls by dotted name. os.path is pure but for the ones that stat the disk.
-CALLS = {"open", "io.open", "builtins.open", "input", "breakpoint", "datetime.datetime.now",
+           "webbrowser", "random", "uuid", "secrets", "pwd", "grp", "getpass"}
+# Calls by dotted name. os.path is pure but for the ones that stat the disk or
+# fold in the cwd or $HOME; os.environ passes, the env is an input.
+CALLS = {"open", "io.open", "builtins.open", "input", "breakpoint", "sys.stdin", "datetime.datetime.now",
          "datetime.datetime.utcnow", "datetime.datetime.today", "datetime.date.today",
          "pathlib.Path", "pathlib.PosixPath", "pathlib.WindowsPath"} | {
     f"os.{n}" for n in (
         "open fdopen read write close pipe dup dup2 system popen fork forkpty kill killpg getcwd getcwdb chdir "
         "stat lstat fstat statvfs access listdir scandir walk fwalk readlink "
         "getlogin remove unlink rmdir removedirs mkdir makedirs mkfifo mknod rename renames replace "
-        "link symlink chmod chown lchown utime truncate ftruncate sync fsync startfile").split()} | {
+        "link symlink chmod chown lchown utime truncate ftruncate sync fsync startfile "
+        "getpid getppid getuid geteuid getgid getegid urandom").split()} | {
     f"os.{p}{n}" for p in ("exec", "spawn", "posix_spawn") for n in ("", "l", "le", "lp", "lpe", "v", "ve", "vp", "vpe", "p")} | {
     f"os.path.{n}" for n in (
         "exists lexists isdir isfile islink ismount isjunction realpath samefile sameopenfile "
-        "getsize getmtime getatime getctime").split()}
+        "getsize getmtime getatime getctime abspath relpath expanduser").split()}
+# The Need constructor, and the kinds or (kind, op) pairs the world answers with
+# a write: an approval spent, a record kept, a door taken. Act owns those.
+NEED = {"Need", "languette.verdict.Need"}
+WRITES = {"claim", "ruleset-keep", "send-keep", ("door", "open"), ("door", "spend"), ("door", "take"),
+          ("worktree", "arrive"), ("worktree", "keep"), ("worktree", "leave")}
 BUILTINS = {"open", "input", "breakpoint"}
 # Methods that do I/O on whatever they are called on: Path's, a file's.
 METHODS = {"read_text", "read_bytes", "write_text", "write_bytes", "iterdir", "rglob", "touch", "unlink", "rmdir",
@@ -68,6 +77,12 @@ METHODS = {"read_text", "read_bytes", "write_text", "write_bytes", "iterdir", "r
 # Remove an entry when its guard yields instead; the tests fail on one more or
 # one fewer, so the list only shrinks.
 KNOWN = {
+    # Needs the world answers with a write, each to move to act.
+    "guards/ask_first.py": ["Need claim"],
+    "guards/guard_bypass_ruleset.py": ["Need ruleset-keep"],
+    "guards/guard_cross_session_send.py": ["Need send-keep"],
+    "guards/guard_github_issues.py": ["Need door open", "Need door spend", "Need door take"],
+    "guards/guard_worktrees.py": ["Need worktree leave", "Need worktree arrive", "Need worktree keep"],
     "guards/guard_bypass_labels.py": ["os.open", "os.fstat", "os.close", "os.fdopen"],
     "guards/guard_disk.py": ["os.getcwd"],
     "guards/guard_permissions.py": ["os.getcwd"],
@@ -126,6 +141,12 @@ def escapes(source):
         elif isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in METHODS \
                 and not (_dotted(n.func, names) or "").startswith("os."):
             out.append((n.lineno, f".{n.func.attr}()"))
+        elif isinstance(n, ast.Call) and _dotted(n.func, names) in NEED \
+                and n.args and isinstance(n.args[0], ast.Constant):
+            kind = n.args[0].value
+            op = n.args[1].value if len(n.args) > 1 and isinstance(n.args[1], ast.Constant) else ""
+            if kind in WRITES or (kind, op) in WRITES:
+                out.append((n.lineno, f"Need {kind} {op}".rstrip()))
     return sorted(out)
 
 
@@ -175,6 +196,15 @@ def test_every_known_escape_is_still_there():
     "p.glob('*')",
     "p.read_text()",
     "p.exists()",
+    "import os\nos.path.abspath('x')",
+    "from os.path import expanduser\nexpanduser('~')",
+    "import sys\nsys.stdin.read()",
+    "import random",
+    "from uuid import uuid4",
+    "import os\nos.getpid()",
+    "from languette.verdict import Need\nyield Need('claim', {})",
+    "from languette import verdict\nyield verdict.Need('worktree', 'keep', r, t)",
+    "yield Need('door', 'take', s, c)",
     "def f(:\n",
 ])
 def test_the_check_catches(source):
@@ -192,6 +222,10 @@ def test_the_check_catches(source):
     "from urllib.parse import quote\nquote('x')",
     "from pathlib import PurePosixPath\nPurePosixPath('a') / 'b'",
     "d.get('exists')",
+    "from languette import secrets\nsecrets.findings(s, [])",
+    "yield Need('which', 'git')",
+    "yield Need('door', 'claim', s, c)",
+    "yield Need('worktree', 'recorded', r)",
 ])
 def test_the_check_passes(source):
     assert_that(escapes(source), empty())
