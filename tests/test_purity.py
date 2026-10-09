@@ -47,20 +47,22 @@ PURE = _pure()
 MODULES = {"subprocess", "socket", "ssl", "time", "shutil", "glob", "tempfile", "fcntl", "select", "selectors",
            "asyncio", "multiprocessing", "pty", "urllib.request", "http.client", "ftplib", "smtplib", "sqlite3",
            "webbrowser", "random", "uuid", "secrets", "pwd", "grp", "getpass", "linecache", "fileinput", "zipfile",
-           "tarfile", "platform", "signal", "threading", "ctypes", "importlib"}
+           "tarfile", "platform", "signal", "threading", "ctypes", "importlib", "mmap"}
 # Calls by dotted name. os.path is pure but for the ones that stat the disk or
 # fold in the cwd or $HOME; os.environ passes, the env is an input.
-CALLS = {"open", "io.open", "builtins.open", "input", "breakpoint", "sys.stdin", "logging.FileHandler",
+CALLS = {"open", "io.open", "io.FileIO", "builtins.open", "codecs.open", "input", "breakpoint", "sys.stdin",
+         "logging.FileHandler",
          "datetime.datetime.now",
          "datetime.datetime.utcnow", "datetime.datetime.today", "datetime.date.today",
          "pathlib.Path", "pathlib.PosixPath", "pathlib.WindowsPath"} | {
     f"os.{n}" for n in (
-        "open fdopen read write close pipe dup dup2 system popen fork forkpty kill killpg getcwd getcwdb chdir "
+        "open fdopen read readv pread preadv write close pipe dup dup2 system popen fork forkpty openpty kill "
+        "killpg getcwd getcwdb chdir isatty ttyname get_terminal_size getxattr listxattr "
         "stat lstat fstat statvfs access listdir scandir walk fwalk readlink "
         "getlogin remove unlink rmdir removedirs mkdir makedirs mkfifo mknod rename renames replace "
         "link symlink chmod chown lchown utime truncate ftruncate sync fsync startfile "
         "getpid getppid getuid geteuid getgid getegid urandom uname getloadavg cpu_count times "
-        "pread pwrite lseek sendfile fchmod fchown umask waitpid").split()} | {
+        "pwrite lseek sendfile fchmod fchown umask waitpid").split()} | {
     f"os.{p}{n}" for p in ("exec", "spawn", "posix_spawn") for n in ("", "l", "le", "lp", "lpe", "v", "ve", "vp", "vpe", "p")} | {
     f"os.path.{n}" for n in (
         "exists lexists isdir isfile islink ismount isjunction realpath samefile sameopenfile "
@@ -77,23 +79,21 @@ METHODS = {"read_text", "read_bytes", "write_text", "write_bytes", "iterdir", "r
            "mkdir", "is_dir", "is_file", "is_symlink", "samefile", "readlink", "symlink_to",
            "hardlink_to", "lstat", "chmod", "exists", "stat", "open", "glob"}
 
-# Escapes at HEAD, file -> one entry per occurrence, each to become a Need.
-# Remove an entry when its guard yields instead; the tests fail on one more or
-# one fewer, so the list only shrinks.
+# Escapes at HEAD, file -> one entry per occurrence. Remove an entry when its
+# guard stops escaping; the tests fail on one more or one fewer, so the list
+# only shrinks. A direct read never goes on it: every read a guard makes is a
+# Need (#114), and test_no_guard_is_let_off_a_direct_read holds it there.
 KNOWN = {
     # Needs that write as they read, under one lock or rename; they move with
     # the approval spend (#84).
     "guards/ask_first.py": ["Need claim"],
     "guards/guard_github_issues.py": ["Need door claim", "Need door take"],
     "guards/guard_worktrees.py": ["Need worktree arrive"],
-    "guards/guard_bypass_labels.py": ["os.open", "os.fstat", "os.close", "os.fdopen"],
-    "guards/guard_disk.py": ["os.getcwd"],
-    "guards/guard_permissions.py": ["os.getcwd"],
-    "guards/guard_recursive_delete.py": ["os.path.lexists", "os.path.realpath", "os.getcwd"],
-    "paths.py": ["os.path.lexists", "os.path.realpath"],
     # The parser ladder's shfmt rung (docs/decisions.md, "Runtime dependencies").
     "scan.py": ["import shutil", "import subprocess", "subprocess.run", "subprocess.TimeoutExpired", "shutil.which"],
 }
+# The design's one named exception to a pure step: parse runs programs.
+LADDER = "scan.py"
 
 
 def _imports(tree):
@@ -174,6 +174,13 @@ def test_no_guard_and_not_the_verdict_reaches_past_the_process():
     assert_that(bad, empty())
 
 
+def test_no_guard_is_let_off_a_direct_read():
+    """Only the write Needs (#84) and the parser ladder stay on KNOWN: a guard,
+    or a helper it imports, that reads for itself fails the check."""
+    let_off = {rel: [w for w in calls if not w.startswith("Need ")] for rel, calls in KNOWN.items() if rel != LADDER}
+    assert_that({rel: w for rel, w in let_off.items() if w}, equal_to({}))
+
+
 def test_every_known_escape_is_still_there():
     found = _found()
     gone = {rel: sorted((Counter(calls) - Counter(w for _, w in found.get(rel, []))).elements())
@@ -192,6 +199,15 @@ def test_every_known_escape_is_still_there():
     "import os\nos.execvp('a', [])",
     "list(map(open, xs))",
     "import os\nf = os.getcwd\nf()",
+    "import os\ncwd = payload.get('cwd') or os.getcwd()",
+    "import os\nfd = os.open(p, os.O_RDONLY | os.O_NONBLOCK)",
+    "import os\nos.fstat(fd).st_mode",
+    "import os\nwith os.fdopen(fd, 'rb') as f:\n    f.read()",
+    "import os\nwhile not os.path.lexists(p):\n    p = os.path.dirname(p)",
+    "import io\nio.FileIO('x')",
+    "import codecs\ncodecs.open('x')",
+    "import mmap",
+    "import os\nos.preadv(fd, bufs, 0)",
     "import os\nsorted(xs, key=os.path.getmtime)",
     "import subprocess",
     "import subprocess as sp\nsp.run(['ls'])",
@@ -249,6 +265,12 @@ def test_the_check_catches(source):
     "from ..secrets import findings\nfindings(s, [])",
     "from . import secrets\nsecrets.findings(s, [])",
     "yield Need('which', name)",
+    "yield Need('read', p, 1 << 20)",
+    "yield Need('cwd')",
+    "yield Need('path', 'lexists', p)",
+    "from .. import paths\nphys = yield from paths.physical(x)",
+    "import codecs\ncodecs.decode(b, 'utf-8')",
+    "import stat\nstat.S_ISREG(mode)",
 ])
 def test_the_check_passes(source):
     assert_that(escapes(source), empty())

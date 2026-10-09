@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import time
 from urllib.parse import quote
@@ -81,9 +82,23 @@ class World:
     def _which(self, name):
         return shutil.which(name, path=os.pathsep.join(os.get_exec_path(self.env)))
 
-    def _read(self, path):
-        with open(path, encoding="utf-8") as f:
-            return f.read()
+    def _read(self, path, limit=None):
+        """The text of the regular file `path`. Opened non-blocking, so a FIFO
+        cannot stall the hook into its timeout; a file that is not regular, or
+        is past `limit` bytes, is a ValueError naming why, and one that is not
+        UTF-8 the UnicodeDecodeError."""
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise ValueError("is not a regular file")
+        except BaseException:
+            os.close(fd)
+            raise
+        with os.fdopen(fd, "rb") as f:
+            data = f.read(-1 if limit is None else limit + 1)
+        if limit is not None and len(data) > limit:
+            raise ValueError(f"is over {limit} bytes")
+        return data.decode("utf-8")
 
     def _path(self, op, path):
         if op == "executable":
