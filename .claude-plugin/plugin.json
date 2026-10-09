@@ -96,7 +96,7 @@
     "protected_services": {
       "type": "string",
       "title": "Protected services",
-      "description": "Services an agent may not stop, restart or kill with systemctl: unit names, comma-separated, a trailing .service optional, * globs allowed. A name also covers its socket and its @instances. Empty means the default, the services a session reaches the machine through.",
+      "description": "Services an agent may not stop, restart or kill with systemctl: unit names, comma-separated, a trailing .service optional, * globs allowed. A name also covers its socket and its @instances. Empty means the default, the services a session reaches the machine through; a list you set replaces it.",
       "default": "ssh,sshd,NetworkManager,systemd-networkd,network,network-online,display-manager,gdm,gdm3,sddm,lightdm,getty",
       "required": false
     },

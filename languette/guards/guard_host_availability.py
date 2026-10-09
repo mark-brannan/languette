@@ -98,7 +98,7 @@ def service_stop(s, a, b, hit, host_verbs=_CTL_HOST):
     return None
 
 
-def judge(text, env=os.environ):
+def judge(text):
     """The deny reason for `text`, or None."""
     for t, _ in sw.texts_of(sw.strip_heredocs(text)):
         s = sw.Scan(t)
@@ -130,5 +130,5 @@ def check(payload, env=os.environ):
     cmd = cmd.rstrip("\n")                     # as $(...) would leave it
     if not cmd:
         return None
-    why = judge(cmd + "\n", env)
+    why = judge(cmd + "\n")
     return deny(f"{NAME}: {why}") if why else None
