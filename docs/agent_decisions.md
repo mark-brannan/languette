@@ -287,3 +287,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t080900z
 - guard-review-threads counts any 7 to 40 hex characters as a commit, all digits included (a short sha is all digits about 1 time in 27); the guard checks a record is named, not that it exists. Supersedes the digit-and-letter entry above Undo: restore the two lookaheads in SHA and move the 1234567 row back to the deny outline ([#118](https://github.com/mark-brannan/languette/pull/118))
+
+### 20261009t080904z
+- guard-review-threads lets a graphql query that opens with { or query pass whatever run-time values fill it (GraphQL runs no mutation from it without operationName), reads a file a -F field or --input names through gather when gh runs alone, and looks for the mutation only in the query; reads denied over 30 days of transcripts fall from 121 to at most 42 of 2603 graphql calls. Supersedes the deny-every-out-of-sight-query entry above Undo: make every run-time query and every @file or --input file unreadable again in _calls ([#118](https://github.com/mark-brannan/languette/pull/118))
