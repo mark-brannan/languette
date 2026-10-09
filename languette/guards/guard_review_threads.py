@@ -6,8 +6,11 @@ its fields or in a heredoc fed to --input, holds a resolveReviewThread
 mutation) names each thread by its PRRT_ id. The guard reads every such
 thread from GitHub, through `gh api graphql`, and denies unless the current
 gh login replied after the bot's last comment, and that reply names a commit
-or a link. A thread no bot commented on passes; an id it cannot read, or
-GitHub that cannot answer, is a deny that says so.
+or a link. It checks that a record is named, not that the commit exists. A
+thread no bot commented on passes. A `gh api graphql` whose query it cannot
+read (a run-time word, a file, stdin with no heredoc) and that names a thread
+or a resolve, an id it cannot read, or GitHub that cannot answer, is a deny
+that says so.
 """
 
 import json
@@ -37,10 +40,12 @@ def _wv(s, i):
 
 def _resolves(command):
     """(thread ids, unreadable): the PRRT_ ids each resolving gh call in
-    `command` names, in order; unreadable when one names none, or builds a
-    word at run time."""
+    `command` names, in order; unreadable when one names none, builds a word
+    at run time, or a graphql call that names a thread or a resolve reads its
+    query from somewhere the guard cannot see."""
     buf = command + "\n"
     hd = "\n".join(sw.heredoc_bodies(buf))
+    named = bool(RESOLVE.search(command))
     ids, unreadable = [], False
     for text, nested in sw.texts_of(sw.strip_heredocs(buf)):
         s = sw.Scan(text)
@@ -52,11 +57,14 @@ def _resolves(command):
             if "api" not in words or "graphql" not in words:
                 continue
             body = "\n".join(words) + ("\n" + hd if "--input" in words else "")
+            live = any(s.live[i] for i in range(g + 1, b + 1))
             if not RESOLVE.search(body):
+                hidden = live or any(w.startswith("query=@") for w in words) or ("--input" in words and not hd)
+                unreadable = unreadable or hidden and (named or bool(THREAD.search(body)))
                 continue
             found = THREAD.findall(body)
             ids += found
-            unreadable = unreadable or not found or any(s.live[i] for i in range(g + 1, b + 1))
+            unreadable = unreadable or not found or live
     return list(dict.fromkeys(ids)), unreadable
 
 
@@ -71,8 +79,9 @@ def _login(c):
 
 
 def _judge(tid, viewer, comments):
-    """deny for one thread, or None."""
-    bots = [i for i, c in enumerate(comments) if _bot(c)]
+    """deny for one thread, or None. The viewer's own comments are replies,
+    even when the viewer is itself a bot."""
+    bots = [i for i, c in enumerate(comments) if _bot(c) and _login(c).casefold() != viewer.casefold()]
     if not bots:
         return None
     mine = [c for c in comments[bots[-1] + 1:] if _login(c).casefold() == viewer.casefold()]
@@ -107,13 +116,14 @@ def _thread(cwd, tid):
 
 def check(payload, env=None):
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if not isinstance(cmd, str) or "resolveReviewThread" not in cmd:
+    if not isinstance(cmd, str) or "graphql" not in cmd:
         return None
     ids, unreadable = _resolves(cmd)
     if unreadable:
-        return deny(f"{NAME}: this resolves a review thread, and the guard cannot tell which review thread (its id "
-                    "is built at run time, or not in the command), so it cannot check that a bot's finding was "
-                    f"answered. Name the thread's PRRT_ id literally. {DO}")
+        return deny(f"{NAME}: this may resolve a review thread, and the guard cannot tell which review thread (the "
+                    "query or the id is built at run time, read from a file or stdin, or not in the command), so it "
+                    "cannot check that a bot's finding was answered. Put the query and the thread's PRRT_ id in the "
+                    f"command literally. {DO}")
     if not ids:
         return None
     cwd = payload.get("cwd")

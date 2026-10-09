@@ -24,8 +24,9 @@ Feature: guard-review-threads
   scenario sets up is what it answers for that id; any other id is not
   found. A bot is an author GitHub calls a Bot, a login ending in `[bot]`,
   or one of coderabbitai, claude, copilot-pull-request-reviewer and
-  github-actions. Known gap: a query the guard cannot read (a variable, a
-  file) is not seen as a resolve.
+  github-actions; the gh login's own comments are replies, even when that
+  login is a bot. The guard checks that a reply names a record, not that
+  the commit exists.
 
   Background:
     Given the stub "gh" is first on PATH, for a Python guard
@@ -159,6 +160,31 @@ Feature: guard-review-threads
       | command                                                                                                       | note                    |
       | gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}' -f id="$T" | the id built at run time |
       | gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}'            | no id at all            |
+
+  Scenario: a bot's own login replying with the fix may resolve its thread
+    Given GH_LOGIN is "claude"
+    And review thread "PRRT_t1" holds:
+      | author       | body                |
+      | coderabbitai | Consider a rename.  |
+      | claude       | Fixed in 3f2a9c1.   |
+    When the agent runs `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=PRRT_t1`
+    Then the guard is silent
+
+  Scenario Outline: a graphql call whose query cannot be read, naming a thread or a resolve, is denied
+    When the agent runs `<command>`
+    Then the guard denies, naming "cannot tell which review thread"
+    And the stub "gh" was not called
+
+    Examples:
+      | command                                                                                                      | note                      |
+      | echo '{"query":"mutation{resolveReviewThread(input:{threadId:\"PRRT_t1\"}){thread{id}}}"}' \| gh api graphql --input - | piped stdin, no heredoc |
+      | Q='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}'; gh api graphql -f query="$Q"       | the query in a variable   |
+      | gh api graphql -f query=@m.graphql -f id=PRRT_t1                                                              | the query in a file       |
+      | gh api graphql --input m.json -f id=PRRT_t1                                                                   | the payload in a file     |
+
+  Scenario: a graphql read from a file that names no thread is not this guard's
+    When the agent runs `gh api graphql -f query=@q.graphql -F owner=o`
+    Then the guard is silent
 
   Scenario Outline: GitHub that cannot be read is a deny that says so
     Given <setup>
