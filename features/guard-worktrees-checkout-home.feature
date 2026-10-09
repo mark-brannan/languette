@@ -143,6 +143,38 @@ Feature: guard-worktrees
       | {PROJ}       | git -C "$SOMEWHERE" -C sub checkout x       |
       | {PROJ}       | cd "$X" && cd sub && git checkout some-branch |
 
+  # A --git-dir or --work-tree that does not resolve pins nothing: it could
+  # name $HOME's repo or work tree, so it is a deny like any other directory
+  # the guard can't resolve.
+  Scenario Outline: a --git-dir or --work-tree that can't be resolved is denied
+    Given the working directory is "<cwd>"
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | cwd          | command                                                     |
+      | {PROJ}       | git --git-dir="$X" checkout some-branch                     |
+      | {PROJ}       | git --work-tree="$X" checkout some-branch                   |
+      | {PROJ}       | git --work-tree=/nonexistent checkout some-branch           |
+      | {PROJ}       | git --git-dir={PROJ}/.git --work-tree="$X" checkout some-branch |
+      | {PROJ}       | git --git-dir=nope/.git checkout some-branch                |
+      | /nonexistent | git --git-dir=rel/.git checkout some-branch                 |
+
+  # Git is how every answer here is found: without it nothing resolves to
+  # $HOME, so the guard denies instead of reading that as "elsewhere".
+  Scenario Outline: with no git on PATH a checkout or switch is denied
+    Given PATH holds only "sh"
+    And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_FOREIGN is "false"
+    And the working directory is "{PROJ}"
+    When the agent runs `<command>`
+    Then the guard denies, naming "git is missing"
+
+    Examples:
+      | command                          |
+      | git checkout some-branch         |
+      | git switch some-branch           |
+      | git -C {PROJ} checkout -b probe  |
+
   # A cd replaces the directory git is judged from. The scanner drops
   # subshell parentheses, so the last row is a known false allow; see
   # docs/agent_decisions.md.
