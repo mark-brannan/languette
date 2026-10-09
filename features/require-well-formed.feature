@@ -1,5 +1,5 @@
 @python
-Feature: guard-unparsable
+Feature: require-well-formed
   A Bash command the parser refuses is denied, whole, naming shfmt's line:col
   and what it found, and saying nothing ran. The other guards skip such a
   command rather than deny it again. Without shfmt, a lower rung reads it:

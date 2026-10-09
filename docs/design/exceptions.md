@@ -26,9 +26,9 @@ across a step's edge, and one place turns a failure into a deny.
 | Class | Means | Raised by | Caught by | The catcher |
 |---|---|---|---|---|
 | `Refuse` | this guard denies, for the reason it carries | deep in a guard's walk | that guard's `check` | returns the deny |
-| `scan.Unparseable` | a parser rung read the text and refused it | parse | guard-unparsable; the ladder, for a nested text | denies; or reads that text with awk |
-| `scan.RunFailed` | the parser's run failed, not the text | parse | guard-unparsable | denies, saying retry |
-| `scan.TooBig`, `scan.TooMany` | the text is past a size, weight or nesting limit | parse | guard-unparsable | denies, naming the limit |
+| `scan.Unparseable` | a parser rung read the text and refused it | parse | require-well-formed; the ladder, for a nested text | denies; or reads that text with awk |
+| `scan.RunFailed` | the parser's run failed, not the text | parse | require-well-formed | denies, saying retry |
+| `scan.TooBig`, `scan.TooMany` | the text is past a size, weight or nesting limit | parse | require-well-formed | denies, naming the limit |
 | a library's own (`ValueError` from `json`, `re.error`, `OSError`) | the call failed | the standard library | the line that made the call | turns it into a value |
 | anything else | a bug | anywhere | the runner, once per guard | a deny naming the guard |
 
@@ -87,7 +87,7 @@ After the verdict, act and the record sit behind one silent catch each.
 ## Allowed
 
 - A step's own signal as a non-local exit out of a walk, a recursion or a
-  judge with many call sites frames below its edge (guard-disk's), caught
+  judge with many call sites frames below its edge (the guard-disks judge), caught
   at the step's edge and turned into a finding.
 - A library's exception, by its own class, on the line that called it.
 - A fence around foreign code: a pip parser that fails is a missing rung.

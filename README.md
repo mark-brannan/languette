@@ -71,7 +71,7 @@ Without the plugin system or the installer, see [Installing by hand](#installing
 
 Each guard checks for one kind of hazard:
 
-- [`guard-unparsable`](features/guard-unparsable.feature): a Bash command that
+- [`require-well-formed`](features/require-well-formed.feature): a Bash command that
   doesn't parse; the other guards skip it
 - [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
@@ -80,7 +80,7 @@ Each guard checks for one kind of hazard:
   `LANGUETTE_PERM_ALLOW` directories
 - [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`, `sh <(curl ..)`,
   `eval "$(wget ..)"`
-- [`guard-disk`](features/guard-disk.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
+- [`guard-disks`](features/guard-disks.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
 - [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb, `systemctl stop sshd`
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
 - [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
@@ -100,7 +100,7 @@ Each guard checks for one kind of hazard:
   applying a label that waives a CI gate, such as `churn-ok`
 - [`guard-secrets`](languette/guards/guard_secrets.py): a pasted credential
 - [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to another session: asks; in `bypassPermissions`, denies after a network read
-- `guard-protected-paths`, `guard-database` (planned)
+- `guard-protected-paths`, `guard-databases` (planned)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
 - [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
@@ -134,11 +134,11 @@ scenarios for a command run in `~/project`, and CI fails if the table drifts:
 | `./cleanup.sh` | allow | no rule; silent (known gap) |
 <!-- /fixtures-table -->
 
-With `shfmt` 3.6 or later on `PATH`, the `guard-unparsable` guard denies a
+With `shfmt` 3.6 or later on `PATH`, the `require-well-formed` guard denies a
 command that doesn't parse. Without `shfmt`, `bash -n` decides; tree-sitter-bash
 or bashlex, if installed, only add the column; below both, its own lexer.
 In a replay of 101,671 agent commands, about 1 in 3,000 didn't parse, and
-each [would have broken](features/guard-unparsable.feature).
+each [would have broken](features/require-well-formed.feature).
 Bash runs a broken command in part, the lines before the error or prose in
 backticks as a command; the deny stops all of it, so the agent looks again.
 Over 64 KB or a nesting weight of 10,000, a command is denied unread: a
@@ -283,7 +283,7 @@ for beyond the command, it declares:
 | Guard | Reads |
 |---|---|
 | `guard-git-work-loss` | nothing: a pure function of the command |
-| `guard-unparsable` | a shell parser; nothing runs the command |
+| `require-well-formed` | a shell parser; nothing runs the command |
 | `guard-recursive-delete` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
 | `guard-bypass-hooks` | the transcript, and the approvals spent |

@@ -54,7 +54,7 @@ jobs:
       - run: bash tests/guard-private-terms.test.sh
       - run: bash tests/guard-worktrees.test.sh
 
-  # The parser ladder's promise end to end: guard-unparsable's hooks.json
+  # The parser ladder's promise end to end: require-well-formed's hooks.json
   # command under PATHs holding only shfmt, only bash, only python3, or a
   # venv's python3 with a pip parser. Red rows are strict xfails.
   smoke:

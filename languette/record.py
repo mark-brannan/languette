@@ -8,9 +8,9 @@ shape, a long random-looking string. record_raw_commands masks nothing. `v`
 names the format, so a reader can refuse one it does not know.
 
     {"v": 1, "t": "2026-10-07T23:09:07Z", "session": "a78b...", "call": "toolu_...",
-     "event": "PreToolUse", "tool": "Bash", "run": "guard-disk", "rung": "shfmt",
+     "event": "PreToolUse", "tool": "Bash", "run": "guard-disks", "rung": "shfmt",
      "command": {"text": "GH_TOKEN=<secret> git push", "masked": 1, "programs": ["git"]},
-     "findings": [{"guard": "guard-disk", "decision": "none"}], "verdict": "silent"}
+     "findings": [{"guard": "guard-disks", "decision": "none"}], "verdict": "silent"}
 
 Standard library only.
 """

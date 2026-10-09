@@ -51,7 +51,7 @@
       "description": "Deny git branch -D and --delete --force. Leave on unless you want this git command through unchecked. Has no effect while guard_git_work_loss is false.",
       "default": true
     },
-    "guard_unparsable": {
+    "require_well_formed": {
       "type": "boolean",
       "title": "Deny a command that does not parse",
       "description": "Deny a Bash command the shell parser refuses, with its line and column, before any of it runs. Turned off, the other guards read such a command through a weaker parser instead.",
@@ -75,7 +75,7 @@
       "description": "Deny curl, wget or fetch output piped into sh, bash, python and other interpreters, or run through eval or a process substitution. The agent saves the file, reads it, then runs it. Leave on unless you want downloads run unread.",
       "default": true
     },
-    "guard_disk": {
+    "guard_disks": {
       "type": "boolean",
       "title": "Block disk wipes",
       "description": "Deny dd onto a device, mkfs, wipefs and shred outside scratch areas, and a redirect or tee onto a disk. Leave on unless you want these through unchecked.",

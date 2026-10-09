@@ -1,4 +1,4 @@
-"""guard-unparsable: a Bash command the parser refuses is denied, whole, before
+"""require-well-formed: a Bash command the parser refuses is denied, whole, before
 anything in it runs.
 
 The parser is languette/scan.py's ladder, read top down: shfmt, `bash -n`,
@@ -17,7 +17,7 @@ deny it a second time on a weaker reading.
 from languette import scan
 from languette.verdict import deny
 
-NAME = "guard-unparsable"
+NAME = "require-well-formed"
 
 
 def judge(command):
@@ -28,17 +28,17 @@ def judge(command):
         scan.check(command)
         scan.texts_of(scan.strip_heredocs(command + "\n"))
     except scan.TooMany as e:
-        return deny(f"guard-unparsable: this command is too big to check: {e}. Nothing ran. "
+        return deny(f"require-well-formed: this command is too big to check: {e}. Nothing ran. "
                     "Every quoted string that may run as shell, and every $( ) inside double quotes, "
                     "is one; the guards read only so many. Split it into several smaller commands, "
                     "or put the script in a file and run that")
     except scan.TooBig as e:
-        return deny(f"guard-unparsable: this command is too big to check: {e}. Nothing ran. "
+        return deny(f"require-well-formed: this command is too big to check: {e}. Nothing ran. "
                     "Every $( ), ( ), { }, backtick, if, case and do adds the depth it stands at, "
                     "and so does every &&, || and | (a chain nests one level per operator). "
                     "Split it into several smaller commands, or nest less")
     except scan.Unparseable as e:
-        return deny(f"guard-unparsable: this command does not parse ({e.rung}: {e}). Nothing ran: "
+        return deny(f"require-well-formed: this command does not parse ({e.rung}: {e}). Nothing ran: "
                     "bad input is a deny; fix the syntax and run it again")
     return None
 

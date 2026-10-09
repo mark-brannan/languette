@@ -91,7 +91,7 @@ def test_raw_keeps_the_command_and_the_reason(tmp_path):
 
 
 def test_a_refused_parse_names_the_rung(tmp_path):
-    run.respond(_payload("echo 'open"), _env(tmp_path), "guard-unparsable")
+    run.respond(_payload("echo 'open"), _env(tmp_path), "require-well-formed")
     [rec] = _records(tmp_path)
     assert rec["refused"] and rec["rung"] and rec["verdict"] == "deny"
 
