@@ -295,6 +295,16 @@ def _project(ctx):
     (ctx.proj / "t.jsonl").touch()             # a session has a transcript, if an empty one
 
 
+@given("the project directory is not a git repository")
+def _not_a_repo(ctx):
+    shutil.rmtree(ctx.proj / ".git")
+
+
+@given("the project's git index is corrupt")
+def _corrupt_index(ctx):
+    (ctx.proj / ".git/index").write_text("not an index\n")
+
+
 @given(parsers.parse('the file "{rel}" holds:'))
 def _file(ctx, rel, docstring):
     f = ctx.proj / rel

@@ -45,7 +45,7 @@ Feature: wiring
       | guard-secrets | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 | denies |
       | guard-infra         | terraform destroy             | denies    |
       | guard-github-issues             | gh issue create -t t -b b     | denies    |
-      | prose-budget-commit    | git commit -m x               | denies    |
+      | prose-budget-commit    | git commit -m x               | warns about "CI fails on this" |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
       | guard-bypass-ruleset      | git push origin HEAD:$b       | asks      |
@@ -275,12 +275,12 @@ Feature: wiring
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | denies    |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | denies    |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | False | git commit -m x               | denies    |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | no    | git commit -m x               | denies    |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | true  | git commit -m x               | denies    |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 1     | git commit -m x               | denies    |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | warns about "CI fails on this" |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | warns about "CI fails on this" |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | False | git commit -m x               | warns about "CI fails on this" |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | no    | git commit -m x               | warns about "CI fails on this" |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | true  | git commit -m x               | warns about "CI fails on this" |
+      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 1     | git commit -m x               | warns about "CI fails on this" |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       |       | gh pr edit 4 --add-label churn-ok | denies  |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | 0     | gh pr edit 4 --add-label churn-ok | denies  |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | False | gh pr edit 4 --add-label churn-ok | denies  |
