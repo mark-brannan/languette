@@ -28,12 +28,12 @@ Feature: doctor
     Then the "Claude Code" row is ✓ "plugin cd31356, user scope; <counts>"
 
     Examples:
-      | options                                         | counts                                 |
-      | {}                                              | 19 guards on, 1 off: guard_worktrees   |
-      | {"guard_worktrees": true, "guard_disk": false}  | 19 guards on, 1 off: guard_disk        |
-      | {"guard_worktrees": true, "guard_disk": "false"} | 19 guards on, 1 off: guard_disk       |
-      | {"guard_worktrees": true, "guard_disk": "no"}   | 20 guards on, 0 off                    |
-      | {"guard_worktrees": "yes"}                      | 19 guards on, 1 off: guard_worktrees   |
+      | options                                           | counts                               |
+      | {}                                                | 19 guards on, 1 off: guard_worktrees |
+      | {"guard_worktrees": true, "guard_disks": false}   | 19 guards on, 1 off: guard_disks     |
+      | {"guard_worktrees": true, "guard_disks": "false"} | 19 guards on, 1 off: guard_disks     |
+      | {"guard_worktrees": true, "guard_disks": "no"}    | 20 guards on, 0 off                  |
+      | {"guard_worktrees": "yes"}                        | 19 guards on, 1 off: guard_worktrees |
 
   Scenario: gh signed out is a warning, not a failure
     Given languette "cd31356ad5db" is installed at user scope
