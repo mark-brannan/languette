@@ -85,6 +85,12 @@ Feature: doctor
     And the doctor exits 1
     And the fake HOME is as it was
 
+  Scenario: a deny from the hook's fallback, with run.py missing, fails
+    Given languette "cd31356ad5db" is installed at user scope from a copy without run.py
+    When the doctor runs
+    Then the "fail-closed" row is ✗ matching "`rm -rf ~` was not denied through the hook command as installed: only the fallback denied it, so the guard never judged it: languette/run.py \(guard-recursive-delete\) is missing"
+    And the doctor exits 1
+
   Scenario: guard-recursive-delete turned off skips the canary
     Given languette "cd31356ad5db" is installed at user scope
     And the languette options are `{"guard_recursive_delete": false}`

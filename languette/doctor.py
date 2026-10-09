@@ -33,6 +33,9 @@ WAIT_MAX = 60                      # seconds the doctor waits on the canary, wha
 GATE = re.compile(r'^\[ "\$\{CLAUDE_PLUGIN_OPTION_(\w+)-\}" (=|!=) (true|false) \]')
 BY_HAND = re.compile(r"languette/run\.py")
 SHA = re.compile(r"[0-9a-f]{7,40}")
+# A deny that came from the wrapper or the loader, not the guard: run.py is
+# missing, crashed, or a guard failed to import. Fail-closed, but nothing judged.
+FALLBACK = re.compile(r"This is a gate and fails closed|^languette: a guard failed to load")
 
 
 class Unreadable(Exception):
@@ -174,9 +177,12 @@ def canary(command, env, cwd, limit):
     if r.returncode == 2:                      # Claude Code reads exit 2 as a block
         return True, "", ms
     try:
-        decision = json.loads(r.stdout)["hookSpecificOutput"]["permissionDecision"] if r.stdout.strip() else None
-    except (ValueError, KeyError, TypeError):
+        out = json.loads(r.stdout)["hookSpecificOutput"] if r.stdout.strip() else {}
+        decision, reason = out.get("permissionDecision"), out.get("permissionDecisionReason")
+    except (ValueError, KeyError, TypeError, AttributeError):
         return False, f"the hook printed something that is not a decision (exit {r.returncode})", ms
+    if decision == "deny" and isinstance(reason, str) and FALLBACK.search(reason):
+        return False, f"only the fallback denied it, so the guard never judged it: {reason.split('. ')[0]}", ms
     if decision == "deny":
         return True, "", ms
     return False, f"the hook {'let it through silently' if decision is None else 'answered ' + str(decision)}" \

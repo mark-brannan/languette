@@ -150,6 +150,14 @@ def _installed_open(doctor, version):
     _install(doctor, version, "user", root=copy)
 
 
+@given(parsers.re(r'languette "(?P<version>\w+)" is installed at user scope from a copy without run\.py'))
+def _installed_no_run_py(doctor, version):
+    copy = doctor.aside / "plugin"
+    (copy / "hooks").mkdir(parents=True)
+    shutil.copy(ROOT / "hooks/hooks.json", copy / "hooks/hooks.json")
+    _install(doctor, version, "user", root=copy)
+
+
 @given(parsers.parse("the languette options are `{options}`"))
 def _options(doctor, options):
     s = doctor.settings()
