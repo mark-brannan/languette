@@ -153,6 +153,12 @@
       "description": "Repos whose issue and PR text is never scanned, as owner/name, comma-separated. Empty by default: every repo is scanned.",
       "required": false
     },
+    "guard_signed_comments": {
+      "type": "boolean",
+      "title": "Sign an agent's GitHub comments as an agent's",
+      "description": "Opt-in, off by default. Deny a PR or issue comment, review or review-thread reply posted through gh, gh api or a GitHub MCP tool unless its body's first line starts with the robot emoji and its last line is the agent signature (model, effort, session). The agent posts under your login; the signature keeps its words from being read as yours. Turn on if your agents sign their comments that way.",
+      "default": false
+    },
     "guard_cross_session_send": {
       "type": "boolean",
       "title": "Check messages to your other sessions",

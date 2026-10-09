@@ -151,8 +151,8 @@ meant. Spent approvals are kept beside the session transcript, in
 
 ## Configuration
 
-Every guard is on by default except `guard-worktrees`, which is opt-in. Turn
-one off (or that one on) with
+Every guard is on by default except `guard-worktrees` and
+`guard-signed-comments`, which are opt-in. Turn one off (or those on) with
 `/plugin configure languette@languette`,
 or at install, by its name with underscores:
 
@@ -162,10 +162,10 @@ claude plugin install languette@languette --config guard_recursive_delete=false
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
-`guard_worktrees` is the reverse: it runs only when its setting is exactly
-`true`, so a misconfiguration leaves it off. Its two controls,
-`guard_worktrees_checkout_home` and `guard_worktrees_foreign`, are each on
-unless set to `false`.
+`guard_worktrees` and `guard_signed_comments` are the reverse: each runs only
+when its setting is exactly `true`, so a misconfiguration leaves it off. The
+first's two controls, `guard_worktrees_checkout_home` and
+`guard_worktrees_foreign`, are each on unless set to `false`.
 
 ### One setting per `guard-git-work-loss` rule
 
@@ -263,6 +263,7 @@ for beyond the command, it declares:
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
 | `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
+| `guard-signed-comments` | the files a comment's body is read from |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
 | `guard-worktrees` | `$HOME` and what `git rev-parse --show-toplevel` resolves to; git, for where each path lands, and a record per session in `$TMPDIR` |
