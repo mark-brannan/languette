@@ -284,3 +284,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t080848z
 - guard-review-threads asks, not denies, when GitHub cannot be read or names no such thread, matching guard-git-stacked-base and guard-bypass-ruleset; the design doc is silent on it. Supersedes the deny entry above Undo: return deny() instead of ask() in check()'s GitHub-unreadable branch and its scenario ([#118](https://github.com/mark-brannan/languette/pull/118))
+
+### 20261009t080900z
+- guard-review-threads counts any 7 to 40 hex characters as a commit, all digits included (a short sha is all digits about 1 time in 27); the guard checks a record is named, not that it exists. Supersedes the digit-and-letter entry above Undo: restore the two lookaheads in SHA and move the 1234567 row back to the deny outline ([#118](https://github.com/mark-brannan/languette/pull/118))
