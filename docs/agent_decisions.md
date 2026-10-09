@@ -194,3 +194,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t040051z
 - The writes_in_acts fixture gates OS write calls during respond, not only World's act methods Undo: wrap only the ACTS methods ([#115](https://github.com/mark-brannan/languette/pull/115))
+
+### 20261009t041509z
+- guard-host-availability keeps only the units nobody stops but to chaos-test the host (dbus, logind, a login session, the run-level targets); ssh, the network, the display manager and getty move to guard-protected-services as its default list Undo: move names between _CORE in guard_host_availability.py and DEFAULT in guard_protected_services.py, with their feature rows ([#116](https://github.com/mark-brannan/languette/pull/116))
