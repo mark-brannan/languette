@@ -242,3 +242,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t071321z
 - guard-signed-comments defaults to on, like every guard but guard-worktrees Undo: default false in .claude-plugin/plugin.json and add guard_signed_comments to OPT_IN in tests/test_repo.py ([#119](https://github.com/mark-brannan/languette/pull/119))
+
+### 20261009t071328z
+- guard-signed-comments gates Bash only; the GitHub MCP comment and review tools are not gated yet Undo: give the guard a TOOLS pattern and an MCP branch, as guard-private-terms has ([#119](https://github.com/mark-brannan/languette/pull/119))
