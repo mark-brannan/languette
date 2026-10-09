@@ -10,11 +10,9 @@ answers: *allow*, *ask*, or **deny**.
 Nothing external like a cloud/web service decides, nor any ML or AI models.
 The critical execution path is [deterministic](https://en.wikipedia.org/wiki/Deterministic_algorithm), and even uses ["pure functions"](https://en.wikipedia.org/wiki/Pure_function) where possible.
 
-**Whose is this for?** You, assuming you are a real human being. A big AI
-vendor's safeguards are its product decision, changed at their whim. We
-don't accept that trust blindly, and you shouldn't have to either. `languette`
-is a guard you can read and understand for yourself: **trust, but verify**. Any
-vendor that copies it is welcome.
+**Whose is this for?** You, a real human being. A big AI vendor's safeguards
+are its product decision, changed at whim; don't take them on trust. `languette`
+is a guard you can read: **trust, but verify**. Copying it is welcome.
 
 *Languette* is French for "little tongue". On a halberd the languette (or 'langet')
 is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
