@@ -1,8 +1,7 @@
 # Exceptions
 
-How languette raises and catches. Present tense is the aim, not today's
-code; "(planned)" marks where the code has not caught up. It rests on
-[the guard pipeline](guard-pipeline.md).
+How languette raises and catches, on [the guard pipeline](guard-pipeline.md).
+Present tense is the aim; "(planned)" marks where the code lags.
 
 ## Purpose
 
@@ -14,7 +13,11 @@ across a step's edge, and one place turns a failure into a deny.
 
 ## The rule
 
-> A pure step never sees an exception from I/O. A Need is answered with a value; a fact that cannot be had is a value saying why, and the guard decides what it means. Exceptions inside a pure step are its own, raised and caught there; anything else is a bug, and the runner's catch-all makes it a deny.
+> A pure step never sees an exception from I/O. A Need is answered with a
+> value; a fact that cannot be had is a value saying why, and the guard
+> decides what it means. Exceptions inside a pure step are its own, raised
+> and caught there; anything else is a bug, and the runner's catch-all makes
+> it a deny.
 
 ## The classes kept
 
@@ -34,9 +37,10 @@ answers `Unavailable(kind, why)` (planned). `kind` is one of a closed list:
 `missing`, `denied`, `not-regular`, `too-big`, `not-text`, `garbled`,
 `timeout`, `failed`. `why` is the OS's words, for a person. `None`, `False`
 and `""` stay facts: `path exists` answering `False` means no such file;
-`Unavailable` means world could not tell. It has no truth value: `if fact:`
-on it raises, so a guard that forgets to check crashes into the catch-all, a
-deny, rather than reading "could not tell" as "no".
+`Unavailable` means world could not tell. `bool()`, `==` and formatting on
+it raise, so a guard that forgets to check crashes into the catch-all, a
+deny, rather than reading "could not tell" as "no". Only `is` slips past, so
+a guard tests for `Unavailable` before it tests `is None`.
 
 The runner's `throw` branch goes; it only sends. A Need of a kind world does
 not know, or an Act it does not do, is a bug in the guard: it ends the guard
@@ -63,28 +67,26 @@ that should have denied.
 
 An event that only keeps state (PostToolUse, SessionStart and the rest) has
 no verdict to deny. A guard that keeps state names the Act a crash stands
-for, and the runner does it: guard-cross-session-send's door opens,
-guard-github-issues' door is spent (planned).
+for, and the runner does it, each toward a deny (planned):
+guard-cross-session-send's door opens (later sends deny or ask), and
+guard-github-issues' door is spent (the next write is denied).
 
-After the verdict, act and the decision record each sit behind one silent
-catch: a failed write never changes a verdict already given.
+After the verdict, act and the record sit behind one silent catch each.
 
 ## Forbidden
 
 - Branching on the class of an exception from world inside a guard.
 - `except Exception` inside a guard.
-- Raising to return a value one frame up: a check that finds one fault
-  returns the reason.
+- Raising to return a value one frame up; a check returns the reason.
 - A bare `except:`, or an `except BaseException` that does not re-raise.
-- Raising a class for a condition it does not name, such as an `OSError`
-  for a payload with no transcript.
+- Raising a class for a condition it does not name (`OSError` for no
+  transcript).
 
 ## Allowed
 
-- A step's own signal as a non-local exit out of a walk: a recursion, or a
-  judge whose many call sites sit frames below its edge (guard-disk,
-  guard-permissions, guard-recursive-delete, guard-worktrees' path walk).
-  The step's edge catches it and turns it into a finding.
+- A step's own signal as a non-local exit out of a walk, a recursion or a
+  judge with many call sites frames below its edge (guard-disk's), caught
+  at the step's edge and turned into a finding.
 - A library's exception, by its own class, on the line that called it.
 - A fence around foreign code: a pip parser that fails is a missing rung.
 - `StopIteration` in the runner: it is how a generator returns.
@@ -97,9 +99,8 @@ catch: a failed write never changes a verdict already given.
 - **Classes as a declared interface, or not at all.** A class that crosses
   a module edge is in the table above; one that is not does not cross.
 - **Fail closed at one boundary**, where the verdict is made.
-- **Errors as values across boundaries**, as in Go's `(value, err)` or
-  Rust's `Result`: the standard library's class tree is not an interface
-  languette chose.
+- **Errors as values across boundaries**, as Go's `(value, err)` and Rust's
+  `Result` do.
 
 ## What changes to get there
 
@@ -114,5 +115,4 @@ catch: a failed write never changes a verdict already given.
   guard-bypass-ruleset's push reading, guard-git-work-loss's rules,
   guard-worktrees' two controls).
 - `paths.resolve` returns the path or the reason; `Unresolved` goes.
-- Guards read the command parsed once, so no parser signal reaches a guard
-  that is not guard-unparsable.
+- Guards read the command parsed once: no parser signal reaches the others.
