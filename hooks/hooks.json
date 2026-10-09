@@ -66,11 +66,6 @@
           },
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-signed-comments; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-signed-comments and was not found on PATH. This is a gate and fails closed: install python3, or set guard_signed_comments=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-signed-comments) is missing from the plugin directory or crashed, so a GitHub comment could not be checked for its agent signature. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking that a GitHub comment is signed as an agent's"
-          },
-          {
-            "type": "command",
             "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_INFRA-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-infra; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-infra and was not found on PATH. This is a gate and fails closed: install python3, or set guard_infra=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-infra) is missing from the plugin directory or crashed, so destructive infrastructure commands could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for a command that destroys infrastructure"
           },
@@ -103,6 +98,16 @@
             "type": "command",
             "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-private-terms; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-private-terms and was not found on PATH. This is a gate and fails closed: install python3, or set guard_private_terms=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-private-terms) is missing from the plugin directory or crashed, so text bound for a public GitHub repo could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking issue/PR text against the private-terms list"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|mcp__.*__(add_issue_comment|add_reply_to_pull_request_comment|add_comment_to_pending_review|pull_request_review_write|update_issue_comment|add_pull_request_review_comment|create_pull_request_review|create_and_submit_pull_request_review|submit_pending_pull_request_review)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-signed-comments; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-signed-comments and was not found on PATH. This is a gate and fails closed: install python3, or set guard_signed_comments=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-signed-comments) is missing from the plugin directory or crashed, so a GitHub comment could not be checked for its agent signature. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking that a GitHub comment is signed as an agent's"
           }
         ]
       },

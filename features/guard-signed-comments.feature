@@ -18,7 +18,8 @@ Feature: guard-signed-comments
   It fires on Bash `gh pr comment`, `gh issue comment`, `gh pr review` with
   a body, `gh pr|issue close|reopen --comment`, `gh api` writing a body to a path with a `comments` or `reviews`
   segment, and `gh api graphql` whose query adds, edits or submits a comment,
-  review or review-thread reply. Editing a PR or issue body is not a comment.
+  review or review-thread reply, and on the GitHub MCP tools that post one.
+  Editing a PR or issue body is not a comment.
   The body is read where it is written: --body/-b, --body-file/-F, gh api's
   body field (literal or `@file`) or --input JSON, a heredoc in the same
   command, a `$(cat <<EOF)` around one, or a variable this command assigns
@@ -205,6 +206,29 @@ Feature: guard-signed-comments
         """
       When the agent runs `gh api repos/o/r/pulls/4/reviews --input {PROJ}/review.json`
       Then the guard denies, naming "first line"
+
+  Rule: the GitHub MCP tools that post a comment are judged the same
+
+    Scenario Outline: every body in the tool's input is read
+      When the agent calls MCP tool "<tool>" with input `<input>`
+      Then the guard <verdict>
+
+      Examples:
+        | tool | input | verdict |
+        | mcp__plugin_github_github__add_issue_comment | {"owner":"o","repo":"r","issue_number":3,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | is silent |
+        | mcp__plugin_github_github__add_issue_comment | {"owner":"o","repo":"r","issue_number":3,"body":"Replacement is the intent"} | denies, naming "first line" |
+        | mcp__plugin_github_github__add_reply_to_pull_request_comment | {"owner":"o","repo":"r","pullNumber":4,"commentId":9,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | is silent |
+        | mcp__plugin_github_github__add_reply_to_pull_request_comment | {"owner":"o","repo":"r","pullNumber":4,"commentId":9,"body":"Replacement is the intent"} | denies, naming "first line" |
+        | mcp__plugin_github_github__add_comment_to_pending_review | {"owner":"o","repo":"r","pullNumber":4,"path":"a.py","subjectType":"FILE","body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | is silent |
+        | mcp__plugin_github_github__add_comment_to_pending_review | {"owner":"o","repo":"r","pullNumber":4,"path":"a.py","subjectType":"FILE","body":"Replacement is the intent"} | denies, naming "first line" |
+        | mcp__plugin_github_github__pull_request_review_write | {"method":"create","owner":"o","repo":"r","pullNumber":4,"event":"COMMENT","body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | is silent |
+        | mcp__plugin_github_github__pull_request_review_write | {"method":"create","owner":"o","repo":"r","pullNumber":4,"event":"COMMENT","body":"Replacement is the intent"} | denies, naming "first line" |
+        | mcp__plugin_github_github__update_issue_comment | {"owner":"o","repo":"r","comment_id":5,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | is silent |
+        | mcp__plugin_github_github__update_issue_comment | {"owner":"o","repo":"r","comment_id":5,"body":"Replacement is the intent"} | denies, naming "first line" |
+        | mcp__github__create_and_submit_pull_request_review | {"owner":"o","repo":"r","pullNumber":4,"event":"COMMENT","body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74","comments":[{"path":"a.py","line":1,"body":"Nit"}]} | denies, naming "first line" |
+        | mcp__plugin_github_github__add_issue_comment | {"owner":"o","repo":"r","issue_number":3,"reaction":"+1"} | is silent |
+        | mcp__plugin_github_github__pull_request_review_write | {"method":"resolve_thread","owner":"o","repo":"r","pullNumber":4,"threadId":"T"} | is silent |
+        | mcp__plugin_github_github__pull_request_read | {"owner":"o","repo":"r","pullNumber":4,"body":"Replacement is the intent"} | is silent |
 
   Rule: a body the guard cannot read is denied, with the fix in the reason
 

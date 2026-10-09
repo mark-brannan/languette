@@ -12,7 +12,7 @@ from hamcrest import assert_that, contains_string, empty, equal_to, has_length, 
 
 import readme_table
 from conftest import hooks_json_commands, hooks_json_prompt_command
-from languette.guards import guard_github_issues, guard_private_terms
+from languette.guards import guard_github_issues, guard_private_terms, guard_signed_comments
 
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
@@ -289,3 +289,27 @@ def test_the_guard_bypass_labels_matcher_covers_the_tool(tool):
 @pytest.mark.parametrize("tool", ["Read", "Write", "Edit"])
 def test_the_guard_bypass_labels_matcher_leaves_other_tools_alone(tool):
     assert_that(re.fullmatch(_guard_bypass_labels_matcher(), tool), is_(None))
+
+
+def _guard_signed_comments_matcher():
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
+    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard guard-signed-comments;" in h["command"] for h in e["hooks"])]
+    return e["matcher"]
+
+
+def _mcp_tools_the_guard_signed_comments_handles():
+    # From the guard's own TOOLS, so a tool added there must be matched here.
+    suffixes = _mcp_suffixes(guard_signed_comments.TOOLS)
+    assert suffixes >= {"add_issue_comment", "add_reply_to_pull_request_comment", "add_comment_to_pending_review",
+                        "pull_request_review_write", "update_issue_comment"}
+    return sorted(f"{prefix}{s}" for s in suffixes for prefix in ("mcp__github__", "mcp__plugin_github_github__"))
+
+
+@pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_signed_comments_handles())
+def test_the_guard_signed_comments_matcher_covers_the_tool(tool):
+    assert_that(re.fullmatch(_guard_signed_comments_matcher(), tool), is_not(None))
+
+
+@pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__create_issue"])
+def test_the_guard_signed_comments_matcher_leaves_other_tools_alone(tool):
+    assert_that(re.fullmatch(_guard_signed_comments_matcher(), tool), is_(None))

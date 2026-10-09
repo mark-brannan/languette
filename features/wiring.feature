@@ -56,6 +56,11 @@ Feature: wiring
     When the agent calls MCP tool "mcp__github__update_issue" with input `{"owner":"o","repo":"r","issue_number":3,"labels":["churn-ok"]}`
     Then the guard denies
 
+  Scenario: the hooks.json command for guard-signed-comments judges an MCP call
+    Given the hook is the hooks.json command for "guard-signed-comments"
+    When the agent calls MCP tool "mcp__plugin_github_github__add_reply_to_pull_request_comment" with input `{"owner":"o","repo":"r","pullNumber":4,"commentId":9,"body":"Replacement is the intent"}`
+    Then the guard denies
+
   # The prompt hook is the only thing that opens the door. Dropped or
   # mis-argumented in hooks.json, the PreToolUse hook would deny every create.
   Scenario: the hooks.json prompt hook opens the door the hooks.json guard-github-issues hook spends

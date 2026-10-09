@@ -9,7 +9,8 @@ begins with `🤖 ` and its last non-empty line is `🤖 <model> · <effort> ·
 Fires on Bash `gh pr comment`, `gh issue comment`, `gh pr review` with a body,
 `gh pr|issue close|reopen --comment`, `gh api` writing a body to a path with a
 comments or reviews segment, and `gh api graphql` whose query adds, edits or
-submits a comment, review or thread reply. The body is read where it is written: --body/-b, --body-file/-F,
+submits a comment, review or thread reply; and on the GitHub MCP tools that
+post one, where every `body` in the input is judged. The body is read where it is written: --body/-b, --body-file/-F,
 a gh api body field (literal or -F @file), --input JSON, a heredoc in the
 command, `$(cat <<EOF)` around one, or a $VAR this command assigns from one.
 Anything else built at run time is a deny, read as guard-private-terms reads
@@ -25,6 +26,12 @@ from languette.guards.guard_private_terms import writes
 from languette.verdict import Need, deny
 
 NAME = "guard-signed-comments"
+_MCP = ("add_issue_comment|add_reply_to_pull_request_comment|add_comment_to_pending_review|"
+        "pull_request_review_write|update_issue_comment|add_pull_request_review_comment|create_pull_request_review|"
+        "create_and_submit_pull_request_review|submit_pending_pull_request_review")
+# The tools hooks.json wires this guard to; the MCP ones by their name's tail.
+TOOLS = re.compile(rf"(?:Bash|mcp__.*__(?:{_MCP}))\Z")
+_MCP_TOOL = re.compile(rf"mcp__.*__(?:{_MCP})\Z")
 GH = re.compile(r"(?:^|/)gh\Z")
 FIRST = "🤖 "
 SIGNATURE = re.compile(r"🤖 \S+ · (?:low|medium|high|xhigh|max|-) · ([0-9a-f]{8})")
@@ -245,14 +252,20 @@ def _graphql_string(t):
 
 
 def check(payload, env):
-    if payload.get("tool_name") != "Bash":
-        return None
+    tool = payload.get("tool_name")
     ti = payload.get("tool_input")
-    cmd = ti.get("command") if isinstance(ti, dict) else None
-    if not isinstance(cmd, str) or "gh" not in cmd:
+    ti = ti if isinstance(ti, dict) else {}
+    if tool == "Bash":
+        cmd = ti.get("command")
+        if not isinstance(cmd, str) or "gh" not in cmd:
+            return None
+        r = _Read(cmd)
+        posts = r.posts
+    elif isinstance(tool, str) and _MCP_TOOL.match(tool):
+        r, posts = None, [[("text", b) for b in _json_bodies(ti)]]
+    else:
         return None
-    r = _Read(cmd)
-    if not r.posts:
+    if not any(posts):
         return None
     sid = payload.get("session_id")
     hexid = sid[:8] if isinstance(sid, str) and re.fullmatch(r"[0-9a-f]{8}", sid[:8]) else None
@@ -367,7 +380,7 @@ def check(payload, env):
         return out
 
     problems = []
-    for post in r.posts:
+    for post in posts:
         for src in post:
             try:
                 got = yield from bodies(src)
