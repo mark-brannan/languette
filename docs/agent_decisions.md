@@ -212,3 +212,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t055703z
 - protected_services: a set list replaces the default list, as bypass_labels does, instead of adding to it as issue #113 said Undo: protected() returns DEFAULT plus the set patterns ([#116](https://github.com/mark-brannan/languette/pull/116))
+
+### 20261009t070910z
+- guard-review-threads denies when GitHub cannot be read, where guard-git-stacked-base and guard-bypass-ruleset ask: a thread left open costs a click, one closed unread hides a finding Undo: return ask() instead of deny() in check()'s unreadable branch and its scenario ([#118](https://github.com/mark-brannan/languette/pull/118))
