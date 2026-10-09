@@ -1,6 +1,7 @@
 """End-to-end smoke test of the parser ladder's promise to a user: if the
 preferred parser is not installed, languette falls back to one you have, and a
-command that does not parse is still denied, naming the parser that read it.
+command that does not parse is still denied, naming the parser that read it,
+and `languette doctor` says which parser is reading, in its "shell parser" row.
 
 Each environment is a PATH holding exactly the tools named, nothing else. The
 hook run is require-well-formed's own command string from hooks/hooks.json, under
@@ -40,6 +41,18 @@ ENVS = {
     "lexer only": ((), None, "(?:awk|lexer)", None, None),
     "bashlex": ((), "LANGUETTE_SMOKE_BASHLEX_PY", "(?:awk|lexer)", "1:15 per bashlex", None),
     "tree-sitter-bash": ((), "LANGUETTE_SMOKE_TREESITTER_PY", "(?:awk|lexer)", "1:6 per tree-sitter-bash", None),
+}
+
+# id -> (the doctor's mark, a regex for the rest of its "shell parser" row, xfail
+# reason). The doctor names the rung that decides; it does not yet name a pip
+# parser that adds the column.
+DOCTOR = {
+    "shfmt": ("✓", r"shfmt \d+\.\d+$", None),
+    "bash -n": ("!", r"no shfmt .* on PATH; bash -n checks the parse instead$", None),
+    "lexer only": ("!", r"no shfmt .* on PATH; the built-in lexer reads commands instead$", None),
+    "bashlex": ("!", r"the built-in lexer reads commands.*bashlex", "the doctor does not name bashlex"),
+    "tree-sitter-bash": ("!", r"the built-in lexer reads commands.*tree-sitter-bash",
+                         "the doctor does not name tree-sitter-bash"),
 }
 
 # The pip rows' venvs, proven outside the xfail: a strict xfail swallows any
@@ -96,10 +109,30 @@ def run_hook(path_dir, home, command):
     return json.loads(r.stdout) if r.stdout.strip() else None
 
 
+def run_doctor(path_dir, home):
+    """`languette doctor` from an empty HOME under the same PATH: the "shell
+    parser" row as (mark, text). The Claude Code row is ✗ there and the exit 1;
+    only the parser row is asked about."""
+    env = {"PATH": str(path_dir), "HOME": str(home), "PYTHONPATH": str(ROOT)}
+    r = subprocess.run([str(path_dir / "python3"), "-m", "languette", "doctor"], capture_output=True, text=True,
+                       env=env, cwd=home, timeout=60)
+    rows = [ln for ln in r.stdout.splitlines() if ln[2:].startswith("shell parser ")]
+    assert len(rows) == 1, f"one 'shell parser' row in:\n{r.stdout}{r.stderr}"
+    return rows[0][0], rows[0][2:][len("shell parser"):].strip()
+
+
+def marked(xfail):
+    return [pytest.mark.xfail(strict=True, reason=xfail)] if xfail else []
+
+
 def params():
     for name, (*_, xfail) in ENVS.items():
-        marks = [pytest.mark.xfail(strict=True, reason=xfail)] if xfail else []
-        yield pytest.param(name, id=name, marks=marks)
+        yield pytest.param(name, id=name, marks=marked(xfail))
+
+
+def doctor_params():
+    for name, (*_, xfail) in DOCTOR.items():
+        yield pytest.param(name, id=name, marks=marked(xfail))
 
 
 @pytest.mark.parametrize("env", list(params()))
@@ -130,3 +163,11 @@ def test_pip_row_has_its_parser(env, tmp_path):
     r = subprocess.run([str(d / "python3"), "-I", "-c", f"import {IMPORTS[env]}"], capture_output=True, text=True,
                        env={"PATH": str(d), "HOME": str(tmp_path)}, timeout=20)
     assert r.returncode == 0, f"{var} cannot import {IMPORTS[env]}: {r.stderr}"
+
+
+@pytest.mark.parametrize("env", list(doctor_params()))
+def test_doctor_names_the_parser_in_use(env, tmp_path):
+    tools, var, *_ = ENVS[env]
+    mark, pattern, _ = DOCTOR[env]
+    got_mark, text = run_doctor(make_path(tmp_path, tools, python_for(var)), tmp_path)
+    assert (got_mark, re.search(pattern, text) is not None) == (mark, True), f"{got_mark} {text}"
