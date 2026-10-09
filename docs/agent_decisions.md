@@ -311,3 +311,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t211657z
 - README install: planned platform blocks point at the epic #102, not per-rung issues, until those exist Undo: repoint each (planned: …) marker at its own issue ([#102](https://github.com/mark-brannan/languette/issues/102)) (no PR, branch claude/languette-epic-scope-48cff1)
+
+### 20261009t220047z
+- run.py: a --guard name no registered guard has is a deny, not a silent pass, so a hook entry left on a renamed guard fails closed Undo: drop the unknown-name check in _respond and its test ([#140](https://github.com/mark-brannan/languette/pull/140))
