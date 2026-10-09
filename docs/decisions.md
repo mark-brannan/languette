@@ -64,7 +64,7 @@ interface is; this file says who decided it and why, one line each.
   `guard-private-terms`; config keys follow, with underscores. The rest are
   renamed as reached.
 
-## Approved guard names: Solace, 2026-10-07 and 2026-10-09
+## Approved guard names
 
 - Only these names are approved. A new guard fits under one of them, or it
   is not approved.
