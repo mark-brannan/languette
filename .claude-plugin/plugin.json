@@ -175,7 +175,7 @@
     "prose_budget_commit": {
       "type": "boolean",
       "title": "Check staged prose against the repo's budgets before a commit",
-      "description": "Deny a git commit when the prose-budget engine (the prose_budget_command option) finds the staged diff over a repo's own budgets. A no-op where that engine isn't installed or the repo has no budgets config. Leave on unless you want staged prose through unchecked.",
+      "description": "Warn on a git commit, and let it run, when the prose-budget engine (the prose_budget_command option) finds the staged diff over a repo's own budgets; CI is the gate. A no-op where that engine isn't installed or the repo has no budgets config. Leave on unless you don't want the warning.",
       "default": true
     },
     "prose_budget_command": {

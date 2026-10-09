@@ -268,8 +268,8 @@ for beyond the command, it declares:
 | `guard-worktrees` | `$HOME` and what `git rev-parse --show-toplevel` resolves to; git, for where each path lands, and a record per session in `$TMPDIR` |
 | `prose-budget-commit` | the staged diff and, for a commit that reaches past the index, the named working-tree files, through `prose-budget` |
 
-A guard that cannot decide denies and says what it saw. A guard that crashes
-is a deny naming the guard; the runner holds that rule, so no guard has to.
+A guard that cannot decide denies and says what it saw (`prose-budget-commit`
+goes silent). A guard that crashes is a deny naming the guard; the runner holds that rule, so no guard has to.
 
 The contract is written as "[gherkin](https://en.wikipedia.org/wiki/Cucumber_(software)#Gherkin_language)" scenarios, in the words a person uses to state the
 rule.  These are still completely deterministic tests, they're just easy for non-technical folks to read.

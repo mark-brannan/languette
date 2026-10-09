@@ -1,16 +1,19 @@
 """prose-budget-commit: before a `git commit`, run the prose-budget engine and
-deny the commit on a finding, so documentation bloat is caught as it is
-written, not in CI. The spec is features/prose-budget-commit.feature.
+warn on a finding, so documentation bloat is caught as it is written. CI is
+the gate; this never blocks the commit. The spec is
+features/prose-budget-commit.feature.
 
 The engine is the command the prose_budget_command option names (an absolute
 path, a path relative to the commit's cwd, or a bare name on PATH), else
 `prose-budget` on PATH. Nothing is bundled: no engine is a no-op, as is an
 engine crash. `--staged` checks the index; a commit that reaches past it (-a,
 a pathspec, an `add` in the same command, -p, --pathspec-from-file) also runs
-`--file` on what it would commit. Exit 1 is a finding and denies; exit 2 (a bad
-budgets config, or an engine too old for --staged/--file) denies and says so.
+`--file` on what it would commit. Exit 1 is a finding and warns; exit 2 (a bad
+budgets config, or an engine too old for --staged/--file) warns and says so.
+Both checks' warnings arrive together: the commit is not blocked, so there is
+no retry to show the second.
 
-Fails closed on what it cannot resolve: a `cd`/`-C` target, a pathspec word, a
+Silent on what it cannot resolve: a `cd`/`-C` target, a pathspec word, a
 directory pathspec, a failed `diff`/`ls-files`, a second commit in a different
 directory. `yadm` is recognised as git's wrapper word, and is run only when
 the command named it.
@@ -20,7 +23,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Need, deny
+from languette.verdict import Need, context
 
 NAME = "prose-budget-commit"
 OPTION = "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"
@@ -31,12 +34,16 @@ GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 _ADD_QUIET = re.compile(r"-[nv]+\Z|--(?:dry-run|verbose)\Z")
 _VALUED = frozenset("-m --message -F --file -C --reuse-message -c --reedit-message --fixup --squash --author "
                     "--date --template".split())
-RETRY = "Fix the prose and retry the same commit: this is a mechanical length check, not a judgment call that " \
-        "needs anyone's sign-off."
+CI = "CI fails on this; fix before the push."
 
 
-def _deny(why):
-    return deny(f"Blocked by {NAME}: {why}")
+def _warn(why):
+    return f"{NAME}: {why}"
+
+
+def _done(notes):
+    """The warnings, joined, as a call that still runs; None when there are none."""
+    return context("\n\n".join(notes)) if notes else None
 
 
 def _join(base, step):
@@ -205,38 +212,32 @@ def check(payload, env):
     c = _Commits(cmd)
     if not c.seen:
         return None
-    if c.multi:
-        return _deny("this command commits in two different directories (or through both git and yadm), so the "
-                     "second commit's prose could not be checked against the right repository. Run the commits "
-                     "as separate commands.")
+    if c.multi:                         # one check cannot serve two repositories
+        return None
     d = cwd
     for step in (c.ccd, c.cdir):
         if not step:
             continue
         new = paths.lexical(step if step.startswith("/") else d + "/" + step)
         if not ((yield Need("path", "isdir", d)) and (yield Need("path", "isdir", new))):
-            return _deny(f'this commit\'s working directory ("{step}") could not be resolved, so staged prose '
-                         "could not be checked. Run the commit from a plain, resolvable path.")
+            return None
         d = new
     if c.bad:
-        return _deny("this commit's pathspec could not be resolved (an unexpanded variable, or a quoted path with "
-                     "spaces), so the unstaged prose it commits could not be checked. Spell the path plainly and "
-                     "retry.")
+        return None
     for p in c.paths:
         if p and (yield Need("path", "isdir", p if p.startswith("/") else d + "/" + p)):
-            return _deny(f'"{p}" is a directory; this guard does not expand a directory pathspec into the files '
-                         "under it. Name the files directly, or stage/commit by pattern (git add -A, git add ., "
-                         "git commit -a) so the check widens instead.")
+            return None                 # this guard does not expand a directory pathspec
 
+    notes = []
     found = yield from _run_engine(engine, d, ["--staged"])
     if found is not None:
         rc, out = found
         if rc == 1:
-            return _deny(f"prose-budget --staged found:\n{out}\n{RETRY}")
-        if rc == 2:
-            return _deny("prose-budget --staged could not check the staged prose (exit 2: a bad budgets config, or "
-                         f"an engine too old for --staged):\n{out}\nFix the config or update the engine, then "
-                         "retry the commit.")
+            notes.append(_warn(f"prose-budget --staged found:\n{out}\n{CI}"))
+        elif rc == 2:
+            notes.append(_warn("prose-budget --staged could not check the staged prose (exit 2: a bad budgets "
+                               f"config, or an engine too old for --staged):\n{out}\nA bad config fails CI too; "
+                               "fix it, or update the engine, before the push."))
 
     files = list(c.paths)
     if c.allflag or c.allnew:
@@ -245,49 +246,42 @@ def check(payload, env):
         # which CLI it names is trusted, found fresh on PATH.
         binary = yield Need("which", "yadm" if re.search(r"(?:^|/)yadm\Z", c.cbin) else "git")
         if not binary:
-            return _deny("neither git nor yadm could be found on PATH, so this commit's unstaged changes outside "
-                         "the staged index could not be checked. Fix PATH, then retry the commit.")
+            return _done(notes)
         try:
-            rc, out, err = yield Need("run", d, GIT_TIMEOUT, binary, "rev-parse", "--show-toplevel")
-        except Exception as e:  # noqa: BLE001
-            rc, out, err = None, "", str(e)
+            rc, out, _ = yield Need("run", d, GIT_TIMEOUT, binary, "rev-parse", "--show-toplevel")
+        except Exception:  # noqa: BLE001
+            rc, out = None, ""
         if rc != 0:
-            return _deny(f'"{binary} rev-parse --show-toplevel" failed (exit {rc}), so this commit\'s unstaged '
-                         f"changes could not be checked:\n{(out + err).rstrip()}\nFix whatever made that fail, "
-                         "then retry the commit.")
+            return _done(notes)
         root = out.rstrip("\n")
         listings = []
         if c.allflag:
-            listings.append(("unstaged tracked changes", ["diff", "-z", "--name-only", "--diff-filter=d"]))
+            listings.append(["diff", "-z", "--name-only", "--diff-filter=d"])          # unstaged tracked changes
         if c.allnew:
-            listings.append(("new untracked files", ["ls-files", "-z", "--others", "--exclude-standard"]))
-        for what, argv in listings:
+            listings.append(["ls-files", "-z", "--others", "--exclude-standard"])      # new untracked files
+        for argv in listings:
             try:
-                rc, out, err = yield Need("run", root, GIT_TIMEOUT, binary, *argv)
-            except Exception as e:  # noqa: BLE001
-                rc, out, err = None, "", str(e)
-            if rc != 0:
-                return _deny(f'"{binary} {" ".join(argv)}" could not list this commit\'s {what} (exit {rc}), so '
-                             f"they could not be checked:\n{err}\nFix whatever made that fail, then retry the commit.")
-            if "\n" in out:
-                return _deny(f"one of this commit's {what} has a newline in its name, which cannot reach "
-                             "prose-budget intact, so it could not be checked. Rename it, then retry the commit.")
+                rc, out, _ = yield Need("run", root, GIT_TIMEOUT, binary, *argv)
+            except Exception:  # noqa: BLE001
+                rc, out = None, ""
+            if rc != 0 or "\n" in out:    # a failed listing, or a name with a newline that cannot reach the engine
+                return _done(notes)
             files += [root + "/" + f for f in out.split("\0") if f]
     files = ["./" + f if f.startswith("-") else f for f in files if f]
     if not files:
-        return None
+        return _done(notes)
     found = yield from _run_engine(engine, d, ["--file", *files])
     if found is not None:
         rc, out = found
         if rc == 1:
-            return _deny("this commit reaches prose outside the staged index (git commit -a/--all, a pathspec "
-                         "commit, or a git add in the same command) -- checked those files directly and "
-                         f"prose-budget found:\n{out}\n{RETRY}")
-        if rc == 2:
-            return _deny("prose-budget --file could not check those files (exit 2: a bad budgets config, or an "
-                         f"engine too old for --file):\n{out}\nFix the config or update the engine, then retry the "
-                         "commit.")
-    return None
+            notes.append(_warn("this commit reaches prose outside the staged index (git commit -a/--all, a pathspec "
+                               "commit, or a git add in the same command) -- checked those files directly and "
+                               f"prose-budget found:\n{out}\n{CI}"))
+        elif rc == 2:
+            notes.append(_warn("prose-budget --file could not check those files (exit 2: a bad budgets config, or "
+                               f"an engine too old for --file):\n{out}\nA bad config fails CI too; fix it, or "
+                               "update the engine, before the push."))
+    return _done(notes)
 
 
 def _run_engine(engine, d, args):
