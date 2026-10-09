@@ -21,7 +21,8 @@ class Need:
         gh-api        path                -> (status, body), or (None, None)
         pr-list       cwd, *argv          -> stdout of argv run in cwd, stripped, or None
         which         name                -> the program's path on the env's PATH, or None
-        read          path                -> the file's text
+        read          path, limit=None    -> the regular file's text, opened non-blocking; ValueError
+                                             when it is not regular or past limit bytes
         path          op, path            -> os.path.<op>(path): isdir, isfile, islink, exists,
                                              lexists, realpath; or executable
         cwd                               -> the hook process's own directory

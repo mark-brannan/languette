@@ -37,10 +37,9 @@ command.
 import json
 import os
 import re
-import stat
 
 from languette import scan as sw
-from languette.verdict import Refuse, deny
+from languette.verdict import Need, Refuse, deny
 
 NAME = "guard-bypass-labels"
 OPTION = "CLAUDE_PLUGIN_OPTION_BYPASS_LABELS"
@@ -92,10 +91,13 @@ def _split(v):
 
 class _Found:
     """What a command or call applies: label names, and the reasons some
-    label could not be read."""
+    label could not be read. `files` is what the runner read so far, path ->
+    text or the Refuse it came to; a path the walk needs and `files` lacks
+    goes on `wanted`, for check to ask for and walk the command again."""
 
-    def __init__(self):
+    def __init__(self, files):
         self.labels, self.unseen = [], []
+        self.files, self.wanted = files, []
 
     def value(self, v, live, what="the label"):
         if live:
@@ -127,9 +129,10 @@ def _wv(s, i):
 
 
 def _read(path, ctx):
-    """The text of the file `path` names, as the shell will open it; raises
-    Refuse, with what is wrong with the path, when the guard cannot open the
-    same file, or when another command in the call could rewrite it first."""
+    """The text of the file `path` names, as the shell will open it and the
+    runner read it (ctx's files); raises Refuse, with what is wrong with the
+    path, when the guard cannot have the same file, or when another command in
+    the call could rewrite it first."""
     cwd, env, moved = ctx["cwd"], ctx["env"], ctx["moved"]
     if not ctx["alone"]:
         raise Refuse("is read at hook time, and another command in the same call could rewrite it before gh "
@@ -143,22 +146,26 @@ def _read(path, ctx):
         if moved or not (isinstance(cwd, str) and os.path.isabs(cwd)):
             raise Refuse("is a relative path, and the guard cannot tell where the command stands")
         p = os.path.join(cwd, p)
+    if p not in ctx["files"]:
+        ctx["wanted"].append(p)
+        raise Refuse("is not read yet")        # check asks for it and walks the command again
+    got = ctx["files"][p]
+    if isinstance(got, Refuse):
+        raise Refuse(str(got))
+    return got
+
+
+def _fetch(p):
+    """The text of the file `p`, as the runner reads it, or the Refuse it
+    comes to."""
     try:
-        # Non-blocking, so a FIFO cannot stall the hook into its timeout.
-        fd = os.open(p, os.O_RDONLY | os.O_NONBLOCK)
-    except OSError as e:
-        raise Refuse(f"cannot be read ({e.strerror or e})")
-    if not stat.S_ISREG(os.fstat(fd).st_mode):
-        os.close(fd)
-        raise Refuse("is not a regular file")
-    with os.fdopen(fd, "rb") as f:
-        data = f.read(MAX_READ + 1)
-    if len(data) > MAX_READ:
-        raise Refuse(f"is over {MAX_READ} bytes")
-    try:
-        return data.decode("utf-8")
+        return (yield Need("read", p, MAX_READ))
     except UnicodeDecodeError as e:
-        raise Refuse(f"cannot be read ({e})")
+        return Refuse(f"cannot be read ({e})")
+    except OSError as e:
+        return Refuse(f"cannot be read ({e.strerror or e})")
+    except ValueError as e:                    # not a regular file, or past MAX_READ
+        return Refuse(str(e))
 
 
 def _payloads(src, live, ctx):
@@ -375,7 +382,7 @@ def _bash(f, cmd, cwd, env, depth=0, alone=True):
     texts = sw.texts_of(text)
     scans = [(sw.Scan(t), nested) for t, nested in texts]
     bodies = sw.heredocs(cmd + "\n")
-    ctx = {"cwd": cwd, "env": env, "bodies": bodies,
+    ctx = {"cwd": cwd, "env": env, "bodies": bodies, "files": f.files, "wanted": f.wanted,
            "moved": any(k == "w" and w in ("cd", "pushd", "popd") for s, _ in scans for k, w in zip(s.k, s.w)),
            "alone": alone and _alone(scans)}
     for s, nested in scans:
@@ -429,12 +436,21 @@ def _mcp(f, v, any_string, depth=0):
 def check(payload, env=os.environ):
     tool = payload.get("tool_name")
     inp = payload.get("tool_input")
-    f = _Found()
+    f = _Found({})
     if tool == "Bash":
         cmd = inp.get("command") if isinstance(inp, dict) else None
         if not isinstance(cmd, str) or not cmd.strip():
             return None
-        _bash(f, cmd, payload.get("cwd"), env)
+        # The walk is pure: each pass asks for the files the last one could
+        # not read, until a pass reads nothing new.
+        while True:
+            _bash(f, cmd, payload.get("cwd"), env)
+            new = [p for p in dict.fromkeys(f.wanted) if p not in f.files]
+            if not new:
+                break
+            for p in new:
+                f.files[p] = yield from _fetch(p)
+            f = _Found(f.files)
     elif isinstance(tool, str) and tool.startswith("mcp__"):
         if not isinstance(inp, dict) or _reads(tool):
             return None
