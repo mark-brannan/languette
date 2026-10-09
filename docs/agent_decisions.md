@@ -176,3 +176,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t023957z
 - HEAD's purity escapes kept as a shrink-only KNOWN list so the PR stays test-only Undo: delete KNOWN once they are Needs ([#111](https://github.com/mark-brannan/languette/pull/111))
+
+### 20261009t024221z
+- The purity check also walks the languette modules the guards import, beyond the design doc's guards and the verdict Undo: drop _pure()'s import walk ([#111](https://github.com/mark-brannan/languette/pull/111))
