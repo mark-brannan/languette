@@ -78,3 +78,10 @@ interface is; this file says who decided it and why, one line each.
 - A guard splits into plan and judge when its questions are known after
   the parse.
 - Design: [docs/design/guard-pipeline.md](design/guard-pipeline.md).
+
+## Gather reads only: Solace, 2026-10-09
+
+- No Need writes, runs a host-named program, or reads another workflow's
+  state. Scar: #107.
+- Whether `prose-budget-commit` keeps running the engine `prose_budget_bin`
+  names is unruled.

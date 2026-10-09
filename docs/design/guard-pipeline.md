@@ -25,7 +25,9 @@ the disk, the network, the clock and other programs into two narrow steps.
 - **\*Parse** is pure in effect: the parser ladder runs `shfmt` and `bash -n`
   as programs. It is the one named exception.
 - **Gather** fetches only what plan listed: no speculative reads, no `gh api`
-  on a command that never names a repo.
+  on a command that never names a repo. It reads only: a Need writes
+  nothing, runs no program a setting or env var names, and reads no other
+  workflow's state.
 - **Act** holds every write: spending an approval, saving the ruleset cache,
   and the simple metrics. It runs at two moments: after the verdict, and
   after the call, for a write that must wait until the command has run
