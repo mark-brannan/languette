@@ -224,3 +224,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t070920z
 - guard-review-threads reads a thread's last 100 comments; a longer thread's earlier comments go unread Undo: page comments backwards in _thread ([#118](https://github.com/mark-brannan/languette/pull/118))
+
+### 20261009t070923z
+- guard-review-threads does not see a resolve whose query it cannot read (a variable, @file); the gap is named in the feature Undo: deny any gh api graphql call whose query is unreadable and that names a PRRT_ id ([#118](https://github.com/mark-brannan/languette/pull/118))
