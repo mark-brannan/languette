@@ -211,6 +211,15 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 
 Without a terms file the guard is off.
 
+### Settings for `guard-host-availability`
+
+| Setting | Holds | Example |
+|---|---|---|
+| `protected_services` | services an agent may not stop, restart or kill, comma-separated; `*` globs, `.service` optional | `postgresql@*,wireguard` |
+
+They add to the built-in list (ssh, login, dbus, the network, the display
+manager) and never replace it. Empty changes nothing.
+
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
 comma-separated; empty means `churn-ok,mixed-loops-ok`.
 

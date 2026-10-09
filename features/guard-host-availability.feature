@@ -98,3 +98,31 @@ Feature: guard-host-availability
       | systemctl stop nginx                             | not a service the session runs on              |
       | systemctl restart myapp.service                  | not a service the session runs on              |
       | systemctl disable sshd                           | disable without --now stops nothing            |
+
+  Scenario Outline: a service named in protected_services is denied like a built-in one
+    Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "<setting>"
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | command                                      | setting                   |
+      | systemctl stop postgresql                    | postgresql                |
+      | systemctl stop postgresql.service            | postgresql                |
+      | systemctl stop postgresql                    | nginx, postgresql.service |
+      | systemctl restart postgresql@16-main.service | postgresql@*              |
+      | systemctl stop sshd                          | postgresql                |
+
+  Scenario Outline: without a match in protected_services, a stop is the agent's
+    Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "<setting>"
+    When the agent runs `<command>`
+    Then the guard is silent
+
+    Examples:
+      | command                     | setting    |
+      | systemctl stop postgresql   |            |
+      | systemctl stop nginx        | postgresql |
+      | systemctl status postgresql | postgresql |
+
+  Scenario: with protected_services unset, a stop of a non-session service is silent
+    When the agent runs `systemctl stop postgresql`
+    Then the guard is silent

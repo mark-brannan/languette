@@ -153,6 +153,12 @@
       "description": "Repos whose issue and PR text is never scanned, as owner/name, comma-separated. Empty by default: every repo is scanned.",
       "required": false
     },
+    "protected_services": {
+      "type": "string",
+      "title": "Protected services",
+      "description": "Services your machine depends on, which an agent may not stop, restart or kill with systemctl: unit names, comma-separated, a trailing .service optional, * globs allowed. Added to the built-in list (ssh, login, dbus, the network, the display manager); never replaces it. Empty by default.",
+      "required": false
+    },
     "guard_cross_session_send": {
       "type": "boolean",
       "title": "Check messages to your other sessions",

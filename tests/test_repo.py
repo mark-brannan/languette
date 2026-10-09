@@ -24,7 +24,7 @@ GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-ba
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"guard_worktrees"}
 # Options that are not a guard's on/off toggle: name -> type.
-OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string",
+OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "protected_services": "string", "bypass_labels": "string",
                  "prose_budget_command": "string",
                  "record_decisions": "boolean", "record_raw_commands": "boolean"}
 # Per-rule switches inside one guard: boolean, on by default.
