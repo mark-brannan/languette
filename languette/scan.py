@@ -182,7 +182,8 @@ class TooBig(Unparseable):
 
 class TooMany(TooBig):
     """The text holds more nested shell strings than texts_of reads
-    (NESTED_CAP): one past the cap could be the one that runs."""
+    (NESTED_CAP texts, the command itself among them): one past the cap
+    could be the one that runs."""
 
 
 LENGTH_MAX = 64 * 1024                         # bytes
@@ -837,7 +838,7 @@ def texts_of(text, prose=PROSE):
 
     def add(t):
         if len(out) >= NESTED_CAP:
-            raise TooMany(f"it holds more than {NESTED_CAP} nested shell strings", "limit")
+            raise TooMany(f"it holds more than {NESTED_CAP - 1} nested shell strings", "limit")
         out.append((t, True))
     x = 0
     while x < len(out):

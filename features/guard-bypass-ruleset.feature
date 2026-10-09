@@ -292,7 +292,7 @@ Feature: guard-bypass-ruleset
       | ! cd {TMP}/m; git push origin HEAD                        | after !, which only negates the status |
       | if cd {TMP}/m; then git push origin HEAD; fi              | the if's own condition   |
 
-  Scenario Outline: past fi or done, a cd inside an if or a loop leaves the directory unknown
+  Scenario Outline: past fi, done or esac, a cd inside an if, a loop or a case leaves the directory unknown
     Given a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
     And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
     And the working directory is "{TMP}/repo"
@@ -305,6 +305,9 @@ Feature: guard-bypass-ruleset
       | for d in {TMP}/m; do cd $d; done; git push origin HEAD    | the loop may run the cd any number of times |
       | while true; do cd {TMP}/m; break; done; git push origin HEAD | a while loop                       |
       | for d in a b; do git push origin HEAD; cd {TMP}/m; done   | a later pass runs the push after the cd |
+      | case x in x) cd {TMP}/m;; esac; git push origin HEAD      | a case arm that ran                   |
+      | case x in y) cd {TMP}/m;; esac; git push origin HEAD      | a case arm that did not run           |
+      | case x in x) cd {TMP}/m; git push origin HEAD;; esac      | a push in the arm itself              |
 
   Scenario Outline: a cd in a then branch never lends its directory to the else or elif after it
     Given a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"

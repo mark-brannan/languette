@@ -123,10 +123,10 @@ Feature: guard-unparsable
       | echo {}{}      | 14  | bytes, over the limit of 65,536           | 98 KB of plain words                 |
 
   Scenario Outline: a command with more nested shell strings than the guards read is denied
-    # The guards read the command and 64 strings in it that may run as shell;
+    # The guards read the command and 63 strings in it that may run as shell;
     # one past that could be the rm -rf, so the cap denies rather than skip it.
     When the agent runs `<head>`, `<filler>` <n> times, then `<tail>`
-    Then the guard denies, naming "more than 64 nested shell strings"
+    Then the guard denies, naming "more than 63 nested shell strings"
 
     Examples:
       | head         | filler    | n  | tail                  | note                                   |
@@ -138,7 +138,7 @@ Feature: guard-unparsable
     # Each level is read again inside the one around it, so the count grows
     # faster than the depth: 6 deep is 29 to 47 strings, 7 deep 42 or past the cap.
     When the agent nests `echo "$({})"` 8 deep
-    Then the guard denies, naming "more than 64 nested shell strings"
+    Then the guard denies, naming "more than 63 nested shell strings"
 
   Scenario: a command at the cap reads as usual
     When the agent runs `eval`, `"true x"` 63 times, then `true`
