@@ -163,6 +163,22 @@ Feature: guard-duplicate-pr
       """
     Then the guard denies, naming "PR #120"
 
+  Scenario: a body file this command rewrites from a heredoc is judged by the heredoc, not the stale file
+    Given GH_TIMELINE is "open-pr"
+    And a project directory
+    And the file "pr.md" holds:
+      """
+      An earlier body, closing nothing.
+      """
+    When the agent runs:
+      """
+      cat > {PROJ}/pr.md <<'EOF'
+      Closes #114
+      EOF
+      gh pr create -R o/r -t t -F {PROJ}/pr.md
+      """
+    Then the guard denies, naming "PR #120"
+
   Scenario Outline: the MCP create_pull_request is judged the same
     Given GH_TIMELINE is "open-pr"
     When the agent calls MCP tool "<tool>" with input `<input>`

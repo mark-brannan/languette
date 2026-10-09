@@ -238,6 +238,8 @@ def _body(post, cwd, cd, docs, fed, env):
                              "it cannot be checked. Put the text in a heredoc in the same command, or in a file and "
                              "pass --body-file <path>.")
             text += "".join(body + "\n" for body, _ in docs)
+        elif v in fed:                         # this command writes it from a heredoc: that text, not the file's
+            text += "".join(body + "\n" for body, _ in docs)
         else:
             p = v
             if p == "~" or p.startswith("~/"):
@@ -247,9 +249,6 @@ def _body(post, cwd, cd, docs, fed, env):
             got = Refuse("is a relative path after a cd, and the guard cannot tell where the command stands") \
                 if p is None else (yield from _fetch(p))
             if isinstance(got, Refuse):
-                if v in fed:                   # written from a heredoc in this same command
-                    text += "".join(body + "\n" for body, _ in docs)
-                    continue
                 return _deny(f"--body-file {v} {got}, so the body cannot be checked for an issue it closes. Write "
                              "it to that path from a heredoc in this same command, or create the file in an "
                              "earlier command and retry; spell the path out, since a variable set in an earlier "
