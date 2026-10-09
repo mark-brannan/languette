@@ -215,3 +215,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t070910z
 - guard-review-threads denies when GitHub cannot be read, where guard-git-stacked-base and guard-bypass-ruleset ask: a thread left open costs a click, one closed unread hides a finding Undo: return ask() instead of deny() in check()'s unreadable branch and its scenario ([#118](https://github.com/mark-brannan/languette/pull/118))
+
+### 20261009t070913z
+- guard-review-threads counts a sha only when its 7 to 40 hex characters hold a digit and a letter, so a number or a word like 'effaced' is not a commit Undo: drop the two lookaheads in SHA and the two scenario rows ([#118](https://github.com/mark-brannan/languette/pull/118))
