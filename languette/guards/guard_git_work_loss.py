@@ -24,7 +24,7 @@ from languette.verdict import Refuse, deny
 
 NAME = "guard-git-work-loss"
 GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
-GLOBAL_VALUE = frozenset("-C -c --git-dir --work-tree --namespace".split())
+GLOBAL_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
 RULE = {"add": "BLANKET_STAGING", "commit": "BLANKET_STAGING", "stash": "STASH", "push": "FORCE_PUSH",
         "checkout": "DISCARD", "restore": "DISCARD", "clean": "DISCARD", "reset": "DISCARD",
         "branch": "BRANCH_DELETE"}
