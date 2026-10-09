@@ -41,7 +41,7 @@ import os
 import re
 
 from languette import scan as sw
-from languette.verdict import Need, Refuse, deny
+from languette.verdict import Act, Need, Refuse, deny
 
 NAME = "guard-worktrees"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES"
@@ -328,7 +328,7 @@ class _Session:
     def leave(self, text):
         """What the next call may adopt as its own: `enter`, or the arrivals."""
         if self.rec:
-            yield Need("worktree", "leave", self.rec, text)
+            yield Act("worktree-leave", self.rec, text)
 
     def arrive(self, own_linked):
         """Record the cwd's toplevel when this call reached it by a vouched
@@ -340,7 +340,7 @@ class _Session:
             self.rec = None
             return
         if adopt and own_linked and not self.under_scratch(self.own_top) and not (yield from self.recorded(self.own_top)):
-            yield Need("worktree", "keep", self.rec, self.own_top)
+            yield Act("worktree-keep", self.rec, self.own_top)
 
     def scratchpad(self):
         d = (yield Need("worktree", "scratchpad", self.sid)) if self.sid else None
