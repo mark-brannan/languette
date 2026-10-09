@@ -112,3 +112,11 @@ interface is; this file says who decided it and why, one line each.
   change them, or merge them into one guard.
 - These name what happens, outside the `guard-<concept>` scheme. The
   suffix `-first` is not reserved.
+
+## License and versions: Solace, 2026-10-08 and 2026-10-09
+
+- Code is AGPL-3.0-or-later and prose is CC BY-SA 4.0 ("AGPL + CC SA for
+  writing").
+- The first release is 0.0.1, carrying `languette doctor`.
+- Every release bumps the patch number only, until Solace says otherwise. No
+  semver; a review that asks for a minor or major bump is out of scope.
