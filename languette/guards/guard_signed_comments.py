@@ -30,7 +30,8 @@ FIRST = "🤖 "
 SIGNATURE = re.compile(r"🤖 \S+ · (?:low|medium|high|-) · [0-9a-f]{8}")
 _MUTATION = re.compile(r"\b(?:addComment|addPullRequestReviewComment|addPullRequestReviewThreadReply|"
                        r"addPullRequestReview|submitPullRequestReview|updateIssueComment|"
-                       r"updatePullRequestReviewComment|updatePullRequestReview)\b")
+                       r"updatePullRequestReviewComment|updatePullRequestReview|addDiscussionComment|"
+                       r"updateDiscussionComment)\b")
 _COMMENTS = re.compile(r"(?:^|/)(?:comments|reviews)(?:/|\Z)")
 _SKIP_VALUE = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 _FROM_DOC = re.compile(r"\$\(\s*cat\s+(?:-\s+)?HEREDOC(\d+)\s*\)")
@@ -100,8 +101,14 @@ class _Read:
         m = _VAR.match(v)
         if m:
             name = m.group(1) or m.group(2)
-            fed = re.search(r"(?:^|[\s;&|(])" + name + r"""=["']?\$\(\s*cat\s+(?:-\s+)?HEREDOC(\d+)\s*\)""", self.text)
-            if m.end() == len(v) and fed:
+            # A shell assignment, not a gh field (-f NAME=...) of the same name.
+            sets = [a for a in re.finditer(r"(?:^|[\s;&|(])" + name + "=", self.text)
+                    if not re.search(r"(?:-[fF]|--field|--raw-field)\s*\Z", self.text[:a.start() + 1])]
+            fed = re.compile(r"""["']?\$\(\s*cat\s+(?:-\s+)?HEREDOC(\d+)\s*\)""").match(self.text, sets[0].end()) \
+                if len(sets) == 1 else None
+            use = re.search(r"\$\{?" + name + r"\b", self.text)
+            # Only one assignment, and it comes before the body is used: a second could replace it.
+            if m.end() == len(v) and fed and use and sets[0].end() <= use.start():
                 return self.doc(int(fed.group(1)))
             return ("opaque", f"the body is built at run time ({_short(v)})")
         return ("text", v)
@@ -123,9 +130,12 @@ class _Read:
         if s.w[g + 1] == "api":
             self.api(g, hi)
             return
-        if g + 2 > hi or (s.w[g + 1], s.w[g + 2]) not in (("pr", "comment"), ("issue", "comment"), ("pr", "review")):
+        v = g + 2                          # -R/--repo may come before the verb
+        while v <= hi and (self.wv(v) in ("-R", "--repo") or re.match(r"--repo=|-R.", self.wv(v))):
+            v += 2 if self.wv(v) in ("-R", "--repo") else 1
+        if v > hi or (s.w[g + 1], self.wv(v)) not in (("pr", "comment"), ("issue", "comment"), ("pr", "review")):
             return
-        bodies, i = [], g + 3
+        bodies, i = [], v + 1
         while i <= hi:
             t, live = self.wv(i), s.live[i]
             if t in ("--body", "-b") and i < hi:
@@ -178,6 +188,7 @@ class _Read:
                 path = t
             i += 1
         p = re.sub(r"^/+", "", re.sub(r"^https?://[^/]+/", "", path, count=1), count=1)
+        p = re.split(r"[?#]", p, maxsplit=1)[0]
         if p == "graphql":
             query = next((src for key, src in fields if key == "query"), None)
             if query is not None or inp is not None:
@@ -312,7 +323,10 @@ def check(payload, env):
             try:
                 query = yield from text(qsrc)
             except _Unread:
-                return []              # a query it cannot read is not known to post, as guard-private-terms reads it
+                # Not known to post, unless a body travels with it: then the signature is unchecked.
+                if inp is None and not any(k == "body" or k.endswith("[body]") for k in fields):
+                    return []
+                raise
         if not isinstance(query, str) or not _MUTATION.search(query):
             return []
         out = []

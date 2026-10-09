@@ -96,6 +96,11 @@ Feature: guard-signed-comments
         | gh api graphql -f query='mutation($b:String!){ addComment(input:{subjectId:"S", body:$b}) { clientMutationId } }' -f b=Done  |
         | sh -c 'gh pr comment 1 -b "Done"'                                                                                           |
         | cd ~/project && gh pr comment 1 -b Done                                                                                     |
+        | gh pr -R o/r comment 1 -b Done                                                                                              |
+        | gh issue --repo=o/r comment 3 -b Done                                                                                       |
+        | gh api -X POST "repos/o/r/issues/1/comments?x=1" -f body=Done                                                               |
+        | gh api graphql -f query='mutation { addDiscussionComment(input:{discussionId:"D", body:"Done"}) { clientMutationId } }'     |
+        | gh api graphql -f query='mutation { updateDiscussionComment(input:{commentId:"C", body:"Done"}) { clientMutationId } }'     |
 
     Scenario Outline: the reason says which line is wrong
       When the agent runs `gh pr comment 1 -b "<body>"`
@@ -191,7 +196,22 @@ Feature: guard-signed-comments
         | gh pr comment 1 --body-file {HOME}/no-such-reply.md            |
         | echo Done \| gh pr comment 1 -F -                              |
         | gh api repos/o/r/issues/1/comments -f body="$(cat reply.md)"   |
+        | gh api graphql -f query="$q" -f body=Done                      |
         | gh api graphql -f query='mutation { addComment(input:$in) { clientMutationId } }' -F in=@x.json |
+
+    Scenario: a variable assigned twice, or after its use, cannot be read
+      When the agent runs:
+        """
+        b=$(cat <<'EOF'
+        🤖 Fixed.
+
+        🤖 claude-opus-5-5 · high · 5a74df74
+        EOF
+        )
+        b="Replacement is the intent"
+        gh pr comment 1 -b "$b"
+        """
+      Then the guard denies, naming "heredoc"
 
   Rule: what is not a comment is silent
 
@@ -213,6 +233,7 @@ Feature: guard-signed-comments
         | gh api -X PATCH repos/o/r/pulls/1 -f body="Replacement is the intent"                                           |
         | gh api repos/o/r/issues/comments/5/reactions -f content=+1                                                      |
         | gh api graphql -f query='query { viewer { login } }'                                                            |
+        | gh api graphql -f query="$q"                                                                                    |
         | gh api graphql -f query='mutation { resolveReviewThread(input:{threadId:"T"}) { thread { isResolved } } }'      |
         | gh api graphql -f query='mutation { submitPullRequestReview(input:{pullRequestReviewId:"R", event:APPROVE}) { clientMutationId } }' |
         | git commit -m "gh pr comment 1 -b Done"                                                                         |
