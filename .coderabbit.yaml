@@ -1,7 +1,7 @@
 # CodeRabbit config. The GitHub App needs a one-time install; this file only
-# tunes it. The prose rules below are a digest of rules/writing.md in this
-# repo; CodeRabbit cannot read ~/.claude, so the digest is inline. Change the
-# rule there first.
+# tunes it. The prose rules below are a digest of rules/writing.md in
+# mark-brannan/claude; CodeRabbit cannot read ~/.claude, so the digest is
+# inline. Change the rule there first.
 
 language: en-US
 
