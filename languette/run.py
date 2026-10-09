@@ -19,6 +19,14 @@ I/O, and throws world's exception into the guard when the fact can't be had.
 A write it wants it yields as a languette.verdict.Act: the runner sends None
 back, and does every Act through world once the verdict is out.
 A guard whose check returns a finding directly needs no change.
+
+A guard whose questions are all known once the command is parsed has no
+check: parse(payload, env) reads the command, plan(parsed) lists every Need,
+the runner answers them all, and judge(parsed, answers) gets the answers keyed
+by Need, with an exception in place of a fact world could not have.
+Such a guard sees the payload with the hook process's own directory as its
+cwd when it has no absolute one, filled before any guard runs; the others see
+the payload as sent.
 """
 
 import inspect
@@ -44,7 +52,7 @@ try:
                                   guard_recursive_delete, guard_scheduled_jobs, guard_secrets, guard_unparsable,
                                   guard_worktrees, prose_budget_commit)
     from languette import record
-    from languette.verdict import Act, allow, ask, context, deny
+    from languette.verdict import Act, Need, allow, ask, context, deny
     from languette.world import ACTS, World
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
@@ -106,6 +114,29 @@ def _drive(r, world, acts):
             answer, err = None, e
 
 
+def _plan_judge(g, payload, env, world):
+    """A plan / judge guard's finding: every Need it plans, answered, then judged once."""
+    parsed = g.parse(payload, env)
+    answers = {}
+    for need in g.plan(parsed):
+        try:
+            answers[need] = world.answer(need)
+        except Exception as e:  # noqa: BLE001 -- judge decides what a missing fact means
+            answers[need] = e
+    return g.judge(parsed, answers)
+
+
+def _with_cwd(payload, world):
+    """`payload`, with the hook process's directory as its cwd when it has no absolute one."""
+    cwd = payload.get("cwd")
+    if isinstance(cwd, str) and cwd.startswith("/"):
+        return payload
+    try:
+        return {**payload, "cwd": world.answer(Need("cwd"))}
+    except Exception:  # noqa: BLE001 -- each guard says what a missing cwd means
+        return payload
+
+
 def respond(stdin_text, env, only=None):
     """The hook's whole stdout for one payload: "" (no objection) or one
     JSON line. `env` is what the guards read in place of os.environ. The
@@ -164,11 +195,17 @@ def _respond(stdin_text, env, only):
         if judged_once and judged_once[0]:
             guards = [g for g in guards if g is guard_unparsable]
     world = World(env, payload)
+    filled = _with_cwd(payload, world) if any(hasattr(g, "plan") for g in guards) else payload
     reasons, asks, notes, rewrites, findings, acts = [], [], [], [], [], []
     for g in guards:
         crashed = False
         try:
-            r = judged_once[0] if judged_once and g is guard_unparsable else _drive(g.check(payload, env), world, acts)
+            if judged_once and g is guard_unparsable:
+                r = judged_once[0]
+            elif hasattr(g, "plan"):
+                r = _plan_judge(g, filled, env, world)
+            else:
+                r = _drive(g.check(payload, env), world, acts)
         except Exception as e:  # noqa: BLE001
             r, crashed = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
         findings.append((g.NAME, r, crashed))
