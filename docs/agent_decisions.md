@@ -221,3 +221,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t070917z
 - guard-review-threads also counts an author GitHub's GraphQL types as Bot, since GraphQL gives bot logins without the [bot] suffix Undo: drop the __typename test in _bot and its row ([#118](https://github.com/mark-brannan/languette/pull/118))
+
+### 20261009t070920z
+- guard-review-threads reads a thread's last 100 comments; a longer thread's earlier comments go unread Undo: page comments backwards in _thread ([#118](https://github.com/mark-brannan/languette/pull/118))
