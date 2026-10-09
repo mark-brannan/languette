@@ -5,6 +5,9 @@ The doctor reads settings and runs programs, so it sits outside the pure
 steps of the guard pipeline (docs/design/guard-pipeline.md): no guard imports
 it. It writes nothing. The canary sends `rm -rf ~` to the installed hook as a
 JSON payload, the way Claude Code would; nothing here ever runs that command.
+Only trusted hooks get the canary: the plugin's own hooks.json and by-hand
+entries in the user's ~/.claude/settings.json. A project's settings arrive
+with whatever was checked out, so their hooks are counted, never run.
 Anything it cannot read, or reads in a shape it does not know, is a ! row,
 never a traceback. Standard library only.
 """
@@ -244,8 +247,9 @@ def check(cwd):
     except Unreadable as e:
         inst, problem = None, str(e)
 
-    canary_hook, env, limit, guard_off = None, None, HOOK_TIMEOUT, False
-    base_env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE_PLUGIN_OPTION_")}
+    canary_hook, env, limit, not_run = None, None, HOOK_TIMEOUT, None
+    # The canary's environment is an allowlist, not the doctor's own.
+    base_env = {k: os.environ[k] for k in ("PATH", "HOME", "TMPDIR") if k in os.environ}
     if inst:
         where = f"plugin {_version(inst)}, {inst.get('scope', '?')} scope"
         root = str(inst.get("installPath") or "")
@@ -281,7 +285,11 @@ def check(cwd):
                 off = sorted(k for k, g in found.items() if not is_on(g, options.get(k)))
                 rows.append((OK, "Claude Code", f"{where}; {len(found) - len(off)} guards on, {len(off)} off"
                                                 + (f": {', '.join(off)}" if off else "")))
-        guard_off = not is_on("=", options.get(CANARY_GUARD.replace("-", "_")))
+        key = CANARY_GUARD.replace("-", "_")
+        if inst.get("enabled") is False:
+            not_run = "the plugin is disabled, so its hooks do not run; the canary did not run"
+        elif not is_on(found.get(key, "="), options.get(key)):
+            not_run = f"{CANARY_GUARD} is off, so `{CANARY}` would go through; the canary did not run"
         env = {**base_env, "CLAUDE_PLUGIN_ROOT": root,
                **{f"CLAUDE_PLUGIN_OPTION_{k.upper()}": _env_value(v) for k, v in options.items()
                   if isinstance(k, str) and re.fullmatch(r"\w+", k) and v is not None}}
@@ -289,7 +297,12 @@ def check(cwd):
         names = ", ".join(_tilde(p) for p in hand)
         count = len({m for hs in hand.values() for h in hs for m in re.findall(r"--guard ([\w-]+)", h["command"])})
         rows.append((OK, "Claude Code", f"by hand, {count} guard{'' if count == 1 else 's'} in {names}"))
-        canary_hook = next((h for hs in hand.values() for h in hs if f"--guard {CANARY_GUARD}" in h["command"]), None)
+        # Only the user's own file supplies a command to run: a project's settings
+        # come with whatever repository was checked out, and the doctor runs in CI.
+        canary_hook = next((h for h in hand.get(user_path, []) if f"--guard {CANARY_GUARD}" in h["command"]), None)
+        if canary_hook is None and any(f"--guard {CANARY_GUARD}" in h["command"] for hs in hand.values() for h in hs):
+            not_run = (f"the by-hand {CANARY_GUARD} hook is in a project's settings, and the doctor runs no "
+                       "command a project supplies; the canary did not run")
         env = base_env
     elif problem:
         rows.append((WARN, "Claude Code", problem))
@@ -315,9 +328,8 @@ def check(cwd):
         rows.append((WARN, "gh", f"{'not signed in' if signed is False else 'not installed or not answering'}; the "
                                  "stacked-base and ruleset guards will ask instead of deciding"))
 
-    if guard_off:
-        rows.append((WARN, "fail-closed", f"{CANARY_GUARD} is off, so `{CANARY}` would go through; the canary "
-                                          "did not run"))
+    if not_run:
+        rows.append((WARN, "fail-closed", not_run))
     elif canary_hook is None:
         rows.append((FAIL, "fail-closed", f"no {CANARY_GUARD} hook {'in the install' if inst or hand else 'installed'}"
                                           " to send the canary to"))

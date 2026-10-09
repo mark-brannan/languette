@@ -62,10 +62,20 @@ Feature: doctor
     And the "fail-closed" row is ✓ matching "`rm -rf ~` was denied through the hook command as installed"
     And the doctor exits 0
 
+  # A project's settings arrive with whatever was checked out, and the doctor
+  # runs in CI: it counts their hooks but never runs one.
+  Scenario: a by-hand hook in a project's settings is counted, never run
+    Given the project's settings have a by-hand guard-recursive-delete hook that leaves a mark
+    When the doctor runs
+    Then the "Claude Code" row is ✓ "by hand, 1 guard in ~/project/.claude/settings.json"
+    And the "fail-closed" row is ! "the by-hand guard-recursive-delete hook is in a project's settings, and the doctor runs no command a project supplies; the canary did not run"
+    And the hook left no mark
+
   Scenario: a disabled plugin fails
     Given languette "cd31356ad5db" is installed at user scope, disabled
     When the doctor runs
     Then the "Claude Code" row is ✗ "plugin cd31356, user scope, is disabled: claude plugin enable languette@languette"
+    And the "fail-closed" row is ! "the plugin is disabled, so its hooks do not run; the canary did not run"
     And the doctor exits 1
 
   Scenario: a hook that lets the canary through fails

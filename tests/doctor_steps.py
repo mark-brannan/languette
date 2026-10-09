@@ -170,6 +170,20 @@ def _by_hand(doctor):
     doctor.write_settings(s)
 
 
+@given("the project's settings have a by-hand guard-recursive-delete hook that leaves a mark")
+def _by_hand_project(doctor):
+    command = f'touch "{doctor.aside}/mark"; python3 -I "{ROOT}/languette/run.py" --guard guard-recursive-delete'
+    p = doctor.home / "project/.claude/settings.json"
+    p.parent.mkdir()
+    p.write_text(json.dumps({"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command",
+                                                                                      "command": command}]}]}}))
+
+
+@then("the hook left no mark")
+def _no_mark(doctor):
+    assert not (doctor.aside / "mark").exists(), "the doctor ran a command from a project's settings"
+
+
 @given(parsers.parse('"{path}" holds `{text}`'))
 def _holds(doctor, path, text):
     doctor.overrides[doctor.expand(path)] = text
