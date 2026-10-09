@@ -236,3 +236,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t070933z
 - guard-review-threads reads GitHub through the existing run Need, not a new gather kind Undo: add a gh-graphql read kind to world.KINDS and yield it from _thread ([#118](https://github.com/mark-brannan/languette/pull/118))
+
+### 20261009t071255z
+- guard-review-threads denies a graphql call whose query it cannot read (a run-time word, query=@file, --input with no heredoc) when it names a PRRT_ id or the command names a resolve; a file-read query naming no thread passes. Supersedes the unseen-query gap above Undo: drop the hidden clause in _resolves and its rows ([#118](https://github.com/mark-brannan/languette/pull/118))
