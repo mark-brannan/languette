@@ -1,8 +1,8 @@
 @python
 Feature: guard-host-availability
   The commands that take the machine down are denied: shutdown, reboot, halt,
-  poweroff, the fork-bomb shape, and stopping or restarting a host service
-  with systemctl. No agent area makes them safe.
+  poweroff, the fork-bomb shape, and a systemctl verb that stops a host service
+  or the host itself. No agent area makes them safe.
 
   Scenario Outline: the fork-bomb shape and a power command are denied
     When the agent runs `<command>`
@@ -40,6 +40,15 @@ Feature: guard-host-availability
       | echo done; systemctl stop nginx          | systemctl stop          | after a ;                             |
       | sh -c "systemctl stop nginx"             | systemctl stop          | nested text                           |
       | systemctl stop a b                       | systemctl stop          | several units                         |
+      | systemctl --root /x stop nginx           | systemctl stop          | an option's value before the verb     |
+      | systemctl --kill-whom main stop nginx    | systemctl stop          | an option's value before the verb     |
+      | systemctl --job-mode replace stop nginx  | systemctl stop          | an option's value before the verb     |
+      | systemctl -T stop nginx                  | systemctl stop          | a flag that takes no value            |
+      | systemctl try-restart nginx              | systemctl try-restart   | a restart by another name             |
+      | systemctl kill nginx                     | systemctl kill          |                                       |
+      | systemctl reboot                         | systemctl reboot        | the host itself                       |
+      | systemctl poweroff                       | systemctl poweroff      | the host itself                       |
+      | systemctl isolate rescue.target          | systemctl isolate       | stops every unit the target lacks     |
 
   Scenario: a fork bomb on a later line is still seen
     When the agent runs:
@@ -75,3 +84,4 @@ Feature: guard-host-availability
       | git commit -m "systemctl restart sshd"           |                                                |
       | systemctl start nginx                            | starting adds availability                     |
       | systemctl list-units stop                        | an argument to another verb                    |
+      | systemctl -t service status restart              | an argument to another verb                    |
