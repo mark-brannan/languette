@@ -257,3 +257,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t071358z
 - guard-signed-comments passes an empty body (gh refuses an empty comment; an approve with --body "" posts no text) and trailing whitespace on the signature line Undo: drop the body.strip() skip and the rstrip() in check ([#119](https://github.com/mark-brannan/languette/pull/119))
+
+### 20261009t071405z
+- guard-signed-comments is silent on a graphql query it cannot read, which is not known to post, as guard-private-terms reads it Undo: deny an unreadable query in bodies() ([#119](https://github.com/mark-brannan/languette/pull/119))
