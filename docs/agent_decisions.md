@@ -218,3 +218,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t070913z
 - guard-review-threads counts a sha only when its 7 to 40 hex characters hold a digit and a letter, so a number or a word like 'effaced' is not a commit Undo: drop the two lookaheads in SHA and the two scenario rows ([#118](https://github.com/mark-brannan/languette/pull/118))
+
+### 20261009t070917z
+- guard-review-threads also counts an author GitHub's GraphQL types as Bot, since GraphQL gives bot logins without the [bot] suffix Undo: drop the __typename test in _bot and its row ([#118](https://github.com/mark-brannan/languette/pull/118))
