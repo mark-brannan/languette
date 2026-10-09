@@ -199,6 +199,16 @@ Feature: guard-review-threads
       """
     Then the guard denies, naming "cannot tell which review thread"
 
+  Scenario: a heredoc fed to another command does not make piped stdin readable
+    When the agent runs:
+      """
+      git commit -F - <<'EOF'
+      notes
+      EOF
+      echo '{"query":"mutation{resolveReviewThread(input:{threadId:\"PRRT_t1\"}){thread{id}}}"}' | gh api graphql --input -
+      """
+    Then the guard denies, naming "cannot tell which review thread"
+
   Scenario Outline: the graphql endpoint by its path or its URL is read
     Given review thread "PRRT_t1" holds:
       | author       | body                |

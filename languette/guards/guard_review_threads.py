@@ -72,7 +72,7 @@ def _resolves(command):
             live = any(s.live[i] for i in range(g + 1, b + 1))
             query = [i for i in range(g + 1, b + 1) if s.k[i] in ("w", "q") and QUERY_FIELD.match(_wv(s, i))]
             if (any(s.live[i] or QUERY_FIELD.sub("", _wv(s, i)).startswith("@") for i in query)
-                    or src is not None and (src != "-" or not hd)):
+                    or src is not None and (src != "-" or "HEREDOC" not in words)):   # scan's mark for a heredoc fed to gh
                 unreadable = True
                 continue
             if not RESOLVE.search(body):
