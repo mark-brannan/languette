@@ -86,11 +86,6 @@ KNOWN = {
     "guards/ask_first.py": ["Need claim"],
     "guards/guard_github_issues.py": ["Need door claim", "Need door take"],
     "guards/guard_worktrees.py": ["Need worktree arrive"],
-    "guards/guard_bypass_labels.py": ["os.open", "os.fstat", "os.close", "os.fdopen"],
-    "guards/guard_disk.py": ["os.getcwd"],
-    "guards/guard_permissions.py": ["os.getcwd"],
-    "guards/guard_recursive_delete.py": ["os.path.lexists", "os.path.realpath", "os.getcwd"],
-    "paths.py": ["os.path.lexists", "os.path.realpath"],
     # The parser ladder's shfmt rung (docs/decisions.md, "Runtime dependencies").
     "scan.py": ["import shutil", "import subprocess", "subprocess.run", "subprocess.TimeoutExpired", "shutil.which"],
 }

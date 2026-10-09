@@ -6,6 +6,7 @@ import os
 import re
 
 from languette import scan as sw
+from languette.verdict import Need
 
 
 class Unresolved(Exception):
@@ -14,13 +15,13 @@ class Unresolved(Exception):
 
 def physical(p):
     """The longest existing prefix resolved through symlinks, the rest
-    appended as written. "" for /."""
+    appended as written. "" for /. A generator: `yield from` it."""
     rest = ""
-    while p != "/" and not os.path.lexists(p):
+    while p != "/" and not (yield Need("path", "lexists", p)):
         head, _, base = p.rpartition("/")
         rest = "/" + base + rest
         p = head or "/"
-    r = os.path.realpath(p)
+    r = yield Need("path", "realpath", p)
     return ("" if r == "/" else r) + rest
 
 
@@ -74,9 +75,12 @@ def resolve(word, quoted, cwd, home, moved):
 
 def own_roots(home, extra=()):
     """Where the agent works and nothing of the user's lives, as written and
-    as the filesystem has them (/tmp is /private/tmp on macOS)."""
+    as the filesystem has them (/tmp is /private/tmp on macOS). A generator."""
     base = ["/tmp", home + "/.local/state/claude-tmpdir", home + "/.claude/worktrees"]
-    return base + [physical(r) for r in base] + list(extra)
+    phys = []
+    for r in base:
+        phys.append((yield from physical(r)))
+    return base + phys + list(extra)
 
 
 def under(p, roots):

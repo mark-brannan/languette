@@ -37,10 +37,9 @@ command.
 import json
 import os
 import re
-import stat
 
 from languette import scan as sw
-from languette.verdict import Refuse, deny
+from languette.verdict import Need, Refuse, deny
 
 NAME = "guard-bypass-labels"
 OPTION = "CLAUDE_PLUGIN_OPTION_BYPASS_LABELS"
@@ -144,21 +143,13 @@ def _read(path, ctx):
             raise Refuse("is a relative path, and the guard cannot tell where the command stands")
         p = os.path.join(cwd, p)
     try:
-        # Non-blocking, so a FIFO cannot stall the hook into its timeout.
-        fd = os.open(p, os.O_RDONLY | os.O_NONBLOCK)
+        return (yield Need("read", p, MAX_READ))
     except OSError as e:
         raise Refuse(f"cannot be read ({e.strerror or e})")
-    if not stat.S_ISREG(os.fstat(fd).st_mode):
-        os.close(fd)
-        raise Refuse("is not a regular file")
-    with os.fdopen(fd, "rb") as f:
-        data = f.read(MAX_READ + 1)
-    if len(data) > MAX_READ:
-        raise Refuse(f"is over {MAX_READ} bytes")
-    try:
-        return data.decode("utf-8")
     except UnicodeDecodeError as e:
         raise Refuse(f"cannot be read ({e})")
+    except ValueError as e:
+        raise Refuse(f"is {e}")
 
 
 def _payloads(src, live, ctx):
@@ -172,14 +163,14 @@ def _payloads(src, live, ctx):
             raise Refuse("the heredoc feeding --input is built at run time (an unquoted delimiter and a $ or backtick)")
         return [body for body, _ in ctx["bodies"]]
     try:
-        return [_read(src, ctx)]
+        return [(yield from _read(src, ctx))]
     except Refuse as e:
         raise Refuse(f"the --input file `{src}` {e}")
 
 
 def _input(f, src, live, path, ctx):
     try:
-        texts = _payloads(src, live, ctx)
+        texts = yield from _payloads(src, live, ctx)
     except Refuse as e:
         f.unseen.append(str(e))
         return
@@ -249,14 +240,14 @@ def _api(f, s, i, b, ctx):
             v = kv.split("=", 1)[1] if "=" in kv else kv
             if v.startswith("@") and flag in ("-F", "--field"):
                 try:
-                    v = _read(v[1:], ctx)
+                    v = yield from _read(v[1:], ctx)
                 except Refuse as e:
                     f.unseen.append(f"the graphql field reads the file `{v[1:]}`, which {e}")
                     continue
             if GRAPHQL_LABELS.search(v):
                 f.unseen.append(GRAPHQL_WHY)
         for src, live in inputs:
-            _input(f, src, live, p, ctx)
+            yield from _input(f, src, live, p, ctx)
         return
     for flag, kv, live in fields:
         if "=" not in kv:
@@ -266,13 +257,13 @@ def _api(f, s, i, b, ctx):
             continue
         if v.startswith("@") and flag in ("-F", "--field"):
             try:
-                f.value(_read(v[1:], ctx).strip(), live)
+                f.value((yield from _read(v[1:], ctx)).strip(), live)
             except Refuse as e:
                 f.unseen.append(f"the field {key} reads the file `{v[1:]}`, which {e}")
         else:
             f.value(v, live, f"the field {key}")
     for src, live in inputs:
-        _input(f, src, live, p, ctx)
+        yield from _input(f, src, live, p, ctx)
 
 
 def _gh(f, s, g, b, ctx):
@@ -280,7 +271,7 @@ def _gh(f, s, g, b, ctx):
         return
     group, act = s.w[g + 1], s.w[g + 2]
     if group == "api":
-        _api(f, s, g + 2, b, ctx)
+        yield from _api(f, s, g + 2, b, ctx)
         return
     if group == "alias":
         _alias(f, s, g, b, act)
@@ -384,7 +375,7 @@ def _bash(f, cmd, cwd, env, depth=0, alone=True):
                 continue
             g = sw.cmd_index(s, a, b, GH, nested)
             if g is not None:
-                _gh(f, s, g, b, ctx)
+                yield from _gh(f, s, g, b, ctx)
     # A heredoc fed to a shell (`sh <<EOF`, `cat <<EOF | sh`) is a command of
     # its own; fed to anything else it is text.
     # Its pipeline is its own segment and every segment piped on from it.
@@ -400,7 +391,7 @@ def _bash(f, cmd, cwd, env, depth=0, alone=True):
                     if bodies[k][1]:
                         f.unseen.append("the heredoc fed to a shell is built at run time (an unquoted delimiter and a $ or backtick)")
                     else:
-                        _bash(f, bodies[k][0], cwd, env, depth + 1, ctx["alone"])
+                        yield from _bash(f, bodies[k][0], cwd, env, depth + 1, ctx["alone"])
                 k += 1
 
 
@@ -434,7 +425,7 @@ def check(payload, env=os.environ):
         cmd = inp.get("command") if isinstance(inp, dict) else None
         if not isinstance(cmd, str) or not cmd.strip():
             return None
-        _bash(f, cmd, payload.get("cwd"), env)
+        yield from _bash(f, cmd, payload.get("cwd"), env)
     elif isinstance(tool, str) and tool.startswith("mcp__"):
         if not isinstance(inp, dict) or _reads(tool):
             return None

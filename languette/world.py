@@ -7,12 +7,14 @@ one timeout per kind of fact, the ruleset cache, the spent-file lock.
 Standard library only.
 """
 
+import errno
 import fcntl
 import glob
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import time
 from urllib.parse import quote
@@ -81,9 +83,16 @@ class World:
     def _which(self, name):
         return shutil.which(name, path=os.pathsep.join(os.get_exec_path(self.env)))
 
-    def _read(self, path):
-        with open(path, encoding="utf-8") as f:
-            return f.read()
+    def _read(self, path, limit=None):
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)   # a FIFO cannot stall the hook
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            os.close(fd)
+            raise OSError(errno.EINVAL, "not a regular file")
+        with os.fdopen(fd, "rb") as f:
+            data = f.read(-1 if limit is None else limit + 1)
+        if limit is not None and len(data) > limit:
+            raise ValueError(f"over {limit} bytes")
+        return data.decode("utf-8")
 
     def _path(self, op, path):
         if op == "executable":
