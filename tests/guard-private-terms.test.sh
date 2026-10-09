@@ -115,6 +115,8 @@ check allow 'dot is literal, not any char' "$(bash_in "$PUB" 'gh issue create -t
 # --- MCP ------------------------------------------------------------------------
 check deny 'MCP create_issue body'   "$(mcp_in mcp__github__create_issue '{"owner":"mark-brannan","repo":"colregs","title":"x","body":"seen on Wanderlust"}')"
 check deny 'MCP add_issue_comment'   "$(mcp_in mcp__github__add_issue_comment '{"owner":"o","repo":"r","issue_number":3,"body":"ping gateway.home.example"}')"
+check deny 'MCP add_reply_to_pull_request_comment' "$(mcp_in mcp__github__add_reply_to_pull_request_comment '{"owner":"o","repo":"r","pullNumber":1,"commentId":9,"body":"seen on Wanderlust"}')"
+check deny 'MCP update_issue_comment' "$(mcp_in mcp__github__update_issue_comment '{"owner":"o","repo":"r","commentId":9,"body":"ping gateway.home.example"}')"
 check deny 'MCP issue_write title'   "$(mcp_in mcp__github__issue_write '{"method":"create","owner":"o","repo":"r","title":"Wanderlust AIS"}')"
 check deny 'MCP review comment nested' "$(mcp_in mcp__github__create_pull_request_review '{"owner":"o","repo":"r","pullNumber":1,"event":"COMMENT","comments":[{"path":"a.ts","body":"acct-4471"}]}')"
 check allow 'MCP clean body'         "$(mcp_in mcp__github__create_issue '{"owner":"o","repo":"r","title":"x","body":"see mark-brannan/colregs#12"}')"

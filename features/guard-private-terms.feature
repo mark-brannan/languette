@@ -150,11 +150,13 @@ Feature: guard-private-terms
     Then the guard <verdict>
 
     Examples:
-      | tool                                         | input                                                      | verdict   |
-      | mcp__github__create_issue                    | {"owner":"o","repo":"r","title":"t","body":"Wanderlust"}   | denies    |
-      | mcp__plugin_github_github__add_issue_comment | {"owner":"o","repo":"r","body":"on gateway.home.example"}  | denies    |
-      | mcp__github__create_issue                    | {"owner":"o","repo":"r","title":"t","body":"clean"}        | is silent |
-      | mcp__github__get_issue                       | {"owner":"o","repo":"r","body":"Wanderlust"}               | is silent |
+      | tool                                           | input                                                                     | verdict   |
+      | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"Wanderlust"}                  | denies    |
+      | mcp__plugin_github_github__add_issue_comment   | {"owner":"o","repo":"r","body":"on gateway.home.example"}                 | denies    |
+      | mcp__github__add_reply_to_pull_request_comment | {"owner":"o","repo":"r","pullNumber":1,"commentId":9,"body":"Wanderlust"} | denies    |
+      | mcp__github__update_issue_comment              | {"owner":"o","repo":"r","commentId":9,"body":"on gateway.home.example"}   | denies    |
+      | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"clean"}                       | is silent |
+      | mcp__github__get_issue                         | {"owner":"o","repo":"r","body":"Wanderlust"}                              | is silent |
 
   Scenario: the home directory in the text is rewritten to ~ and the post allowed
     Given the private terms file holds:
