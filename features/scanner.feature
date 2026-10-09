@@ -27,6 +27,8 @@ Feature: scanner
       | echo ${VAR}                       | ["w:echo", "w:${VAR}"]                                                      | a glued ${...} stays in the word                                                 |
       | find . -name x -exec rm -rf {} \; | ["w:find", "w:.", "w:-name", "w:x", "w:-exec", "w:rm", "w:-rf", ";", "w:;"] | find's {} is a separator; the escaped ; is a plain word                          |
       | xargs -I{} gh pr edit {} --label x | ["w:xargs", "w:-I{}", "w:gh", "w:pr", "w:edit", "w:{}", "w:--label", "w:x"] | a bare {} among words is a word, so the gh segment keeps its flags               |
+      | find . -exec sh -c "echo hi" {} \; | ["w:find", "w:.", "w:-exec", "w:sh", "w:-c", "q:echo hi", ";", "w:;"] | a quoted word before find's {} does not hide the -exec, so {} stays a separator |
+      | xargs -I{} gh pr edit --title -ok {} --label x | ["w:xargs", "w:-I{}", "w:gh", "w:pr", "w:edit", "w:--title", "w:-ok", "w:{}", "w:--label", "w:x"] | -ok outside a find command is a plain word, so {} stays a word |
       | sh -c "rm -rf build"              | ["w:sh", "w:-c", "q:rm -rf build"]                                          | a quoted string with whitespace is one q word, raw text kept for the nested scan |
       | git commit -m "add -A everything" | ["w:git", "w:commit", "w:-m", "q:add -A everything"]                        | prose in a commit message is one q word                                          |
       | echo 'it is $(x)'                 | ["w:echo", "q:it is $(x)"]                                                  | single quotes are literal                                                        |

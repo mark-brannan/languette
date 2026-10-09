@@ -65,6 +65,7 @@ Feature: guard-bypass-labels
         | echo "gh pr edit 12 --add-label churn-ok" \| sh              |
         | echo 12 \| xargs gh pr edit --add-label churn-ok             |
         | echo 12 \| xargs -I{} gh pr edit {} --add-label churn-ok     |
+        | echo 12 \| xargs -I{} gh pr edit --title -ok {} --add-label churn-ok |
         | gh pr edit --add-label churn-ok                              |
         | gh pr edit 12 --add-label churn"-ok"                         |
         | gh pr edit 12 --add-label 'churn'-ok                         |

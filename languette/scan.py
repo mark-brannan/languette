@@ -35,6 +35,8 @@ PROSE = frozenset("grep egrep fgrep rg ag ack echo printf git yadm gh glab sed a
                   "cat tee test [ diff sort head tail wc tr cut less more".split())
 EXEC = frozenset("sh bash zsh dash ksh ash busybox eval exec xargs su ssh sudo doas env nohup "
                  "timeout nice time watch parallel script chroot docker podman kubectl".split())
+_FIND_EXECS = frozenset("-exec -execdir -ok -okdir".split())
+_FIND_WRAPPERS = frozenset("sudo doas env nice nohup time command exec ionice xargs stdbuf timeout".split())
 SHELL = frozenset("sh bash zsh dash ksh ash eval source .".split())
 WRAP = frozenset("sudo env command exec time nice nohup timeout doas builtin "
                  "if then else elif while until do !".split())
@@ -704,14 +706,22 @@ class Scan:
         self.quoted.append(False)
 
     def _in_find_exec(self):
-        """True when the segment so far holds find's -exec, -execdir, -ok or
-        -okdir, whose {} ends the command it runs."""
-        j = len(self.w) - 1
-        while j >= 0 and self.k[j] == "w":
-            if self.w[j] in ("-exec", "-execdir", "-ok", "-okdir"):
-                return True
-            j -= 1
-        return False
+        """True when this segment is a find (the command word, past VAR=x, flags
+        and a wrapper like sudo or xargs) that already holds -exec, -execdir,
+        -ok or -okdir, whose {} ends the command it runs. A quoted word is
+        skipped over; only the segment boundary stops the walk. Keyed on the
+        command word, so `gh pr edit --title -ok {}` is not a find."""
+        n = len(self.w)
+        i = n
+        while i > 0 and self.k[i - 1] != ";":
+            i -= 1
+        while i < n and self.k[i] == "w" and (
+                _ASSIGN.match(self.w[i]) or self.w[i].startswith("-")
+                or self.w[i].rsplit("/", 1)[-1] in _FIND_WRAPPERS):
+            i += 1
+        if i >= n or self.k[i] != "w" or self.w[i].rsplit("/", 1)[-1] != "find":
+            return False
+        return any(self.k[x] == "w" and self.w[x] in _FIND_EXECS for x in range(i + 1, n))
 
     def _lex(self, b):
         """The awk lexer over b, carrying the word in progress across calls."""
