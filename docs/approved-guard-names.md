@@ -14,3 +14,4 @@
 | `guard-secrets` | credentials | one committed, printed into the transcript, or posted |
 | `ask-first` | commands the repo lists as costly | each runs only after the user approves that run |
 | `guard-protected-paths` | paths the repo lists | any agent write to them |
+| `guard-database` | stored data | SQL or NoSQL drops, unbounded deletes, migration resets, restores |
