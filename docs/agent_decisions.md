@@ -269,3 +269,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t072014z
 - guard-signed-comments denies an unreadable graphql query only when a body field or an --input payload travels with it; alone it stays silent (supersedes the earlier silent-on-unreadable call) Undo: deny every unreadable graphql query in bodies() ([#119](https://github.com/mark-brannan/languette/pull/119#discussion_r4227666481))
+
+### 20261009t072022z
+- guard-signed-comments gates discussion comments too (addDiscussionComment, updateDiscussionComment), past the brief's list Undo: drop addDiscussionComment and updateDiscussionComment from _MUTATION ([#119](https://github.com/mark-brannan/languette/pull/119#discussion_r4227669039))
