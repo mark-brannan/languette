@@ -8,10 +8,29 @@
 # pull_request rule when unset, "none" an empty list, "upgrade" the 403 a
 # free private repo gets. For `api .../protection`, GH_PROTECTION "reviews"
 # is protection with required reviews; unset is 404 "Branch not protected".
+# For `api .../issues/<n>/timeline...` it answers GH_TIMELINE: "open-pr" a
+# cross-reference from open PR #120, "closed-pr" from closed PR #120, "issue"
+# from open issue #121 (no pull_request), each beside a labeled event; "full"
+# a full page of 100 labeled events; unset is an empty timeline.
 printf '%s\n' "$*" >> "${LANGUETTE_STUB_LOG:?}/gh"
 [ -n "${GH_FAIL:-}" ] && exit 1
 upgrade='{"message":"Upgrade to GitHub Pro or make this repository public to enable this feature.","status":"403"}'
+xref() {   # number, state, the source's extra fields
+  printf '[{"event":"labeled","label":{"name":"bug"}},'
+  printf '{"event":"cross-referenced","source":{"type":"issue","issue":{"number":%s,"title":"the first one",' "$1"
+  printf '"state":"%s",%s"repository":{"full_name":"o/r"},"html_url":"https://github.com/o/r/pull/%s"}}}]\n' "$2" "$3" "$1"
+}
 case "$*" in
+  api*/issues/*/timeline*)
+    case "${GH_TIMELINE:-}" in
+      open-pr) xref 120 open '"pull_request":{"url":"https://api.github.com/repos/o/r/pulls/120"},' ;;
+      closed-pr) xref 120 closed '"pull_request":{"url":"https://api.github.com/repos/o/r/pulls/120"},' ;;
+      issue) xref 121 open '' ;;
+      full) printf '['; i=1; while [ "$i" -lt 100 ]; do printf '{"event":"labeled"},'; i=$((i + 1)); done
+            echo '{"event":"labeled"}]' ;;
+      *) echo '[]' ;;
+    esac
+    exit 0 ;;
   api*/rules/branches/*)
     case "${GH_RULES:-pr}" in
       none) echo '[]' ;;
