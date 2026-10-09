@@ -81,12 +81,11 @@ METHODS = {"read_text", "read_bytes", "write_text", "write_bytes", "iterdir", "r
 # Remove an entry when its guard yields instead; the tests fail on one more or
 # one fewer, so the list only shrinks.
 KNOWN = {
-    # Needs the world answers with a write, each to move to act.
+    # Needs that write as they read, under one lock or rename; they move with
+    # the approval spend (#84).
     "guards/ask_first.py": ["Need claim"],
-    "guards/guard_bypass_ruleset.py": ["Need ruleset-keep"],
-    "guards/guard_cross_session_send.py": ["Need send-keep"],
-    "guards/guard_github_issues.py": ["Need door open", "Need door spend", "Need door claim", "Need door take"],
-    "guards/guard_worktrees.py": ["Need worktree leave", "Need worktree arrive", "Need worktree keep"],
+    "guards/guard_github_issues.py": ["Need door claim", "Need door take"],
+    "guards/guard_worktrees.py": ["Need worktree arrive"],
     "guards/guard_bypass_labels.py": ["os.open", "os.fstat", "os.close", "os.fdopen"],
     "guards/guard_disk.py": ["os.getcwd"],
     "guards/guard_permissions.py": ["os.getcwd"],
