@@ -260,3 +260,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t071405z
 - guard-signed-comments is silent on a graphql query it cannot read, which is not known to post, as guard-private-terms reads it Undo: deny an unreadable query in bodies() ([#119](https://github.com/mark-brannan/languette/pull/119))
+
+### 20261009t071412z
+- README trims 'for one kind of' and 'the other guards' and joins the ask-first bullet so the new guard's line fits the section and line caps Undo: restore the three README lines and raise the caps in docs/budgets.json in a PR of its own ([#119](https://github.com/mark-brannan/languette/pull/119))
