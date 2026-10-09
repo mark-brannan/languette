@@ -15,7 +15,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Refuse, context, deny
+from languette.verdict import Need, Refuse, context, deny
 
 NAME = "guard-permissions"
 
@@ -35,7 +35,8 @@ _WAY_OUT = ("Spell the files out: chmod or chown the paths themselves, without -
 
 
 def _parse_allow(value, home, home_p):
-    """LANGUETTE_PERM_ALLOW -> (extra_roots, error or None): absolute paths only."""
+    """LANGUETTE_PERM_ALLOW -> (extra_roots, error or None): absolute paths only. A generator:
+    each entry is resolved through the disk by a Need."""
     roots = []
     for ent in value.split(":"):
         if ent == "":
@@ -50,7 +51,7 @@ def _parse_allow(value, home, home_p):
             ent = ent[:-1]
         if ent in ("", home):
             return roots, f"'{ent}' is / or $HOME"
-        ent_p = paths.physical(ent)
+        ent_p = yield from paths.physical(ent)
         if ent_p in ("", home, home_p):
             return roots, f"'{ent}' resolves to / or $HOME"
         roots += [ent, ent_p]
@@ -180,15 +181,15 @@ def check(payload, env=os.environ):
         return None
     cwd = payload.get("cwd")
     if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = os.getcwd()
+        cwd = yield Need("cwd")
     home = env.get("HOME", "")
     if not home.startswith("/"):
         return deny("guard-permissions: $HOME is not an absolute path, cannot resolve targets")
 
-    home_p = paths.physical(home)
     extra_roots, allow_err = [], None
     if env.get("LANGUETTE_PERM_ALLOW"):
-        extra_roots, allow_err = _parse_allow(env["LANGUETTE_PERM_ALLOW"], home, home_p)
+        home_p = yield from paths.physical(home)
+        extra_roots, allow_err = yield from _parse_allow(env["LANGUETTE_PERM_ALLOW"], home, home_p)
     allow_msg = None
     if allow_err:
         allow_msg = (f"LANGUETTE_PERM_ALLOW is malformed ({allow_err}). Recursive chown, chgrp and chmod, and "
@@ -208,12 +209,12 @@ def check(payload, env=os.environ):
     if refused is not None:
         return deny(refused)
 
-    roots = paths.own_roots(home, extra_roots)
+    roots = yield from paths.own_roots(home, extra_roots)
     for abs_, what, raw in judge.targets:
         if not paths.under(abs_, roots):
             return deny(f"`{what} {raw}` is blocked: only the scratchpad, /tmp, agent worktrees and paths named "
                         f"in LANGUETTE_PERM_ALLOW may be swept, and {abs_} is none of those. {_WAY_OUT}")
-        phys = paths.physical(abs_)
+        phys = yield from paths.physical(abs_)
         if phys != abs_ and not paths.under(phys, roots):
             return deny(f"`{what} {raw}` is blocked: {abs_} resolves through a symlink to {phys}, which is not "
                         f"the scratchpad, /tmp or an agent worktree. {_WAY_OUT}")

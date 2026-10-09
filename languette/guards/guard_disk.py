@@ -13,7 +13,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Refuse, deny
+from languette.verdict import Need, Refuse, deny
 
 NAME = "guard-disk"
 
@@ -204,7 +204,7 @@ def check(payload, env=os.environ):
         return None
     cwd = payload.get("cwd")
     if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = os.getcwd()
+        cwd = yield Need("cwd")
     home = env.get("HOME", "")
     if not home.startswith("/"):
         return deny("guard-disk: $HOME is not an absolute path, cannot resolve targets")
@@ -215,12 +215,12 @@ def check(payload, env=os.environ):
     except Refuse as e:
         return deny(f"guard-disk: {e}")
 
-    roots = paths.own_roots(home)
+    roots = yield from paths.own_roots(home)
     for abs_, what, raw in judge.targets:
         if not paths.under(abs_, roots):
             kind = "a device node" if abs_.startswith("/dev/") else "outside the scratchpad, /tmp and agent worktrees"
             return deny(f"guard-disk: `{what} {raw}` is blocked: {abs_} is {kind}. {_WAY_OUT}")
-        phys = paths.physical(abs_)
+        phys = yield from paths.physical(abs_)
         if phys != abs_ and not paths.under(phys, roots):
             return deny(f"guard-disk: `{what} {raw}` is blocked: {abs_} resolves through a symlink to {phys}, "
                         f"which is not the scratchpad, /tmp or an agent worktree. {_WAY_OUT}")
