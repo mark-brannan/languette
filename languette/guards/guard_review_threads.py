@@ -22,7 +22,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.guards.guard_bypass_labels import _alone
+from languette.guards.guard_bypass_labels import MAX_READ, _alone
 from languette.verdict import Need, ask, deny
 
 NAME = "guard-review-threads"
@@ -168,11 +168,12 @@ def _calls(command, cwd, home):
 
 
 def _read(p):
-    """A file's text, decoded too when it is JSON, or None when it cannot be read."""
+    """A file's text, decoded too when it is JSON, or None when it cannot be
+    read (past MAX_READ included)."""
     if p is None or not (yield Need("path", "isfile", p)):
         return None
     try:
-        return _decoded((yield Need("read", p)))
+        return _decoded((yield Need("read", p, MAX_READ)))
     except Exception:  # noqa: BLE001 -- unreadable or not text: the caller denies
         return None
 
