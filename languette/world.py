@@ -1,7 +1,8 @@
 """The one module that touches the disk, subprocesses, the clock or the network.
 
 The runner (run.py) holds one World per payload and asks it for each Need a
-guard yields (languette.verdict.Need lists the kinds). World owns the budget:
+guard yields (languette.verdict.Need lists the kinds), then, after the verdict,
+does each Act (languette.verdict.Act). World owns the budget:
 one timeout per kind of fact, the ruleset cache, the spent-file lock.
 Standard library only.
 """
@@ -23,8 +24,10 @@ SPENT = ".languette-ask"            # appended to the transcript path
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
-KINDS = frozenset("git gh-api pr-list which read path cwd clock ruleset-cache ruleset-keep claim worktree run door "
-                  "send-state send-keep".split())
+KINDS = frozenset("git gh-api pr-list which read path cwd clock ruleset-cache claim worktree run door "
+                  "send-state".split())
+ACTS = {"ruleset-keep": "_ruleset_keep", "send-keep": "_send_keep", "worktree-keep": "_wt_keep",
+        "worktree-leave": "_wt_leave", "door-open": "_door_open", "door-spend": "_door_spend"}
 DOOR = "languette-guard-github-issues."   # + the session id, under $TMPDIR
 SEND_STATE = "languette-guard-cross-session-send."   # + session id, under $TMPDIR
 SEND_SUBAGENTS_MAX = 500            # names and ids kept per session; the oldest go first
@@ -95,12 +98,26 @@ class World:
         dec = lambda b: b.decode("utf-8", "surrogateescape")
         return r.returncode, dec(r.stdout), dec(r.stderr)
 
-    def _door(self, op, session, call=""):
-        """guard-github-issues' door for one session: a file under $TMPDIR that a
-        human turn opens and one identifier write claims, then spends.
+    def _door_file(self, session):
+        return os.path.join(self.env.get("TMPDIR") or "/tmp", DOOR + session)
 
-            open           -> None: the door is a fresh plain file, any claim dropped
-            spend          -> None: door and claim both gone
+    def _door_spend(self, session):
+        door = self._door_file(session)
+        for f in (door, door + ".held"):
+            try:
+                os.unlink(f)
+            except FileNotFoundError:
+                pass
+
+    def _door_open(self, session):
+        self._door_spend(session)
+        os.close(os.open(self._door_file(session), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
+
+    def _door(self, op, session, call):
+        """guard-github-issues' door for one session: a file under $TMPDIR that a
+        human turn opens (the door-open act) and one identifier write claims,
+        then spends (door-spend).
+
             claim          -> True when this call took the open door; False when
                               another call won it first; else the id the standing
                               claim holds ("" when there is none)
@@ -109,17 +126,8 @@ class World:
         A taker renames the file to a name of its own (atomic: one racer wins)
         and stamps its id in a file made fresh, so a link planted at the door
         or the claim is removed, never written through."""
-        door = os.path.join(self.env.get("TMPDIR") or "/tmp", DOOR + session)
+        door = self._door_file(session)
         held = door + ".held"
-        if op in ("open", "spend"):
-            for f in (door, held):
-                try:
-                    os.unlink(f)
-                except FileNotFoundError:
-                    pass
-            if op == "open":
-                os.close(os.open(door, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
-            return None
         if op == "claim":
             if os.path.lexists(door):
                 return self._take(door, door, call)
@@ -187,7 +195,7 @@ class World:
     # strict as the cwd alone.
 
     def _worktree(self, op, *args):
-        if op not in ("arrive", "recorded", "keep", "leave", "scratchpad"):
+        if op not in ("arrive", "recorded", "scratchpad"):
             raise ValueError(f"no worktree fact {op!r}")
         return getattr(self, "_wt_" + op)(*args)
 
@@ -380,6 +388,14 @@ class World:
             raise
 
     # --- acts ------------------------------------------------------------
+
+    def act(self, a):
+        """Do one Act. Silent on any failure: an act comes after the verdict and
+        never changes it."""
+        try:
+            getattr(self, ACTS[a.kind])(*a.args)
+        except Exception:  # noqa: BLE001
+            pass
 
     def keep(self, rec):
         """Append one decision record (languette.record). Silent on any failure:

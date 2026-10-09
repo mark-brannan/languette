@@ -16,6 +16,8 @@ user's approvals) it asks for: its check is then a generator that yields a
 languette.verdict.Need and gets the answer back, and returns its finding. This
 runner answers every Need through languette.world, the only module that does
 I/O, and throws world's exception into the guard when the fact can't be had.
+A write it wants it yields as a languette.verdict.Act: the runner sends None
+back, and does every Act through world once the verdict is out.
 A guard whose check returns a finding directly needs no change.
 """
 
@@ -42,8 +44,8 @@ try:
                                   guard_recursive_delete, guard_scheduled_jobs, guard_secrets, guard_unparsable,
                                   guard_worktrees, prose_budget_commit)
     from languette import record
-    from languette.verdict import allow, ask, context, deny
-    from languette.world import World
+    from languette.verdict import Act, allow, ask, context, deny
+    from languette.world import ACTS, World
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
                                          "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"}))
@@ -80,9 +82,9 @@ def _on(g, env):
     return not opt or env.get(opt) == "true"
 
 
-def _drive(r, world):
+def _drive(r, world, acts):
     """A guard's finding: `r` itself, or what generator `r` returns once every Need it
-    yields is answered."""
+    yields is answered. Each Act it yields goes on `acts`."""
     if not inspect.isgenerator(r):
         return r
     answer, err = None, None
@@ -91,6 +93,13 @@ def _drive(r, world):
             need = r.throw(err) if err else r.send(answer)
         except StopIteration as stop:
             return stop.value
+        if isinstance(need, Act):
+            if need.kind in ACTS:
+                acts.append(need)
+                answer, err = None, None
+            else:
+                answer, err = None, ValueError(f"no such act: {need!r}")
+            continue
         try:
             answer, err = world.answer(need), None
         except Exception as e:  # noqa: BLE001 -- the guard decides what a missing fact means
@@ -99,12 +108,15 @@ def _drive(r, world):
 
 def respond(stdin_text, env, only=None):
     """The hook's whole stdout for one payload: "" (no objection) or one
-    JSON line. `env` is what the guards read in place of os.environ. With
-    record_decisions on, the call is recorded after the verdict (record.py)."""
+    JSON line. `env` is what the guards read in place of os.environ. The
+    guards' Acts are done after the verdict, and with record_decisions on, the
+    call is recorded (record.py)."""
     out, judged = _respond(stdin_text, env, only)
-    if judged and record.wanted(env):
+    world, payload, findings, acts = judged
+    for a in acts:
+        world.act(a)
+    if record.wanted(env):
         try:
-            world, payload, findings = judged
             world.keep(record.build(payload, env, only, findings, _verdict(out)))
         except Exception:  # noqa: BLE001 -- a record never changes the verdict
             pass
@@ -119,13 +131,13 @@ def _verdict(out):
 
 
 def _respond(stdin_text, env, only):
-    """(stdout, (world, payload, [(guard, result, crashed)]) or None)."""
+    """(stdout, (world, payload, [(guard, result, crashed)], [Act]))."""
     try:
         payload = json.loads(stdin_text)
         if not isinstance(payload, dict):
             raise ValueError("payload is not an object")
     except Exception as e:  # noqa: BLE001 -- a gate fails closed on anything
-        return _out("PreToolUse", deny(f"languette: unreadable hook payload ({e})")), (World(env, {}), {}, [])
+        return _out("PreToolUse", deny(f"languette: unreadable hook payload ({e})")), (World(env, {}), {}, [], [])
     # The shell guards never read the event; a payload without one is judged
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
@@ -152,11 +164,11 @@ def _respond(stdin_text, env, only):
         if judged_once and judged_once[0]:
             guards = [g for g in guards if g is guard_unparsable]
     world = World(env, payload)
-    reasons, asks, notes, rewrites, findings = [], [], [], [], []
+    reasons, asks, notes, rewrites, findings, acts = [], [], [], [], [], []
     for g in guards:
         crashed = False
         try:
-            r = judged_once[0] if judged_once and g is guard_unparsable else _drive(g.check(payload, env), world)
+            r = judged_once[0] if judged_once and g is guard_unparsable else _drive(g.check(payload, env), world, acts)
         except Exception as e:  # noqa: BLE001
             r, crashed = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
         findings.append((g.NAME, r, crashed))
@@ -170,7 +182,7 @@ def _respond(stdin_text, env, only):
             rewrites.append(r["updatedInput"])
         if r.get("additionalContext"):
             notes.append(r["additionalContext"])
-    judged = (world, payload, findings)
+    judged = (world, payload, findings, acts)
     if event != "PreToolUse":                  # state-keeping events: nothing to decide
         return "", judged
     if reasons:

@@ -42,7 +42,7 @@ import re
 from urllib.parse import quote
 
 from languette import scan as sw
-from languette.verdict import Need, Refuse, ask, deny
+from languette.verdict import Act, Need, Refuse, ask, deny
 
 NAME = "guard-bypass-ruleset"
 TTL = 3600
@@ -458,7 +458,7 @@ def _requires_pr(slug, branch):
         else:
             return None
     if got == "pr":
-        yield Need("ruleset-keep", slug, branch, got)
+        yield Act("ruleset-keep", slug, branch, got)
     return got
 
 

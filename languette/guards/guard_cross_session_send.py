@@ -34,7 +34,7 @@ import os
 import re
 
 from languette import scan as sw
-from languette.verdict import Need, ask, deny
+from languette.verdict import Act, Need, ask, deny
 
 NAME = "guard-cross-session-send"
 
@@ -224,10 +224,7 @@ def check(payload, env=os.environ):
     if event != "PreToolUse":
         rec = _record(payload, event) if sid else None
         if rec:
-            try:
-                yield Need("send-keep", sid, *rec)
-            except Exception:  # noqa: BLE001 -- World leaves an open door in place of a write that failed
-                pass
+            yield Act("send-keep", sid, *rec)   # a write that fails leaves an open door (World._send_keep)
         return None
 
     # --- the send -------------------------------------------------------------
