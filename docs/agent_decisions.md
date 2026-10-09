@@ -281,3 +281,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t073952z
 - README keeps its existing guard-list wording as on main and omits guard-signed-comments' bullet, since even its bare name puts the section over the 232-word cap (supersedes the README-trims call); the reads table keeps its row Undo: raise the 'The guards' section cap to 236 in its own PR, then add the bullet ': unsigned agent comments' ([#119](https://github.com/mark-brannan/languette/pull/119#discussion_r4227758381)) ([#119](https://github.com/mark-brannan/languette/pull/119))
+
+### 20261009t080848z
+- guard-review-threads asks, not denies, when GitHub cannot be read or names no such thread, matching guard-git-stacked-base and guard-bypass-ruleset; the design doc is silent on it. Supersedes the deny entry above Undo: return deny() instead of ask() in check()'s GitHub-unreadable branch and its scenario ([#118](https://github.com/mark-brannan/languette/pull/118))
