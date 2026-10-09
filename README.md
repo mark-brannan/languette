@@ -27,6 +27,8 @@ The guards run as `PreToolUse` hooks in Claude Code today, on shell commands,
 `gh` and GitHub MCP calls, and messages to other sessions; other agent hosts
 are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
+### Claude Code
+
 ```
 /plugin marketplace add mark-brannan/languette
 /plugin install languette@languette
@@ -35,7 +37,35 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 It needs `python3`, standard library only. `shfmt` (the parser it trusts
 most) and `gh` (for the two guards that ask GitHub) are optional.
 
-Without the plugin system, see [Installing by hand](#installing-by-hand).
+### macOS (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
+
+```
+brew install mark-brannan/tap/languette
+languette install && languette doctor
+```
+
+### Linux and WSL (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
+
+```
+sudo apt install python3 pipx shfmt gh
+pipx install languette
+languette install && languette doctor
+```
+
+### Windows without WSL
+
+languette protects Claude Code inside WSL: run `wsl --install`, then the
+Claude Code block above. An agent running natively in PowerShell is not protected.
+
+### Devcontainer, Codespace and CI (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
+
+One line in `devcontainer.json` installs languette before the agent starts:
+
+```json
+"postCreateCommand": "pipx install languette"
+```
+
+Without the plugin system or the installer, see [Installing by hand](#installing-by-hand).
 
 ## The guards
 
