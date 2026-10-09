@@ -1,5 +1,5 @@
 {
-  "lines": {"README.md": 390, "docs/design/guard-pipeline.md": 70, "must_budget": ["docs/design/*.md"]},
+  "lines": {"README.md": 390, "docs/design/guard-pipeline.md": 70, "docs/design/exceptions.md": 150, "must_budget": ["docs/design/*.md"]},
   "sections": {"targets": ["README.md", "docs/decisions.md", "docs/approved-guard-names.md", "docs/design/*.md"], "max_words": 288, "exempt": ["Configuration"]},
   "delta": {"targets": ["README.md", "docs/**/*.md", "!docs/agent_decisions.md", "!docs/decisions.md", "!docs/approved-guard-names.md", "!docs/design/*.md"], "max_words": 40},
   "narration": {
