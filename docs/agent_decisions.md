@@ -251,3 +251,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t071344z
 - guard-signed-comments checks the signature's eight hex for shape only, so a subagent may sign with its agent id Undo: compare the eight hex to the payload's session_id[:8] ([#119](https://github.com/mark-brannan/languette/pull/119))
+
+### 20261009t071350z
+- guard-signed-comments denies a relative --body-file after a cd in the same command rather than replaying the cd Undo: replay the cd with guard-private-terms' _Replay ([#119](https://github.com/mark-brannan/languette/pull/119))
