@@ -248,3 +248,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t071336z
 - guard-signed-comments gates comment edits too: a non-GET gh api on a comments path and the three graphql update mutations Undo: drop updateIssueComment, updatePullRequestReviewComment and updatePullRequestReview from _MUTATION and gate only POST on a comments path ([#119](https://github.com/mark-brannan/languette/pull/119))
+
+### 20261009t071344z
+- guard-signed-comments checks the signature's eight hex for shape only, so a subagent may sign with its agent id Undo: compare the eight hex to the payload's session_id[:8] ([#119](https://github.com/mark-brannan/languette/pull/119))
