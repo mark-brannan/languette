@@ -266,3 +266,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t071702z
 - guard-review-threads denies every gh api graphql call whose query is out of sight (run-time, @file, --input with no heredoc), even a read; a run-time value in another field does not count. Supersedes the narrower rule above Undo: restore the names-a-thread condition on the hidden clause in _resolves ([#118](https://github.com/mark-brannan/languette/pull/118))
+
+### 20261009t072014z
+- guard-signed-comments denies an unreadable graphql query only when a body field or an --input payload travels with it; alone it stays silent (supersedes the earlier silent-on-unreadable call) Undo: deny every unreadable graphql query in bodies() ([#119](https://github.com/mark-brannan/languette/pull/119#discussion_r4227666481))
