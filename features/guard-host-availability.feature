@@ -51,6 +51,13 @@ Feature: guard-host-availability
       | systemctl --job-mode replace stop sshd   | systemctl stop sshd            | an option's value before the verb     |
       | systemctl -T reboot                      | systemctl reboot               | a flag that takes no value            |
       | systemctl --what status reboot           | systemctl reboot               | an unknown option before a read verb  |
+      | systemctl --root -M stop sshd            | systemctl stop sshd            | -M as an option's value, not a host   |
+      | systemctl -p --user stop sshd            | systemctl stop sshd            | --user as an option's value           |
+      | systemctl stop 'ssh*'                    | systemctl stop ssh*            | a glob may match a session service    |
+      | systemctl stop sshd.socket               | systemctl stop sshd.socket     | another unit type                     |
+      | systemctl stop user@1000.service         | systemctl stop user@1000.service | the user's whole session            |
+      | systemctl stop session-3.scope           | systemctl stop session-3.scope | a login session                       |
+      | systemctl isolate graphical.target       | systemctl isolate              |                                       |
 
   Scenario: a fork bomb on a later line is still seen
     When the agent runs:

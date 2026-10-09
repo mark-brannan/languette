@@ -24,7 +24,8 @@ _CTL_HOST = {"isolate", "rescue", "emergency", "halt", "poweroff", "reboot", "ke
 _CTL_STOP = {"stop", "restart", "try-restart", "reload-or-restart", "try-reload-or-restart", "kill"}
 # The services a session runs on: stopping one cuts the user off the machine.
 _SESSION = {"ssh", "sshd", "systemd-logind", "dbus", "dbus-broker", "NetworkManager", "systemd-networkd",
-            "display-manager", "gdm", "gdm3", "sddm", "lightdm"}
+            "display-manager", "gdm", "gdm3", "sddm", "lightdm", "getty", "user",
+            "multi-user", "graphical", "default", "network", "network-online", "basic", "sysinit"}
 # Options that take a separate value; the value is not the verb. A missing one only fails closed.
 _CTL_ARG = {"-t", "--type", "-p", "--property", "-s", "--signal", "-n", "--lines", "-o", "--output",
             "--root", "--state", "--job-mode", "--kill-whom", "--kill-who", "--preset-mode", "--timestamp"}
@@ -51,18 +52,26 @@ def _power(s, a, b):
     return None if g is None else os.path.basename(s.w[g])
 
 
+def _session_unit(u):
+    """True when the unit is, or may match, one the session runs on. A glob fails closed."""
+    if any(c in u for c in "*?["):
+        return True
+    base = re.sub(r"\.(?:service|socket|target|scope|slice)\Z", "", u).split("@")[0]
+    return base in _SESSION or base.startswith("session-")
+
+
 def _service_stop(s, a, b):
     """`<verb>` or `<verb> <unit>` when the segment takes the host or a session service down, else None."""
     g = sw.cmd_index(s, a, b, _CTL, True)
     if g is None:
         return None
     words = [s.w[i] for i in range(g + 1, b + 1) if s.k[i] == "w"]
-    if any(w in _CTL_OTHER or w.startswith(("--host=", "--machine=")) for w in words):
-        return None
     pos, skip, known = [], False, True
     for w in words:
         if skip:
             skip = False
+        elif w in _CTL_OTHER or w.startswith(("--host=", "--machine=")):
+            return None                        # tested here, so an option's value (`--root -M`) is not it
         elif w in _CTL_ARG:
             skip = True
         elif w.startswith("-"):
@@ -77,7 +86,7 @@ def _service_stop(s, a, b):
         if w in _CTL_HOST:
             return w
         if w in _CTL_STOP or (w in ("disable", "mask") and "--now" in words):
-            unit = next((u for u in pos[i + 1:] if re.sub(r"\.service\Z", "", u) in _SESSION), None)
+            unit = next((u for u in pos[i + 1:] if _session_unit(u)), None)
             if unit:
                 return f"{w} {unit}"
     return None
