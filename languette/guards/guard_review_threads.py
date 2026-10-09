@@ -9,7 +9,9 @@ gh login replied after the bot's last comment, and that reply names a commit
 or a link. It checks that a record is named, not that the commit exists. A
 thread no bot commented on passes. A `gh api graphql` whose query it cannot
 read (a run-time word, a file, stdin with no heredoc), an id it cannot read,
-or GitHub that cannot answer, is a deny that says so.
+or GitHub that cannot answer, is a deny that says so; so is a `gh api` whose
+endpoint is built at run time and could be graphql. Only gh is read: a POST
+to the GraphQL endpoint by another client (curl, a script) is not.
 """
 
 import json
@@ -27,6 +29,7 @@ SHA = re.compile(r"(?<![0-9A-Za-z])(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{
 LINK = re.compile(r"https://\S+|(?<![\w./-])[\w.-]+/[\w.-]+#[0-9]+\b")
 GRAPHQL = re.compile(r"(?:https?://[^/]+)?/*(?:api/v3/)?graphql")
 QUERY_FIELD = re.compile(r"(?:-[fF]|--(?:raw-)?field=)?query=")
+VAR = re.compile(r"\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])|\$\([^)]*\)|`[^`]*`|[\"']")
 TIMEOUT = 10
 # The last 100 comments: the bot's last word and every reply after it.
 QUERY = ("query($id: ID!) { viewer { login } node(id: $id) { ... on PullRequestReviewThread { "
@@ -49,6 +52,15 @@ def _input(words):
     return None
 
 
+def _decoded(body):
+    """A heredoc body, and, when it is JSON, its decoded text too: a \\u escape
+    can spell the mutation's name."""
+    try:
+        return body + "\n" + json.dumps(json.loads(body), ensure_ascii=False)
+    except ValueError:
+        return body
+
+
 def _resolves(command):
     """(thread ids, unreadable): the PRRT_ ids each resolving gh call in
     `command` names, in order; unreadable when one names none or builds a
@@ -56,7 +68,7 @@ def _resolves(command):
     at run time, read from a file, or stdin with no heredoc), since that
     query cannot be shown not to resolve a thread."""
     buf = command + "\n"
-    hd = "\n".join(sw.heredoc_bodies(buf))
+    hd = "\n".join(_decoded(b) for b in sw.heredoc_bodies(buf))
     ids, unreadable = [], False
     for text, nested in sw.texts_of(sw.strip_heredocs(buf)):
         s = sw.Scan(text)
@@ -65,7 +77,13 @@ def _resolves(command):
             if g is None:
                 continue
             words = [_wv(s, i) for i in range(g + 1, b + 1) if s.k[i] in ("w", "q")]
-            if "api" not in words or not any(GRAPHQL.fullmatch(w) for w in words):
+            if "api" not in words:
+                continue
+            if not any(GRAPHQL.fullmatch(w) for w in words):
+                # A run-time word that could spell the endpoint cannot be shown not to be graphql.
+                unreadable = unreadable or any(
+                    s.live[i] and "graphql".endswith(VAR.sub("", _wv(s, i)).rsplit("/", 1)[-1])
+                    for i in range(g + 1, b + 1) if s.k[i] in ("w", "q"))
                 continue
             src = _input(words)
             body = "\n".join(words) + ("\n" + hd if src == "-" else "")
@@ -131,7 +149,7 @@ def _thread(cwd, tid):
 
 def check(payload, env=None):
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if not isinstance(cmd, str) or "graphql" not in cmd:
+    if not isinstance(cmd, str) or "api" not in cmd:
         return None
     ids, unreadable = _resolves(cmd)
     if unreadable:

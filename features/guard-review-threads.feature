@@ -221,6 +221,31 @@ Feature: guard-review-threads
       | /graphql                         |
       | https://api.github.com/graphql   |
 
+  Scenario: a JSON escape in the --input heredoc does not hide the mutation
+    Given review thread "PRRT_t1" holds:
+      | author       | body                |
+      | coderabbitai | Consider a rename.  |
+    When the agent runs:
+      """
+      gh api graphql --input - <<'EOF'
+      {"query": "mutation { resolveReviewThread(input: {threadId: \"PRRT_t1\"}) { thread { id } } }"}
+      EOF
+      """
+    Then the guard denies, naming "no reply from me after"
+
+  Scenario Outline: an endpoint built at run time that could be graphql is denied
+    When the agent runs `<command>`
+    Then the guard denies, naming "cannot tell which review thread"
+
+    Examples:
+      | command                                                                                          |
+      | E=graphql; gh api "$E" -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}' |
+      | E=graph; gh api "${E}ql" -f id=PRRT_t1                                                           |
+
+  Scenario: a REST call with a run-time path is not this guard's
+    When the agent runs `gh api "repos/$R/pulls/5"`
+    Then the guard is silent
+
   Scenario: a readable query with a run-time field resolves nothing, and is not this guard's
     When the agent runs `gh api graphql -f query='query($n:Int!){viewer{login}}' -F n="$N"`
     Then the guard is silent
