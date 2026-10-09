@@ -105,9 +105,11 @@ def _imports(tree):
             for a in n.names:
                 names[a.asname or a.name.split(".")[0]] = a.name if a.asname else a.name.split(".")[0]
         elif isinstance(n, ast.ImportFrom):
-            # A relative import keeps its tail: `from ..verdict import Need as N` -> verdict.Need.
+            # A relative import is languette's own: `from ..verdict import Need as N` ->
+            # languette.verdict.Need, never the stdlib `secrets` that `from . import secrets` would read as.
+            pkg = "languette." if n.level else ""
             for a in n.names:
-                names[a.asname or a.name] = f"{n.module}.{a.name}" if n.module else a.name
+                names[a.asname or a.name] = f"{pkg}{n.module}.{a.name}" if n.module else f"{pkg}{a.name}"
     return names
 
 
@@ -152,9 +154,12 @@ def escapes(source):
         elif isinstance(n, ast.Call) and (_dotted(n.func, names) or "").endswith(NEED) \
                 and n.args and isinstance(n.args[0], ast.Constant):
             kind = n.args[0].value
-            op = n.args[1].value if len(n.args) > 1 and isinstance(n.args[1], ast.Constant) else ""
-            if kind in WRITES or (kind, op) in WRITES:
-                out.append((n.lineno, f"Need {kind} {op}".rstrip()))
+            op = n.args[1].value if len(n.args) > 1 and isinstance(n.args[1], ast.Constant) else None
+            # An op the source does not spell, on a kind with a write op, may be that op.
+            if kind in WRITES:
+                out.append((n.lineno, f"Need {kind}"))
+            elif (kind, op) in WRITES or (op is None and any(w[0] == kind for w in WRITES if isinstance(w, tuple))):
+                out.append((n.lineno, f"Need {kind} {'?' if op is None else op}"))
     return sorted(out)
 
 
@@ -216,6 +221,7 @@ def test_every_known_escape_is_still_there():
     "yield Need('door', 'claim', s, c)",
     "from ..verdict import Need as N\nyield N('claim', {})",
     "from os import *",
+    "yield Need('door', op, s, c)",
     "import os\nos.uname()",
     "import platform",
     "import logging\nlogging.FileHandler('x')",
@@ -241,6 +247,9 @@ def test_the_check_catches(source):
     "yield Need('worktree', 'recorded', r)",
     "import logging\nlogging.getLogger('x')",
     "from .. import paths\npaths.physical(x)",
+    "from ..secrets import findings\nfindings(s, [])",
+    "from . import secrets\nsecrets.findings(s, [])",
+    "yield Need('which', name)",
 ])
 def test_the_check_passes(source):
     assert_that(escapes(source), empty())
