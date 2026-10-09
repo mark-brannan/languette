@@ -27,7 +27,8 @@ Feature: guard-review-threads
   or one of coderabbitai, claude, copilot-pull-request-reviewer and
   github-actions; the gh login's own comments are replies, even when that
   login is a bot. The guard checks that a reply names a record, not that
-  the commit exists.
+  the commit exists. Only gh is read: a POST to the GraphQL endpoint by
+  another client (curl, a script) is not this guard's.
 
   Background:
     Given the stub "gh" is first on PATH, for a Python guard
