@@ -299,3 +299,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t191154z
 - approved guard names: the Concept and Under the umbrella wording is the agent's, drawn from the README and the rename draft Undo: edit the row ([#130](https://github.com/mark-brannan/languette/pull/130))
+
+### 20261009t192906z
+- new-guard-names: CI job, not pre-commit; table read from the PR base, found by its heading anywhere under docs/; a renamed NAME counts as new Undo: drop or edit the new-guard-names job in ci.yml ([#132](https://github.com/mark-brannan/languette/pull/132))
