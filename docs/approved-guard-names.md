@@ -6,6 +6,7 @@ A countable thing is plural (`guard-secrets`); an act or a mass noun is singular
 |---|---|---|
 | `ask-first` | commands the repo lists as costly | each runs only after the user approves that run |
 | `deny-always` | commands the repo forbids | each listed command, denied every time |
+| `require-well-formed` | commands the guards can read whole | a command that does not parse, or is too big or too deep to parse |
 | `guard-commits` | the repo's commit policy | a commit that fails a check the repo lists |
 | `guard-databases` | stored data | SQL or NoSQL drops, unbounded deletes, migration resets, restores |
 | `guard-disks` | disks and volumes | `dd`, `mkfs`, `wipefs`, `shred` onto a device; partitioning; pool removal |
