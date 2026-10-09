@@ -1,6 +1,6 @@
 {
   "name": "languette",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, commands that destroy infrastructure, untrusted text relayed to another of your sessions, and a credential pasted into a command.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, stopping a service you depend on, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, commands that destroy infrastructure, untrusted text relayed to another of your sessions, and a credential pasted into a command.",
   "author": {
     "name": "Mark Brannan"
   },
@@ -84,8 +84,21 @@
     "guard_host_availability": {
       "type": "boolean",
       "title": "Block shutdowns and the fork bomb",
-      "description": "Deny shutdown, reboot, halt, poweroff and the fork-bomb shape. Leave on unless you want an agent able to take the machine down.",
+      "description": "Deny shutdown, reboot, halt, poweroff, the fork-bomb shape, and a systemctl stop of a unit the host cannot run without (dbus, logind, a login session). Leave on unless you want an agent able to take the machine down, as in a chaos test.",
       "default": true
+    },
+    "guard_protected_services": {
+      "type": "boolean",
+      "title": "Block stopping a protected service",
+      "description": "Deny a systemctl stop, restart or kill of a service named in protected_services. Leave on unless you want an agent able to stop the services your machine depends on.",
+      "default": true
+    },
+    "protected_services": {
+      "type": "string",
+      "title": "Protected services",
+      "description": "Services an agent may not stop, restart or kill with systemctl: unit names, comma-separated, a trailing .service optional, * globs allowed. A name also covers its socket and its @instances. Empty means the default, the services a session reaches the machine through.",
+      "default": "ssh,sshd,NetworkManager,systemd-networkd,network,network-online,display-manager,gdm,gdm3,sddm,lightdm,getty",
+      "required": false
     },
     "guard_scheduled_jobs": {
       "type": "boolean",
@@ -151,12 +164,6 @@
       "type": "string",
       "title": "Private repos",
       "description": "Repos whose issue and PR text is never scanned, as owner/name, comma-separated. Empty by default: every repo is scanned.",
-      "required": false
-    },
-    "protected_services": {
-      "type": "string",
-      "title": "Protected services",
-      "description": "Services your machine depends on, which an agent may not stop, restart or kill with systemctl: unit names, comma-separated, a trailing .service optional, * globs allowed. Added to the built-in list (ssh, login, dbus, the network, the display manager); never replaces it. Empty by default.",
       "required": false
     },
     "guard_cross_session_send": {

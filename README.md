@@ -51,7 +51,8 @@ Each guard checks for one kind of hazard:
 - [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`, `sh <(curl ..)`,
   `eval "$(wget ..)"`
 - [`guard-disk`](features/guard-disk.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
-- [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb, `systemctl stop sshd`
+- [`guard-host-availability`](features/guard-host-availability.feature): shutdown, fork bomb, `systemctl stop dbus`
+- [`guard-protected-services`](features/guard-protected-services.feature): `systemctl stop sshd`
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
 - [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
   `stash pop`, force-push, `reset --hard` and other moves that throw work away
@@ -210,15 +211,6 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 | `private_repos` | repos whose posts are never scanned, comma-separated | `you/notes,you/scratch` |
 
 Without a terms file the guard is off.
-
-### Settings for `guard-host-availability`
-
-| Setting | Holds | Example |
-|---|---|---|
-| `protected_services` | services an agent may not stop, restart or kill, comma-separated; `*` globs, `.service` optional | `postgresql@*,wireguard` |
-
-They add to the built-in list (ssh, login, dbus, the network, the display
-manager) and never replace it. Empty changes nothing.
 
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
 comma-separated; empty means `churn-ok,mixed-loops-ok`.

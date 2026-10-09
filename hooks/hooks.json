@@ -41,6 +41,11 @@
           },
           {
             "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_PROTECTED_SERVICES-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-protected-services; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-protected-services and was not found on PATH. This is a gate and fails closed: install python3, or set guard_protected_services=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-protected-services) is missing from the plugin directory or crashed, so a stop of a protected service could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for a stop of a protected service"
+          },
+          {
+            "type": "command",
             "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-scheduled-jobs; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-scheduled-jobs and was not found on PATH. This is a gate and fails closed: install python3, or set guard_scheduled_jobs=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-scheduled-jobs) is missing from the plugin directory or crashed, so a crontab deletion could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for a crontab deletion"
           },

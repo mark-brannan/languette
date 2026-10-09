@@ -19,13 +19,13 @@ GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-ba
           "guard-private-terms", "prose-budget-commit", "guard-worktrees",
           "guard-bypass-labels", "guard-unparsable", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
           "guard-permissions", "guard-pipe-to-shell", "guard-disk",
-          "guard-host-availability", "guard-scheduled-jobs", "guard-cross-session-send",
+          "guard-host-availability", "guard-protected-services", "guard-scheduled-jobs", "guard-cross-session-send",
           "guard-secrets"}
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"guard_worktrees"}
 # Options that are not a guard's on/off toggle: name -> type.
-OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "protected_services": "string", "bypass_labels": "string",
-                 "prose_budget_command": "string",
+OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string",
+                 "protected_services": "string", "prose_budget_command": "string",
                  "record_decisions": "boolean", "record_raw_commands": "boolean"}
 # Per-rule switches inside one guard: boolean, on by default.
 RULE_OPTIONS = {f"guard_git_work_loss_{r}" for r in ("blanket_staging", "stash", "force_push", "discard", "branch_delete")} | {

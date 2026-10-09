@@ -3,12 +3,13 @@
 Blocks the commands that take the machine down: shutdown, reboot, halt and
 poweroff, at command position or as the one-word script of `sh -c`, the
 fork-bomb shape, and a `systemctl` verb that takes the host down or stops a
-service the user's session runs on (ssh, login, dbus, the network, the display
-manager) or one the protected_services setting names. The user's own `--user` manager and a remote `-H`/`-M` host are not
-the host. Any other service is the agent's to stop.
+unit the host cannot run without (dbus, logind, a login session, a run-level
+target). Nobody stops those except to chaos-test the host. The services a user
+merely depends on (ssh, the network, the display manager) are
+guard-protected-services'. The user's own `--user` manager and a remote
+`-H`/`-M` host are not the host.
 """
 
-import fnmatch
 import json
 import os
 import re
@@ -23,11 +24,8 @@ _CTL = re.compile(r"(?:^|/)systemctl\Z")
 _CTL_OTHER = {"--user", "-H", "--host", "-M", "--machine"}
 _CTL_HOST = {"isolate", "rescue", "emergency", "halt", "poweroff", "reboot", "kexec", "soft-reboot"}
 _CTL_STOP = {"stop", "restart", "try-restart", "reload-or-restart", "try-reload-or-restart", "kill"}
-# The services a session runs on: stopping one cuts the user off the machine.
-_SESSION = {"ssh", "sshd", "systemd-logind", "dbus", "dbus-broker", "NetworkManager", "systemd-networkd",
-            "display-manager", "gdm", "gdm3", "sddm", "lightdm", "getty", "user",
-            "multi-user", "graphical", "default", "network", "network-online", "basic", "sysinit"}
-OPTION = "CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES"
+# The units the host cannot run without: stopping one is a chaos test, not maintenance.
+_CORE = {"systemd-logind", "dbus", "dbus-broker", "user", "multi-user", "graphical", "default", "basic", "sysinit"}
 # Options that take a separate value; the value is not the verb. A missing one only fails closed.
 _CTL_ARG = {"-t", "--type", "-p", "--property", "-s", "--signal", "-n", "--lines", "-o", "--output",
             "--root", "--state", "--job-mode", "--kill-whom", "--kill-who", "--preset-mode", "--timestamp"}
@@ -54,22 +52,22 @@ def _power(s, a, b):
     return None if g is None else os.path.basename(s.w[g])
 
 
-def _protected(env):
-    """The `protected_services` patterns: comma-separated, a trailing `.service` optional, globs allowed."""
-    return [re.sub(r"\.service\Z", "", p.strip()) for p in (env.get(OPTION) or "").split(",") if p.strip()]
+def unit_names(u):
+    """The names `u` answers to: as written, without its unit-type suffix, and without its `@instance`."""
+    bare = re.sub(r"\.(?:service|socket|target|scope|slice)\Z", "", u)
+    return {u, bare, bare.split("@")[0]}
 
 
-def _session_unit(u, extra=()):
-    """True when the unit is, or may match, one the session runs on or the user protects. A glob fails closed."""
+def _core_unit(u):
+    """True when the unit is, or may match, one the host cannot run without. A glob fails closed."""
     if any(c in u for c in "*?["):
         return True
-    base = re.sub(r"\.(?:service|socket|target|scope|slice)\Z", "", u).split("@")[0]
-    return (base in _SESSION or base.startswith("session-")
-            or any(fnmatch.fnmatchcase(re.sub(r"\.service\Z", "", u), p) for p in extra))
+    return any(n in _CORE or n.startswith("session-") for n in unit_names(u))
 
 
-def _service_stop(s, a, b, extra=()):
-    """`<verb>` or `<verb> <unit>` when the segment takes the host or a session service down, else None."""
+def service_stop(s, a, b, hit, host_verbs=_CTL_HOST):
+    """`<verb>` or `<verb> <unit>` when the segment's host `systemctl` runs one of `host_verbs`,
+    or stops a unit `hit` accepts; else None."""
     g = sw.cmd_index(s, a, b, _CTL, True)
     if g is None:
         return None
@@ -91,10 +89,10 @@ def _service_stop(s, a, b, extra=()):
     # The verb is the first word past the options, but an option's value looks like a word too
     # (`--root /x reboot`), so any down verb in the segment counts unless a read verb leads.
     for i, w in enumerate(pos):
-        if w in _CTL_HOST:
+        if w in host_verbs:
             return w
         if w in _CTL_STOP or (w in ("disable", "mask") and "--now" in words):
-            unit = next((u for u in pos[i + 1:] if _session_unit(u, extra)), None)
+            unit = next((u for u in pos[i + 1:] if hit(u)), None)
             if unit:
                 return f"{w} {unit}"
     return None
@@ -102,7 +100,6 @@ def _service_stop(s, a, b, extra=()):
 
 def judge(text, env=os.environ):
     """The deny reason for `text`, or None."""
-    extra = _protected(env)
     for t, _ in sw.texts_of(sw.strip_heredocs(text)):
         s = sw.Scan(t)
         segs = [(a, b) for a, b in s.segments() if a <= b]
@@ -111,10 +108,10 @@ def judge(text, env=os.environ):
             if what:
                 return f"`{what}` is blocked: it takes the machine down, with the user's session on it. {_WAY_USER}"
         for a, b in segs:
-            verb = _service_stop(s, a, b, extra)
+            verb = service_stop(s, a, b, _core_unit)
             if verb:
-                return (f"`systemctl {verb}` is blocked: it takes down the host or a service the "
-                        f"user's session runs on. {_WAY_USER}")
+                return (f"`systemctl {verb}` is blocked: it takes down the host or a unit the host "
+                        f"cannot run without. {_WAY_USER}")
         # The fork bomb is raw text, so a commit message that quotes it must not trip it:
         # only a text with a segment that is not led by a prose consumer is read.
         if any(sw.seg_cmd(s, a, b) is None or s.w[sw.seg_cmd(s, a, b)] not in sw.PROSE or s.shellseg
