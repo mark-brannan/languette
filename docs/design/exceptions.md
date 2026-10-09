@@ -13,13 +13,11 @@ across a step's edge, and one place turns a failure into a deny.
 
 ## The rule
 
-> A pure step never sees an exception from I/O.
->
-> - A Need is answered with a value. A fact that cannot be had is still a
->   value, one that says why, and the guard decides what it means.
-> - A pure step's own exceptions are raised and caught inside it; none
->   leaves the step.
-> - Any other exception is a bug. The runner's catch-all turns it into a deny.
+> A pure step never sees an exception from I/O. A Need is answered with a
+> value; a fact that cannot be had is a value saying why, and the guard
+> decides what it means. Exceptions inside a pure step are its own, raised
+> and caught there; anything else is a bug, and the runner's catch-all makes
+> it a deny.
 
 ## The classes kept
 
