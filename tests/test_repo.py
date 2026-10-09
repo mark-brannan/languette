@@ -12,7 +12,7 @@ from hamcrest import assert_that, contains_string, empty, equal_to, has_length, 
 
 import readme_table
 from conftest import hooks_json_commands, hooks_json_prompt_command
-from languette.guards import guard_github_issues, guard_private_terms
+from languette.guards import guard_github_issues, guard_private_terms, guard_protected_services
 
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
@@ -148,6 +148,12 @@ def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():
         want = key not in OPT_IN
         assert opt.get("type") == "boolean" and opt.get("default") is want and opt.get("title") \
             and opt.get("description"), f"userConfig.{key}: want a titled, described boolean defaulting to {str(want).lower()}"
+
+
+def test_the_protected_services_default_is_the_guards_default():
+    uc = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())["userConfig"]
+    assert_that(guard_protected_services.protected({guard_protected_services.OPTION: uc["protected_services"]["default"]}),
+                equal_to(guard_protected_services.DEFAULT))
 
 
 # The parser ladder's pip parsers (docs/decisions.md, "Runtime dependencies"):
