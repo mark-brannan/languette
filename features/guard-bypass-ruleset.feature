@@ -306,6 +306,18 @@ Feature: guard-bypass-ruleset
       | while true; do cd {TMP}/m; break; done; git push origin HEAD | a while loop                       |
       | for d in a b; do git push origin HEAD; cd {TMP}/m; done   | a later pass runs the push after the cd |
 
+  Scenario Outline: a cd in a then branch never lends its directory to the else or elif after it
+    Given a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
+    And the working directory is "{TMP}/m"
+    When the agent runs `<command>`
+    Then the guard asks
+
+    Examples:
+      | command                                                              | note                              |
+      | if false; then cd {TMP}/repo; else git push origin HEAD; fi         | the else runs where the if began  |
+      | if false; then cd {TMP}/repo; elif true; then git push origin HEAD; fi | so does an elif                 |
+
   Scenario: a subshell's cd never lends the push its branch
     Given HOME is "{TMP}"
     And a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"

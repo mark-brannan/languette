@@ -174,3 +174,4 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 ### 20261009t000619z
 - scanner: past the 64-text nested-string cap, texts_of raises and guard-unparsable denies, rather than read 64 and pass the rest Undo: return out in texts_of where add raises ([#105](https://github.com/mark-brannan/languette/pull/105))
 - guard-bypass-ruleset: a loop that holds a cd leaves the directory unknown from its top, so a push in it asks Undo: drop the n in loops clause in _walk ([#105](https://github.com/mark-brannan/languette/pull/105))
+- guard-bypass-ruleset: an else or elif after a branch that holds a cd leaves the directory unknown, so a push in it asks Undo: drop the else/elif clause in _walk ([#105](https://github.com/mark-brannan/languette/pull/105))

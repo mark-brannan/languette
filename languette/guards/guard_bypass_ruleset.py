@@ -353,8 +353,8 @@ def _walk(cmd, cwd, home=None):
     it is an element of a pipeline, its and-or list is backgrounded or carries on past `||`,
     it follows `||`, a command before it in its and-or list may have skipped it and the list
     ends, or a backtick follows. The last seven leave the directory unknown. A cd behind
-    `then`, `else`, `do` or `!` is seen; past the `fi` or `done` that closes it, the directory
-    is unknown, and through a whole loop that holds one, since a later pass starts where it left."""
+    `then`, `else`, `do` or `!` is seen; past the `else` or `elif` that follows it and past the `fi`
+    or `done` that closes it, the directory is unknown, and through a whole loop that holds one, since a later pass starts where it left."""
     pushes, admin, refused = [], False, None
     for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
         s, here, moved = sw.Scan(text), cwd, False
@@ -396,6 +396,8 @@ def _walk(cmd, cwd, home=None):
                 here = None                    # a later pass starts wherever the cd left it
             if close and kw and kw.pop():
                 here = None                    # the cd inside may not have run
+            if kw and a <= b and s.k[a] == "w" and not s.quoted[a] and s.w[a] in ("else", "elif") and kw[-1]:
+                here = None                    # a branch that did not run left no cd behind it
             if c is not None and _CD.match(s.w[c]):
                 kw = [True] * len(kw)
                 prev = _ops(s.op[a - 1]) if a > 0 else []
