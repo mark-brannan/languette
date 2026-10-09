@@ -357,4 +357,4 @@ in Python now, and this repo is where they are maintained.
 
 Markdown files are [CC BY-SA 4.0](LICENSE-CC-BY-SA); everything else is
 [AGPL-3.0-or-later](LICENSE), except where a file carries its own notice.
-Copyright 2026 Solace (Mark) Brannan. Credit "Solace Brannan" and link this repository.
+Copyright 2026 Mark Brannan. Credit "Mark Brannan" and link this repository.

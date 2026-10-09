@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you borrow from this work, please credit it as below."
 title: "languette: deterministic guards against risky actions by coding agents"
 authors:
-  - given-names: Solace
+  - given-names: Mark ("Solace")
     family-names: Brannan
 repository-code: "https://github.com/mark-brannan/languette"
 license:
