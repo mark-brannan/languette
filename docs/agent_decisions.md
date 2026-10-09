@@ -320,3 +320,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t220938z
 - smoke: the bashlex and tree-sitter-bash doctor rows are strict xfails, since the doctor does not name a pip parser; no doctor change here Undo: name the pip parser in the doctor's row and drop the two DOCTOR xfail reasons ([#142](https://github.com/mark-brannan/languette/pull/142))
+
+### 20261009t230316z
+- smoke.feature: the lexer row checks the deny names awk literally, dropping the (?:awk|lexer) tolerance Undo: make the reader cell match awk or lexer ([#146](https://github.com/mark-brannan/languette/pull/146))
