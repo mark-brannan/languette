@@ -2,8 +2,9 @@
 Feature: guard-signed-comments
   A comment an agent posts to GitHub is signed as an agent's. The body's
   first line begins with `🤖 ` and its last non-empty line is the signature,
-  `🤖 <model id> · <low|medium|high|-> · <eight lowercase hex>`: the model,
-  its effort, and the first eight hex of the session id.
+  `🤖 <model id> · <low|medium|high|xhigh|max|-> · <eight lowercase hex>`: the
+  model, its effort, and the first eight hex of the session id, checked
+  against the payload's when it carries one.
 
       🤖 Fixed in a03793a: …
 
@@ -15,7 +16,7 @@ Feature: guard-signed-comments
   reversal of the user's instruction was merged into the PR.
 
   It fires on Bash `gh pr comment`, `gh issue comment`, `gh pr review` with
-  a body, `gh api` writing a body to a path with a `comments` or `reviews`
+  a body, `gh pr|issue close|reopen --comment`, `gh api` writing a body to a path with a `comments` or `reviews`
   segment, and `gh api graphql` whose query adds, edits or submits a comment,
   review or review-thread reply. Editing a PR or issue body is not a comment.
   The body is read where it is written: --body/-b, --body-file/-F, gh api's
@@ -67,12 +68,31 @@ Feature: guard-signed-comments
         | 🤖 claude-opus-5-5 · high · 5a74df74    | is silent                  |
         | 🤖 claude-opus-5-5 · low · 5a74df74     | is silent                  |
         | 🤖 some-model · - · 00000000            | is silent                  |
-        | 🤖 claude-opus-5-5 · xhigh · 5a74df74   | denies, naming "last line" |
+        | 🤖 claude-opus-5-5 · xhigh · 5a74df74   | is silent                  |
+        | 🤖 claude-opus-5-5 · max · 5a74df74     | is silent                  |
+        | 🤖 claude-opus-5-5 · huge · 5a74df74    | denies, naming "last line" |
         | 🤖 claude-opus-5-5 · high · 5A74DF74    | denies, naming "last line" |
         | 🤖 claude-opus-5-5 · high · 5a74df7     | denies, naming "last line" |
         | 🤖 claude-opus-5-5 - high - 5a74df74    | denies, naming "last line" |
         | 🤖 · high · 5a74df74                    | denies, naming "last line" |
         | 🤖claude-opus-5-5 · high · 5a74df74     | denies, naming "first line" |
+
+    Scenario: the hex is this session's when the payload names one
+      Given the session is "0badcafe-1234"
+      When the agent runs:
+        """
+        gh pr comment 1 -b "🤖 Done.
+
+        🤖 claude-opus-5-5 · high · 0badcafe"
+        """
+      Then the guard is silent
+      When the agent runs:
+        """
+        gh pr comment 1 -b "🤖 Done.
+
+        🤖 claude-opus-5-5 · high · 5a74df74"
+        """
+      Then the guard denies, naming "not this session's (0badcafe)"
 
   Rule: an unsigned comment is denied, and the reason shows the signature
 
@@ -101,6 +121,10 @@ Feature: guard-signed-comments
         | gh api -X POST "repos/o/r/issues/1/comments?x=1" -f body=Done                                                               |
         | gh api graphql -f query='mutation { addDiscussionComment(input:{discussionId:"D", body:"Done"}) { clientMutationId } }'     |
         | gh api graphql -f query='mutation { updateDiscussionComment(input:{commentId:"C", body:"Done"}) { clientMutationId } }'     |
+        | gh pr close 5 --comment "Superseded by #6"                                                                                  |
+        | gh pr -R o/r reopen 5 -c Back                                                                                               |
+        | gh issue close 3 --reason "not planned" --comment=Duplicate                                                                 |
+        | gh issue reopen 3 -cBack                                                                                                    |
 
     Scenario Outline: the reason says which line is wrong
       When the agent runs `gh pr comment 1 -b "<body>"`
@@ -197,6 +221,7 @@ Feature: guard-signed-comments
         | echo Done \| gh pr comment 1 -F -                              |
         | gh api repos/o/r/issues/1/comments -f body="$(cat reply.md)"   |
         | gh api graphql -f query="$q" -f body=Done                      |
+        | gh api graphql -f query="$q" -f text=Done                      |
         | gh api graphql -f query='mutation { addComment(input:$in) { clientMutationId } }' -F in=@x.json |
 
     Scenario: a variable assigned twice, or after its use, cannot be read
@@ -227,6 +252,8 @@ Feature: guard-signed-comments
         | gh pr review 4 --approve                                                                                        |
         | gh pr review 4 --approve --body ""                                                                              |
         | gh pr comment 1 --web                                                                                           |
+        | gh pr close 5 --delete-branch                                                                                   |
+        | gh pr review 4 --comment                                                                                        |
         | gh pr view 116 --comments                                                                                       |
         | gh api repos/o/r/issues/1/comments                                                                              |
         | gh api repos/o/r/pulls/1/comments --jq '.[].body'                                                               |

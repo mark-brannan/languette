@@ -4,12 +4,12 @@ agent's. The spec is features/guard-signed-comments.feature.
 An agent posts under the user's own login, so without a mark a review bot and
 the next agent read its reply as the user's ruling. The body's first line
 begins with `🤖 ` and its last non-empty line is `🤖 <model> · <effort> ·
-<eight hex>`.
+<eight hex>`; the hex is the payload's session id's, when it has one.
 
 Fires on Bash `gh pr comment`, `gh issue comment`, `gh pr review` with a body,
-`gh api` writing a body to a path with a comments or reviews segment, and
-`gh api graphql` whose query adds, edits or submits a comment, review or
-thread reply. The body is read where it is written: --body/-b, --body-file/-F,
+`gh pr|issue close|reopen --comment`, `gh api` writing a body to a path with a
+comments or reviews segment, and `gh api graphql` whose query adds, edits or
+submits a comment, review or thread reply. The body is read where it is written: --body/-b, --body-file/-F,
 a gh api body field (literal or -F @file), --input JSON, a heredoc in the
 command, `$(cat <<EOF)` around one, or a $VAR this command assigns from one.
 Anything else built at run time is a deny, read as guard-private-terms reads
@@ -27,7 +27,7 @@ from languette.verdict import Need, deny
 NAME = "guard-signed-comments"
 GH = re.compile(r"(?:^|/)gh\Z")
 FIRST = "🤖 "
-SIGNATURE = re.compile(r"🤖 \S+ · (?:low|medium|high|-) · [0-9a-f]{8}")
+SIGNATURE = re.compile(r"🤖 \S+ · (?:low|medium|high|xhigh|max|-) · ([0-9a-f]{8})")
 _MUTATION = re.compile(r"\b(?:addComment|addPullRequestReviewComment|addPullRequestReviewThreadReply|"
                        r"addPullRequestReview|submitPullRequestReview|updateIssueComment|"
                        r"updatePullRequestReviewComment|updatePullRequestReview|addDiscussionComment|"
@@ -38,8 +38,11 @@ _FROM_DOC = re.compile(r"\$\(\s*cat\s+(?:-\s+)?HEREDOC(\d+)\s*\)")
 _VAR = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
 _HOME = re.compile(r"(?:~|\$HOME|\$\{HOME\})(?=/|\Z)")
 _MARK = " HEREDOC "
-# The two lines a body needs, shown in every reason; the hex is the session's when the payload has one.
+# The two lines a body needs, shown in every reason, with the payload's session hex.
 _EXAMPLE = "🤖 Fixed in a03793a: …\n\n🤖 claude-opus-5-5 · high · {hex}"
+# gh's verbs that post a comment, and the flags that carry its body.
+_VERBS = {("pr", "comment"): "b", ("issue", "comment"): "b", ("pr", "review"): "b",
+          ("pr", "close"): "c", ("pr", "reopen"): "c", ("issue", "close"): "c", ("issue", "reopen"): "c"}
 
 
 class _Unread(Exception):
@@ -133,12 +136,21 @@ class _Read:
         v = g + 2                          # -R/--repo may come before the verb
         while v <= hi and (self.wv(v) in ("-R", "--repo") or re.match(r"--repo=|-R.", self.wv(v))):
             v += 2 if self.wv(v) in ("-R", "--repo") else 1
-        if v > hi or (s.w[g + 1], self.wv(v)) not in (("pr", "comment"), ("issue", "comment"), ("pr", "review")):
+        verb = _VERBS.get((s.w[g + 1], self.wv(v))) if v <= hi else None
+        if verb is None:
             return
         bodies, i = [], v + 1
         while i <= hi:
             t, live = self.wv(i), s.live[i]
-            if t in ("--body", "-b") and i < hi:
+            if verb == "c":                 # close / reopen: only --comment/-c posts text
+                if t in ("--comment", "-c") and i < hi:
+                    i += 1
+                    bodies.append(self.val(self.wv(i), s.live[i]))
+                elif t.startswith("--comment="):
+                    bodies.append(self.val(t[10:], live))
+                elif re.match(r"-c.", t):
+                    bodies.append(self.val(t[2:], live))
+            elif t in ("--body", "-b") and i < hi:
                 i += 1
                 bodies.append(self.val(self.wv(i), s.live[i]))
             elif t in ("--body-file", "-F") and i < hi:
@@ -243,8 +255,8 @@ def check(payload, env):
     if not r.posts:
         return None
     sid = payload.get("session_id")
-    hexid = sid[:8] if isinstance(sid, str) and re.fullmatch(r"[0-9a-f]{8}", sid[:8]) else "5a74df74"
-    example = _EXAMPLE.format(hex=hexid)
+    hexid = sid[:8] if isinstance(sid, str) and re.fullmatch(r"[0-9a-f]{8}", sid[:8]) else None
+    example = _EXAMPLE.format(hex=hexid or "<first 8 hex of the session id>")
     cwd = payload.get("cwd")
     if not isinstance(cwd, str) or not cwd:
         cwd = yield Need("cwd")
@@ -323,8 +335,8 @@ def check(payload, env):
             try:
                 query = yield from text(qsrc)
             except _Unread:
-                # Not known to post, unless a body travels with it: then the signature is unchecked.
-                if inp is None and not any(k == "body" or k.endswith("[body]") for k in fields):
+                # Not known to post, unless a field or payload travels with it: one may be the body.
+                if inp is None and not any(k != "query" for k in fields):
                     return []
                 raise
         if not isinstance(query, str) or not _MUTATION.search(query):
@@ -368,11 +380,14 @@ def check(payload, env):
                 last = ([ln.rstrip() for ln in lines if ln.strip()] or [""])[-1]
                 if not lines[0].startswith(FIRST):
                     problems.append(f"the first line does not start with `{FIRST}`: `{_short(lines[0])}`")
-                if not SIGNATURE.fullmatch(last):
+                sig = SIGNATURE.fullmatch(last)
+                if not sig:
                     problems.append(f"the last line is not the signature: `{_short(last)}`")
+                elif hexid and sig.group(1) != hexid:
+                    problems.append(f"the last line's hex is not this session's ({hexid}): `{_short(last)}`")
     if not problems:
         return None
     return deny(f"{NAME}: this posts a GitHub comment under the user's login, so it must be signed as an agent's, "
                 f"or a reader takes it for the user's own words. Here {'; '.join(problems)}. Start the first line "
-                f"with `{FIRST}` and end with the line `🤖 <model id> · <low|medium|high|-> · <first 8 hex of the "
-                f"session id>`:\n\n{example}")
+                f"with `{FIRST}` and end with the line `🤖 <model id> · <low|medium|high|xhigh|max|-> · <first 8 "
+                f"hex of the session id>`:\n\n{example}")
