@@ -1,6 +1,6 @@
 {
   "name": "languette",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, commands that destroy infrastructure, untrusted text relayed to another of your sessions, and a credential pasted into a command.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, commands that destroy infrastructure, untrusted text relayed to another of your sessions, a credential pasted into a command, and an agent's GitHub comment not signed as an agent's.",
   "author": {
     "name": "Mark Brannan"
   },
@@ -152,6 +152,12 @@
       "title": "Private repos",
       "description": "Repos whose issue and PR text is never scanned, as owner/name, comma-separated. Empty by default: every repo is scanned.",
       "required": false
+    },
+    "guard_signed_comments": {
+      "type": "boolean",
+      "title": "Sign an agent's GitHub comments as an agent's",
+      "description": "Deny a PR or issue comment, review or review-thread reply posted through gh or gh api unless its body's first line starts with the robot emoji and its last line is the agent signature (model, effort, session). The agent posts under your login; the signature keeps its words from being read as yours. Leave on unless your agents never post comments.",
+      "default": true
     },
     "guard_cross_session_send": {
       "type": "boolean",

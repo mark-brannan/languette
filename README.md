@@ -39,10 +39,10 @@ Without the plugin system, see [Installing by hand](#installing-by-hand).
 
 ## The guards
 
-Each guard checks for one kind of hazard:
+Each guard checks one hazard:
 
 - [`guard-unparsable`](features/guard-unparsable.feature): a Bash command that
-  doesn't parse; the other guards skip it
+  doesn't parse; the others skip it
 - [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
 - [`guard-permissions`](features/guard-permissions.feature): recursive `chmod`,
@@ -69,10 +69,10 @@ Each guard checks for one kind of hazard:
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
   applying a label that waives a CI gate, such as `churn-ok`
 - [`guard-secrets`](languette/guards/guard_secrets.py): a pasted credential
+- [`guard-signed-comments`](features/guard-signed-comments.feature): unsigned agent comments
 - [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to another session: asks; in `bypassPermissions`, denies after a network read
 - `guard-protected-paths`, `guard-database` (planned)
-- [`ask-first`](#ask-first): a command the repo lists as costly, until you
-  approve that one run
+- [`ask-first`](#ask-first): a command the repo lists as costly, until you approve that one run
 - [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
 - [`guard-infra`](languette/guards/guard_infra.py): `terraform destroy`, `kubectl delete` and
@@ -263,6 +263,7 @@ for beyond the command, it declares:
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
 | `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
+| `guard-signed-comments` | the files a comment's body is read from |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
 | `guard-worktrees` | `$HOME` and what `git rev-parse --show-toplevel` resolves to; git, for where each path lands, and a record per session in `$TMPDIR` |
