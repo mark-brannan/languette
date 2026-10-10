@@ -131,6 +131,13 @@ jobs:
           git fetch -q --depth=1 origin "$BASE"
           python3 tests/new_guard_names.py "$BASE"
 
+  # A measurement, not a gate, so it stays out of ci-gate's needs.
+  complexity:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: mark-brannan/.github/.github/workflows/complexity.yml@main
+
   ci-gate:
     needs: [nonempty, pr-title, tests, smoke, shellcheck, prose-budget, new-guard-names]
     if: always()
