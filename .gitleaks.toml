@@ -1,0 +1,15 @@
+title = "languette gitleaks config"
+
+[extend]
+useDefault = true
+
+# Feature rows quote real command shapes, `curl ... -u "$STRIPE_KEY:"` among
+# them. A shell variable there is a placeholder, not a credential; a literal
+# after -u is still flagged.
+[[allowlists]]
+description = "shell-variable placeholders in feature-file command rows"
+condition = "AND"
+targetRules = ["curl-auth-user"]
+paths = ['''^features/.*\.feature$''']
+regexTarget = "line"
+regexes = ['''-u\s+"\$\{?[A-Z][A-Z0-9_]*\}?(:\$\{?[A-Z][A-Z0-9_]*\}?)?:?"''']
