@@ -347,3 +347,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261010t080121z
 - scan.texts_of takes read= so the document shares its scan memo Undo: copy texts_of into document.py ([#179](https://github.com/mark-brannan/languette/pull/179))
+
+### 20261010t080128z
+- tests/test_claim.py's fake guard is check(doc); no two-argument shim in the runner Undo: restore the fake and the shim ([#179](https://github.com/mark-brannan/languette/pull/179))
