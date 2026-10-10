@@ -273,4 +273,3 @@ Feature: infrastructure
       | ssh edge1 rm /opt/traefik/dynamic/routes.yml             | asks    |      |
       | ssh edge1 docker rm -f traefik                           | asks    |      |
       | ssh edge1 docker compose -f /opt/edge/compose.yml down traefik | asks |    |
-      | curl -X DELETE http://traefik.internal:8080/api/http/routers/web@file | asks | |
