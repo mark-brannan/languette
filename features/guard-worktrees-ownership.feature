@@ -229,8 +229,9 @@ Feature: guard-worktrees
 
   Scenario: with no session id nothing is remembered
     Given the payload carries no session id
+    When the agent runs `git status`
     And the working directory is "{TMP}/other-clone"
-    When the agent runs `git -C {TMP}/repo/.claude/worktrees/mine status`
+    And the agent runs `git -C {TMP}/repo/.claude/worktrees/mine status`
     Then the guard denies
 
   Scenario: a worktree reached by no vouched route is own only while the shell stands in it
