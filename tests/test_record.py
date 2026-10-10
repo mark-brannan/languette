@@ -99,6 +99,34 @@ def test_a_secret_the_command_does_not_spell_that_way_drops_the_text_not_the_sec
     assert record.mask("echo hi") == (None, 1)
 
 
+ACME = "acme_skzop8bx8jbs1x04d6233g6w"  # gitleaks:allow
+
+
+def _project(tmp_path, config):
+    d = tmp_path / "proj"
+    (d / ".languette").mkdir(parents=True)
+    (d / ".languette" / "secrets.json").write_text(config)
+    return str(d)
+
+
+def test_the_projects_own_patterns_mask_the_record(tmp_path):
+    cwd = _project(tmp_path, json.dumps({"patterns": [{"id": "acme-key", "regex": "acme_[a-z0-9]{24}"}]}))
+    out = run.respond(_payload(f"echo {ACME}", cwd=cwd), _env(tmp_path), "guard-secrets")
+    [rec] = _records(tmp_path)
+    assert json.loads(out) and rec["verdict"] == "deny"
+    assert rec["command"]["text"] == "echo <secret>" and rec["command"]["masked"] == 1
+    assert ACME not in json.dumps(rec)
+
+
+def test_a_project_list_that_cannot_be_read_drops_the_text_and_leaves_the_verdict(tmp_path):
+    cwd = _project(tmp_path, "not json")
+    want = run.respond(_payload(f"echo {ACME}", cwd=cwd), _env(tmp_path, on=False), "guard-secrets")
+    assert run.respond(_payload(f"echo {ACME}", cwd=cwd), _env(tmp_path), "guard-secrets") == want
+    [rec] = _records(tmp_path)
+    assert rec["command"] == {"text": None, "masked": None, "programs": ["echo"]}
+    assert ACME not in json.dumps(rec) and "reason" not in rec["findings"][0]
+
+
 def test_a_masking_failure_leaves_the_verdict_alone(tmp_path, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("detector broke")

@@ -31,9 +31,9 @@ MASK = "<secret>"
 MIN_MASKED = 8      # a shorter secret is not swapped in place; the text is dropped
 
 
-def mask(text):
+def mask(text, extra=()):
     """(text with each secret in it replaced by MASK, how many distinct ones),
-    by the detector guard-secrets uses. The text is the command as written, so
+    by the detector guard-secrets uses, with the project's own rules (`extra`). The text is the command as written, so
     quoting, spacing and heredocs survive: each word a finding names is swapped
     for its redacted form where it stands, or, when the shell unquoted it so it
     does not stand as read, just the secret in it is. Text is None when a
@@ -43,7 +43,7 @@ def mask(text):
     secret or a command that no longer reads as it ran."""
     out, secret, lost = text, set(), False
     for s in secrets.scans(text):
-        found = secrets.findings(s, mask_only=True)
+        found = secrets.findings(s, extra, mask_only=True)
         redacted = secrets.redact(s, found, MASK)
         for i in sorted({f.index for f in found}):
             word = secrets.word_text(s, i)
@@ -66,17 +66,17 @@ def mask(text):
     return (None if lost else out), len(secret)
 
 
-def _mask_prose(text):
+def _mask_prose(text, extra=()):
     """A guard's reason, masked: read as lines of data, not as shell."""
     s = secrets.Text(text)
-    return "\n".join(secrets.redact(s, secrets.findings(s, mask_only=True), MASK))
+    return "\n".join(secrets.redact(s, secrets.findings(s, extra, mask_only=True), MASK))
 
 
 def wanted(env):
     return env.get(ON) == "true"
 
 
-def _finding(guard, r, crashed, raw):
+def _finding(guard, r, crashed, raw, extra=()):
     """One guard's finding: what it decided, and its words when raw."""
     r = r or {}
     f = {"guard": guard, "decision": r.get("permissionDecision") or ("context" if r.get("additionalContext") else "none")}
@@ -86,9 +86,9 @@ def _finding(guard, r, crashed, raw):
     if why:
         if raw:
             f["reason"] = why
-        else:
+        elif extra is not None:
             try:
-                f["reason"] = _mask_prose(why)
+                f["reason"] = _mask_prose(why, extra)
             except Exception:  # noqa: BLE001 -- a reason that cannot be masked is left out, not the call
                 pass
     return f
@@ -124,8 +124,10 @@ def _rung(command):
         return None, False
 
 
-def build(payload, env, only, findings, verdict, clock=time.time):
-    """The record of one hook call. findings: [(guard name, its result, crashed)]."""
+def build(payload, env, only, findings, verdict, clock=time.time, extra=()):
+    """The record of one hook call. findings: [(guard name, its result, crashed)].
+    extra: the project's secret rules, gathered by the caller (run.py); None
+    when they could not be, and then no command text or reason is written."""
     raw = env.get(RAW) == "true"
     ti = payload.get("tool_input")
     command = ti.get("command") if payload.get("tool_name") == "Bash" and isinstance(ti, dict) else None
@@ -145,12 +147,12 @@ def build(payload, env, only, findings, verdict, clock=time.time):
             except Exception:  # noqa: BLE001
                 progs = None
             try:
-                text, n = mask(command)
+                text, n = (None, None) if extra is None else mask(command, extra)
             except Exception:  # noqa: BLE001 -- a command that cannot be masked is left out
                 text, n = None, None
             rec["command"] = {"text": text, "masked": n, "programs": progs}
     elif raw and ti is not None:
         rec["input"] = ti
-    rec["findings"] = [_finding(g, r, crashed, raw) for g, r, crashed in findings]
+    rec["findings"] = [_finding(g, r, crashed, raw, extra) for g, r, crashed in findings]
     rec["verdict"] = verdict
     return rec

@@ -135,6 +135,14 @@ def _load(path):
     return rules
 
 
+def project_rules(payload, env):
+    """The project's own rules, gathered: () when it has no list, Refuse when
+    the list is malformed. guard-secrets judges with them and so does the
+    decision record, which masks what the guard would deny."""
+    path = yield from _config(payload, env)
+    return (yield from _load(path)) if path else ()
+
+
 def check(payload, env=os.environ):
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if cmd is None or cmd is False:
@@ -145,8 +153,7 @@ def check(payload, env=os.environ):
     if not cmd:
         return None
     try:
-        path = yield from _config(payload, env)
-        extra = (yield from _load(path)) if path else ()
+        extra = yield from project_rules(payload, env)
     except Refuse as e:
         return deny(f"guard-secrets: {CONFIG} is {e}, so the project's secret patterns cannot be read. "
                     f"Fix the file; until then every Bash command is denied.")
