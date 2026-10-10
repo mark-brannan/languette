@@ -16,6 +16,7 @@ Feature: doctor
     When the doctor runs
     Then the "Claude Code" row is ✓ "plugin cd31356, user scope; 21 guards on, 0 off"
     And the "shell parser" row is there
+    And the "Claude Code" row comes before the "version" row
     And the "version" row comes before the "shell parser" row
     And the "gh" row is ✓ "signed in"
     And the "parse check" row is ✓ matching "^`echo \"unclosed` was denied: .+, \d+ ms$"
