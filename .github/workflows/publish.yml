@@ -100,3 +100,37 @@ jobs:
           git add .claude-plugin/plugin.json
           git commit -m "plugin: $TAG"
           git push --force origin HEAD:refs/heads/release
+
+  # The Homebrew tap builds from the tag's source tarball, so its formula
+  # follows each release: the new tag's url and the tarball's sha256. The
+  # tap's own workflow then builds and tests it. HOMEBREW_TAP_TOKEN is a
+  # fine-grained token scoped to the tap alone (Contents: read and write).
+  # If this fails after the upload, re-run only this job, as for
+  # plugin-release.
+  homebrew:
+    needs: pypi
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: mark-brannan/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      - env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag $TAG is not vX.Y.Z" >&2; exit 1; }
+          url="https://github.com/$REPO/archive/refs/tags/$TAG.tar.gz"
+          sha=$(curl -fsSL "$url" | sha256sum | cut -d' ' -f1)
+          sed -i -E \
+            -e "s|^(  url )\".*\"|\1\"$url\"|" \
+            -e "s|^(  sha256 )\".*\"|\1\"$sha\"|" \
+            Formula/languette.rb
+          git diff --exit-code --quiet Formula/languette.rb && { echo "formula already at $TAG"; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/languette.rb
+          git commit -m "languette ${TAG#v}"
+          git push origin HEAD
