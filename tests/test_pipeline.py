@@ -1,5 +1,5 @@
 """The document every guard reads (languette/document.py). Its promises on
-every scenario in features/ (parsed once, any order, pinned I/O) are checked
+every scenario in features/ (parsed once, pinned I/O) are checked
 as each one runs: tests/pipeline_checks.py."""
 
 import json

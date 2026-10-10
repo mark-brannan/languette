@@ -164,6 +164,8 @@
  "tests/test_features.py::test_each_cd_and_c_is_folded_onto_the_one_before_it[cd a; cd b; git commit -m x-separated by semicolons]": {"run": 1},
  "tests/test_features.py::test_each_cd_and_c_is_folded_onto_the_one_before_it[git -C a -C b commit -m x-two -C]": {"run": 1},
  "tests/test_features.py::test_enterworktree_by_path_is_denied_whatever_it_names_by_name_is_not": {"git": 3},
+ "tests/test_features.py::test_everyday_git_on_the_agents_own_branch_is_allowed[git push --force-with-lease origin topic-the one legitimate force]": {"git": 2},
+ "tests/test_features.py::test_everyday_git_on_the_agents_own_branch_is_allowed[git push -u origin topic-]": {"git": 2},
  "tests/test_features.py::test_exit_2_a_bad_budgets_config_warns_and_says_so": {"run": 1},
  "tests/test_features.py::test_exit_2_from_the_file_check_warns_too": {"run": 2},
  "tests/test_features.py::test_git_outside_home_and_nothing_pointing_back_at_it_is_allowed[/tmp-GIT_DIR={PROJ}/.git git checkout some-branch]": {"git": 5},
