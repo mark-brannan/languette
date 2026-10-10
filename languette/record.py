@@ -3,7 +3,8 @@ verdict, never read by it. Pure: World.keep writes it.
 
 Off unless record_decisions is on. The command and each guard's reason are
 kept whole except for what secrets.findings names as a secret (a known token
-shape, or a value a credential's name, option or URL gives away), which mask()
+shape, a value a credential's name, option or URL gives away, or, in its
+mask-only tier, a mysql -p password or a long random-looking run), which mask()
 replaces. When a secret cannot be masked cleanly the text is null.
 record_raw_commands masks nothing. `v`
 names the format, so a reader can refuse one it does not know.
@@ -40,7 +41,7 @@ def mask(text):
     cannot be placed, so a record with a hole beats one with a secret."""
     out, secret, lost = text, set(), False
     for s in guard_secrets.scans(text):
-        found = secrets.findings(s)
+        found = secrets.findings(s, mask_only=True)
         redacted = secrets.redact(s, found, MASK)
         for i in sorted({f.index for f in found}):
             word = secrets.word_text(s, i)
@@ -62,7 +63,7 @@ def mask(text):
 def _mask_prose(text):
     """A guard's reason, masked: read as lines of data, not as shell."""
     s = secrets.Text(text)
-    return "\n".join(secrets.redact(s, secrets.findings(s), MASK))
+    return "\n".join(secrets.redact(s, secrets.findings(s, mask_only=True), MASK))
 
 
 def wanted(env):

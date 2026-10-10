@@ -59,6 +59,8 @@ SECRET = [
     (f"curl -u acme:{PW} https://x", "curl -u acme:<secret> https://x"),  # gitleaks:allow
     (f"git clone https://acme:{PW}@git.example.com/a.git", "git clone https://acme:<secret>@git.example.com/a.git"),
     (f"echo {PAT}", "echo <secret>"),
+    ("mysql -u root -phunter2 db", "mysql -u root -p<secret> db"),  # mask-only: guard-secrets stays silent
+    ("echo " + "Ab3" * 12, "echo <secret>"),                          # mask-only: a long mixed-case run
     (f"bash -c 'export T={PAT}'", "bash -c 'export T=<secret>'"),
     (f"cat <<EOF\nDB_PASSWORD={PW}\nEOF", "cat <<EOF\nDB_PASSWORD=<secret>\nEOF"),
 ]
