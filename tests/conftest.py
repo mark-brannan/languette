@@ -885,12 +885,14 @@ def _languette_scan_big(ctx, args):
 
 @then("it prints:")
 def _prints(ctx, docstring):
-    assert (ctx.out, ctx.code) == (docstring + "\n", 0), f"exit {ctx.code}, stderr {ctx.err!r}"
+    assert ctx.code == 0, f"exit {ctx.code}, stderr {ctx.err!r}"
+    assert json.loads(ctx.out) == json.loads(docstring)
 
 
-@then("it prints nothing")
-def _prints_nothing(ctx):
-    assert (ctx.out, ctx.code) == ("", 0), f"exit {ctx.code}, stderr {ctx.err!r}"
+@then("it prints no segments")
+def _prints_no_segments(ctx):
+    assert ctx.code == 0, f"exit {ctx.code}, stderr {ctx.err!r}"
+    assert json.loads(ctx.out)["segments"] == []
 
 
 @then(parsers.re(r'it prints nothing and exits (?P<code>\d+), naming "(?P<text>.*)"'))
