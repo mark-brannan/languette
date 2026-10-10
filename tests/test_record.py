@@ -59,7 +59,7 @@ SECRET = [
     (f"curl -u acme:{PW} https://x", "curl -u acme:<secret> https://x"),  # gitleaks:allow
     (f"git clone https://acme:{PW}@git.example.com/a.git", "git clone https://acme:<secret>@git.example.com/a.git"),
     (f"echo {PAT}", "echo <secret>"),
-    ("mysql -u root -phunter2 db", "mysql -u root -p<secret> db"),  # mask-only: guard-secrets stays silent
+    (f"mysql -u root -p{PW} db", "mysql -u root -p<secret> db"),  # mask-only: guard-secrets stays silent
     ("echo " + "Ab3" * 12, "echo <secret>"),                          # mask-only: a long mixed-case run
     (f"bash -c 'export T={PAT}'", "bash -c 'export T=<secret>'"),
     (f"cat <<EOF\nDB_PASSWORD={PW}\nEOF", "cat <<EOF\nDB_PASSWORD=<secret>\nEOF"),
@@ -86,6 +86,11 @@ def test_the_record_masks_the_command(tmp_path):
 def test_a_reason_is_masked_as_lines_of_data():
     r = {"permissionDecision": "deny", "permissionDecisionReason": f"a\nDB_PASSWORD={PW}\nb"}
     assert record._finding("guard-x", r, False, False)["reason"] == "a\nDB_PASSWORD=<secret>\nb"
+
+
+def test_a_secret_too_short_to_swap_safely_drops_the_text_not_the_command():
+    # Swapping the one character "a" would rewrite every "a" in the command.
+    assert record.mask("mysql -u root -pa db") == (None, 1)
 
 
 def test_a_secret_the_command_does_not_spell_that_way_drops_the_text_not_the_secret(monkeypatch):
