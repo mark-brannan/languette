@@ -344,7 +344,7 @@ def _loops_moved(s, segs):
     return out
 
 
-def _walk(cmd, cwd, home=None):
+def _walk(doc, cmd, cwd, home=None):
     """(pushes, whether an admin merge was seen, the first Refuse). A Refuse ends only its own
     command, so an admin merge or a push on PR-only main later in the line still denies.
 
@@ -356,8 +356,8 @@ def _walk(cmd, cwd, home=None):
     `then`, `else`, `do` or `!` is seen; past the `else` or `elif` that follows it and past the `fi`
     or `done` that closes it, the directory is unknown, and through a whole loop that holds one, since a later pass starts where it left."""
     pushes, admin, refused = [], False, None
-    for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
-        s, here, moved = sw.Scan(text), cwd, False
+    for text, nested in doc.texts():
+        s, here, moved = doc.scan(text), cwd, False
         lits = None if nested else _Literals(s, cmd)
         # Each open bracket: (here, and the and-or list's state) as it opened. Scan keeps no
         # separator before the first word, so brackets that lead the text are read here. The
@@ -524,12 +524,13 @@ def _judge(p, env):
     return asked
 
 
-def check(payload, env=os.environ):
+def check(doc):
+    payload, env = doc.payload, doc.env
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd.strip():
         return None
     cwd = payload["cwd"]
-    pushes, admin, refused = _walk(cmd.rstrip("\n"), cwd, env.get("HOME"))
+    pushes, admin, refused = _walk(doc, cmd.rstrip("\n"), cwd, env.get("HOME"))
     if admin:
         return deny(ADMIN)
     asked = None

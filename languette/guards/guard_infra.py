@@ -285,12 +285,12 @@ def _candidates(s, g, b, nested):
     return [i for i in range(g, b + 1) if s.k[i] == "w" and _TOOL.search(s.w[i])]
 
 
-def _runs(text):
-    """({rule: [tool name per run]}, whether the text has a loop word). A
+def _runs(doc):
+    """({rule: [tool name per run]}, whether the command has a loop word). A
     segment is one run of at most one rule."""
     found, loop = {}, False
-    for t, nested in sw.texts_of(sw.strip_heredocs(text), PROSE):
-        s = sw.Scan(t)
+    for t, nested in doc.texts(PROSE):
+        s = doc.scan(t)
         loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
         for a, b in s.segments():
             if a > b:
@@ -306,11 +306,12 @@ def _runs(text):
     return found, loop
 
 
-def check(payload, env=None):
+def check(doc):
+    payload = doc.payload
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd.strip():
         return None
-    found, loop = _runs(cmd + "\n")
+    found, loop = _runs(doc)
     if not found:
         return None
     if loop:

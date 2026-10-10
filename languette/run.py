@@ -10,20 +10,16 @@ skip it), and a guard that raises is a deny naming the guard. No guard
 matched, or none objected, is exit 0 with no output; a deny outranks an ask.
 Standard library only.
 
-The shape: a guard is a pure function of the payload and env. A fact it can't
-read from them (a git ref, GitHub's rules for a branch, a file, the clock, the
-user's approvals) it asks for: its check is then a generator that yields a
-languette.verdict.Need and gets the answer back, and returns its finding. This
-runner answers every Need through languette.world, the only module that does
-I/O, and throws world's exception into the guard when the fact can't be had.
-A write it wants it yields as a languette.verdict.Act: the runner sends None
-back, and does every Act through world once the verdict is out.
-A guard whose check returns a finding directly needs no change.
-
-A guard whose questions are all known once the command is parsed has no
-check: parse(payload, env) reads the command, plan(parsed) lists every Need,
-the runner answers them all, and judge(parsed, answers) gets the answers keyed
-by Need, with an exception in place of a fact world could not have.
+The shape: the payload is parsed once into one read-only
+languette.document.Document, and every guard's check(doc) reads that one
+parse. A fact it can't read from the document (a git ref, GitHub's rules for
+a branch, a file, the clock, the user's approvals) it asks for: its check is
+then a generator that yields a languette.verdict.Need and gets the answer
+back, and returns its finding. This runner answers every Need through
+languette.world, the only module that does I/O, and throws world's exception
+into the guard when the fact can't be had. A write it wants it yields as a
+languette.verdict.Act: the runner sends None back, and does every Act through
+world once the verdict is out. Guards run one at a time, in one loop.
 Every guard sees the payload as sent: the runner never fills in a cwd, and
 denies a PreToolUse payload without an absolute one before any guard runs.
 """
@@ -51,7 +47,8 @@ try:
                                   guard_protected_services, guard_recursive_delete, guard_scheduled_jobs, guard_secrets,
                                   require_well_formed, guard_worktrees, prose_budget_commit)
     from languette import record
-    from languette.verdict import Act, Need, deny, verdict
+    from languette.document import Document
+    from languette.verdict import Act, deny, verdict
     from languette.world import ACTS, World
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
@@ -90,6 +87,13 @@ def _on(g, env):
     return not opt or env.get(opt) == "true"
 
 
+def wired(event, tool):
+    """Every guard registered for `event` and `tool`, in the order they judge. An
+    entry with no tool pattern matches an event with no tool."""
+    return [g for ev, rx, gs in GUARDS if ev == event and (rx is None or isinstance(tool, str) and rx.match(tool))
+            for g in gs]
+
+
 def _drive(r, world, acts):
     """A guard's finding: `r` itself, or what generator `r` returns once every Need it
     yields is answered. Each Act it yields goes on `acts`."""
@@ -114,16 +118,12 @@ def _drive(r, world, acts):
             answer, err = None, e
 
 
-def _plan_judge(g, payload, env, world):
-    """A plan / judge guard's finding: every Need it plans, answered, then judged once."""
-    parsed = g.parse(payload, env)
-    answers = {}
-    for need in g.plan(parsed):
-        try:
-            answers[need] = world.answer(need)
-        except Exception as e:  # noqa: BLE001 -- judge decides what a missing fact means
-            answers[need] = e
-    return g.judge(parsed, answers)
+def _finding(g, doc, world, acts):
+    """(g's finding on `doc`, whether it crashed)."""
+    try:
+        return _drive(g.check(doc), world, acts), False
+    except Exception as e:  # noqa: BLE001
+        return deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
 
 
 def respond(stdin_text, env, only=None):
@@ -189,39 +189,26 @@ def _respond(stdin_text, env, only):
                                        "This is a gate and fails closed: reinstall the plugin, or copy the "
                                        "entry again from hooks/hooks.json")), (World(env, payload), payload, [], [])
     # An opt-in guard (OPT_IN names its option) runs alone by name, or with the
-    # rest only when its option is exactly "true", as hooks.json runs it. An
-    # entry with no tool pattern matches an event with no tool.
-    guards = [g for ev, rx, gs in GUARDS if ev == event and (rx is None or isinstance(tool, str) and rx.match(tool))
-              for g in gs if only == g.NAME or (only is None and _on(g, env))]
-    ti = payload.get("tool_input")
-    command = ti.get("command") if tool == "Bash" and isinstance(ti, dict) else None
-    judged_once = None   # require-well-formed's verdict, when this reading got one
-    if (guards and event == "PreToolUse" and isinstance(command, str)
+    # rest only when its option is exactly "true", as hooks.json runs it.
+    guards = [g for g in wired(event, tool) if only == g.NAME or (only is None and _on(g, env))]
+    doc = Document(payload, env)
+    if (guards and event == "PreToolUse" and doc.command is not None
             and env.get("CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED") != "false"):
         # A command that does not parse is require-well-formed's to deny; the others
         # would only read it again through a weaker parser. With require-well-formed
-        # off, nothing would deny it, so the others read it on the awk rung.
-        # require-well-formed's verdict is this one reading, never a second parse:
-        # a parser that timed out here may finish there, and pass what it denied.
+        # off, nothing would deny it, so the others read it on the awk rung. The
+        # document keeps this one reading: a parser that timed out here never
+        # gets a second run that might pass what it denied.
         try:
-            judged_once = (require_well_formed.judge(command),)
-        except Exception:  # noqa: BLE001 -- require-well-formed's own run reports the crash
-            pass
-        if judged_once and judged_once[0]:
+            refused = doc.refusal
+        except Exception:  # noqa: BLE001 -- require-well-formed's own check reports the crash
+            refused = None
+        if refused:
             guards = [g for g in guards if g is require_well_formed]
     world = World(env, payload)
     findings, acts = [], []
     for g in guards:
-        crashed = False
-        try:
-            if judged_once and g is require_well_formed:
-                r = judged_once[0]
-            elif hasattr(g, "plan"):
-                r = _plan_judge(g, payload, env, world)
-            else:
-                r = _drive(g.check(payload, env), world, acts)
-        except Exception as e:  # noqa: BLE001
-            r, crashed = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
+        r, crashed = _finding(g, doc, world, acts)
         findings.append((g.NAME, r, crashed))
     judged = (world, payload, findings, acts)
     fields = verdict(event, findings)
