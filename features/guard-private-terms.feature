@@ -65,9 +65,13 @@ Feature: guard-private-terms
 
     Examples:
       | command                                                         | term                 |
+      | gh pr comment 12 -R o/r --body="host is gateway.home.example"   | gateway.home.example |
+
+    @also_guard-github-issues
+    Examples:
+      | command                                                         | term                 |
       | gh issue create -R o/r -t t -b "seen on Wanderlust last night"  | Wanderlust           |
       | gh issue create -R o/r -t "WANDERLUST: AIS drops" -b b          | Wanderlust           |
-      | gh pr comment 12 -R o/r --body="host is gateway.home.example"   | gateway.home.example |
       | sh -c 'gh issue create -R o/r -t t -b "on Wanderlust"'          | Wanderlust           |
       | gh api repos/o/r/issues -f title=t -f body=Wanderlust           | Wanderlust           |
 
@@ -77,12 +81,17 @@ Feature: guard-private-terms
 
     Examples:
       | command                                                    |
-      | gh issue create -R o/r -t t -b "all public"                |
       | gh issue list -R o/r --search Wanderlust                   |
       | gh issue view 3 -R o/r                                     |
       | echo Wanderlust > note.md                                  |
       | gh pr comment 12 -R o/r -b "private terms -- see the file" |
 
+    @also_guard-github-issues
+    Examples:
+      | command                                                    |
+      | gh issue create -R o/r -t t -b "all public"                |
+
+  @also_guard-github-issues
   Scenario: a term in a heredoc body is denied
     When the agent runs:
       """
@@ -92,6 +101,7 @@ Feature: guard-private-terms
       """
     Then the guard denies, naming "gateway.home.example"
 
+  @also_guard-github-issues
   Scenario: a term in the file named by --body-file is denied, one only in its path is not
     Given a project directory
     And the file "body.md" holds:
@@ -107,6 +117,7 @@ Feature: guard-private-terms
     When the agent runs `gh issue create -R o/r -t t --body-file {PROJ}/Wanderlust/clean.md`
     Then the guard is silent
 
+  @also_guard-github-issues
   Scenario: a repo listed in private_repos is never scanned
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS is "you/notes,you/scratch"
     When the agent runs `gh issue create -R you/scratch -t t -b "Wanderlust"`
@@ -114,6 +125,7 @@ Feature: guard-private-terms
     When the agent runs `gh issue comment https://github.com/you/notes/issues/1 -b "Wanderlust"`
     Then the guard is silent
 
+  @also_guard-github-issues
   Scenario: with private_repos unset, every repo is scanned
     When the agent runs `gh issue create -R you/notes -t t -b "Wanderlust"`
     Then the guard denies, naming "Wanderlust"
@@ -129,6 +141,7 @@ Feature: guard-private-terms
       | gh pr comment o/r#1 -b Wanderlust                                        |
       | gh api graphql -f query='mutation { addComment(input:{body:"Wanderlust"}) { clientMutationId } }' |
 
+  @also_guard-github-issues
   Scenario: a body built at run time that no heredoc feeds cannot be seen, so it is denied
     When the agent runs `gh issue create -R o/r -t t -b "$(date)"`
     Then the guard denies
@@ -151,12 +164,16 @@ Feature: guard-private-terms
 
     Examples:
       | tool                                           | input                                                                     | verdict   |
-      | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"Wanderlust"}                  | denies    |
       | mcp__plugin_github_github__add_issue_comment   | {"owner":"o","repo":"r","body":"on gateway.home.example"}                 | denies    |
       | mcp__github__add_reply_to_pull_request_comment | {"owner":"o","repo":"r","pullNumber":1,"commentId":9,"body":"Wanderlust"} | denies    |
       | mcp__github__update_issue_comment              | {"owner":"o","repo":"r","commentId":9,"body":"on gateway.home.example"}   | denies    |
-      | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"clean"}                       | is silent |
       | mcp__github__get_issue                         | {"owner":"o","repo":"r","body":"Wanderlust"}                              | is silent |
+
+    @also_guard-github-issues
+    Examples:
+      | tool                                           | input                                                                     | verdict   |
+      | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"Wanderlust"}                  | denies    |
+      | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"clean"}                       | is silent |
 
   Scenario: the home directory in the text is rewritten to ~ and the post allowed
     Given the private terms file holds:
@@ -166,11 +183,13 @@ Feature: guard-private-terms
     When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
     Then the guard allows, rewriting the command to "gh issue comment 3 -R o/r -b ~/x"
 
+  @also_guard-github-issues
   Scenario: a terms file that is set but cannot be read denies, naming the option
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is "{HOME}/no-such-terms.txt"
     When the agent runs `gh issue create -R o/r -t t -b "all public"`
     Then the guard denies, naming "private_terms_file"
 
+  @also_guard-github-issues
   Scenario: a terms file with no terms in it denies
     Given the private terms file holds:
       """
@@ -180,11 +199,13 @@ Feature: guard-private-terms
     When the agent runs `gh issue create -R o/r -t t -b "all public"`
     Then the guard denies, naming "no terms in it"
 
+  @also_guard-github-issues
   Scenario: with the option unset the guard is inert
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
     When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`
     Then the guard is silent
 
+  @also_guard-github-issues
   Scenario: with the option empty the guard is inert
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is ""
     When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`

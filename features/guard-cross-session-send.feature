@@ -169,10 +169,7 @@ Feature: guard-cross-session-send
       | git status                                |
       | git fetch origin main                     |
       | git -C /w fetch --prune                   |
-      | gh issue create -t t -b b                 |
       | gh pr comment 7 -b done                   |
-      | gh api -X POST repos/o/r/issues -f title=t |
-      | gh api repos/o/r/issues -f title=t         |
       | gh api graphql -f query='mutation { x }'  |
       | gh run list                               |
       | gh run rerun 123                          |
@@ -180,6 +177,13 @@ Feature: guard-cross-session-send
       | C=curl; $C -s u                           |
       | echo "gh issue view 12"                   |
       | ugh issue view 3                          |
+
+    @also_guard-github-issues
+    Examples:
+      | command                                   |
+      | gh issue create -t t -b b                 |
+      | gh api -X POST repos/o/r/issues -f title=t |
+      | gh api repos/o/r/issues -f title=t         |
 
   Scenario: a read that failed still opens the door
     Given the permission mode is "bypassPermissions"

@@ -122,6 +122,7 @@ Feature: guard-git-stacked-base
     Then the guard asks
     And the stub "gh" was not called
 
+    @also_guard-worktrees
     Examples:
       | command                                        | note                            |
       | git push origin --delete claude/already-merged | a branch no open PR names       |
@@ -170,11 +171,15 @@ Feature: guard-git-stacked-base
       | git push --push-option ci.skip origin --delete claude/already-merged   | is silent | --base origin | --push-option       |
       | git push --repo origin origin --delete claude/already-merged           | is silent | --base origin | --repo              |
       | git push --receive-pack /bin/x origin --delete claude/already-merged   | is silent | --base /bin/x | --receive-pack      |
-      | git push -fo ci.skip origin --delete claude/already-merged           | is silent | --base origin | -o ending a cluster |
       | git push --exec /bin/x origin --delete claude/already-merged           | is silent | --base /bin/x | --exec, its alias   |
       | git push --push-opt x origin --delete claude/already-merged            | is silent | --base x      | an unambiguous prefix |
       | git push origin --delete claude/already-merged -o claude/base-branch   | is silent | --base claude/base-branch | the value after the ref |
       | git push -o ci.skip origin --delete claude/base-branch                 | denies    | --base origin | a real base still denies |
+
+    @also_guard-git-work-loss
+    Examples:
+      | command                                                                | verdict   | ghost         | note                |
+      | git push -fo ci.skip origin --delete claude/already-merged           | is silent | --base origin | -o ending a cluster |
 
   Scenario Outline: the safe deletions and the non-deletions pass silently
     When the agent runs `<command>`
@@ -183,10 +188,7 @@ Feature: guard-git-stacked-base
     Examples:
       | command                                               | note                                 |
       | git push origin --delete claude/already-merged        | no open PR names it                  |
-      | git push origin main                                  | not a deletion                       |
-      | git push origin HEAD:main                             |                                      |
       | git push --force-with-lease origin claude/stacked-one | force-push of a stacked branch       |
-      | git branch -D claude/base-branch                      | local delete takes nothing from a PR |
       | git branch -d claude/base-branch                      |                                      |
       | gh pr merge 2 --delete-branch                         | the safe deletion names no branch    |
       | gh pr merge 2 -d                                      |                                      |
@@ -194,3 +196,14 @@ Feature: guard-git-stacked-base
       | git status                                            | unrelated                            |
       | gh api repos/o/r/git/refs/heads/claude/base-branch    | a GET                                |
       | echo 'git push origin --delete claude/base-branch'    | a deletion quoted into prose         |
+
+    @also_guard-bypass-ruleset
+    Examples:
+      | command                                               | note                                 |
+      | git push origin main                                  | not a deletion                       |
+      | git push origin HEAD:main                             |                                      |
+
+    @also_guard-git-work-loss
+    Examples:
+      | command                                               | note                                 |
+      | git branch -D claude/base-branch                      | local delete takes nothing from a PR |
