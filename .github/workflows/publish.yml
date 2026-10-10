@@ -94,5 +94,6 @@ jobs:
           mv plugin.json.new .claude-plugin/plugin.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "plugin: $TAG"
+          git add .claude-plugin/plugin.json
+          git commit -m "plugin: $TAG"
           git push --force origin HEAD:refs/heads/release
