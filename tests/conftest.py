@@ -30,6 +30,7 @@ from pytest_bdd import given, parsers, then, when
 
 from matchers import Verdict, asks, denies, is_silent, warns_about
 from doctor_steps import *  # noqa: F401,F403  (features/doctor.feature)
+from pipeline_checks import *  # noqa: F401,F403  (the guard pipeline's promises, on every scenario)
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
