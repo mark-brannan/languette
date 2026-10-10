@@ -3,7 +3,8 @@ Feature: guard-permissions
   A recursive chown, chgrp or chmod, chmod 777, and a find that runs one of
   them are denied unless every target is the agent's own area: the
   scratchpad, an agent worktree, /tmp, or a path LANGUETTE_PERM_ALLOW names.
-  The working directory is {HOME}/project unless a scenario says otherwise.
+  The working directory is {CWD}, a directory outside $HOME, unless a
+  scenario says otherwise.
 
   Scenario Outline: a recursive sweep of anything but the agent's own area is denied, however the flag is spelled
     When the agent runs `<command>`

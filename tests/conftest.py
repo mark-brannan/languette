@@ -14,8 +14,10 @@ awk rung.
 import builtins
 import json
 import os
+import random
 import re
 import shutil
+import string
 import subprocess
 import sys
 import tempfile
@@ -45,13 +47,20 @@ _REAL_HOME = os.environ.get("HOME")
 EVENTS = {"prompt": "UserPromptSubmit", "post": "PostToolUse"}
 
 
+_ELSEWHERE = None                              # the run's root for directories outside $HOME
+
+
 def pytest_configure(config):
     # A throwaway $HOME for the whole run, so no verdict depends on, and no
-    # step can touch, the real one. {HOME}/project is the default cwd. Not
-    # under /tmp: guard-recursive-delete allows all of /tmp, so every target would pass.
+    # step can touch, the real one; {HOME}/project for a row that names it.
+    # The default cwd and the hook process's own directory are elsewhere (see
+    # scattered). Not under /tmp: guard-recursive-delete allows all of /tmp,
+    # so every target would pass.
+    global _ELSEWHERE
     home = tempfile.mkdtemp(prefix="languette-home-", dir="/var/tmp")
     os.mkdir(os.path.join(home, "project"))
     os.environ["HOME"] = home
+    _ELSEWHERE = tempfile.mkdtemp(prefix="languette-elsewhere-", dir="/var/tmp")
 
 
 def pytest_unconfigure(config):
@@ -62,6 +71,21 @@ def pytest_unconfigure(config):
         os.environ["HOME"] = _REAL_HOME
     if os.path.basename(home).startswith("languette-home-"):
         shutil.rmtree(home, ignore_errors=True)
+    if _ELSEWHERE:
+        shutil.rmtree(_ELSEWHERE, ignore_errors=True)
+
+
+def scattered(seed, role):
+    """A fresh directory under the run's root, outside $HOME: a random name
+    at a random depth, seeded from `seed` (the test's id), so a failure
+    reproduces. `role` keeps the scenario's directories apart: none is
+    another's ancestor, and none is $HOME's."""
+    rng = random.Random(f"{seed}\0{role}")
+    parts = ["".join(rng.choices(string.ascii_lowercase + string.digits, k=rng.randint(3, 10)))
+             for _ in range(rng.randint(1, 5))]
+    d = Path(_ELSEWHERE, role, *parts)
+    d.mkdir(parents=True, exist_ok=True)
+    return str(d)
 
 
 def pytest_generate_tests(metafunc):
@@ -148,9 +172,12 @@ def writes_in_acts(engine, monkeypatch):
 
 
 class Ctx:
-    def __init__(self, engine):
+    def __init__(self, engine, seed):
         self.engine, self.guard = engine, None
-        self.cwd = "{HOME}/project"
+        # The payload's cwd and the hook process's own directory: unrelated
+        # to each other and to $HOME, so a guard that assumes otherwise fails.
+        self.cwd = self.default_cwd = scattered(seed, "cwd")
+        self.process_dir = scattered(seed, "process")
         self.env = {}                          # name -> value, or None for unset
         self.proj = self.tmp = self.stub_log = self.bare = self.cache = None
         self.project_env = True
@@ -183,7 +210,8 @@ class Ctx:
         if "{PROJ}" in s:
             assert self.proj, f"test setup: {s!r} names {{PROJ}} but the scenario has no project directory"
             s = s.replace("{PROJ}", str(self.proj))
-        s = s.replace("{HOME}", os.environ["HOME"])
+        s = s.replace("{HOME}", os.environ["HOME"]).replace("{CWD}", self.default_cwd)
+        s = s.replace("{UP}", "../" * self.default_cwd.count("/"))
         if "{TMP}" in s:
             self.tmp = self.tmp or self.mkdtemp()
             s = s.replace("{TMP}", self.tmp)
@@ -238,7 +266,12 @@ class Ctx:
             if self.arg:
                 # The event is in the payload, as Claude Code sends it.
                 stdin = json.dumps({**json.loads(stdin), "hook_event_name": EVENTS[self.arg]})
-            self.verdict = Verdict(run.respond(stdin, env, only=self.guard))
+            here = os.getcwd()
+            os.chdir(self.process_dir)
+            try:
+                self.verdict = Verdict(run.respond(stdin, env, only=self.guard))
+            finally:
+                os.chdir(here)
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
         path = env["PATH"]
@@ -253,7 +286,8 @@ class Ctx:
         argv = ["sh", "-c", self.hook]
         env.update(self.scenario_env())
         try:
-            r = subprocess.run(argv, input=stdin, env=env, capture_output=True, text=True, timeout=5)
+            r = subprocess.run(argv, input=stdin, env=env, cwd=self.process_dir, capture_output=True, text=True,
+                               timeout=5)
             self.verdict = Verdict(r.stdout, r.returncode, r.stderr)
         except subprocess.TimeoutExpired:
             self.verdict = Verdict("", 124, "TIMEOUT after 5 s")
@@ -266,8 +300,8 @@ class Ctx:
 
 
 @pytest.fixture
-def ctx(engine):
-    c = Ctx(engine)
+def ctx(engine, request):
+    c = Ctx(engine, request.node.nodeid)
     yield c
     c.cleanup()
 
