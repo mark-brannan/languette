@@ -329,3 +329,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261010t043139z
 - publish.yml triggers on release published, not tag push Undo: change the on: block ([#154](https://github.com/mark-brannan/languette/pull/154))
+
+### 20261010t044548z
+- publish.yml is dispatched on a release tag only, matching the shared release workflow; a release trigger too would race it Undo: add a release: published trigger to the on: block ([#154](https://github.com/mark-brannan/languette/pull/154))
