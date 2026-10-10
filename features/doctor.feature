@@ -91,6 +91,12 @@ Feature: doctor
     Then the "fail-closed" row is ✗ matching "`rm -rf ~` was not denied through the hook command as installed: only the fallback denied it, so the guard never judged it: languette/run.py \(guard-recursive-delete\) is missing"
     And the doctor exits 1
 
+  Scenario: a deny from a guard that crashed fails
+    Given languette "cd31356ad5db" is installed at user scope from a copy whose guard-recursive-delete raises when called
+    When the doctor runs
+    Then the "fail-closed" row is ✗ matching "`rm -rf ~` was not denied through the hook command as installed: only the fallback denied it, so the guard never judged it: guard-recursive-delete: guard crashed \(RuntimeError: canary\)"
+    And the doctor exits 1
+
   Scenario: guard-recursive-delete turned off skips the canary
     Given languette "cd31356ad5db" is installed at user scope
     And the languette options are `{"guard_recursive_delete": false}`
