@@ -72,6 +72,7 @@ Feature: guard-host-availability
       | rc-service -v dbus stop                  | rc-service dbus stop           | the OpenRC form with an option        |
       | /etc/init.d/ssh stop                     | /etc/init.d/ssh stop           | the init script itself                |
       | sudo /etc/init.d/networking restart      | /etc/init.d/networking restart | the init script behind sudo           |
+      | /etc/rc.d/init.d/sshd restart            | /etc/rc.d/init.d/sshd restart  | the RHEL init script path             |
 
   Scenario: a fork bomb on a later line is still seen
     When the agent runs:
@@ -117,4 +118,5 @@ Feature: guard-host-availability
       | rc-service nginx restart                         | not a service the session runs on              |
       | /etc/init.d/nginx stop                           | not a service the session runs on              |
       | /etc/init.d/ssh status                           | a verb outside the set on a core unit          |
+      | /etc/rc.d/init.d/nginx stop                      | not a service the session runs on              |
       | systemctl disable sshd                           | disable without --now stops nothing            |

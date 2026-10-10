@@ -5,9 +5,9 @@ poweroff, at command position or as the one-word script of `sh -c`, the
 fork-bomb shape, and a `systemctl` verb (or the SysV `service`, `invoke-rc.d`,
 `rc-service` and `/etc/init.d/<unit>` stop and restart) that takes the host down
 or stops a service the user's session runs on (ssh, login, dbus, the network,
-the display manager). The user's own `--user` manager and a remote `-H`/`-M` host are not
-the host. Any other service is the agent's to stop, unless the user lists it
-in guard-protected-services.
+the display manager). The user's own `--user` manager and a remote `-H`/`-M`
+host are not the host. Any other service is the agent's to stop, unless the
+user lists it in guard-protected-services.
 """
 
 import json
@@ -22,7 +22,7 @@ NAME = "guard-host-availability"
 _POWER = re.compile(r"(?:^|/)(?:shutdown|reboot|halt|poweroff)\Z")
 _CTL = re.compile(r"(?:^|/)systemctl\Z")
 _SYSV = re.compile(r"(?:^|/)(?:service|invoke-rc\.d|rc-service)\Z")
-_INITD = re.compile(r"(?:^|/)etc/init\.d/[^/]+\Z")
+_INITD = re.compile(r"(?:^|/)etc/(?:rc\.d/)?init\.d/[^/]+\Z")
 _SERVICE_STOP = {"stop", "restart", "force-reload", "try-restart", "--full-restart"}
 _CTL_OTHER = {"--user", "-H", "--host", "-M", "--machine"}
 _CTL_HOST = {"isolate", "rescue", "emergency", "halt", "poweroff", "reboot", "kexec", "soft-reboot"}
