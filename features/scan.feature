@@ -4,7 +4,8 @@ Feature: scan
   every nested text it runs, each word in the scanner's encoding ("w:" a
   word, "q:" the raw text of a quoted word holding whitespace). Each scenario
   runs it as such a hook would, `python3 -I` on the plugin's
-  `languette/__main__.py`, from a directory outside this repo.
+  `languette/__main__.py`, from a directory outside this repo. The output is unstable: it may change
+  in any release until its contract is settled.
 
   Scenario: every segment, nested texts after the command's own
     When `languette scan` reads `cd pkg && sh -c 'npm publish --tag next'`

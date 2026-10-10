@@ -1,6 +1,7 @@
 """The `languette` command: `languette doctor` or `languette scan`; from a
 clone, `python3 -m languette ...`; from a plugin install, `python3 -I
-"$PLUGIN_ROOT/languette/__main__.py" ...`."""
+"$PLUGIN_ROOT/languette/__main__.py" ...`. `scan` is unstable: its output
+may change in any release until its contract is settled."""
 
 import argparse
 import json
@@ -45,10 +46,11 @@ def main(argv=None):
     sub.add_parser("doctor", help="say whether languette protects Claude Code here; exits 1 on any ✗",
                    description="Say whether languette protects Claude Code on this machine, from the current "
                                "directory. Exits 1 on any ✗.")
-    sc = sub.add_parser("scan", help="read a shell command on stdin and print its segments as JSON lines",
+    sc = sub.add_parser("scan", help="(unstable) read a shell command on stdin and print its segments as JSON lines",
                         description="Read a shell command on stdin, as the Bash tool would run it, and print one "
                                     "JSON line per segment the guards would judge, nested texts included. "
-                                    "Exits 1, printing nothing, when the scanner will not read the command.")
+                                    "Exits 1, printing nothing, when the scanner will not read the command. "
+                                    "Unstable: the output may change in any release.")
     sc.add_argument("--command", dest="match", metavar="REGEX", type=_regex,
                     help="only segments whose command word matches REGEX, their words from that word on")
     args = p.parse_args(argv)
