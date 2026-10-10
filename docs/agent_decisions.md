@@ -323,3 +323,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261009t230316z
 - smoke.feature: the lexer row checks the deny names awk literally, dropping the (?:awk|lexer) tolerance Undo: make the reader cell match awk or lexer ([#146](https://github.com/mark-brannan/languette/pull/146))
+
+### 20261010t021210z
+- doctor PR keeps the smoke suite's direct per-parser require-well-formed call alongside the doctor's parse check row (that call checks which parser read the command, and that echo ok passes silently) Undo: cut the smoke scenario 'require-well-formed denies an unclosed quote and allows echo ok' and assert the parse check row per machine instead ([#151](https://github.com/mark-brannan/languette/pull/151))
