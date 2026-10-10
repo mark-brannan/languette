@@ -24,8 +24,8 @@ A guard whose questions are all known once the command is parsed has no
 check: parse(payload, env) reads the command, plan(parsed) lists every Need,
 the runner answers them all, and judge(parsed, answers) gets the answers keyed
 by Need, with an exception in place of a fact world could not have.
-Every guard sees the payload as sent: the runner never fills in a cwd, and a
-guard that needs an absolute one denies without it.
+Every guard sees the payload as sent: the runner never fills in a cwd, and
+denies a PreToolUse payload without an absolute one before any guard runs.
 """
 
 import inspect
