@@ -182,10 +182,7 @@ def parse(payload, env=os.environ):
     cmd = cmd.rstrip("\n")                     # as $(...) would leave it
     if not cmd:
         return out
-    cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd.startswith("/"):
-        out["found"] = deny("guard-permissions: the working directory is not an absolute path, cannot resolve targets")
-        return out
+    cwd = payload["cwd"]
     home = env.get("HOME", "")
     if not home.startswith("/"):
         out["found"] = deny("guard-permissions: $HOME is not an absolute path, cannot resolve targets")

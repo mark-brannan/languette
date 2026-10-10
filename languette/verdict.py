@@ -29,7 +29,6 @@ class Need:
                                              lexists, realpath; or executable
         physical      path                -> the longest existing prefix of path resolved through
                                              symlinks, the rest appended as written; "" for /
-        cwd                               -> the hook process's own directory
         ruleset-cache slug, branch        -> (mtime, text), or None
         clock                             -> seconds since the epoch
         worktree      op, *args           -> guard-worktrees' per-session record: arrive rec, top

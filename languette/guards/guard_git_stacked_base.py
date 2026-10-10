@@ -167,9 +167,7 @@ def check(payload, env=None):
         return ask(f"{NAME}: this deletes a remote branch, but neither `timeout` nor `gtimeout` is installed "
                    "(macOS: `brew install coreutils`), so the open-PR list can't be read without risking a hang. "
                    f"Deleting a branch an open PR points at closes that PR silently. Confirm by hand first:\n{LIST}")
-    cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd:
-        cwd = yield Need("cwd")
+    cwd = payload["cwd"]
     for repo, b in dict.fromkeys(found):
         for side, field in (("--base", "baseRefName"), ("--head", "headRefName")):
             argv = [bound, str(TIMEOUT), "gh", "pr", "list", "--state", "open"]
