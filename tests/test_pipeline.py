@@ -41,6 +41,13 @@ def test_each_text_is_scanned_once_whoever_asks(monkeypatch):
 def test_trailing_newlines_read_as_one():
     assert doc("ls\n\n\n").texts() == doc("ls").texts()
     assert doc("ls\n").stripped() == "ls\n"
+    # A continuation that ends the command is read as the shell runs it: one
+    # word, no empty line after it. Before the document, a guard that added a
+    # newline to the command read a trailing separator too.
+    d = doc("foo \\\n")
+    assert d.texts() == doc("foo \\\n\n").texts()
+    s = d.scan(d.texts()[0][0])
+    assert s.w == ["foo"] and list(s.segments()) == [(0, 0)]
 
 
 @pytest.mark.parametrize("command", ["echo 'open", "x" * (scan.LENGTH_MAX + 1)])
