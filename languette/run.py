@@ -162,13 +162,13 @@ def _respond(stdin_text, env, only):
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
     # Every guard resolves paths from the payload's cwd, never the hook
-    # process's own directory, which no one promises is the session's.
+    # process's own directory, which no one promises is the session's. The
+    # state-keeping events read no cwd, and skipping them would fail open.
     cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd.startswith("/"):
-        out = "" if event != "PreToolUse" else _out(event, deny(
+    if event == "PreToolUse" and (not isinstance(cwd, str) or not cwd.startswith("/")):
+        return _out(event, deny(
             "languette: the hook payload has no working directory, or only a relative one, so no path in "
-            "the call can be resolved. This is a gate and fails closed."))
-        return out, (World(env, payload), payload, [], [])
+            "the call can be resolved. This is a gate and fails closed.")), (World(env, payload), payload, [], [])
     tool = payload.get("tool_name")
     # A hook entry that names no guard here, say one renamed since it was
     # copied, would otherwise judge nothing and pass every command.

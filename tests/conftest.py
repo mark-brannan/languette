@@ -575,6 +575,15 @@ def _post(ctx, event):
     ctx.verdict = pre
 
 
+@when(parsers.re(r"the agent runs `(?P<command>.*)`, its post hook carrying no working directory", flags=re.S))
+def _runs_post_no_cwd(ctx, command):
+    ctx.run(ctx.payload(command))
+    pre, p = ctx.verdict, json.loads(ctx.stdin)
+    del p["cwd"]
+    ctx.run(json.dumps({**p, "hook_event_name": "PostToolUse", "tool_response": "..."}))
+    ctx.verdict = pre
+
+
 @when(parsers.re(r"the agent runs `(?P<command>.*)`, which fails", flags=re.S))
 def _runs_failing(ctx, command):
     ctx.run(ctx.payload(command))
