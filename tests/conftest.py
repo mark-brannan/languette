@@ -202,9 +202,11 @@ class Ctx:
              "session_id": self.session, "tool_use_id": f"toolu_call{self.calls}"}
         if self.proj:
             p["transcript_path"] = f"{self.proj}/t.jsonl"
-        return json.dumps(self.moded(p))
+        return json.dumps(self.as_sent(p))
 
-    def moded(self, p):
+    def as_sent(self, p):
+        """`p` with what Claude Code puts in every payload: the cwd, and the mode when set."""
+        p.setdefault("cwd", self.expand(self.cwd))
         if self.mode is not None:
             p["permission_mode"] = self.mode
         return p
@@ -508,7 +510,7 @@ def _hooks_json_event(ctx, event, guard):
 
 @when(parsers.parse('Claude Code fires {event} for tool "{tool}"'))
 def _fires(ctx, event, tool):
-    ctx.run(json.dumps(ctx.moded({"hook_event_name": event, "session_id": ctx.session, "tool_name": tool,
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": event, "session_id": ctx.session, "tool_name": tool,
                                   "tool_input": {}, "tool_response": "..."})))
 
 
@@ -667,7 +669,8 @@ def _call_declined(ctx):
 @when("the human speaks, opening the door")
 def _open_door(ctx):
     ctx.arg = "prompt"
-    ctx.run(json.dumps({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session, "prompt": "yes, file it"}))
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
+                                    "prompt": "yes, file it"})))
     ctx.arg = None
 
 
@@ -676,19 +679,20 @@ def _open_door_via_hooks_json(ctx):
     # The UserPromptSubmit command exactly as hooks.json writes it, run the way
     # Claude Code runs it; the PreToolUse hook is restored for the next step.
     pretool, ctx.hook = ctx.hook, hooks_json_prompt_command()
-    ctx.run(json.dumps({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session, "prompt": "yes, file it"}))
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
+                                    "prompt": "yes, file it"})))
     ctx.hook = pretool
 
 
 @when(parsers.re(r'the agent calls MCP tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
 def _mcp_call(ctx, tool, inp):
-    ctx.run(json.dumps(ctx.moded({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)})))
+    ctx.run(json.dumps(ctx.as_sent({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)})))
     _ran(ctx)
 
 
 @when(parsers.re(r'the agent calls tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
 def _tool_call(ctx, tool, inp):
-    ctx.run(json.dumps(ctx.moded({"session_id": ctx.session, "tool_name": tool,
+    ctx.run(json.dumps(ctx.as_sent({"session_id": ctx.session, "tool_name": tool,
                                   "tool_input": json.loads(ctx.expand(inp)), "cwd": ctx.expand(ctx.cwd)})))
     _ran(ctx)
 
@@ -706,7 +710,7 @@ def _no_mode(ctx):
 
 @when("the human speaks")
 def _speaks(ctx):
-    ctx.run(json.dumps(ctx.moded({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
                                   "prompt": "go on"})))
     assert ctx.verdict.stdout == "", f"UserPromptSubmit printed {ctx.verdict.stdout!r}"
 
@@ -714,13 +718,13 @@ def _speaks(ctx):
 @given(parsers.parse('the session starts from "{source}"'))
 @when(parsers.parse('the session starts from "{source}"'))
 def _session_starts(ctx, source):
-    ctx.run(json.dumps(ctx.moded({"hook_event_name": "SessionStart", "session_id": ctx.session, "source": source})))
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "SessionStart", "session_id": ctx.session, "source": source})))
     assert ctx.verdict.stdout == "", f"SessionStart printed {ctx.verdict.stdout!r}"
 
 
 @when(parsers.parse('the agent spawns a subagent named "{name}", given id "{agent}"'))
 def _spawns(ctx, name, agent):
-    ctx.run(json.dumps(ctx.moded({"hook_event_name": "PostToolUse", "session_id": ctx.session, "tool_name": "Agent",
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "PostToolUse", "session_id": ctx.session, "tool_name": "Agent",
                                   "tool_input": {"name": name, "prompt": "p", "description": "d"},
                                   "tool_response": {"status": "async_launched", "agentId": agent}})))
     assert ctx.verdict.stdout == "", f"PostToolUse printed {ctx.verdict.stdout!r}"
@@ -737,14 +741,14 @@ def _team(ctx, name):
 
 @when(parsers.parse('subagent "{agent}" starts'))
 def _subagent_starts(ctx, agent):
-    ctx.run(json.dumps(ctx.moded({"hook_event_name": "SubagentStart", "session_id": ctx.session,
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "SubagentStart", "session_id": ctx.session,
                                   "agent_id": agent, "agent_type": "general-purpose"})))
     assert ctx.verdict.stdout == "", f"SubagentStart printed {ctx.verdict.stdout!r}"
 
 
 def _send(ctx, to, message, **extra):
     ctx.calls += 1
-    ctx.run(json.dumps(ctx.moded({"hook_event_name": "PreToolUse", "session_id": ctx.session, "tool_name": "SendMessage",
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "PreToolUse", "session_id": ctx.session, "tool_name": "SendMessage",
                                   "tool_input": {"to": to, "message": message},
                                   "tool_use_id": f"toolu_call{ctx.calls}", **extra})))
 

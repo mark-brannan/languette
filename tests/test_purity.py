@@ -266,7 +266,7 @@ def test_the_check_catches(source):
     "from . import secrets\nsecrets.findings(s, [])",
     "yield Need('which', name)",
     "yield Need('read', p, 1 << 20)",
-    "yield Need('cwd')",
+    "yield Need('clock')",
     "yield Need('path', 'lexists', p)",
     "from .. import paths\nphys = yield from paths.physical(x)",
     "import codecs\ncodecs.decode(b, 'utf-8')",

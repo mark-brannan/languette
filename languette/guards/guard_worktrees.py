@@ -416,10 +416,7 @@ def _foreign(payload, env):
         raise Refuse(f"{NAME}: git is missing, so worktree ownership cannot be checked. This is a gate and fails "
                      "closed.")
     tool = payload.get("tool_name")
-    pcwd = payload.get("cwd")
-    if not isinstance(pcwd, str) or not pcwd:
-        raise Refuse(f"{NAME}: the payload names no working directory, so worktree ownership cannot be checked. "
-                     "This is a gate and fails closed.")
+    pcwd = payload["cwd"]
     home = yield from _canon(env.get("HOME") or "")
     if not home:
         raise Refuse(f"{NAME}: $HOME does not resolve, so worktree ownership cannot be checked. This is a gate "

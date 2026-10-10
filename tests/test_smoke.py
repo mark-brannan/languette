@@ -88,7 +88,8 @@ def make_path(tmp_path, tools, python):
 
 
 def run_hook(path_dir, home, command):
-    payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command}}
+    payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command},
+               "cwd": str(home)}
     env = {"PATH": str(path_dir), "CLAUDE_PLUGIN_ROOT": str(ROOT), "HOME": str(home)}
     r = subprocess.run(["/bin/sh", "-c", hook_command()], input=json.dumps(payload), capture_output=True,
                        text=True, env=env, timeout=20)
