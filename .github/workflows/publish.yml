@@ -73,3 +73,26 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  # The plugin directory follows the `release` branch: the tagged tree, with
+  # the tag's version written into plugin.json. Main carries no version, so an
+  # install from main updates on every commit; an install from `release`
+  # updates only on a release, at the version PyPI has.
+  plugin-release:
+    needs: pypi
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          jq --arg v "${TAG#v}" '{name} + {version: $v} + del(.name)' \
+            .claude-plugin/plugin.json > plugin.json.new
+          mv plugin.json.new .claude-plugin/plugin.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "plugin: $TAG"
+          git push --force origin HEAD:refs/heads/release
