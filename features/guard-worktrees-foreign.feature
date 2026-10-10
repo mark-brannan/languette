@@ -198,3 +198,22 @@ Feature: guard-worktrees
       | {TMP}/repo                         | cd .claude                    |
       | {TMP}/repo/.claude/worktrees/mine  | cd                            |
       | {TMP}/repo/.claude/worktrees       | git commit -m "cd theirs"     |
+
+  # The gate fails closed on what it needs to judge by: the payload's cwd and
+  # a $HOME that resolves.
+  Scenario: a payload with no working directory is denied
+    When the payload is:
+      """
+      {"tool_name": "Bash", "tool_input": {"command": "ls"}, "session_id": "s1"}
+      """
+    Then the guard denies, naming "no working directory"
+
+  Scenario Outline: a $HOME that does not resolve is denied
+    Given HOME is "<home>"
+    When the agent runs `ls`
+    Then the guard denies, naming "$HOME does not resolve"
+
+    Examples:
+      | home         |
+      | /nonexistent |
+      |              |

@@ -10,8 +10,12 @@ answers: *allow*, *ask*, or **deny**.
 Nothing external like a cloud/web service decides, nor any ML or AI models.
 The critical execution path is [deterministic](https://en.wikipedia.org/wiki/Deterministic_algorithm), and even uses ["pure functions"](https://en.wikipedia.org/wiki/Pure_function) where possible.
 
+**Whose is this for?** You, a real human being. A big AI vendor's safeguards
+are its product decision, changed at whim; don't take them on trust. `languette`
+is a guard you can read: **trust, but verify**. Copying it is welcome.
+
 *Languette* is French for "little tongue". On a halberd the languette (or 'langet')
-it is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
+is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
 the pole. These guards are that strip: protecting your work, strengthening your tools, while holding back certain agentic hazards that could ruin your day.
 
 It's also a play on words: Shell is a little language, and languette listens for the
@@ -27,6 +31,8 @@ The guards run as `PreToolUse` hooks in Claude Code today, on shell commands,
 `gh` and GitHub MCP calls, and messages to other sessions; other agent hosts
 are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
+### Claude Code
+
 ```
 /plugin marketplace add mark-brannan/languette
 /plugin install languette@languette
@@ -35,13 +41,41 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 It needs `python3`, standard library only. `shfmt` (the parser it trusts
 most) and `gh` (for the two guards that ask GitHub) are optional.
 
-Without the plugin system, see [Installing by hand](#installing-by-hand).
+### macOS (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
+
+```
+brew install mark-brannan/tap/languette
+languette install && languette doctor
+```
+
+### Linux and WSL (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
+
+```
+sudo apt install python3 pipx shfmt gh
+pipx install languette
+languette install && languette doctor
+```
+
+### Windows without WSL
+
+languette protects Claude Code inside WSL: run `wsl --install`, then the
+Claude Code block above. An agent running natively in PowerShell is not protected.
+
+### Devcontainer, Codespace and CI (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
+
+One line in `devcontainer.json` installs languette before the agent starts:
+
+```json
+"postCreateCommand": "pipx install languette"
+```
+
+Without the plugin system or the installer, see [Installing by hand](#installing-by-hand).
 
 ## The guards
 
 Each guard checks for one kind of hazard:
 
-- [`guard-unparsable`](features/guard-unparsable.feature): a Bash command that
+- [`require-well-formed`](features/require-well-formed.feature): a Bash command that
   doesn't parse; the other guards skip it
 - [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
@@ -50,9 +84,9 @@ Each guard checks for one kind of hazard:
   `LANGUETTE_PERM_ALLOW` directories
 - [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`, `sh <(curl ..)`,
   `eval "$(wget ..)"`
-- [`guard-disk`](features/guard-disk.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
-- [`guard-host-availability`](features/guard-host-availability.feature): shutdown, fork bomb, `systemctl stop dbus`
-- [`guard-protected-services`](features/guard-protected-services.feature): `systemctl stop sshd`
+- [`guard-disks`](features/guard-disks.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
+- [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb, `systemctl stop sshd`
+- [`guard-protected-services`](features/guard-protected-services.feature): `systemctl stop postgresql`, for the services you list
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
 - [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
   `stash pop`, force-push, `reset --hard` and other moves that throw work away
@@ -71,7 +105,7 @@ Each guard checks for one kind of hazard:
   applying a label that waives a CI gate, such as `churn-ok`
 - [`guard-secrets`](languette/guards/guard_secrets.py): a pasted credential
 - [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to another session: asks; in `bypassPermissions`, denies after a network read
-- `guard-protected-paths`, `guard-database` (planned)
+- `guard-protected-paths`, `guard-databases` (planned)
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
 - [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
@@ -105,11 +139,11 @@ scenarios for a command run in `~/project`, and CI fails if the table drifts:
 | `./cleanup.sh` | allow | no rule; silent (known gap) |
 <!-- /fixtures-table -->
 
-With `shfmt` 3.6 or later on `PATH`, the `guard-unparsable` guard denies a
+With `shfmt` 3.6 or later on `PATH`, the `require-well-formed` guard denies a
 command that doesn't parse. Without `shfmt`, `bash -n` decides; tree-sitter-bash
 or bashlex, if installed, only add the column; below both, its own lexer.
 In a replay of 101,671 agent commands, about 1 in 3,000 didn't parse, and
-each [would have broken](features/guard-unparsable.feature).
+each [would have broken](features/require-well-formed.feature).
 Bash runs a broken command in part, the lines before the error or prose in
 backticks as a command; the deny stops all of it, so the agent looks again.
 Over 64 KB or a nesting weight of 10,000, a command is denied unread: a
@@ -254,7 +288,7 @@ for beyond the command, it declares:
 | Guard | Reads |
 |---|---|
 | `guard-git-work-loss` | nothing: a pure function of the command |
-| `guard-unparsable` | a shell parser; nothing runs the command |
+| `require-well-formed` | a shell parser; nothing runs the command |
 | `guard-recursive-delete` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
 | `guard-bypass-hooks` | the transcript, and the approvals spent |
@@ -323,3 +357,9 @@ test, which installs the plugin in a scratch project and confirms a recursive
 verdict out. The guards began as shell scripts copied from
 [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles); they run
 in Python now, and this repo is where they are maintained.
+
+## License
+
+Markdown files are [CC BY-SA 4.0](LICENSE-CC-BY-SA); everything else is
+[AGPL-3.0-or-later](LICENSE), except where a file carries its own notice.
+Copyright 2026 Mark Brannan. Credit "Mark Brannan" and link this repository.

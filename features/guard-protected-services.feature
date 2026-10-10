@@ -1,26 +1,19 @@
 @python
 Feature: guard-protected-services
   A systemctl stop, restart, kill or disable --now of a service the user's
-  machine depends on is denied. The protected_services setting names them;
-  unset, they are the services a session reaches the machine through: ssh, the
-  network and the display manager. A user who means to stop one of those sets
-  a list without it. Any other service is the agent's to stop.
+  machine depends on is denied. The user lists them in protected_services; the
+  list starts empty. The services a session runs on, such as ssh, the network
+  and the display manager, are guard-host-availability's. Any other service is
+  the agent's to stop.
 
-  Scenario Outline: with the setting unset, ssh, the network and the display manager are protected
+  Scenario Outline: a glob in the unit may match a protected service
+    Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "postgresql"
     When the agent runs `<command>`
-    Then the guard denies, naming "<naming>"
+    Then the guard denies
 
     Examples:
-      | command                                  | naming                         | note                       |
-      | systemctl stop sshd                      | systemctl stop sshd            |                            |
-      | sudo systemctl restart ssh.service       | systemctl restart ssh.service  | behind sudo                |
-      | systemctl stop nginx NetworkManager      | systemctl stop NetworkManager  | among several units        |
-      | systemctl try-restart gdm                | systemctl try-restart gdm      | a restart by another name  |
-      | systemctl disable --now sshd             | systemctl disable sshd         | disable that also stops    |
-      | sh -c "systemctl stop display-manager"   | systemctl stop display-manager | nested text                |
-      | systemctl stop sshd.socket               | systemctl stop sshd.socket     | another unit type          |
-      | systemctl stop getty@tty1.service        | systemctl stop getty@tty1.service | an instance             |
-      | systemctl stop 'ssh*'                    | systemctl stop ssh*            | a glob may match one       |
+      | command                  | note                |
+      | systemctl stop 'post*'   | a glob may match it |
 
   Scenario Outline: a service named in protected_services is denied, in any of its unit forms
     Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "<setting>"
@@ -44,11 +37,12 @@ Feature: guard-protected-services
 
     Examples:
       | command                         | setting      | note                                       |
-      | systemctl stop postgresql       |              | unset: the defaults hold, and it is not one |
+      | systemctl stop postgresql       |              | unset: nothing is protected               |
       | systemctl stop nginx            | postgresql   |                                            |
       | systemctl status postgresql     | postgresql   | a read, not a stop                         |
-      | systemctl restart sshd          | postgresql   | a set list replaces the defaults           |
+      | systemctl restart sshd          | postgresql   | guard-host-availability's to judge         |
       | systemctl stop wg-quick@wg1     | wg-quick@wg0 | another instance                           |
       | systemctl --user stop postgresql | postgresql  | the user's own manager                     |
       | echo systemctl stop postgresql  | postgresql   | prose that names a command is not it       |
       | systemctl reboot                | postgresql   | guard-host-availability's to judge         |
+      | systemctl stop 'post*'          |              | unset: a glob matches nothing to protect   |

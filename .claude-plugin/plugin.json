@@ -1,6 +1,6 @@
 {
   "name": "languette",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, stopping a service you depend on, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, commands that destroy infrastructure, untrusted text relayed to another of your sessions, and a credential pasted into a command.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for the commands that could ruin a day, such as recursive rm, a disk wipe, a shutdown or a credential pasted into a command.",
   "author": {
     "name": "Mark Brannan"
   },
@@ -51,7 +51,7 @@
       "description": "Deny git branch -D and --delete --force. Leave on unless you want this git command through unchecked. Has no effect while guard_git_work_loss is false.",
       "default": true
     },
-    "guard_unparsable": {
+    "require_well_formed": {
       "type": "boolean",
       "title": "Deny a command that does not parse",
       "description": "Deny a Bash command the shell parser refuses, with its line and column, before any of it runs. Turned off, the other guards read such a command through a weaker parser instead.",
@@ -75,7 +75,7 @@
       "description": "Deny curl, wget or fetch output piped into sh, bash, python and other interpreters, or run through eval or a process substitution. The agent saves the file, reads it, then runs it. Leave on unless you want downloads run unread.",
       "default": true
     },
-    "guard_disk": {
+    "guard_disks": {
       "type": "boolean",
       "title": "Block disk wipes",
       "description": "Deny dd onto a device, mkfs, wipefs and shred outside scratch areas, and a redirect or tee onto a disk. Leave on unless you want these through unchecked.",
@@ -84,7 +84,7 @@
     "guard_host_availability": {
       "type": "boolean",
       "title": "Block shutdowns and the fork bomb",
-      "description": "Deny shutdown, reboot, halt, poweroff, the fork-bomb shape, and a systemctl stop of a unit the host cannot run without (dbus, logind, a login session). Leave on unless you want an agent able to take the machine down, as in a chaos test.",
+      "description": "Deny shutdown, reboot, halt, poweroff and the fork-bomb shape. Leave on unless you want an agent able to take the machine down.",
       "default": true
     },
     "guard_protected_services": {
@@ -96,8 +96,8 @@
     "protected_services": {
       "type": "string",
       "title": "Protected services",
-      "description": "Services an agent may not stop, restart or kill with systemctl: unit names, comma-separated, a trailing .service optional, * globs allowed. A name also covers its socket and its @instances. Empty means the default, the services a session reaches the machine through; a list you set replaces it.",
-      "default": "ssh,sshd,NetworkManager,systemd-networkd,network,network-online,display-manager,gdm,gdm3,sddm,lightdm,getty",
+      "description": "Services an agent may not stop, restart or kill with systemctl: unit names, comma-separated, a trailing .service optional, * globs allowed. A name also covers its socket and its @instances. Empty protects none; ssh, the network and the display manager are already guard-host-availability's.",
+      "default": "",
       "required": false
     },
     "guard_scheduled_jobs": {
@@ -188,7 +188,7 @@
     "prose_budget_commit": {
       "type": "boolean",
       "title": "Check staged prose against the repo's budgets before a commit",
-      "description": "Deny a git commit when the prose-budget engine (the prose_budget_command option) finds the staged diff over a repo's own budgets. A no-op where that engine isn't installed or the repo has no budgets config. Leave on unless you want staged prose through unchecked.",
+      "description": "Warn on a git commit, and let it run, when the prose-budget engine (the prose_budget_command option) finds the staged diff over a repo's own budgets; CI is the gate. A no-op where that engine isn't installed or the repo has no budgets config. Leave on unless you don't want the warning.",
       "default": true
     },
     "prose_budget_command": {

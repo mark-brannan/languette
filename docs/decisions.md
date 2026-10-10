@@ -85,3 +85,43 @@ interface is; this file says who decided it and why, one line each.
 - The readable set is the read kinds in `KINDS` in `languette/world.py`.
 - Whether `prose-budget-commit` keeps running the engine `prose_budget_bin`
   names is unruled.
+
+## New guards: Solace, 2026-10-09
+
+- A guard enters languette through an issue, never straight from a miss.
+  Issue fields: incident, root cause, hazard, concept, name. Scar: #125.
+- Hazard: why it could ruin a day, as the README's lede puts it; a waste
+  of an hour is not one. Concept: a setting of an existing guard, or a new
+  one. Name: under the naming ruling above.
+- Root cause first, guard second. A miss is often a workflow gap, and a
+  guard at most a backstop for it.
+- No prototypes here, not even as drafts; a closed PR is residue. A quick
+  fix lands in the author's own hook layer, or an unstable sibling repo, and
+  comes here once Solace puts the GitHub label `ready` on its issue.
+- If prototyping outside is hard because the parser and engine live here,
+  the fix is to expose those interfaces, not to admit the prototype.
+- Whether guards that watch an agent's conduct on GitHub (#118, #119, #125)
+  are one concept or several is unruled.
+- Prose now; a check with teeth once the gate's shape is settled.
+
+## Base-case guard names: Solace, 2026-10-09
+
+- `require-well-formed` replaces `guard-unparsable`. Well-formed means
+  parsed whole, within the size and depth bounds.
+- `ask-first` and `deny-always` stand, in pen for now; config's form may
+  change them, or merge them into one guard.
+- These name what happens, outside the `guard-<concept>` scheme. The
+  suffix `-first` is not reserved.
+
+## License and versions: Solace, 2026-10-08 and 2026-10-09
+
+- Code is AGPL-3.0-or-later and prose is CC BY-SA 4.0 ("AGPL + CC SA for
+  writing").
+- The first release is 0.0.1, carrying `languette doctor`.
+- Every release bumps the patch number only, until Solace says otherwise. No
+  semver; a review that asks for a minor or major bump is out of scope.
+
+## Trust and licence riders: Solace, 2026-10-09
+
+- No licence rider against AI companies: AGPL answers hosting, and no licence
+  answers training. The README states the distrust as a position, not a condition.

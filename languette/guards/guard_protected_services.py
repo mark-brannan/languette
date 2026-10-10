@@ -2,11 +2,10 @@
 
 Blocks a `systemctl` stop, restart, kill or `disable --now` of a service the
 user's machine depends on: the protected_services setting, comma-separated,
-a trailing `.service` optional, `*` globs allowed. Unset or empty, it is
-DEFAULT, the services a session reaches the machine through. A pattern
-matches the unit as written, without its type suffix, or without its
-`@instance`. A glob in the unit fails closed. The units the host itself cannot
-run without are guard-host-availability's.
+a trailing `.service` optional, `*` globs allowed. Unset or empty, it guards
+nothing: the user fills it. A pattern matches the unit as written, without its
+type suffix, or without its `@instance`. A glob in the unit fails closed. The
+services a session runs on (ssh, the network) are guard-host-availability's.
 """
 
 import fnmatch
@@ -20,20 +19,20 @@ from languette.verdict import deny
 
 NAME = "guard-protected-services"
 OPTION = "CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES"
-DEFAULT = ("ssh", "sshd", "NetworkManager", "systemd-networkd", "network", "network-online",
-           "display-manager", "gdm", "gdm3", "sddm", "lightdm", "getty")
 _WAY_USER = "That is the user's to run, not an agent's: say what you need and hand them the exact command."
 
 
 def protected(env):
-    """The protected_services patterns, or DEFAULT when unset or empty."""
+    """The protected_services patterns; empty when unset."""
     got = [re.sub(r"\.service\Z", "", p.strip()) for p in (env.get(OPTION) or "").split(",") if p.strip()]
-    return tuple(got) or DEFAULT
+    return tuple(got)
 
 
 def judge(text, env=os.environ):
     """The deny reason for `text`, or None."""
     pats = protected(env)
+    if not pats:
+        return None
 
     def hit(u):
         return any(c in u for c in "*?[") or any(fnmatch.fnmatchcase(n, p) for n in unit_names(u) for p in pats)

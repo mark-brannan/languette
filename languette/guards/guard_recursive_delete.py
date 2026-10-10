@@ -12,8 +12,9 @@ import json
 import os
 import re
 
+from languette import paths
 from languette import scan as sw
-from languette.verdict import Refuse, context, deny
+from languette.verdict import Need, Refuse, context, deny
 
 NAME = "guard-recursive-delete"
 
@@ -31,25 +32,14 @@ _CD = re.compile(r"^(?:cd|pushd|popd)\Z")
 _ALLOW_CHARS = re.compile(r"[A-Za-z0-9._@+/-]*")
 
 
-def _physical(p):
-    """The longest existing prefix resolved through symlinks, the rest
-    appended as written. "" for /."""
-    rest = ""
-    while p != "/" and not os.path.lexists(p):
-        head, _, base = p.rpartition("/")
-        rest = "/" + base + rest
-        p = head or "/"
-    r = os.path.realpath(p)
-    return ("" if r == "/" else r) + rest
-
-
 def _normalize(p):
     out = "".join("/" + s for s in p.split("/") if s not in ("", "."))
     return out or "/"
 
 
 def _parse_allow(value, home, home_p):
-    """LANGUETTE_RM_ALLOW -> (extra_roots, extra_names, error or None)."""
+    """LANGUETTE_RM_ALLOW -> (extra_roots, extra_names, error or None). A generator:
+    each path entry is resolved through the disk by a Need."""
     roots, names = [], []
     for ent in value.split(":"):
         if ent == "":
@@ -63,7 +53,7 @@ def _parse_allow(value, home, home_p):
                 ent = ent[:-1]
             if ent in ("", home):
                 return roots, names, f"'{ent}' is / or $HOME"
-            ent_p = _physical(ent)
+            ent_p = yield from paths.physical(ent)
             if ent_p in ("", home, home_p):
                 return roots, names, f"'{ent}' resolves to / or $HOME"
             roots += [ent, ent_p]
@@ -188,15 +178,15 @@ def check(payload, env=os.environ):
         return None
     cwd = payload.get("cwd")
     if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = os.getcwd()
+        cwd = yield Need("cwd")
     home = env.get("HOME", "")
     if not home.startswith("/"):
         return deny("guard-recursive-delete: $HOME is not an absolute path, cannot resolve targets")
 
-    home_p = _physical(home)
     extra_roots, extra_names, allow_err = [], [], None
     if env.get("LANGUETTE_RM_ALLOW"):
-        extra_roots, extra_names, allow_err = _parse_allow(env["LANGUETTE_RM_ALLOW"], home, home_p)
+        home_p = yield from paths.physical(home)
+        extra_roots, extra_names, allow_err = yield from _parse_allow(env["LANGUETTE_RM_ALLOW"], home, home_p)
     allow_msg = None
     if allow_err:
         allow_msg = (f"LANGUETTE_RM_ALLOW is malformed ({allow_err}). Recursive rm and find -delete are "
@@ -217,9 +207,7 @@ def check(payload, env=os.environ):
         return deny(refused)
 
     names = GENERATED_NAMES + tuple(extra_names)
-    scratch = home + "/.local/state/claude-tmpdir"
-    worktrees = home + "/.claude/worktrees"
-    roots = ["/tmp", scratch, worktrees, _physical("/tmp"), _physical(scratch), _physical(worktrees)] + extra_roots
+    roots = yield from paths.own_roots(home, extra_roots)
 
     def is_generated(p):
         if p.startswith(home + "/"):
@@ -241,7 +229,7 @@ def check(payload, env=os.environ):
                 f"recursively, and {abs_} is none of those. `git status --short {raw}` and `git clean -n {raw}` "
                 "show what is there; `git rm` tracked files by path, and hand anything untracked to the user "
                 "-- a directory they own can hold downloads and logs no session knows about.")
-        phys = _physical(abs_)
+        phys = yield from paths.physical(abs_)
         if phys != abs_ and not allowed(phys):
             return deny(
                 f"`{what}` is blocked: {abs_} resolves through a symlink to {phys}, which is not a generated "

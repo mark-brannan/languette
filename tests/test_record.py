@@ -91,7 +91,7 @@ def test_raw_keeps_the_command_and_the_reason(tmp_path):
 
 
 def test_a_refused_parse_names_the_rung(tmp_path):
-    run.respond(_payload("echo 'open"), _env(tmp_path), "guard-unparsable")
+    run.respond(_payload("echo 'open"), _env(tmp_path), "require-well-formed")
     [rec] = _records(tmp_path)
     assert rec["refused"] and rec["rung"] and rec["verdict"] == "deny"
 
@@ -172,3 +172,9 @@ def test_a_symlink_in_place_of_the_file_is_not_followed(tmp_path):
     (d / "decisions.jsonl").symlink_to(tmp_path / "elsewhere")
     World(_env(tmp_path), {}).keep({"n": 0})
     assert not (tmp_path / "elsewhere").exists()
+
+
+def test_a_guard_name_nothing_has_is_a_deny(tmp_path):
+    out = json.loads(run.respond(_payload("echo hi"), _env(tmp_path, on=False), "guard-disk"))
+    assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "no guard is named guard-disk" in out["hookSpecificOutput"]["permissionDecisionReason"]

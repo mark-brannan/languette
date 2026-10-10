@@ -17,8 +17,8 @@ from languette.guards import guard_github_issues, guard_private_terms, guard_pro
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
           "guard-private-terms", "prose-budget-commit", "guard-worktrees",
-          "guard-bypass-labels", "guard-unparsable", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
-          "guard-permissions", "guard-pipe-to-shell", "guard-disk",
+          "guard-bypass-labels", "require-well-formed", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
+          "guard-permissions", "guard-pipe-to-shell", "guard-disks",
           "guard-host-availability", "guard-protected-services", "guard-scheduled-jobs", "guard-cross-session-send",
           "guard-secrets"}
 # Guards that are off unless the user turns them on: their option defaults to false.
@@ -150,10 +150,10 @@ def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():
             and opt.get("description"), f"userConfig.{key}: want a titled, described boolean defaulting to {str(want).lower()}"
 
 
-def test_the_protected_services_default_is_the_guards_default():
+def test_protected_services_starts_empty():
     uc = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())["userConfig"]
     assert_that(guard_protected_services.protected({guard_protected_services.OPTION: uc["protected_services"]["default"]}),
-                equal_to(guard_protected_services.DEFAULT))
+                equal_to(()))
 
 
 # The parser ladder's pip parsers (docs/decisions.md, "Runtime dependencies"):

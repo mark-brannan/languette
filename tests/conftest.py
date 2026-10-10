@@ -7,7 +7,7 @@ except under CI); @hook runs a hooks/hooks.json command by subprocess, the way
 Claude Code runs it (wiring.feature). @shfmt_only narrows a scenario to the
 shfmt rung; @no_shfmt drops the shfmt rung, for a row its
 parse check denies before any guard reads it. The feature's name is the guard's name, except
-guard-unparsable, which has its own guard. @python_only narrows a scenario to the
+require-well-formed, which has its own guard. @python_only narrows a scenario to the
 awk rung.
 """
 
@@ -270,7 +270,7 @@ def ctx(engine):
 
 
 def pytest_bdd_before_scenario(request, feature, scenario):
-    request.getfixturevalue("ctx").guard = None if feature.name == "guard-unparsable" else feature.name
+    request.getfixturevalue("ctx").guard = None if feature.name == "require-well-formed" else feature.name
 
 
 # --- Given ---------------------------------------------------------------
@@ -293,6 +293,16 @@ def _project(ctx):
     (ctx.proj / "sub").mkdir()
     subprocess.run(["git", "init", "-q", str(ctx.proj)], check=True)
     (ctx.proj / "t.jsonl").touch()             # a session has a transcript, if an empty one
+
+
+@given("the project directory is not a git repository")
+def _not_a_repo(ctx):
+    shutil.rmtree(ctx.proj / ".git")
+
+
+@given("the project's git index is corrupt")
+def _corrupt_index(ctx):
+    (ctx.proj / ".git/index").write_text("not an index\n")
 
 
 @given(parsers.parse('the file "{rel}" holds:'))
