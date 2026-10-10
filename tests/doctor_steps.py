@@ -156,6 +156,18 @@ def _installed_open(doctor, version, guard):
     _install(doctor, version, "user", root=copy)
 
 
+@given(parsers.re(r'languette "(?P<version>\w+)" is installed at user scope from a copy without a '
+                  r'(?P<guard>[\w-]+) hook'))
+def _installed_without(doctor, version, guard):
+    copy = doctor.aside / "plugin"
+    (copy / "hooks").mkdir(parents=True)
+    real = json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]["PreToolUse"]
+    hooks = [h for e in real for h in e["hooks"] if f"--guard {guard}" not in h["command"]]
+    (copy / "languette").symlink_to(ROOT / "languette")
+    (copy / "hooks/hooks.json").write_text(json.dumps({"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": hooks}]}}))
+    _install(doctor, version, "user", root=copy)
+
+
 @given(parsers.re(r'languette "(?P<version>\w+)" is installed at user scope from a copy without run\.py'))
 def _installed_no_run_py(doctor, version):
     copy = doctor.aside / "plugin"

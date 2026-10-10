@@ -97,6 +97,13 @@ Feature: doctor
     And the "fail-closed" row is ✓ matching "was denied"
     And the doctor exits 1
 
+  Scenario: a plugin install without a require-well-formed hook fails
+    Given languette "cd31356ad5db" is installed at user scope from a copy without a require-well-formed hook
+    When the doctor runs
+    Then the "parse check" row is ✗ "no require-well-formed hook in the install to send the probe to"
+    And the "fail-closed" row is ✓ matching "was denied"
+    And the doctor exits 1
+
   Scenario: a deny from the hook's fallback, with run.py missing, fails
     Given languette "cd31356ad5db" is installed at user scope from a copy without run.py
     When the doctor runs

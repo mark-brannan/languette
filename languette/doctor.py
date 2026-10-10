@@ -189,7 +189,7 @@ def probe(command, env, cwd, limit, sent):
         return False, f"the hook command could not start ({e.strerror or e})", None
     ms = round((time.monotonic() - start) * 1000)
     if r.returncode == 2:                      # Claude Code reads exit 2 as a block
-        return True, one_line(r.stderr), ms
+        return True, one_line(r.stderr) or "no reason given", ms
     try:
         out = json.loads(r.stdout)["hookSpecificOutput"] if r.stdout.strip() else {}
         decision, reason = out.get("permissionDecision"), out.get("permissionDecisionReason")
@@ -198,7 +198,7 @@ def probe(command, env, cwd, limit, sent):
     if decision == "deny" and isinstance(reason, str) and FALLBACK.search(reason):
         return False, f"only the fallback denied it, so the guard never judged it: {reason.split('. ')[0]}", ms
     if decision == "deny":
-        return True, one_line(reason) if isinstance(reason, str) else "", ms
+        return True, (one_line(reason) if isinstance(reason, str) else "") or "no reason given", ms
     return False, f"the hook {'let it through silently' if decision is None else 'answered ' + str(decision)}" \
                   f" (exit {r.returncode})", ms
 
@@ -354,20 +354,21 @@ def check(cwd):
         rows.append((WARN, "gh", f"{'not signed in' if signed is False else 'not installed or not answering'}; the "
                                  "stacked-base and ruleset guards will ask instead of deciding"))
 
-    for label, guard, sent in PROBES:
+    for p in PROBES:
+        label, guard, sent = p
         hook = probed.get(guard)
         if guard in not_run:
             rows.append((WARN, label, not_run[guard]))
         elif hook is None:
             # A by-hand install may carry only some guards; a plugin's hooks.json carries both.
             absent = f"no {guard} hook {'in the install' if inst or hand else 'installed'} to send the probe to"
-            rows.append((FAIL if (label, guard, sent) == CANARY else WARN, label, absent))
+            rows.append((FAIL if p == CANARY or inst else WARN, label, absent))
         else:
             t = hook.get("timeout")
             limit = t if isinstance(t, (int, float)) and not isinstance(t, bool) and t > 0 else HOOK_TIMEOUT
             denied, what, ms = probe(hook["command"], env, cwd, limit, sent)
             how = "through the hook command as installed"
-            if denied and (label, guard, sent) == PARSE:
+            if denied and p == PARSE:
                 rows.append((OK, label, f"`{sent}` was denied: {what}, {ms} ms"))
             elif denied:
                 rows.append((OK, label, f"`{sent}` was denied {how}, {ms} ms of {limit:g} s"))
