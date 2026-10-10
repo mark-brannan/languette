@@ -23,7 +23,7 @@ Feature: doctor
     And the "parse check" row comes before the "fail-closed" row
     And the "fail-closed" row comes before the "gh" row
     And the "fail-closed" row is ✓ matching "`rm -rf /fake/languette-doctor` was denied through the hook command as installed, \d+ ms of 600 s"
-    And the "version" row is ! "no releases yet; plugin at commit cd31356"
+    And the "version" row is ! "plugin at commit cd31356, from main; not a release"
     And the doctor exits 0
     And the fake HOME is as it was
 
