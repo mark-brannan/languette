@@ -12,20 +12,20 @@ from hamcrest import assert_that, contains_string, empty, equal_to, has_length, 
 
 import readme_table
 from conftest import hooks_json_commands, hooks_json_prompt_command
-from languette.guards import guard_github_issues, guard_private_terms
+from languette.guards import guard_github_issues, guard_private_terms, guard_protected_services
 
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
           "guard-private-terms", "prose-budget-commit", "guard-worktrees",
           "guard-bypass-labels", "require-well-formed", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
           "guard-permissions", "guard-pipe-to-shell", "guard-disks",
-          "guard-host-availability", "guard-scheduled-jobs", "guard-cross-session-send",
+          "guard-host-availability", "guard-protected-services", "guard-scheduled-jobs", "guard-cross-session-send",
           "guard-secrets"}
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"guard_worktrees"}
 # Options that are not a guard's on/off toggle: name -> type.
 OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string",
-                 "prose_budget_command": "string",
+                 "protected_services": "string", "prose_budget_command": "string",
                  "record_decisions": "boolean", "record_raw_commands": "boolean"}
 # Per-rule switches inside one guard: boolean, on by default.
 RULE_OPTIONS = {f"guard_git_work_loss_{r}" for r in ("blanket_staging", "stash", "force_push", "discard", "branch_delete")} | {
@@ -148,6 +148,12 @@ def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():
         want = key not in OPT_IN
         assert opt.get("type") == "boolean" and opt.get("default") is want and opt.get("title") \
             and opt.get("description"), f"userConfig.{key}: want a titled, described boolean defaulting to {str(want).lower()}"
+
+
+def test_protected_services_starts_empty():
+    uc = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())["userConfig"]
+    assert_that(guard_protected_services.protected({guard_protected_services.OPTION: uc["protected_services"]["default"]}),
+                equal_to(()))
 
 
 # The parser ladder's pip parsers (docs/decisions.md, "Runtime dependencies"):

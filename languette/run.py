@@ -19,6 +19,13 @@ I/O, and throws world's exception into the guard when the fact can't be had.
 A write it wants it yields as a languette.verdict.Act: the runner sends None
 back, and does every Act through world once the verdict is out.
 A guard whose check returns a finding directly needs no change.
+
+A guard whose questions are all known once the command is parsed has no
+check: parse(payload, env) reads the command, plan(parsed) lists every Need,
+the runner answers them all, and judge(parsed, answers) gets the answers keyed
+by Need, with an exception in place of a fact world could not have.
+Every guard sees the payload as sent: the runner never fills in a cwd, and a
+guard that needs an absolute one denies without it.
 """
 
 import inspect
@@ -41,10 +48,10 @@ try:
                                   guard_cross_session_send, guard_disks, guard_git_stacked_base,
                                   guard_git_work_loss, guard_github_issues, guard_host_availability,
                                   guard_infra, guard_permissions, guard_pipe_to_shell, guard_private_terms,
-                                  guard_recursive_delete, guard_scheduled_jobs, guard_secrets, require_well_formed,
-                                  guard_worktrees, prose_budget_commit)
+                                  guard_protected_services, guard_recursive_delete, guard_scheduled_jobs, guard_secrets,
+                                  require_well_formed, guard_worktrees, prose_budget_commit)
     from languette import record
-    from languette.verdict import Act, allow, ask, context, deny
+    from languette.verdict import Act, Need, allow, ask, context, deny
     from languette.world import ACTS, World
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
@@ -59,8 +66,9 @@ GUARDS = (
     ("PreToolUse", re.compile(r"Bash\Z"), (require_well_formed, guard_git_work_loss, guard_recursive_delete, ask_first,
                                            guard_bypass_hooks, guard_infra, guard_bypass_labels,
                                            guard_bypass_ruleset, guard_permissions, guard_pipe_to_shell,
-                                           guard_disks, guard_host_availability, guard_scheduled_jobs,
-                                           guard_git_stacked_base, guard_secrets, prose_budget_commit)),
+                                           guard_disks, guard_host_availability, guard_protected_services,
+                                           guard_scheduled_jobs, guard_git_stacked_base, guard_secrets,
+                                           prose_budget_commit)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
     ("PreToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
     ("PreToolUse", guard_private_terms.TOOLS, (guard_private_terms,)),
@@ -104,6 +112,18 @@ def _drive(r, world, acts):
             answer, err = world.answer(need), None
         except Exception as e:  # noqa: BLE001 -- the guard decides what a missing fact means
             answer, err = None, e
+
+
+def _plan_judge(g, payload, env, world):
+    """A plan / judge guard's finding: every Need it plans, answered, then judged once."""
+    parsed = g.parse(payload, env)
+    answers = {}
+    for need in g.plan(parsed):
+        try:
+            answers[need] = world.answer(need)
+        except Exception as e:  # noqa: BLE001 -- judge decides what a missing fact means
+            answers[need] = e
+    return g.judge(parsed, answers)
 
 
 def respond(stdin_text, env, only=None):
@@ -174,7 +194,12 @@ def _respond(stdin_text, env, only):
     for g in guards:
         crashed = False
         try:
-            r = judged_once[0] if judged_once and g is require_well_formed else _drive(g.check(payload, env), world, acts)
+            if judged_once and g is require_well_formed:
+                r = judged_once[0]
+            elif hasattr(g, "plan"):
+                r = _plan_judge(g, payload, env, world)
+            else:
+                r = _drive(g.check(payload, env), world, acts)
         except Exception as e:  # noqa: BLE001
             r, crashed = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
         findings.append((g.NAME, r, crashed))
