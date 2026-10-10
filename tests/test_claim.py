@@ -98,7 +98,7 @@ def test_a_spend_from_before_calls_were_recorded_stays_spent(tmp_path):
 def test_two_guards_wanting_one_label_for_one_command_need_one_click(tmp_path, monkeypatch):
     tp = _transcript(tmp_path)
 
-    def check(payload, env):
+    def check(doc):
         approved, spent = yield Need("claim", {"Run e2e": 1})
         return None if spent else {"permissionDecision": "deny", "permissionDecisionReason": "no click"}
 

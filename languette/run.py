@@ -118,17 +118,10 @@ def _drive(r, world, acts):
             answer, err = None, e
 
 
-def _check(g, doc):
-    # A check(payload, env) from before the document, as tests/test_claim.py's fakes write it.
-    if g.check.__code__.co_argcount > 1:
-        return g.check(doc.payload, doc.env)
-    return g.check(doc)
-
-
 def _finding(g, doc, world, acts):
     """(g's finding on `doc`, whether it crashed)."""
     try:
-        return _drive(_check(g, doc), world, acts), False
+        return _drive(g.check(doc), world, acts), False
     except Exception as e:  # noqa: BLE001
         return deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
 
