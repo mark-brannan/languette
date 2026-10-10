@@ -178,14 +178,14 @@ def _segment(s, a, b, nested, env):
         _reset(args)
 
 
-def check(payload, env=None):
-    env = env or {}
+def check(doc):
+    payload, env = doc.payload, doc.env or {}
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd:
         return None
     try:
-        for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
-            s = sw.Scan(text)
+        for text, nested in doc.texts():
+            s = doc.scan(text)
             for a, b in s.segments():
                 if a <= b:
                     _segment(s, a, b, nested, env)

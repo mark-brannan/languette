@@ -62,12 +62,12 @@ class _Commits:
     unstaged tracked change (allflag) or untracked files too (allnew); whether a
     pathspec cannot be resolved (bad); whether a second commit runs elsewhere (multi)."""
 
-    def __init__(self, command):
+    def __init__(self, doc):
         self.seen = self.multi = self.allflag = self.allnew = self.bad = self.addseen = False
         self.paths, self.cd, self.ctx = [], "", None
         self.ccd = self.cdir = self.cbin = self.addctx = None
-        for text, nested in sw.texts_of(sw.strip_heredocs(command + "\n")):
-            s = self.s = sw.Scan(text)
+        for text, nested in doc.texts():
+            s = self.s = doc.scan(text)
             for a, b in s.segments():
                 if a <= b:
                     self._segment(a, b, nested)
@@ -197,7 +197,8 @@ def _engine(env, cwd):
     return None
 
 
-def check(payload, env):
+def check(doc):
+    payload, env = doc.payload, doc.env
     if payload.get("tool_name") != "Bash":
         return None
     ti = payload.get("tool_input")
@@ -208,7 +209,7 @@ def check(payload, env):
     engine = yield from _engine(env, cwd)
     if engine is None:
         return None
-    c = _Commits(cmd)
+    c = _Commits(doc)
     if not c.seen:
         return None
     if c.multi:                         # one check cannot serve two repositories
