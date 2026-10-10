@@ -24,9 +24,8 @@ A guard whose questions are all known once the command is parsed has no
 check: parse(payload, env) reads the command, plan(parsed) lists every Need,
 the runner answers them all, and judge(parsed, answers) gets the answers keyed
 by Need, with an exception in place of a fact world could not have.
-Such a guard sees the payload with the hook process's own directory as its
-cwd when it has no absolute one, filled before any guard runs; the others see
-the payload as sent.
+Every guard sees the payload as sent: the runner never fills in a cwd, and a
+guard that needs an absolute one denies without it.
 """
 
 import inspect
@@ -126,17 +125,6 @@ def _plan_judge(g, payload, env, world):
     return g.judge(parsed, answers)
 
 
-def _with_cwd(payload, world):
-    """`payload`, with the hook process's directory as its cwd when it has no absolute one."""
-    cwd = payload.get("cwd")
-    if isinstance(cwd, str) and cwd.startswith("/"):
-        return payload
-    try:
-        return {**payload, "cwd": world.answer(Need("cwd"))}
-    except Exception:  # noqa: BLE001 -- each guard says what a missing cwd means
-        return payload
-
-
 def respond(stdin_text, env, only=None):
     """The hook's whole stdout for one payload: "" (no objection) or one
     JSON line. `env` is what the guards read in place of os.environ. The
@@ -201,7 +189,6 @@ def _respond(stdin_text, env, only):
         if judged_once and judged_once[0]:
             guards = [g for g in guards if g is require_well_formed]
     world = World(env, payload)
-    filled = _with_cwd(payload, world) if any(hasattr(g, "plan") for g in guards) else payload
     reasons, asks, notes, rewrites, findings, acts = [], [], [], [], [], []
     for g in guards:
         crashed = False
@@ -209,7 +196,7 @@ def _respond(stdin_text, env, only):
             if judged_once and g is require_well_formed:
                 r = judged_once[0]
             elif hasattr(g, "plan"):
-                r = _plan_judge(g, filled, env, world)
+                r = _plan_judge(g, payload, env, world)
             else:
                 r = _drive(g.check(payload, env), world, acts)
         except Exception as e:  # noqa: BLE001
