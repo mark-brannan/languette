@@ -472,7 +472,7 @@
  "tests/test_features.py::test_a_pathspecfromfile_commit_reaches_past_the_index_so_every_unstaged_tracked_change_is_checked[git commit -m x --pathspec-from-file list.txt-as the next word]": {"git": 1, "run": 4},
  "tests/test_features.py::test_a_pathspecfromfile_commit_reaches_past_the_index_so_every_unstaged_tracked_change_is_checked[git commit -m x --pathspec-from-file=list.txt-stuck to the option]": {"git": 1, "run": 4},
  "tests/test_features.py::test_a_permission_change_that_is_not_a_sweep_and_the_agents_own_areas_pass[/tmp-chmod -R 755 .-the working directory is the agent's]": {"git": 1},
- "tests/test_features.py::test_a_permission_change_that_is_not_a_sweep_and_the_agents_own_areas_pass[/tmp/x-chmod -R 755 sub dir-relative targets resolve to /tmp]": {"git": 1},
+ "tests/test_features.py::test_a_permission_change_that_is_not_a_sweep_and_the_agents_own_areas_pass[/tmp-chmod -R 755 sub dir-relative targets resolve to /tmp]": {"git": 1},
  "tests/test_features.py::test_a_permission_change_that_is_not_a_sweep_and_the_agents_own_areas_pass[{HOME}/project-chgrp staff file-]": {"git": 1},
  "tests/test_features.py::test_a_permission_change_that_is_not_a_sweep_and_the_agents_own_areas_pass[{HOME}/project-chmod +x run.sh-not recursive]": {"git": 1},
  "tests/test_features.py::test_a_permission_change_that_is_not_a_sweep_and_the_agents_own_areas_pass[{HOME}/project-chmod -R 755 /tmp/x-/tmp is the agent's]": {"git": 2},

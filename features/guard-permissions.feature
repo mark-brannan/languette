@@ -108,7 +108,7 @@ Feature: guard-permissions
       | {HOME}/project                      | chmod -R 755 {HOME}/.claude/worktrees/w/src | an agent worktree                       |
       | {HOME}/project                      | chmod -R 755 ~/.claude/worktrees/w/src      | ~/ spelled out                          |
       | /tmp                                | chmod -R 755 .                              | the working directory is the agent's    |
-      | /tmp/x                              | chmod -R 755 sub dir                        | relative targets resolve to /tmp        |
+      | /tmp                                | chmod -R 755 sub dir                        | relative targets resolve to /tmp        |
       | {HOME}/project                      | git commit -m "chmod -R 777 everything"     | prose that names it is not it           |
       | {HOME}/project                      | echo chmod -R 755 src                       |                                         |
       | {HOME}/project                      | grep -r "chmod -R" docs                     |                                         |
