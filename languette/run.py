@@ -24,8 +24,8 @@ A guard whose questions are all known once the command is parsed has no
 check: parse(payload, env) reads the command, plan(parsed) lists every Need,
 the runner answers them all, and judge(parsed, answers) gets the answers keyed
 by Need, with an exception in place of a fact world could not have.
-Every guard sees the payload as sent: the runner never fills in a cwd, and a
-guard that needs an absolute one denies without it.
+Every guard sees the payload as sent: the runner never fills in a cwd, and
+denies a PreToolUse payload without an absolute one before any guard runs.
 """
 
 import inspect
@@ -51,7 +51,7 @@ try:
                                   guard_protected_services, guard_recursive_delete, guard_scheduled_jobs, guard_secrets,
                                   require_well_formed, guard_worktrees, prose_budget_commit)
     from languette import record
-    from languette.verdict import Act, Need, allow, ask, context, deny
+    from languette.verdict import Act, Need, deny, verdict
     from languette.world import ACTS, World
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
@@ -161,6 +161,14 @@ def _respond(stdin_text, env, only):
     # The shell guards never read the event; a payload without one is judged
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
+    # Every guard resolves paths from the payload's cwd, never the hook
+    # process's own directory, which no one promises is the session's. The
+    # state-keeping events read no cwd, and skipping them would fail open.
+    cwd = payload.get("cwd")
+    if event == "PreToolUse" and (not isinstance(cwd, str) or not cwd.startswith("/")):
+        return _out(event, deny(
+            "languette: the hook payload has no working directory, or only a relative one, so no path in "
+            "the call can be resolved. This is a gate and fails closed.")), (World(env, payload), payload, [], [])
     tool = payload.get("tool_name")
     # A hook entry that names no guard here, say one renamed since it was
     # copied, would otherwise judge nothing and pass every command.
@@ -190,7 +198,7 @@ def _respond(stdin_text, env, only):
         if judged_once and judged_once[0]:
             guards = [g for g in guards if g is require_well_formed]
     world = World(env, payload)
-    reasons, asks, notes, rewrites, findings, acts = [], [], [], [], [], []
+    findings, acts = [], []
     for g in guards:
         crashed = False
         try:
@@ -203,28 +211,9 @@ def _respond(stdin_text, env, only):
         except Exception as e:  # noqa: BLE001
             r, crashed = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
         findings.append((g.NAME, r, crashed))
-        if not r:
-            continue
-        if r.get("permissionDecision") == "deny":
-            reasons.append(r["permissionDecisionReason"])
-        if r.get("permissionDecision") == "ask":
-            asks.append(r["permissionDecisionReason"])
-        if r.get("permissionDecision") == "allow" and "updatedInput" in r:
-            rewrites.append(r["updatedInput"])
-        if r.get("additionalContext"):
-            notes.append(r["additionalContext"])
     judged = (world, payload, findings, acts)
-    if event != "PreToolUse":                  # state-keeping events: nothing to decide
-        return "", judged
-    if reasons:
-        return _out(event, deny("\n\n".join(reasons))), judged
-    if asks:
-        return _out(event, ask("\n\n".join(asks))), judged
-    if rewrites:                               # the first rewrite wins; two cannot both apply
-        return _out(event, {**allow(rewrites[0]), **(context("\n\n".join(notes)) if notes else {})}), judged
-    if notes:
-        return _out(event, context("\n\n".join(notes))), judged
-    return "", judged
+    fields = verdict(event, findings)
+    return (_out(event, fields) if fields else ""), judged
 
 
 def main(argv):

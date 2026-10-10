@@ -105,7 +105,8 @@ def given_machine(machine, name, tmp_path):
 
 @when(parsers.re(r"the agent runs `(?P<command>.*)` there"))
 def run_hook(machine, command):
-    payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command}}
+    payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command},
+               "cwd": str(machine.home)}
     env = {"PATH": str(machine.path), "CLAUDE_PLUGIN_ROOT": str(ROOT), "HOME": str(machine.home)}
     r = subprocess.run(["/bin/sh", "-c", hook_command()], input=json.dumps(payload), capture_output=True,
                        text=True, env=env, timeout=20)

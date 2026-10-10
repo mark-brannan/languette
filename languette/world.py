@@ -25,7 +25,7 @@ SPENT = ".languette-ask"            # appended to the transcript path
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
-KINDS = frozenset("git gh-api pr-list which read path physical cwd clock ruleset-cache claim worktree run door "
+KINDS = frozenset("git gh-api pr-list which read path physical clock ruleset-cache claim worktree run door "
                   "send-state".split())
 ACTS = {"ruleset-keep": "_ruleset_keep", "send-keep": "_send_keep", "worktree-keep": "_wt_keep",
         "worktree-leave": "_wt_leave", "door-open": "_door_open", "door-spend": "_door_spend"}
@@ -183,9 +183,6 @@ class World:
             f.write(call)
         os.rename(mine, held)
         return True
-
-    def _cwd(self):
-        return os.getcwd()
 
     def _clock(self):
         return time.time()
