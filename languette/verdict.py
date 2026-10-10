@@ -1,10 +1,11 @@
 """The verdicts a guard returns, in Claude Code's hookSpecificOutput words,
 and the facts a guard may ask for.
 
-A guard's check returns deny(reason), ask(reason), context(text), allow(input)
-or None; or it is a generator that yields Needs and Acts and returns one of those.
-A plan / judge guard instead lists its Needs up front (plan) and gets every
-answer at once (judge), keyed by the Need.
+A guard's check(doc) reads the call's languette.document.Document and returns
+deny(reason), ask(reason), context(text), allow(input) or None; or it is a
+generator that yields Needs and Acts and returns one of those. A guard whose
+Needs are all known once the command is parsed writes its check as
+planned(doc, parse, plan, judge).
 Refuse is how a guard's internals say "deny, for this reason" from deep inside
 a walk; check catches it and returns deny. Standard library only.
 """
@@ -74,6 +75,20 @@ class Act(Need):
     """
 
     __slots__ = ()
+
+
+def planned(doc, parse, plan, judge):
+    """A check for a guard that parses once: parse(doc) reads the command, plan
+    lists every Need, and judge(parsed, answers) gets the answers keyed by
+    Need, with world's exception in place of a fact it could not have."""
+    parsed = parse(doc)
+    answers = {}
+    for need in plan(parsed):
+        try:
+            answers[need] = yield need
+        except Exception as e:  # noqa: BLE001 -- judge decides what a missing fact means
+            answers[need] = e
+    return judge(parsed, answers)
 
 
 def deny(reason):

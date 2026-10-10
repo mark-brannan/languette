@@ -114,11 +114,11 @@ def _operands(words):
     return out
 
 
-def bash_read(command):
-    """What a Bash command fetched from the network, or None: a curl or wget
+def bash_read(doc):
+    """What the Bash command fetched from the network, or None: a curl or wget
     anywhere among its words, fetch as the command run, or a `gh` read."""
-    for text, nested in sw.texts_of(sw.strip_heredocs(command.rstrip("\n") + "\n")):
-        s = sw.Scan(text)
+    for text, nested in doc.texts():
+        s = doc.scan(text)
         for i, w in enumerate(s.w):
             if s.k[i] == "w" and os.path.basename(w) in _FETCHERS:
                 return f"`{os.path.basename(w)}`"
@@ -139,8 +139,9 @@ def _mcp_reads(tool):
     return bool(words & _MCP_READ) or not words & _MCP_WRITE
 
 
-def untrusted_read(payload):
+def untrusted_read(doc):
     """The tool that read untrusted content, as the deny names it, or None."""
+    payload = doc.payload
     tool = payload.get("tool_name")
     if not isinstance(tool, str):
         return None
@@ -155,7 +156,7 @@ def untrusted_read(payload):
     if not isinstance(cmd, str):
         return None
     try:
-        what = bash_read(cmd)
+        what = bash_read(doc)
     except Exception:  # noqa: BLE001 -- a command it cannot read may have read anything
         return "Bash (a command this guard could not read)"
     return f"Bash {what}" if what else None
@@ -201,8 +202,9 @@ def _first_line(message):
     return f'"{_shown(lines[0])}"{more}'
 
 
-def _record(payload, event):
+def _record(doc, event):
     """(op, arg) for World's send-keep, or None when the event changes nothing."""
+    payload = doc.payload
     if event == "SessionStart":
         return ("clear", None) if payload.get("source") in _FRESH else None
     if event == "SubagentStart":
@@ -211,18 +213,19 @@ def _record(payload, event):
     if payload.get("tool_name") == "Agent":
         names = spawned(payload)
         return ("names", names) if names else None
-    what = untrusted_read(payload)
+    what = untrusted_read(doc)
     return ("read", what) if what else None
 
 
-def check(payload, env=os.environ):
+def check(doc):
+    payload, env = doc.payload, doc.env
     event = payload.get("hook_event_name") or "PreToolUse"
     sid = payload.get("session_id")
     sid = sid if isinstance(sid, str) and sid else None
 
     # --- the state hooks: record, never object ------------------------------
     if event != "PreToolUse":
-        rec = _record(payload, event) if sid else None
+        rec = _record(doc, event) if sid else None
         if rec:
             yield Act("send-keep", sid, *rec)   # a write that fails leaves an open door (World._send_keep)
         return None

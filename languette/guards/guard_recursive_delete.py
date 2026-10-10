@@ -9,12 +9,11 @@ with a reason naming what it saw.
 """
 
 import json
-import os
 import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Need, Refuse, context, deny
+from languette.verdict import Need, Refuse, context, deny, planned
 
 NAME = "guard-recursive-delete"
 
@@ -155,9 +154,8 @@ class _Judge:
         for i in tgt:
             self.target(s, i)
 
-    def run(self, text):
-        texts = sw.texts_of(sw.strip_heredocs(text))
-        scans = [(sw.Scan(t), nested) for t, nested in texts]
+    def run(self, doc):
+        scans = [(doc.scan(t), nested) for t, nested in doc.texts()]
         # Any cd anywhere makes every relative target in the command unresolvable.
         self.moved = any(a <= b and sw.cmd_index(s, a, b, _CD, True) is not None
                          for s, _ in scans for a, b in s.segments())
@@ -167,9 +165,10 @@ class _Judge:
                     self.segment(s, a, b, nested)
 
 
-def parse(payload, env=os.environ):
+def parse(doc):
     """The command read into what plan and judge need; "found" is a finding
     parse alone comes to."""
+    payload, env = doc.payload, doc.env
     out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None}
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if cmd is None or cmd is False:
@@ -186,7 +185,7 @@ def parse(payload, env=os.environ):
         return out
     judge = _Judge(cwd, home)
     try:
-        judge.run(cmd + "\n")
+        judge.run(doc)
     except Refuse as e:
         out["refused"] = str(e)
     out.update(home=home, allow=env.get("LANGUETTE_RM_ALLOW") or None, targets=judge.targets)
@@ -259,3 +258,7 @@ def judge(parsed, answers):
                 "directory, the scratchpad, /tmp or an agent worktree. rm follows a trailing slash into the "
                 "link's target.")
     return None
+
+
+def check(doc):
+    return (yield from planned(doc, parse, plan, judge))

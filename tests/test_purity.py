@@ -1,6 +1,6 @@
-"""The purity check (docs/design/guard-pipeline.md): every guard and the
-verdict, read as source and never run, may not open a file, start a program,
-open a connection, read the clock or ask the disk about a path. What a guard
+"""The purity check (docs/design/guard-pipeline.md): every guard, the verdict
+and the document, read as source and never run, may not open a file, start a
+program, open a connection, read the clock or ask the disk about a path. What a guard
 needs from the world it yields as a Need; languette.world answers it. A Need
 reads only (docs/decisions.md, "Gather reads only"): a kind the world answers
 with a write is an escape too, the shape #107 had.
@@ -19,9 +19,10 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _pure():
-    """The guards, the verdict, and every languette module they import, so a
-    helper cannot carry the escape for them."""
-    todo, seen = sorted((ROOT / "languette" / "guards").glob("*.py")) + [ROOT / "languette" / "verdict.py"], set()
+    """The guards, the verdict, the document they read, and every languette
+    module those import, so a helper cannot carry the escape for them."""
+    todo, seen = sorted((ROOT / "languette" / "guards").glob("*.py")) + [ROOT / "languette" / f
+                                                                         for f in ("verdict.py", "document.py")], set()
     while todo:
         f = todo.pop()
         if f in seen:
@@ -179,6 +180,19 @@ def test_no_guard_is_let_off_a_direct_read():
     or a helper it imports, that reads for itself fails the check."""
     let_off = {rel: [w for w in calls if not w.startswith("Need ")] for rel, calls in KNOWN.items() if rel != LADDER}
     assert_that({rel: w for rel, w in let_off.items() if w}, equal_to({}))
+
+
+def test_the_runner_runs_only_pure_guards_through_check():
+    """Every guard run.py runs is one of the modules checked here, and the runner
+    reaches it only through check(doc): no parse, plan or judge of its own."""
+    from languette import run
+    guards = {g for _, _, gs in run.GUARDS for g in gs}
+    assert_that(sorted(g.NAME for g in guards if Path(g.__file__).resolve() not in PURE), empty())
+    assert_that(sorted(g.NAME for g in guards if getattr(g.check, "__code__", None) is None
+                       or g.check.__code__.co_argcount != 1), empty())
+    tree = ast.parse((ROOT / "languette" / "run.py").read_text())
+    called = sorted({n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)} & {"parse", "plan", "judge"})
+    assert_that(called, empty())
 
 
 def test_every_known_escape_is_still_there():
