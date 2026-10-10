@@ -109,7 +109,7 @@ Each guard checks for one kind of hazard:
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
   applying a label that waives a CI gate, such as `churn-ok`
 - [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push to
-  a branch GitHub says requires a pull request, or `gh pr merge --admin`; the
+  the default branch when GitHub says it requires a pull request, or `gh pr merge --admin`; the
   agent holds your credentials, so it holds your bypass
 - [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to
   another session; it asks first, and in `bypassPermissions` mode it denies a
@@ -303,7 +303,7 @@ for beyond the command, it declares:
 | `guard-infra` | the transcript, the approvals spent |
 | `guard-git-stacked-base` | GitHub, through `gh` |
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
-| `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
+| `guard-github-issues` | the payload's `session_id`, the transcript, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
@@ -325,8 +325,10 @@ Scenario: a target the guard cannot resolve is denied on sight
 
 ## Installing by hand
 
-Clone the repo and copy the entries from `hooks/hooks.json` into
-`settings.json`, wrapper and all. The wrapper is what makes a missing or
+Clone the repo and add one entry per guard in `hooks/hooks.json` to
+`settings.json`, shaped like the one below. Replace `${CLAUDE_PLUGIN_ROOT}`
+with the path to your clone, since it is unset outside the plugin, and keep
+the wrapper. The wrapper is what makes a missing or
 crashing guard a deny: without it, a missing script is a non-blocking error
 to Claude Code, and every command goes through. One entry:
 
