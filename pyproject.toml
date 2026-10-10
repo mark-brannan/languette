@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,8 @@ name = "languette"
 version = "0.0.1"
 description = "Fail-closed guards against risky actions by coding agents, and a doctor that says whether they are on."
 readme = "README.md"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE", "LICENSE-CC-BY-SA"]
 authors = [{ name = "Mark Brannan" }]
 dependencies = []
 
