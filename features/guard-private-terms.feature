@@ -3,8 +3,9 @@ Feature: guard-private-terms
   Text bound for a public GitHub repo is checked against the user's private
   terms file, wherever the text travels: a flag value, a heredoc, a file, an
   MCP field. The file is the private_terms_file option. Without one the guard
-  is inert; with one that cannot be read it is closed. The standalone suite,
-  tests/guard-private-terms.test.sh, walks the long tail of shell shapes.
+  is inert; with one that cannot be read it is closed. The long tail of shell
+  shapes is in guard-private-terms-shapes.feature, and how a --body-file path
+  is found in guard-private-terms-body-file.feature.
 
   Why. A private repo or notes directory holds details (boat names,
   hostnames, service URLs, account identifiers) that must not reach the

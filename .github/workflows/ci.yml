@@ -49,7 +49,7 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-dev.txt
       # shfmt for the Python engine's shfmt rung: noble's is 3.8, past the 3.6 floor.
-      # jq for the two bash suites' payloads.
+      # jq for the bash suite's payloads.
       - name: Install shfmt and jq
         run: |
           set -euo pipefail
@@ -58,9 +58,8 @@ jobs:
       - run: pip install -r requirements-dev.txt
       # smoke_steps.py builds its own PATHs and venvs: the smoke job runs it.
       - run: python -m pytest -q
-      # The long tail of shell shapes for two guards, until features/ holds
-      # them (~40 s: guard-worktrees builds a fixture repo with worktrees).
-      - run: bash tests/guard-private-terms.test.sh
+      # The long tail of shell shapes for guard-worktrees, until features/ holds
+      # it (~40 s: it builds a fixture repo with worktrees).
       - run: bash tests/guard-worktrees.test.sh
 
   # The parser ladder's promise end to end: require-well-formed's hooks.json

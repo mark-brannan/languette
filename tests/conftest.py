@@ -356,9 +356,10 @@ def _corrupt_index(ctx):
 
 @given(parsers.parse('the file "{rel}" holds:'))
 def _file(ctx, rel, docstring):
-    f = ctx.proj / rel
+    # A path under {HOME} or {TMP} is absolute once expanded; any other is the project's.
+    f = Path(ctx.proj or "/", ctx.expand(rel))
     f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_text(docstring)
+    f.write_text(ctx.expand(docstring))
 
 
 @given(parsers.parse('the file "{rel}" is committed'))
@@ -742,7 +743,7 @@ def _open_door_via_hooks_json(ctx):
 
 @when(parsers.re(r'the agent calls MCP tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
 def _mcp_call(ctx, tool, inp):
-    ctx.run(json.dumps(ctx.as_sent({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)})))
+    ctx.run(json.dumps(ctx.as_sent({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(ctx.expand(inp))})))
     _ran(ctx)
 
 
@@ -922,6 +923,12 @@ def _denies_naming(ctx, text):
     assert_that(ctx.verdict, denies(naming=ctx.expand(text)))
 
 
+@then(parsers.re(r'the guard denies, not naming "(?P<text>.*)"'))
+def _denies_not_naming(ctx, text):
+    assert_that(ctx.verdict, denies())
+    assert ctx.expand(text) not in ctx.verdict.reason, f"the reason names {text!r}: {ctx.verdict.reason}"
+
+
 @then(parsers.re(r'the guard asks, naming "(?P<text>.*)"'))
 def _asks_naming(ctx, text):
     assert_that(ctx.verdict, asks(naming=ctx.expand(text)))
@@ -947,6 +954,13 @@ def _rewrites(ctx, text):
     assert ctx.verdict.decision == "allow", ctx.verdict.show()
     got = ctx.verdict.out.get("updatedInput", {}).get("command")
     assert got == ctx.expand(text), f"rewritten to {got!r}, want {ctx.expand(text)!r}"
+
+
+@then(parsers.re(r'the guard allows, rewriting the input field "(?P<key>[a-z_]+)" to "(?P<text>.*)"'))
+def _rewrites_field(ctx, key, text):
+    assert ctx.verdict.decision == "allow", ctx.verdict.show()
+    got = ctx.verdict.out.get("updatedInput", {}).get(key)
+    assert got == ctx.expand(text), f"{key} rewritten to {got!r}, want {ctx.expand(text)!r}"
 
 
 @then(parsers.re(r'the stub "(?P<name>[a-z-]+)" was called with "(?P<text>.*)"'))
