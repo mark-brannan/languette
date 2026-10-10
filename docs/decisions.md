@@ -121,6 +121,16 @@ interface is; this file says who decided it and why, one line each.
 - Every release bumps the patch number only, until Solace says otherwise. No
   semver; a review that asks for a minor or major bump is out of scope.
 
+## Releases and titles: 2026-10-10
+
+- The maintainer ships when ready, by merging the standing release pull request.
+  Work piles up in it until then; nothing ships on a schedule.
+- Pull request titles, and so the squashed commits, carry a conventional
+  type with the area as its scope: `fix(doctor): …`, not `doctor: …`.
+  release-please reads nothing else.
+- Docs changes count toward a release, so a README fix can open the
+  release pull request. Opening it obliges nothing.
+
 ## Trust and licence riders: Solace, 2026-10-09
 
 - No licence rider against AI companies: AGPL answers hosting, and no licence
