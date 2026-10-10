@@ -1,6 +1,5 @@
 """guard-worktrees: two controls over where a session's git work lands. The
-specs are features/guard-worktrees-checkout-home.feature and
-features/guard-worktrees-foreign.feature.
+spec is features/guard-worktrees.feature.
 
   checkout-home  a `git`/`yadm` checkout or switch that would move the branch
                  checked out in $HOME, when $HOME is itself a worktree
