@@ -54,10 +54,13 @@ Feature: guard-host-availability
       | systemctl --root -M stop sshd            | systemctl stop sshd            | -M as an option's value, not a host   |
       | systemctl -p --user stop sshd            | systemctl stop sshd            | --user as an option's value           |
       | systemctl stop 'ssh*'                    | systemctl stop ssh*            | a glob may match a session service    |
+      | systemctl restart networking             | systemctl restart networking   | Debian's network service              |
       | systemctl stop sshd.socket               | systemctl stop sshd.socket     | another unit type                     |
       | systemctl stop user@1000.service         | systemctl stop user@1000.service | the user's whole session            |
       | systemctl stop session-3.scope           | systemctl stop session-3.scope | a login session                       |
       | systemctl isolate graphical.target       | systemctl isolate              |                                       |
+      | service ssh stop                         | service ssh stop               | the SysV form                         |
+      | sudo service networking restart          | service networking restart     | the SysV form behind sudo             |
 
   Scenario: a fork bomb on a later line is still seen
     When the agent runs:
@@ -97,4 +100,5 @@ Feature: guard-host-availability
       | systemctl -t service status reboot               | an argument to another verb                    |
       | systemctl stop nginx                             | not a service the session runs on              |
       | systemctl restart myapp.service                  | not a service the session runs on              |
+      | service nginx stop                               | not a service the session runs on              |
       | systemctl disable sshd                           | disable without --now stops nothing            |
