@@ -17,6 +17,7 @@ import json
 import os
 import random
 import re
+import shlex
 import shutil
 import string
 import subprocess
@@ -856,6 +857,44 @@ def _scan_doc(ctx, docstring):
 @when(parsers.re(r"the scanner reads the JSON string (?P<js>\".*\")"))
 def _scan_json(ctx, js):
     ctx.scanned = json.loads(js)
+
+
+def _languette_scan(ctx, args, command):
+    """features/scan.feature: the command line an outside hook runs."""
+    argv = [sys.executable, "-I", str(ROOT / "languette" / "__main__.py"), *shlex.split(args)]
+    r = subprocess.run(argv, input=command, cwd=ctx.process_dir, capture_output=True, text=True, timeout=10)
+    ctx.out, ctx.err, ctx.code = r.stdout, r.stderr, r.returncode
+
+
+@when(parsers.re(r"`languette (?P<args>scan[^`]*)` reads `(?P<command>.*)`", flags=re.S))
+def _languette_scan_line(ctx, args, command):
+    _languette_scan(ctx, args, command)
+
+
+@when(parsers.re(r"`languette (?P<args>scan[^`]*)` reads:"))
+def _languette_scan_doc(ctx, args, docstring):
+    _languette_scan(ctx, args, docstring)
+
+
+@when(parsers.re(r"`languette (?P<args>scan[^`]*)` reads a command one byte over the length limit"))
+def _languette_scan_big(ctx, args):
+    _languette_scan(ctx, args, "x" * (scan.LENGTH_MAX + 1))
+
+
+@then("it prints:")
+def _prints(ctx, docstring):
+    assert (ctx.out, ctx.code) == (docstring + "\n", 0), f"exit {ctx.code}, stderr {ctx.err!r}"
+
+
+@then("it prints nothing")
+def _prints_nothing(ctx):
+    assert (ctx.out, ctx.code) == ("", 0), f"exit {ctx.code}, stderr {ctx.err!r}"
+
+
+@then(parsers.re(r'it prints nothing and exits (?P<code>\d+), naming "(?P<text>.*)"'))
+def _prints_nothing_exits(ctx, code, text):
+    assert (ctx.out, ctx.code) == ("", int(code)), f"exit {ctx.code}, stdout {ctx.out!r}"
+    assert text in ctx.err, ctx.err
 
 
 def scanned(ctx, mode):

@@ -359,6 +359,10 @@ verdict out. The guards began as shell scripts copied from
 [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles); they run
 in Python now, and this repo is where they are maintained.
 
+A hook of your own can read a command the way the guards do: `languette
+scan --command '^npm$'` takes it on stdin and prints one JSON line per
+segment npm leads, nested `sh -c` texts included.
+
 ## License
 
 Markdown files are [CC BY-SA 4.0](LICENSE-CC-BY-SA); everything else is
