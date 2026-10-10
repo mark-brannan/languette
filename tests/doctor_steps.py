@@ -22,7 +22,7 @@ PLUGIN_ID = "languette@languette"
 
 class Doctor:
     def __init__(self):
-        # Not under /tmp: guard-recursive-delete allows all of /tmp, so `rm -rf ~` would pass.
+        # Not under /tmp: guard-recursive-delete allows all of /tmp.
         self.home = Path(tempfile.mkdtemp(prefix="languette-doctor-home-", dir="/var/tmp"))
         (self.home / "project/sub").mkdir(parents=True)
         (self.home / ".claude/plugins").mkdir(parents=True)
@@ -141,12 +141,18 @@ def _installed_project(doctor, version, project):
 
 
 @given(parsers.re(r'languette "(?P<version>\w+)" is installed at user scope from a copy whose '
-                  r'guard-recursive-delete hook allows everything'))
-def _installed_open(doctor, version):
+                  r'(?P<guard>[\w-]+) hook allows everything'))
+def _installed_open(doctor, version, guard):
     copy = doctor.aside / "plugin"
     (copy / "hooks").mkdir(parents=True)
-    hook = {"type": "command", "command": "cat >/dev/null # --guard guard-recursive-delete"}
-    (copy / "hooks/hooks.json").write_text(json.dumps({"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [hook]}]}}))
+    # Both probed guards get a hook: the named one lets everything through, the other is the real one.
+    real = json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]["PreToolUse"]
+    hooks = [h for e in real for h in e["hooks"]
+             if any(f"--guard {g}" in h["command"] for g in ("guard-recursive-delete", "require-well-formed"))
+             and f"--guard {guard}" not in h["command"]]
+    hooks.append({"type": "command", "command": f"cat >/dev/null # --guard {guard}"})
+    (copy / "languette").symlink_to(ROOT / "languette")      # the real guard behind the real hook
+    (copy / "hooks/hooks.json").write_text(json.dumps({"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": hooks}]}}))
     _install(doctor, version, "user", root=copy)
 
 
@@ -217,6 +223,12 @@ def _row_matching(doctor, label, mark, pattern):
     got_mark, got = doctor.row(label)
     assert_that(got_mark, equal_to(mark), got)
     assert re.search(pattern, got), f"{got!r} does not match {pattern!r}"
+
+
+@then(parsers.parse('the "{first}" row comes before the "{second}" row'))
+def _row_order(doctor, first, second):
+    labels = [ln[2:].split("  ")[0].strip() for ln in doctor.out.splitlines()]
+    assert_that(labels.index(first) < labels.index(second), f"{first!r} before {second!r} in:\n{doctor.out}")
 
 
 @then(parsers.parse('the "{label}" row is there'))
