@@ -164,6 +164,17 @@ def _installed_no_run_py(doctor, version):
     _install(doctor, version, "user", root=copy)
 
 
+@given(parsers.re(r'languette "(?P<version>\w+)" is installed at user scope from a copy whose '
+                  r'guard-recursive-delete raises when called'))
+def _installed_crashing(doctor, version):
+    copy = doctor.aside / "plugin"
+    shutil.copytree(ROOT / "hooks", copy / "hooks")
+    shutil.copytree(ROOT / "languette", copy / "languette", ignore=shutil.ignore_patterns("__pycache__"))
+    with open(copy / "languette/guards/guard_recursive_delete.py", "a", encoding="utf-8") as f:
+        f.write("\n\ndef plan(parsed):\n    raise RuntimeError(\"canary\")\n")
+    _install(doctor, version, "user", root=copy)
+
+
 @given(parsers.parse("the languette options are `{options}`"))
 def _options(doctor, options):
     s = doctor.settings()
