@@ -83,7 +83,7 @@ Feature: infrastructure
       | command                                                  | verdict | note                    |
       | ansible-playbook -i inventory/prod site.yml              | asks    | no --limit, no --check  |
       | ansible-playbook -b -i hosts.ini upgrade.yml             | asks    |                         |
-      | ansible all -i inventory/prod -m include_role -e 'name=db state=destroy' | asks |              |
+      | ansible all -i inventory/prod -m ansible.builtin.shell -a 'terraform {{ op }} -auto-approve' -e 'op=destroy' | asks | |
 
   @planned
   Scenario Outline: a cluster's releases are rolled back or forced
@@ -120,7 +120,7 @@ Feature: infrastructure
       | az account management-group subscription remove --name prod-mg --subscription web-prod | asks |           |
 
   @planned
-  Scenario Outline: a DNS record or zone is deleted
+  Scenario Outline: a DNS record or zone is deleted or edited
     When the agent runs `<command>`
     Then the guard <verdict>
 
