@@ -347,13 +347,6 @@ def check(cwd):
             rows.append((WARN, "shell parser", f"no shfmt {'.'.join(map(str, scan.SHFMT_MIN))} or newer on PATH; "
                                                f"{fallback} instead"))
 
-    signed = gh_signed_in()
-    if signed:
-        rows.append((OK, "gh", "signed in"))
-    else:
-        rows.append((WARN, "gh", f"{'not signed in' if signed is False else 'not installed or not answering'}; the "
-                                 "stacked-base and ruleset guards will ask instead of deciding"))
-
     for p in PROBES:
         label, guard, sent = p
         hook = probed.get(guard)
@@ -375,12 +368,20 @@ def check(cwd):
             else:
                 rows.append((FAIL, label, f"`{sent}` was not denied {how}: {what}"))
 
+    signed = gh_signed_in()
+    if signed:
+        rows.append((OK, "gh", "signed in"))
+    else:
+        rows.append((WARN, "gh", f"{'not signed in' if signed is False else 'not installed or not answering'}; the "
+                                 "stacked-base and ruleset guards will ask instead of deciding"))
+
+    # Under the Claude Code row, which is always rows[0].
     if inst:
         v = str(inst.get("version") or "")
-        rows.append((WARN, "version", f"no releases yet; plugin at commit {v[:7]}" if SHA.fullmatch(v) else
-                     f"plugin at {v or 'an unknown version'}; not checked against the latest release"))
+        rows.insert(1, (WARN, "version", f"no releases yet; plugin at commit {v[:7]}" if SHA.fullmatch(v) else
+                        f"plugin at {v or 'an unknown version'}; not checked against the latest release"))
     elif hand:
-        rows.append((WARN, "version", "installed by hand; not checked"))
+        rows.insert(1, (WARN, "version", "installed by hand; not checked"))
     return rows
 
 
