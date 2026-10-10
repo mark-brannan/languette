@@ -22,6 +22,15 @@ jobs:
       contents: read
     uses: mark-brannan/.github/.github/workflows/nonempty-diff.yml@main
 
+  # The squash title is the commit release-please reads, so it carries a
+  # conventional type: `fix(doctor): ...`, not `doctor: ...`.
+  pr-title:
+    permissions:
+      pull-requests: read
+    uses: mark-brannan/.github/.github/workflows/pr-title.yml@main
+    with:
+      conventional: true
+
   # Every scenario in features/, under the Python engine on its awk rung and
   # on its shfmt rung, plus the hooks.json commands run as Claude Code runs
   # them. The same run checks the hooks.json shape (`claude plugin validate
@@ -123,7 +132,7 @@ jobs:
           python3 tests/new_guard_names.py "$BASE"
 
   ci-gate:
-    needs: [nonempty, tests, smoke, shellcheck, prose-budget, new-guard-names]
+    needs: [nonempty, pr-title, tests, smoke, shellcheck, prose-budget, new-guard-names]
     if: always()
     permissions: {}
     uses: mark-brannan/.github/.github/workflows/ci-gate.yml@main
