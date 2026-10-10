@@ -29,7 +29,7 @@ few words in a shell command that can do damage. When it hears one, it tells the
 "hold your tongue!"
 
 > *"The wise speak only of what they know, Gríma son of Gálmód. A witless worm have you become. Therefore be silent, and keep your forked tongue behind your teeth. I have not passed through fire and death to bandy crooked words with a serving-man till the lightning falls."*
-— **Gandalf**, in J.R.R Tolkein's *The Two Towers*, Book 3, Chapter 6
+— **Gandalf**, in J.R.R. Tolkien's *The Two Towers*, Book 3, Chapter 6
 
 ## Install
 
@@ -99,7 +99,7 @@ Each guard checks for one kind of hazard:
 - [`guard-git-stacked-base`](features/guard-git-stacked-base.feature): deleting a
   remote branch an open PR is based on (GitHub silently closes the PR)
 - [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push to
-  a branch GitHub says requires a pull request, or `gh pr merge --admin`; the
+  the default branch when GitHub says it requires a pull request, or `gh pr merge --admin`; the
   agent holds your credentials, so it holds your bypass
 - [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub issue create, transfer
   or delete in one human turn, or any inside a loop
@@ -302,7 +302,7 @@ for beyond the command, it declares:
 | `guard-infra` | the transcript, the approvals spent |
 | `guard-git-stacked-base` | GitHub, through `gh` |
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
-| `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
+| `guard-github-issues` | the payload's `session_id`, the transcript, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
@@ -330,8 +330,9 @@ which the code is proven.
 
 ## Installing by hand
 
-Clone the repo and copy the entries from `hooks/hooks.json` into
-`settings.json`, wrapper and all. The wrapper is what makes a missing or
+Clone the repo and write one entry per guard in `hooks/hooks.json` into
+`settings.json`, shaped like the one below: a fixed path where the plugin
+has `${CLAUDE_PLUGIN_ROOT}`, which is unset outside it, and the wrapper kept. The wrapper is what makes a missing or
 crashing guard a deny: without it, a missing script is a non-blocking error
 to Claude Code, and every command goes through. One entry:
 
