@@ -36,9 +36,13 @@ jobs:
           raw = f"https://raw.githubusercontent.com/{repo}/{sha}/"
           blob = f"https://github.com/{repo}/blob/{sha}/"
           def fix(m):
-              return f"{m[1]}{m[2]}({(raw if m[1] else blob)}{m[3].removeprefix('./')})"
+              return f"{m[1]}{m[2]}({(raw if m[1] else blob)}{m[3].removeprefix('./').lstrip('/')})"
           p = pathlib.Path("README.md")
-          p.write_text(re.sub(r"(!?)(\[[^\]]*\])\((?!https?:|#|mailto:)([^)\s]+)\)", fix, p.read_text()))
+          text = re.sub(r"(!?)(\[[^\]]*\])\((?!https?:|#|mailto:)([^)\s]+)\)", fix, p.read_text())
+          # Fail closed on any link form the rewrite missed.
+          if left := re.findall(r"\]\((?!https?:|#|mailto:)[^)]*\)|<(?:img|a)\s|^\s*\[[^\]]+\]:\s", text, re.M):
+              raise SystemExit(f"relative links left in README.md: {left}")
+          p.write_text(text)
           EOF
       - run: python -m build
       - run: twine check dist/*
