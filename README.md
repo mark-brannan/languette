@@ -86,6 +86,7 @@ Each guard checks for one kind of hazard:
   `eval "$(wget ..)"`
 - [`guard-disks`](features/guard-disks.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
 - [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb, `systemctl stop sshd`
+- [`guard-protected-services`](features/guard-protected-services.feature): `systemctl stop postgresql`, for the services you list
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
 - [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
   `stash pop`, force-push, `reset --hard` and other moves that throw work away

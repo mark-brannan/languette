@@ -48,8 +48,8 @@ try:
                                   guard_cross_session_send, guard_disks, guard_git_stacked_base,
                                   guard_git_work_loss, guard_github_issues, guard_host_availability,
                                   guard_infra, guard_permissions, guard_pipe_to_shell, guard_private_terms,
-                                  guard_recursive_delete, guard_scheduled_jobs, guard_secrets, require_well_formed,
-                                  guard_worktrees, prose_budget_commit)
+                                  guard_protected_services, guard_recursive_delete, guard_scheduled_jobs, guard_secrets,
+                                  require_well_formed, guard_worktrees, prose_budget_commit)
     from languette import record
     from languette.verdict import Act, Need, allow, ask, context, deny
     from languette.world import ACTS, World
@@ -66,8 +66,9 @@ GUARDS = (
     ("PreToolUse", re.compile(r"Bash\Z"), (require_well_formed, guard_git_work_loss, guard_recursive_delete, ask_first,
                                            guard_bypass_hooks, guard_infra, guard_bypass_labels,
                                            guard_bypass_ruleset, guard_permissions, guard_pipe_to_shell,
-                                           guard_disks, guard_host_availability, guard_scheduled_jobs,
-                                           guard_git_stacked_base, guard_secrets, prose_budget_commit)),
+                                           guard_disks, guard_host_availability, guard_protected_services,
+                                           guard_scheduled_jobs, guard_git_stacked_base, guard_secrets,
+                                           prose_budget_commit)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
     ("PreToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
     ("PreToolUse", guard_private_terms.TOOLS, (guard_private_terms,)),
