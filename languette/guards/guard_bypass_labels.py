@@ -39,7 +39,7 @@ import os
 import re
 
 from languette import scan as sw
-from languette.verdict import Need, Refuse, deny
+from languette.verdict import Need, Refuse, deny, planned
 
 NAME = "guard-bypass-labels"
 OPTION = "CLAUDE_PLUGIN_OPTION_BYPASS_LABELS"
@@ -378,11 +378,9 @@ def _runs_quoted(s, c, b, w):
     return False
 
 
-def _bash(f, cmd, cwd, env, depth=0, alone=True):
-    text = sw.strip_heredocs(cmd + "\n")
-    texts = sw.texts_of(text)
-    scans = [(sw.Scan(t), nested) for t, nested in texts]
-    bodies = sw.heredocs(cmd + "\n")
+def _bash(f, doc, cmd, cwd, env, depth=0, alone=True):
+    scans = [(doc.scan(t), nested) for t, nested in doc.texts(text=cmd)]
+    bodies = doc.heredocs(cmd)
     ctx = {"cwd": cwd, "env": env, "bodies": bodies, "files": f.files, "wanted": f.wanted,
            "moved": any(k == "w" and w in ("cd", "pushd", "popd") for s, _ in scans for k, w in zip(s.k, s.w)),
            "alone": alone and _alone(scans)}
@@ -408,7 +406,7 @@ def _bash(f, cmd, cwd, env, depth=0, alone=True):
                     if bodies[k][1]:
                         f.unseen.append("the heredoc fed to a shell is built at run time (an unquoted delimiter and a $ or backtick)")
                     else:
-                        _bash(f, bodies[k][0], cwd, env, depth + 1, ctx["alone"])
+                        _bash(f, doc, bodies[k][0], cwd, env, depth + 1, ctx["alone"])
                 k += 1
 
 
@@ -434,9 +432,11 @@ def _mcp(f, v, any_string, depth=0):
         f.labels.extend(_split(v))
 
 
-def parse(payload, env=os.environ):
-    """One walk of the call with no file read yet: (what it found, the Bash
-    command and cwd to walk again once its files are read, or None; env)."""
+def parse(doc):
+    """One walk of the call with no file read yet: (what it found, the
+    document, Bash command and cwd to walk again once its files are read, or
+    None; env)."""
+    payload, env = doc.payload, doc.env
     tool = payload.get("tool_name")
     inp = payload.get("tool_input")
     f = _Found({})
@@ -444,8 +444,8 @@ def parse(payload, env=os.environ):
         cmd = inp.get("command") if isinstance(inp, dict) else None
         if not isinstance(cmd, str) or not cmd.strip():
             return None
-        _bash(f, cmd, payload.get("cwd"), env)
-        return f, (cmd, payload.get("cwd")), env
+        _bash(f, doc, cmd, payload.get("cwd"), env)
+        return f, (doc, cmd, payload.get("cwd")), env
     if isinstance(tool, str) and tool.startswith("mcp__"):
         if not isinstance(inp, dict) or _reads(tool):
             return None
@@ -481,3 +481,7 @@ def judge(parsed, answers):
                     f"({', '.join(bad)}). Write the label literally in the command, or leave it for the "
                     "user to add.")
     return None
+
+
+def check(doc):
+    return (yield from planned(doc, parse, plan, judge))

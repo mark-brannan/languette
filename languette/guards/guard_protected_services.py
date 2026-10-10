@@ -10,10 +10,8 @@ services a session runs on (ssh, the network) are guard-host-availability's.
 
 import fnmatch
 import json
-import os
 import re
 
-from languette import scan as sw
 from languette.guards.guard_host_availability import service_stop, unit_names
 from languette.verdict import deny
 
@@ -28,17 +26,17 @@ def protected(env):
     return tuple(got)
 
 
-def judge(text, env=os.environ):
-    """The deny reason for `text`, or None."""
-    pats = protected(env)
+def judge(doc):
+    """The deny reason for the command, or None."""
+    pats = protected(doc.env)
     if not pats:
         return None
 
     def hit(u):
         return any(c in u for c in "*?[") or any(fnmatch.fnmatchcase(n, p) for n in unit_names(u) for p in pats)
 
-    for t, _ in sw.texts_of(sw.strip_heredocs(text)):
-        s = sw.Scan(t)
+    for t, _ in doc.texts():
+        s = doc.scan(t)
         for a, b in s.segments():
             verb = a <= b and service_stop(s, a, b, hit, host_verbs=())
             if verb:
@@ -47,7 +45,8 @@ def judge(text, env=os.environ):
     return None
 
 
-def check(payload, env=os.environ):
+def check(doc):
+    payload = doc.payload
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if cmd is None or cmd is False:
         return None
@@ -56,5 +55,5 @@ def check(payload, env=os.environ):
     cmd = cmd.rstrip("\n")                     # as $(...) would leave it
     if not cmd:
         return None
-    why = judge(cmd + "\n", env)
+    why = judge(doc)
     return deny(f"{NAME}: {why}") if why else None

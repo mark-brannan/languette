@@ -113,13 +113,13 @@ def _gh_api(s, a, b, nested, out):
         _emit(out, repo, w[w.index("refs/heads/") + len("refs/heads/"):])
 
 
-def deletions(cmd):
-    """[(repo, branch)] for each remote-branch deletion in `cmd`, in order: repo
+def deletions(doc):
+    """[(repo, branch)] for each remote-branch deletion in the command, in order: repo
     is "-" for the cwd's repository, "owner/name" when the command names one,
     "?" when git is pointed elsewhere; a branch of "?" is not a literal name."""
     out = []
-    for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
-        s = sw.Scan(text)
+    for text, nested in doc.texts():
+        s = doc.scan(text)
         for a, b in s.segments():
             if a <= b:
                 _git_push(s, a, b, nested, out)
@@ -140,11 +140,12 @@ def _unreadable(b):
                f"hand first:\n{LIST}")
 
 
-def check(payload, env=None):
+def check(doc):
+    payload = doc.payload
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd or ("push" not in cmd and "refs/heads/" not in cmd):
         return None
-    found = deletions(cmd)
+    found = deletions(doc)
     if not found:
         return None
     if any(b == "?" for _, b in found):
