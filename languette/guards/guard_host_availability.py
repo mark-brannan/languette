@@ -2,11 +2,12 @@
 
 Blocks the commands that take the machine down: shutdown, reboot, halt and
 poweroff, at command position or as the one-word script of `sh -c`, the
-fork-bomb shape, and a `systemctl` verb that takes the host down or stops a
-service the user's session runs on (ssh, login, dbus, the network, the display
-manager). The user's own `--user` manager and a remote `-H`/`-M` host are not
-the host. Any other service is the agent's to stop, unless the user lists it
-in guard-protected-services.
+fork-bomb shape, and a `systemctl` verb (or the SysV `service`, `invoke-rc.d`,
+`rc-service` and `/etc/init.d/<unit>` stop and restart) that takes the host down
+or stops a service the user's session runs on (ssh, login, dbus, the network,
+the display manager). The user's own `--user` manager and a remote `-H`/`-M`
+host are not the host. Any other service is the agent's to stop, unless the
+user lists it in guard-protected-services.
 """
 
 import json
@@ -20,11 +21,14 @@ NAME = "guard-host-availability"
 
 _POWER = re.compile(r"(?:^|/)(?:shutdown|reboot|halt|poweroff)\Z")
 _CTL = re.compile(r"(?:^|/)systemctl\Z")
+_SYSV = re.compile(r"(?:^|/)(?:service|invoke-rc\.d|rc-service)\Z")
+_INITD = re.compile(r"(?:^|/)etc/(?:rc\.d/)?init\.d/[^/]+\Z")
+_SERVICE_STOP = {"stop", "restart", "force-reload", "try-restart", "--full-restart"}
 _CTL_OTHER = {"--user", "-H", "--host", "-M", "--machine"}
 _CTL_HOST = {"isolate", "rescue", "emergency", "halt", "poweroff", "reboot", "kexec", "soft-reboot"}
 _CTL_STOP = {"stop", "restart", "try-restart", "reload-or-restart", "try-reload-or-restart", "kill"}
 # The services a session runs on: stopping one cuts the user off the machine.
-_CORE = {"ssh", "sshd", "systemd-logind", "dbus", "dbus-broker", "NetworkManager", "systemd-networkd",
+_CORE = {"ssh", "sshd", "systemd-logind", "dbus", "dbus-broker", "NetworkManager", "systemd-networkd", "networking",
          "display-manager", "gdm", "gdm3", "sddm", "lightdm", "getty", "user",
          "multi-user", "graphical", "default", "network", "network-online", "basic", "sysinit"}
 # Options that take a separate value; the value is not the verb. A missing one only fails closed.
@@ -99,6 +103,27 @@ def service_stop(s, a, b, hit, host_verbs=_CTL_HOST):
     return None
 
 
+def sysv_stop(s, a, b):
+    """`<command> <unit> <verb>` when the segment's SysV `service`, `invoke-rc.d`, `rc-service` or
+    `/etc/init.d/<unit>` stops or restarts a unit the session runs on; else None. The verb is any word
+    of the segment (`service ssh --full-restart`, `service -v ssh stop`), not only the second."""
+    g = sw.cmd_index(s, a, b, _SYSV, True)
+    init = g is None
+    if init:
+        g = sw.cmd_index(s, a, b, _INITD, True)
+        if g is None:
+            return None
+    words = [s.w[i] for i in range(g + 1, b + 1) if s.k[i] == "w"]
+    verb = next((w for w in words if w in _SERVICE_STOP), None)
+    if verb is None:
+        return None
+    units = [os.path.basename(s.w[g])] if init else [w for w in words if not w.startswith("-")]
+    unit = next((u for u in units if u != verb and _core_unit(u)), None)
+    if unit is None:
+        return None
+    return f"{os.path.basename(s.w[g])} {unit} {verb}" if not init else f"{s.w[g]} {verb}"
+
+
 def judge(doc):
     """The deny reason for the command, or None."""
     for t, _ in doc.texts():
@@ -112,6 +137,11 @@ def judge(doc):
             verb = service_stop(s, a, b, _core_unit)
             if verb:
                 return (f"`systemctl {verb}` is blocked: it takes down the host or a service the "
+                        f"user's session runs on. {_WAY_USER}")
+        for a, b in segs:
+            verb = sysv_stop(s, a, b)
+            if verb:
+                return (f"`{verb}` is blocked: it takes down a service the "
                         f"user's session runs on. {_WAY_USER}")
         # The fork bomb is raw text, so a commit message that quotes it must not trip it:
         # only a text with a segment that is not led by a prose consumer is read.
