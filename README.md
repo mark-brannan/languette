@@ -40,7 +40,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 ### Claude Code
 
 ```
-/plugin marketplace add mark-brannan/languette
+/plugin marketplace add mark-brannan/languette#release
 /plugin install languette@languette
 ```
 
