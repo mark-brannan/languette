@@ -6,7 +6,6 @@
       "package-name": "languette",
       "changelog-path": "CHANGELOG.md",
       "versioning": "always-bump-patch",
-      "release-as": "0.0.1",
       "include-v-in-tag": true,
       "include-component-in-tag": false,
       "draft": false,
