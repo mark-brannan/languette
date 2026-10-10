@@ -85,6 +85,16 @@ Feature: require-well-formed
       | echo "unclosed                | awk: the " opened at `"unclosed`       |
       | git commit -m 'half; rm -rf x | awk: the ' opened at `'half; rm -rf x` |
 
+  @python_only
+  Scenario: on the awk rung alone, a quote left open on a heredoc opener line is denied, the lines after it unstripped
+    When the agent runs:
+      """
+      cat <<EOF; echo "
+      rm -rf examples
+      EOF
+      """
+    Then the guard denies, naming "awk: the " opened at `"`"
+
   @shfmt_only
   Scenario: a substitution in a heredoc with no closing line is denied
     When the agent runs:

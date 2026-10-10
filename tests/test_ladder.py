@@ -351,8 +351,11 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens_and_operato
     # quote to the end; the shfmt rung resumes at the next Word. Every guard
     # strips heredoc bodies first, so neither reading reaches one. A " inside
     # a $(...) inside double quotes: the awk lexer closes the quote there, the
-    # shfmt rung does not; both queue the substitution's body (texts_of).
+    # shfmt rung does not; both queue the substitution's body (texts_of). A
+    # \' in $'...': the awk lexer closes the quote there; heredoc stripping
+    # (_line_end) does not, so every guard reads it as the shell does.
     assert differ == ["cat <<EOF\n$(echo \"it's\") don't\nEOF\nrm -rf examples",
+                      "cat <<EOF; echo $'it\\'s\nx'; rm -rf examples\nbody\nEOF",
                       "cat <<\\<<< EOF\n<\necho it's\nEOF\nrm -rf examples",
                       'echo "$(echo "x"; rm -rf examples)"',
                       'echo "a $(echo "$(rm -rf examples)") b"']
