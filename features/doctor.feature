@@ -13,7 +13,7 @@ Feature: doctor
     Given languette "cd31356ad5db" is installed at user scope
     And the languette options are `{"guard_worktrees": true}`
     When the doctor runs
-    Then the "Claude Code" row is ✓ "plugin cd31356, user scope; 20 guards on, 0 off"
+    Then the "Claude Code" row is ✓ "plugin cd31356, user scope; 21 guards on, 0 off"
     And the "shell parser" row is there
     And the "gh" row is ✓ "signed in"
     And the "fail-closed" row is ✓ matching "`rm -rf ~` was denied through the hook command as installed, \d+ ms of 600 s"
@@ -29,11 +29,11 @@ Feature: doctor
 
     Examples:
       | options                                           | counts                               |
-      | {}                                                | 19 guards on, 1 off: guard_worktrees |
-      | {"guard_worktrees": true, "guard_disks": false}   | 19 guards on, 1 off: guard_disks     |
-      | {"guard_worktrees": true, "guard_disks": "false"} | 19 guards on, 1 off: guard_disks     |
-      | {"guard_worktrees": true, "guard_disks": "no"}    | 20 guards on, 0 off                  |
-      | {"guard_worktrees": "yes"}                        | 19 guards on, 1 off: guard_worktrees |
+      | {}                                                | 20 guards on, 1 off: guard_worktrees |
+      | {"guard_worktrees": true, "guard_disks": false}   | 20 guards on, 1 off: guard_disks     |
+      | {"guard_worktrees": true, "guard_disks": "false"} | 20 guards on, 1 off: guard_disks     |
+      | {"guard_worktrees": true, "guard_disks": "no"}    | 21 guards on, 0 off                  |
+      | {"guard_worktrees": "yes"}                        | 20 guards on, 1 off: guard_worktrees |
 
   Scenario: gh signed out is a warning, not a failure
     Given languette "cd31356ad5db" is installed at user scope
@@ -109,7 +109,7 @@ Feature: doctor
     And the languette options are `{"guard_worktrees": true}`
     And claude plugin list fails
     When the doctor runs
-    Then the "Claude Code" row is ✓ "plugin cd31356, user scope; 20 guards on, 0 off"
+    Then the "Claude Code" row is ✓ "plugin cd31356, user scope; 21 guards on, 0 off"
     And the doctor exits 0
 
   Scenario Outline: what the doctor cannot read is a warning row, never a traceback
