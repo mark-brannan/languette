@@ -189,7 +189,8 @@ class Ctx:
         self.stubs = False
         self.hook = None                       # a hooks.json command, for wiring
         self.arg = None                        # the hook event, as Claude Code names it, for the guard to read
-        self.session = "s1"                    # session_id in the payload, for guard-github-issues
+        self.session = "s1"                    # session_id in the payload, for guard-github-issues; None leaves it out
+        self.agent = None                      # agent_id in the payload: a subagent's call, for guard-worktrees
         self.mode = None                       # permission_mode in the payload, for guard-cross-session-send
         self._doordir = None
         self.calls = 0                         # tool_use_id in the payload: one per call, as Claude Code gives
@@ -241,6 +242,10 @@ class Ctx:
     def as_sent(self, p):
         """`p` with what Claude Code puts in every payload: the cwd, and the mode when set."""
         p.setdefault("cwd", self.expand(self.cwd))
+        if self.session is None:
+            p.pop("session_id", None)
+        if self.agent:
+            p["agent_id"] = self.agent
         if self.mode is not None:
             p["permission_mode"] = self.mode
         return p
@@ -328,6 +333,24 @@ def pytest_bdd_before_scenario(request, feature, scenario):
 @when(parsers.parse('the working directory is "{path}"'))
 def _cwd(ctx, path):
     ctx.cwd = path
+
+
+@given("the payload carries no session id")
+@when("the payload carries no session id")
+def _no_session(ctx):
+    ctx.session = None
+
+
+@given(parsers.parse('the call comes from subagent "{agent}"'))
+@when(parsers.parse('the call comes from subagent "{agent}"'))
+def _from_subagent(ctx, agent):
+    ctx.agent = agent
+
+
+@given("the call comes from the session itself")
+@when("the call comes from the session itself")
+def _from_session(ctx):
+    ctx.agent = None
 
 
 @given(parsers.parse('the session is "{session}"'))
