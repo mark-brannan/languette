@@ -122,11 +122,12 @@ def _qopen(t):
 def _line_end(t):
     """Index of the newline that ends t's first logical line, or -1, read by
     the lexer's own rules (_qopen): a newline inside a quote, after a
-    backslash, or in `$'...'` goes on, and `#` comments to the end of its line
-    only before a word has begun. A heredoc body begins on the line after it.
-    A quote left open to the end of t gives -1, so nothing after it is taken
-    for a body and every word stays in the text."""
-    L, i, have, dollar = len(t), 0, False, False
+    backslash, in `$'...'`, or in a `$(...)` or `...` substitution goes on,
+    and `#` comments to the end of its line only before a word has begun. A
+    heredoc body begins on the line after it. A quote or substitution left
+    open to the end of t gives -1, so nothing after it is taken for a body and
+    every word stays in the text."""
+    L, i, have, dollar, subs = len(t), 0, False, False, []
     while i < L:
         c, after_dollar, dollar = t[i], dollar, False
         if c == "\\":
@@ -134,7 +135,11 @@ def _line_end(t):
             i += 2
             continue
         if c == "\n":
-            return i
+            if not subs:
+                return i
+            have = False
+            i += 1
+            continue
         if c in "'\"":
             have = True
             if c == "'" and not after_dollar:
@@ -149,7 +154,16 @@ def _line_end(t):
             i += 1
             continue
         if c == "#" and not have:
-            return t.find("\n", i)
+            i = t.find("\n", i)
+            if i < 0 or not subs:
+                return i
+            continue
+        if c == "(" and (after_dollar or subs[-1:] == [")"]):
+            subs.append(")")                       # $( opens, ( nests inside one
+        elif c == ")" and subs[-1:] == [")"] or c == "`" and subs[-1:] == ["`"]:
+            subs.pop()
+        elif c == "`":
+            subs.append("`")
         if c in " \t;|&()`<>":
             have = False
         elif c not in "{}" or have:
@@ -538,9 +552,10 @@ def _heredocs(b):
     """(stripped, [(body, quoted)]) -- the awk's sw_heredocs walk. Every opener
     on a line takes its body in turn from the lines below; the rest of the
     opener line stays. The opener's line runs to the first newline outside a
-    quote and after no backslash (_line_end); a quote that never closes leaves
-    the rest of the text as commands. quoted says the delimiter was quoted, so the shell
-    expands nothing in it; an unquoted one's body keeps its command
+    quote or substitution and after no backslash (_line_end); one that never
+    closes leaves the rest of the text as commands. quoted says the delimiter
+    was quoted, so the shell expands nothing in it; an unquoted one's body
+    keeps its command
     substitutions (heredoc_subs). A body whose closing line never comes stays
     in the text as commands. body is "" when the opener ends the text. The
     search resumes after each heredoc, never inside what it kept, so a `<<X`

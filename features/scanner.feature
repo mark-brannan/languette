@@ -118,6 +118,26 @@ Feature: scanner
       """
     Then its texts are ["0:cat  HEREDOC ; echo \"\ntext\n\"; rm -rf x\n"]
 
+  Scenario: a quote in a comment on the opener line opens nothing, so the body starts on the next line
+    When the scanner reads:
+      """
+      cat <<EOF # it's here
+      rm -rf x
+      EOF
+      """
+    Then its texts are ["0:cat  HEREDOC  # it's here\n"]
+
+  Scenario: a substitution running past the opener line keeps its lines, and the body starts after its end
+    When the scanner reads:
+      """
+      cat <<EOF; echo $(
+      rm -rf x
+      )
+      body
+      EOF
+      """
+    Then its texts are ["0:cat  HEREDOC ; echo $(\nrm -rf x\n)\n"]
+
   Scenario: two openers on one line keep the line and take their bodies in turn
     When the scanner reads:
       """

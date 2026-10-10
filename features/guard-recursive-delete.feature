@@ -324,6 +324,38 @@ Feature: guard-recursive-delete
       """
     Then the guard denies, naming "rm -r examples"
 
+  Scenario: an escaped quote in $'...' on the opener line does not close it, so the body starts after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo $'it\'s
+      x'; rm -rf examples
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a $(...) running past the opener line puts the body after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo $(
+      rm -rf examples
+      )
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a backtick substitution running past the opener line puts the body after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo `
+      rm -rf examples
+      `
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
   Scenario: a here-string is not a heredoc opener
     When the agent runs:
       """
