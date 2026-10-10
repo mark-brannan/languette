@@ -17,7 +17,7 @@ Feature: money
       | command                                                  | note               |
       | stripe customers list --limit 5                          |                    |
       | stripe listen --forward-to localhost:3000/webhooks       | test-mode events   |
-      | curl -s https://api.stripe.com/v1/prices | a GET            |
+      | curl -s https://api.stripe.com/v1/prices -u "$STRIPE_KEY:" | a GET            |
       | git commit -m "stripe customers delete is never run from here" | prose        |
 
   @planned
@@ -32,7 +32,7 @@ Feature: money
       | stripe prices delete price_123                                  | asks    | checkout that names it breaks          |
       | stripe coupons delete SPRING                                    | asks    |                                        |
       | stripe webhook_endpoints delete we_123                          | asks    | payment events stop arriving           |
-      | curl -X DELETE https://api.stripe.com/v1/customers/cus_123 | asks |                          |
+      | curl -X DELETE https://api.stripe.com/v1/customers/cus_123 -u "$STRIPE_KEY:" | asks |                          |
       | stripe delete /v1/subscription_items/si_123                     | asks    |                                        |
 
   @planned
