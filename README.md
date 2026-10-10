@@ -10,8 +10,12 @@ answers: *allow*, *ask*, or **deny**.
 Nothing external like a cloud/web service decides, nor any ML or AI models.
 The critical execution path is [deterministic](https://en.wikipedia.org/wiki/Deterministic_algorithm), and even uses ["pure functions"](https://en.wikipedia.org/wiki/Pure_function) where possible.
 
+**Whose is this for?** You, a real human being. A big AI vendor's safeguards
+are its product decision, changed at whim; don't take them on trust. `languette`
+is a guard you can read: **trust, but verify**. Copying it is welcome.
+
 *Languette* is French for "little tongue". On a halberd the languette (or 'langet')
-it is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
+is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
 the pole. These guards are that strip: protecting your work, strengthening your tools, while holding back certain agentic hazards that could ruin your day.
 
 It's also a play on words: Shell is a little language, and languette listens for the
@@ -352,3 +356,9 @@ test, which installs the plugin in a scratch project and confirms a recursive
 verdict out. The guards began as shell scripts copied from
 [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles); they run
 in Python now, and this repo is where they are maintained.
+
+## License
+
+Markdown files are [CC BY-SA 4.0](LICENSE-CC-BY-SA); everything else is
+[AGPL-3.0-or-later](LICENSE), except where a file carries its own notice.
+Copyright 2026 Mark Brannan. Credit "Mark Brannan" and link this repository.
