@@ -6,12 +6,17 @@ rung and as "shfmt" on its shfmt rung (skipped without a shfmt new enough,
 except under CI); @hook runs a hooks/hooks.json command by subprocess, the way
 Claude Code runs it (wiring.feature). @shfmt_only narrows a scenario to the
 shfmt rung; @no_shfmt drops the shfmt rung, for a row its
-parse check denies before any guard reads it. The feature's name is the guard's name, except
-require-well-formed, which has its own guard. @python_only narrows a scenario to the
-awk rung. @family marks a feature named for a family of guards, not one guard:
-its scenarios run against every guard. @planned marks verdicts no guard gives
-yet, on a feature or one scenario: it is expected to fail (xfail, not strict),
-and on a feature it runs against every guard.
+parse check denies before any guard reads it. @python_only narrows a scenario to the
+awk rung.
+
+In-process, every scenario runs with every guard on, opt-in guards switched on
+unless the scenario sets their option. A feature's name is the guard it names:
+that guard gives the row's verdict and every other guard is silent, except one
+the row names with an @also_<guard> tag (on the scenario, or on an Examples
+block), which must fire too. @family marks a feature named for a family of
+guards, not one guard, and @planned one whose verdicts no guard gives yet: no
+guard is named, so the silence check is off. @planned on one scenario marks it
+expected to fail (xfail, not strict).
 """
 
 import builtins
@@ -37,7 +42,7 @@ from pipeline_checks import *  # noqa: F401,F403  (the guard pipeline's promises
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from languette import run, scan, world  # noqa: E402
+from languette import run, scan, verdict, world  # noqa: E402
 
 ENGINES = ("python", "shfmt", "hook")
 IN_PROCESS = {"python": ("awk",), "shfmt": ("shfmt",)}   # engine -> scan.RUNGS
@@ -53,9 +58,14 @@ EVENTS = {"prompt": "UserPromptSubmit", "post": "PostToolUse"}
 
 
 _ELSEWHERE = None                              # the run's root for directories outside $HOME
+GUARD_NAMES = sorted({g.NAME for _, _, gs in run.GUARDS for g in gs})
+# Every opt-in guard's option, switched on for every in-process scenario.
+OPT_INS = sorted({g.OPT_IN for _, _, gs in run.GUARDS for g in gs if getattr(g, "OPT_IN", None)})
 
 
 def pytest_configure(config):
+    for g in GUARD_NAMES:
+        config.addinivalue_line("markers", f"also_{g}: the row rightly trips {g} too")
     # A throwaway $HOME for the whole run, so no verdict depends on, and no
     # step can touch, the real one; {HOME}/project for a row that names it.
     # The default cwd and the hook process's own directory are elsewhere (see
@@ -178,7 +188,10 @@ def writes_in_acts(engine, monkeypatch):
 
 class Ctx:
     def __init__(self, engine, seed):
-        self.engine, self.guard = engine, None
+        self.engine = engine
+        self.guard = None                      # the guard the feature names; None for a family
+        self.also = set()                      # guards the row names as rightly firing too
+        self.fired = set()                     # guards other than self.guard that gave a finding
         # The payload's cwd and the hook process's own directory: unrelated
         # to each other and to $HOME, so a guard that assumes otherwise fails.
         self.cwd = self.default_cwd = scattered(seed, "cwd")
@@ -263,7 +276,8 @@ class Ctx:
             assert not self.hook, "test setup: a hook command needs the hook engine (@hook)"
             # TMPDIR fresh per scenario, so a guard's per-session file starts
             # empty; PATH and the stub log as the stubs need.
-            env = {"HOME": os.environ["HOME"], "TMPDIR": self.doordir(), **self.scenario_env()}
+            on = {k: "true" for k in OPT_INS if k not in self.env}
+            env = {"HOME": os.environ["HOME"], "TMPDIR": self.doordir(), **on, **self.scenario_env()}
             if self.bare or self.stubs:
                 env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
             if self.stub_log:
@@ -273,10 +287,22 @@ class Ctx:
                 stdin = json.dumps({**json.loads(stdin), "hook_event_name": EVENTS[self.arg]})
             here = os.getcwd()
             os.chdir(self.process_dir)
+            seen = []
             try:
-                self.verdict = Verdict(run.respond(stdin, env, only=self.guard))
+                self.verdict = Verdict(_respond_all(stdin, env, seen))
             finally:
                 os.chdir(here)
+            if self.guard and seen:
+                others = {g: r for g, r, _ in seen if r and g != self.guard}
+                self.fired |= others.keys()
+                stray = {g: r for g, r in others.items() if g not in self.also}
+                assert not stray, (f"every guard but {self.guard} should be silent; tag the row @also_<guard> "
+                                   f"if it rightly trips another: {stray}")
+                # The row's verdict is the named guard's own. With no finding at all, the hook
+                # answered before any guard judged (no cwd, say), and that answer stands.
+                event = json.loads(stdin).get("hook_event_name") or "PreToolUse"
+                fields = verdict.verdict(event, [f for f in seen if f[0] == self.guard])
+                self.verdict = Verdict(run._out(event, fields) if fields else "")
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
         path = env["PATH"]
@@ -304,6 +330,21 @@ class Ctx:
             return []
 
 
+def _respond_all(stdin, env, seen):
+    """run.respond with every guard on; each guard's own finding goes on `seen`."""
+    real = run._respond
+
+    def spy(*a):
+        out, judged = real(*a)
+        seen.extend(judged[2])
+        return out, judged
+    run._respond = spy
+    try:
+        return run.respond(stdin, env)
+    finally:
+        run._respond = real
+
+
 @pytest.fixture
 def ctx(engine, request):
     c = Ctx(engine, request.node.nodeid)
@@ -318,8 +359,19 @@ def pytest_collection_modifyitems(items):
 
 
 def pytest_bdd_before_scenario(request, feature, scenario):
-    every = feature.name == "require-well-formed" or {"planned", "family"} & set(feature.tags)
-    request.getfixturevalue("ctx").guard = None if every else feature.name
+    c = request.getfixturevalue("ctx")
+    named = feature.name in GUARD_NAMES and not {"planned", "family"} & set(feature.tags)
+    c.guard = feature.name if named else None
+    c.also = {m.name.removeprefix("also_") for m in request.node.iter_markers() if m.name.startswith("also_")}
+    unknown = c.also - set(GUARD_NAMES)
+    assert not unknown, f"test setup: @also_ names no guard: {sorted(unknown)}"
+
+
+def pytest_bdd_after_scenario(request, feature, scenario):
+    c = request.getfixturevalue("ctx")
+    if c.guard and c.engine in IN_PROCESS:
+        quiet = c.also - c.fired
+        assert not quiet, f"@also_ names a guard that never fired here: {sorted(quiet)}"
 
 
 # --- Given ---------------------------------------------------------------

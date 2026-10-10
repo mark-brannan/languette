@@ -216,4 +216,8 @@ Feature: guard-worktrees
     Examples:
       | home         |
       | /nonexistent |
+
+    @also_guard-disks @also_guard-permissions @also_guard-recursive-delete
+    Examples:
+      | home         |
       |              |

@@ -22,13 +22,11 @@ Feature: guard-bypass-ruleset
       | git push origin main                          | by name                            |
       | git push origin HEAD:main                     | a refspec                          |
       | git push origin claude/topic:refs/heads/main  | a qualified destination            |
-      | git push -u origin +HEAD:main                 | a forced refspec                   |
       | git push --all origin                         | every branch, main among them      |
       | git push git@github.com:o/r.git main          | a URL in place of the remote       |
       | cd {TMP}/r && git push origin main            | after a cd                         |
       | git -C {TMP}/r push origin main               | through -C                         |
       | sh -c 'git push origin main'                  | nested in sh -c                    |
-      | echo ok; git push origin --no-verify main     | after a separator, with a flag     |
       | git pu''sh origin main                        | a subcommand split by quotes       |
       | git pu"sh" origin main                        | a subcommand split by double quotes |
       | git push --al origin                          | an abbreviated --all               |
@@ -40,6 +38,16 @@ Feature: guard-bypass-ruleset
       | git push https://GitHub.com/o/r main          | the host in another case           |
       | git push ssh://git@github.com:22/o/r.git main | a URL with a port                  |
       | (cd {TMP}/r && git push origin main)          | a cd inside the push's own subshell |
+
+    @also_guard-git-work-loss
+    Examples:
+      | command                                       | note                               |
+      | git push -u origin +HEAD:main                 | a forced refspec                   |
+
+    @also_guard-bypass-hooks
+    Examples:
+      | command                                       | note                               |
+      | echo ok; git push origin --no-verify main     | after a separator, with a flag     |
 
   Scenario Outline: main and master are watched even after the agent moves the remote's HEAD
     Given the remote HEAD of "{TMP}/r" points at "zzz"
@@ -78,10 +86,14 @@ Feature: guard-bypass-ruleset
       | echo git push origin main                 | text, not a push                          |
       | gh pr merge 5 --squash --auto             | a merge that waits for the rules          |
       | gh api repos/$R/pulls/5                   | a run-time path under a literal api       |
-      | gh api -X POST repos/o/r/issues           | a method value is not a subcommand        |
       | gh pr checks 5 -R $R                      | a run-time repo beside a literal pr       |
       | gh issue $verb 5                          | a run-time word under issue, not pr       |
       | gh -R o/r api repos/$R/pulls/5            | a literal repo before a literal api       |
+
+    @also_guard-github-issues
+    Examples:
+      | command                                   | note                                      |
+      | gh api -X POST repos/o/r/issues           | a method value is not a subcommand        |
 
   Scenario Outline: a variable set to a literal earlier in the line is read as that literal
     When the agent runs `<command>`
@@ -93,7 +105,6 @@ Feature: guard-bypass-ruleset
       | B=claude/x; git push origin "HEAD:$B"                    | is silent                                 | set, then ;                           |
       | export B=claude/x; git push origin HEAD:${B}             | is silent                                 | exported, read in braces              |
       | B=main; git push origin HEAD:$B                          | denies, naming "requires a pull request"  | main through a variable               |
-      | B=main && git push -u origin +HEAD:"$B"                  | denies, naming "requires a pull request"  | the same, forced                      |
       | B=claude/x; B=$(gh pr view 32 --json headRefName -q .headRefName); git push origin HEAD:$B | asks | set again at run time |
       | (B=claude/x); git push origin HEAD:$B                    | asks                                      | set in a subshell                     |
       | B=claude/x \| cat; git push origin HEAD:$B               | asks                                      | set in a pipeline                     |
@@ -107,6 +118,11 @@ Feature: guard-bypass-ruleset
       | B=claude/x:main; git push origin $B                      | denies, naming "requires a pull request"  | a whole refspec, landing on main      |
       | B=claude/x\ HEAD:main; git push origin HEAD:$B           | asks                                      | splits into a second refspec, on main |
       | B=claude/x\ main && git push origin $B                   | asks                                      | the same, a bare second branch        |
+
+    @also_guard-git-work-loss
+    Examples:
+      | command                                                  | verdict                                   | note                                  |
+      | B=main && git push -u origin +HEAD:"$B"                  | denies, naming "requires a pull request"  | the same, forced                      |
 
   Scenario: a variable set on an earlier line is read as that literal
     When the agent runs:
@@ -141,6 +157,7 @@ Feature: guard-bypass-ruleset
     When the agent runs `gh pr merge 5 --adm''in`
     Then the guard denies, naming "--admin"
 
+  @also_guard-worktrees
   Scenario: a remote URL that climbs out of the slug is not a repository
     When the agent runs `git push https://github.com/../x main`
     Then the guard is silent

@@ -155,6 +155,7 @@ Feature: ask-first
       When the agent runs it again
       Then the guard denies
 
+    @also_guard-disks
     Scenario: a click comes back when the user declines the command
       Given the transcript holds:
         """
@@ -169,6 +170,7 @@ Feature: ask-first
       When the agent runs it again
       Then the guard denies
 
+    @also_guard-disks
     Scenario: a click comes back when another hook denies the command
       Given the transcript holds:
         """

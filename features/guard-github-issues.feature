@@ -71,12 +71,17 @@ Feature: guard-github-issues
       | eval "gh issue transfer 4 o/x"                      |
       | url=$(gh issue create -t t -b b)                     |
       | gh api repos/o/r/issues -f title=t                  |
+
+    @also_guard-bypass-labels
+    Examples:
+      | command                                            |
       | gh api -X POST repos/o/r/issues --input body.json   |
 
   Scenario: a graphql createIssue mutation is denied, door shut
     When the agent runs `gh api graphql -f query='mutation { createIssue(input:{}) { issue { id } } }'`
     Then the guard denies
 
+  @also_guard-bypass-labels
   Scenario: a graphql mutation on its own line in a heredoc is denied, door shut
     When the agent runs:
       """

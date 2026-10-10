@@ -83,16 +83,20 @@ Feature: guard-git-work-loss
       | git push -f origin foo                                            | denies    |                          |
       | git push -fu origin foo                                           | denies    |                          |
       | git push origin +foo                                              | denies    | a + refspec forces       |
+      | git push --force-with-lease origin claude/foo                     | is silent | the one legitimate force |
+      | git push --force-with-lease origin HEAD:claude/foo                | is silent | HEAD:branch              |
+      | git push --force-with-lease origin main:backup                    | is silent | from main, to a branch   |
+      | git push -u origin claude/foo                                     | is silent |                          |
+      | git push --force-with-lease --force-if-includes origin claude/foo | is silent |                          |
+
+    @also_guard-bypass-ruleset
+    Examples:
+      | command                                                           | verdict   | note                     |
       | git push --force-with-lease origin main                           | denies    | force to main            |
       | git push --force-with-lease origin HEAD:main                      | denies    | HEAD:main is main        |
       | git push --force-with-lease origin foo:refs/heads/main            | denies    | refs/heads/main is main  |
       | git push --force-with-lease=master origin master                  | denies    | master is main too       |
-      | git push --force-with-lease origin claude/foo                     | is silent | the one legitimate force |
-      | git push --force-with-lease origin HEAD:claude/foo                | is silent | HEAD:branch              |
-      | git push --force-with-lease origin main:backup                    | is silent | from main, to a branch   |
       | git push origin HEAD:main                                         | is silent | not a force              |
-      | git push -u origin claude/foo                                     | is silent |                          |
-      | git push --force-with-lease --force-if-includes origin claude/foo | is silent |                          |
 
   Scenario Outline: discarding uncommitted work is denied
     When the agent runs `<command>`
@@ -157,17 +161,21 @@ Feature: guard-git-work-loss
       | git checkout -- './'                | denies    | quoted ./                          |
       | git stash drop                      | denies    | drop with no ref drops the top     |
       | git stash clear                     | denies    |                                    |
-      | git push --delete origin main       | denies    |                                    |
-      | git push -d origin main             | denies    |                                    |
-      | git push origin :main               | denies    |                                    |
       | sudo git add -A                     | denies    | git reached through a wrapper      |
       | GIT_DIR=x git add -A                | denies    | an assignment prefix               |
       | timeout 30 git push -f origin foo   | denies    | a wrapper with an argument         |
       | /usr/bin/git add -A                 | denies    | a full path                        |
-      | git push --delete origin claude/foo | is silent | deleting a branch that is not main |
-      | git push origin :claude/foo         | is silent | the same, by refspec               |
       | git stash drop stash@{3}            | is silent | by ref                             |
       | git stash drop abc123               | is silent | by sha                             |
+
+    @also_guard-git-stacked-base
+    Examples:
+      | command                             | verdict   | note                               |
+      | git push --delete origin main       | denies    |                                    |
+      | git push -d origin main             | denies    |                                    |
+      | git push origin :main               | denies    |                                    |
+      | git push --delete origin claude/foo | is silent | deleting a branch that is not main |
+      | git push origin :claude/foo         | is silent | the same, by refspec               |
 
   Scenario: a footgun after a heredoc is still run
     When the agent runs:
@@ -206,6 +214,7 @@ Feature: guard-git-work-loss
       """
     Then the guard is silent
 
+  @also_guard-bypass-ruleset
   Scenario: a backtick code span in an unquoted heredoc body is run by the shell
     When the agent runs:
       """
@@ -282,13 +291,17 @@ Feature: guard-git-work-loss
       | git clean --forc --dry                             | is silent |                                 |
       | git branch --del --for topic                       | denies    |                                 |
       | git push --force-w origin topic                    | is silent | --force-w is --force-with-lease |
-      | git push --force-w origin main                     | denies    | the same, to main               |
       | git commit -m "hooks: block git add -A everywhere" | is silent | prose in a commit message       |
       | git commit -m "block git add -A everywhere"        | is silent | prose in a commit message       |
       | echo "never run git add -A"                        | is silent | echo prints                     |
       | git commit -m "it's done" && echo "don't"          | is silent | apostrophes in prose            |
       | sudo apt-get install -y git                        | is silent | git as an argument              |
       | git-lfs install                                    | is silent | git-lfs is not git              |
+
+    @also_guard-bypass-ruleset
+    Examples:
+      | command                                            | verdict   | note                            |
+      | git push --force-w origin main                     | denies    | the same, to main               |
 
   Scenario: reset --hard named in a heredoc is not run
     When the agent runs:
