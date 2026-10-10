@@ -33,9 +33,10 @@ WAIT_MAX = 60                      # seconds the doctor waits on the canary, wha
 GATE = re.compile(r'^\[ "\$\{CLAUDE_PLUGIN_OPTION_(\w+)-\}" (=|!=) (true|false) \]')
 BY_HAND = re.compile(r"languette/run\.py")
 SHA = re.compile(r"[0-9a-f]{7,40}")
-# A deny that came from the wrapper or the loader, not the guard: run.py is
-# missing, crashed, or a guard failed to import. Fail-closed, but nothing judged.
-FALLBACK = re.compile(r"This is a gate and fails closed|^languette: a guard failed to load")
+# A deny that came from the wrapper, the loader or a crash, not the guard: run.py is
+# missing, a guard failed to import or raised, or the payload was refused. Fail-closed, but nothing judged.
+FALLBACK = re.compile(r"This is a gate and fails closed|^languette: (a guard failed to load|unreadable hook payload)"
+                      r"|^[\w-]+: guard crashed \(")
 
 
 class Unreadable(Exception):
