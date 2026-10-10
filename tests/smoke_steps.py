@@ -35,7 +35,8 @@ MACHINES = {
 def known_gap(request):
     """A @known_gap Examples row is a strict xfail: green while the gap stands, red the day it closes."""
     if request.node.get_closest_marker("known_gap"):
-        request.applymarker(pytest.mark.xfail(strict=True, reason="a @known_gap row in features/smoke.feature"))
+        request.applymarker(pytest.mark.xfail(strict=True, raises=AssertionError,
+                                                reason="a @known_gap row in features/smoke.feature"))
 
 
 def hook_command():
@@ -142,7 +143,7 @@ def silent(machine):
 @then(parsers.re(r'its "shell parser" row is (?P<mark>[✓!✗]) matching "(?P<pattern>.*)"'))
 def parser_row(machine, mark, pattern):
     out = machine.out
-    rows = [ln for ln in out.splitlines() if ln[2:].startswith("shell parser ")]
+    rows = [m for m in (re.match(r"(\S+)\s+shell parser\s+(.*)$", ln) for ln in out.splitlines()) if m]
     assert len(rows) == 1, f"one 'shell parser' row in:\n{out}"
-    got, text = rows[0][0], rows[0][2:][len("shell parser"):].strip()
+    got, text = rows[0].groups()
     assert (got, re.search(pattern, text) is not None) == (mark, True), f"{got} {text}"

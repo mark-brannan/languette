@@ -26,6 +26,8 @@ Feature: smoke
       | shfmt and bash                | ✓    | shfmt \d+\.\d+$                                                 |
       | no shfmt but bash             | !    | no shfmt .* on PATH; bash -n checks the parse instead$          |
       | neither shfmt nor bash        | !    | no shfmt .* on PATH; the built-in lexer reads commands instead$ |
+      | no shfmt but bashlex          | !    | no shfmt .* on PATH; the built-in lexer reads commands instead$ |
+      | no shfmt but tree-sitter-bash | !    | no shfmt .* on PATH; the built-in lexer reads commands instead$ |
 
     @known_gap
     Examples: the doctor does not name a pip parser yet
