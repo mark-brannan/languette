@@ -158,6 +158,8 @@ def _line_end(t):
             if i < 0 or not subs:
                 return i
             continue
+        if subs and not have and re.match(r"case[ \t\n]", t[i:i + 5]):
+            return -1                              # a pattern's ) would close $( early: fail closed
         if c == "(" and (after_dollar or subs[-1:] == [")"]):
             subs.append(")")                       # $( opens, ( nests inside one
         elif c == ")" and subs[-1:] == [")"] or c == "`" and subs[-1:] == ["`"]:
