@@ -455,6 +455,7 @@ Feature: guard-worktrees
         | cwd                                | command                       |
         | {TMP}/repo                         | cd .claude                    |
         | {TMP}/repo/.claude/worktrees/mine  | cd                            |
+        | {TMP}/repo/.claude/worktrees/mine  | cd mine                       |
         | {TMP}/repo/.claude/worktrees       | git commit -m "cd theirs"     |
 
     # The gate fails closed on what it needs to judge by: the payload's cwd and
@@ -539,6 +540,7 @@ Feature: guard-worktrees
     Scenario: EnterWorktree by path is refused with a fast-forward as the way to work on a branch
       When the agent calls tool "EnterWorktree" with input `{"path": "{TMP}/repo/.claude/worktrees/theirs"}`
       Then the guard denies, naming "git merge --ff-only <branch>"
+      And the guard denies, not naming "git checkout <branch>"
 
     Scenario: a deny advises the fast-forward, and says why a self-made worktree is foreign
       When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
@@ -566,6 +568,7 @@ Feature: guard-worktrees
         | cat {TMP}/repo/.claude/worktrees/mine/nothing-here.txt  |
         | git -C "$SOME_DIR" status                               |
         | ls {TMP}/repo/.claude/worktrees/*/                      |
+        | cd {TMP}/other-clone                                    |
 
     Scenario Outline: prose that mentions another worktree's path is not a command
       When the agent runs `<command>`
@@ -653,10 +656,11 @@ Feature: guard-worktrees
       Given the session is "aaaaaaaa-1111-4222-8333-444444444444"
       And the directory "{TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad"
       And CLAUDE_CODE_TMPDIR is "{TMP}/scratch/claude-tmpdir"
-      And a git repository at "{TMP}/yhome"
-      And a linked worktree "{TMP}/ywt/theirs" of the repository at "{TMP}/yhome"
+      And the directory "{TMP}/yhome"
+      And a yadm-style repository at "{TMP}/yadm/repo.git" whose work tree is "{TMP}/yhome"
+      And a linked worktree "{TMP}/ywt/theirs" of the repository at "{TMP}/yadm/repo.git"
       When the agent runs `git -C {TMP}/ywt/theirs status`
-      Then the guard denies, naming "git --git-dir={TMP}/yhome/.git worktree add {TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/<name>"
+      Then the guard denies, naming "git --git-dir={TMP}/yadm/repo.git worktree add {TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/<name>"
 
     Scenario: with no CLAUDE_CODE_TMPDIR the recipe finds the scratchpad under the state directory
       Given the session is "aaaaaaaa-1111-4222-8333-444444444444"
