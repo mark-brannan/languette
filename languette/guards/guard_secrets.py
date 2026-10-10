@@ -136,7 +136,7 @@ def _load(path):
     return rules
 
 
-def _scans(cmd):
+def scans(cmd):
     """Every text the command may run or feed, read the way it will be: the
     command with heredocs stripped and its nested shell strings as shell,
     each heredoc body as lines of data."""
@@ -162,7 +162,7 @@ def check(payload, env=os.environ):
                     f"Fix the file; until then every Bash command is denied.")
     desc = {r.id: r.description for r in tuple(secrets.secret_rules.RULES) + tuple(extra)}
     shapes, contexts = [], []
-    for s in _scans(cmd):
+    for s in scans(cmd):
         for f in secrets.findings(s, extra):
             item = f"`{secrets.shown(s, f)}` ({desc.get(f.rule, f.rule.replace('context:', 'named by '))})"
             (shapes if f.how == "shape" else contexts).append(item)
