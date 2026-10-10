@@ -3,9 +3,11 @@ machine, one row per check, each ✓, ! or ✗. Exits 1 on any ✗, so CI can ru
 
 The doctor reads settings and runs programs, so it sits outside the pure
 steps of the guard pipeline (docs/design/guard-pipeline.md): no guard imports
-it. It writes nothing. The canary sends `rm -rf ~` to the installed hook as a
-JSON payload, the way Claude Code would; nothing here ever runs that command.
-Only trusted hooks get the canary: the plugin's own hooks.json and by-hand
+it. It writes nothing. Two probes each send one command to an installed hook as
+a JSON payload, the way Claude Code would: a command that does not parse, to
+require-well-formed, and a recursive delete of a fake path, to
+guard-recursive-delete. Nothing here ever runs either command.
+Only trusted hooks get a probe: the plugin's own hooks.json and by-hand
 entries in the user's ~/.claude/settings.json. A project's settings arrive
 with whatever was checked out, so their hooks are counted, never run.
 Anything it cannot read, or reads in a shape it does not know, is a ! row,
@@ -24,10 +26,13 @@ from pathlib import Path
 from languette import scan
 
 OK, WARN, FAIL = "✓", "!", "✗"
-CANARY = "rm -rf ~"
-CANARY_GUARD = "guard-recursive-delete"
+# A probe is (row label, guard, command): the command goes to the guard's hook as a payload.
+PARSE = ("parse check", "require-well-formed", 'echo "unclosed')
+CANARY = ("fail-closed", "guard-recursive-delete", "rm -rf /fake/languette-doctor")
+PROBES = (PARSE, CANARY)
+REASON_MAX = 100                   # characters of a deny reason the parse check row shows
 HOOK_TIMEOUT = 600                 # seconds: Claude Code's default for a command hook
-WAIT_MAX = 60                      # seconds the doctor waits on the canary, whatever the hook's limit
+WAIT_MAX = 60                      # seconds the doctor waits on a probe, whatever the hook's limit
 # The gate each hooks.json command opens with: `= false` runs the guard unless
 # its option is exactly false, `!= true` (an opt-in guard) only when exactly true.
 GATE = re.compile(r'^\[ "\$\{CLAUDE_PLUGIN_OPTION_(\w+)-\}" (=|!=) (true|false) \]')
@@ -160,10 +165,18 @@ def gh_signed_in():
         return None
 
 
-def canary(command, env, cwd, limit):
-    """Send `rm -rf ~` to a hook command as Claude Code would, under /bin/sh:
-    (denied, what happened, milliseconds). The command is a payload only."""
-    payload = json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": CANARY},
+def one_line(reason):
+    """A deny reason on one short line: its first sentence, the parenthesised detail if it has one."""
+    first = " ".join(reason.split()).split(". ")[0].rstrip(".")
+    m = re.search(r"\((.+)\)", first)
+    text = m[1] if m else first
+    return text if len(text) <= REASON_MAX else text[:REASON_MAX - 1] + "…"
+
+
+def probe(command, env, cwd, limit, sent):
+    """Send `sent` to a hook command as Claude Code would, under /bin/sh:
+    (denied, why it was denied or what went wrong, milliseconds). `sent` is a payload only."""
+    payload = json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": sent},
                           "cwd": cwd, "session_id": "languette-doctor"})
     wait = min(limit, WAIT_MAX)
     start = time.monotonic()
@@ -176,7 +189,7 @@ def canary(command, env, cwd, limit):
         return False, f"the hook command could not start ({e.strerror or e})", None
     ms = round((time.monotonic() - start) * 1000)
     if r.returncode == 2:                      # Claude Code reads exit 2 as a block
-        return True, "", ms
+        return True, one_line(r.stderr) or "no reason given", ms
     try:
         out = json.loads(r.stdout)["hookSpecificOutput"] if r.stdout.strip() else {}
         decision, reason = out.get("permissionDecision"), out.get("permissionDecisionReason")
@@ -185,7 +198,7 @@ def canary(command, env, cwd, limit):
     if decision == "deny" and isinstance(reason, str) and FALLBACK.search(reason):
         return False, f"only the fallback denied it, so the guard never judged it: {reason.split('. ')[0]}", ms
     if decision == "deny":
-        return True, "", ms
+        return True, (one_line(reason) if isinstance(reason, str) else "") or "no reason given", ms
     return False, f"the hook {'let it through silently' if decision is None else 'answered ' + str(decision)}" \
                   f" (exit {r.returncode})", ms
 
@@ -215,8 +228,8 @@ def _env_value(v):
 
 def gates(hooks):
     """Option name -> its gate, `=` (on unless false) or `!=` (on only if true),
-    and the guard-recursive-delete hook, from a hooks.json object."""
-    found, canary_hook = {}, None
+    and the first hook of each probed guard, from a hooks.json object."""
+    found, probed = {}, {}
     pre = hooks.get("hooks") if isinstance(hooks, dict) else None
     if not isinstance(pre, dict):
         raise Unreadable("hooks.json has a shape the doctor does not know")
@@ -224,9 +237,10 @@ def gates(hooks):
         m = GATE.match(h["command"])
         if m:
             found[m[1].lower()] = m[2]
-        if f"--guard {CANARY_GUARD}" in h["command"] and canary_hook is None:
-            canary_hook = h
-    return found, canary_hook
+        for _, guard, _ in PROBES:
+            if f"--guard {guard}" in h["command"]:
+                probed.setdefault(guard, h)
+    return found, probed
 
 
 def is_on(gate, value):
@@ -254,8 +268,8 @@ def check(cwd):
     except Unreadable as e:
         inst, problem = None, str(e)
 
-    canary_hook, env, limit, not_run = None, None, HOOK_TIMEOUT, None
-    # The canary's environment is an allowlist, not the doctor's own.
+    probed, env, not_run = {}, None, {}      # guard -> trusted hook; guard -> why its probe did not run
+    # A probe's environment is an allowlist, not the doctor's own.
     base_env = {k: os.environ[k] for k in ("PATH", "HOME", "TMPDIR") if k in os.environ}
     if inst:
         where = f"plugin {_version(inst)}, {inst.get('scope', '?')} scope"
@@ -279,7 +293,7 @@ def check(cwd):
         try:
             if not root:
                 raise Unreadable("the install names no installPath")
-            found, canary_hook = gates(_json(Path(root) / "hooks/hooks.json"))
+            found, probed = gates(_json(Path(root) / "hooks/hooks.json"))
         except Unreadable as e:
             found, hooks_problem = {}, str(e)
         else:
@@ -292,11 +306,12 @@ def check(cwd):
                 off = sorted(k for k, g in found.items() if not is_on(g, options.get(k)))
                 rows.append((OK, "Claude Code", f"{where}; {len(found) - len(off)} guards on, {len(off)} off"
                                                 + (f": {', '.join(off)}" if off else "")))
-        key = CANARY_GUARD.replace("-", "_")
-        if inst.get("enabled") is False:
-            not_run = "the plugin is disabled, so its hooks do not run; the canary did not run"
-        elif not is_on(found.get(key, "="), options.get(key)):
-            not_run = f"{CANARY_GUARD} is off, so `{CANARY}` would go through; the canary did not run"
+        for _, guard, sent in PROBES:
+            key = guard.replace("-", "_")
+            if inst.get("enabled") is False:
+                not_run[guard] = "the plugin is disabled, so its hooks do not run; the probe did not run"
+            elif not is_on(found.get(key, "="), options.get(key)):
+                not_run[guard] = f"{guard} is off, so `{sent}` would go through; the probe did not run"
         env = {**base_env, "CLAUDE_PLUGIN_ROOT": root,
                **{f"CLAUDE_PLUGIN_OPTION_{k.upper()}": _env_value(v) for k, v in options.items()
                   if isinstance(k, str) and re.fullmatch(r"\w+", k) and v is not None}}
@@ -306,10 +321,14 @@ def check(cwd):
         rows.append((OK, "Claude Code", f"by hand, {count} guard{'' if count == 1 else 's'} in {names}"))
         # Only the user's own file supplies a command to run: a project's settings
         # come with whatever repository was checked out, and the doctor runs in CI.
-        canary_hook = next((h for h in hand.get(user_path, []) if f"--guard {CANARY_GUARD}" in h["command"]), None)
-        if canary_hook is None and any(f"--guard {CANARY_GUARD}" in h["command"] for hs in hand.values() for h in hs):
-            not_run = (f"the by-hand {CANARY_GUARD} hook is in a project's settings, and the doctor runs no "
-                       "command a project supplies; the canary did not run")
+        for _, guard, _ in PROBES:
+            flag = f"--guard {guard}"
+            hook = next((h for h in hand.get(user_path, []) if flag in h["command"]), None)
+            if hook:
+                probed[guard] = hook
+            elif any(flag in h["command"] for hs in hand.values() for h in hs):
+                not_run[guard] = (f"the by-hand {guard} hook is in a project's settings, and the doctor runs no "
+                                  "command a project supplies; the probe did not run")
         env = base_env
     elif problem:
         rows.append((WARN, "Claude Code", problem))
@@ -335,20 +354,26 @@ def check(cwd):
         rows.append((WARN, "gh", f"{'not signed in' if signed is False else 'not installed or not answering'}; the "
                                  "stacked-base and ruleset guards will ask instead of deciding"))
 
-    if not_run:
-        rows.append((WARN, "fail-closed", not_run))
-    elif canary_hook is None:
-        rows.append((FAIL, "fail-closed", f"no {CANARY_GUARD} hook {'in the install' if inst or hand else 'installed'}"
-                                          " to send the canary to"))
-    else:
-        t = canary_hook.get("timeout")
-        limit = t if isinstance(t, (int, float)) and not isinstance(t, bool) and t > 0 else HOOK_TIMEOUT
-        denied, what, ms = canary(canary_hook["command"], env, cwd, limit)
-        how = "through the hook command as installed"
-        if denied:
-            rows.append((OK, "fail-closed", f"`{CANARY}` was denied {how}, {ms} ms of {limit:g} s"))
+    for p in PROBES:
+        label, guard, sent = p
+        hook = probed.get(guard)
+        if guard in not_run:
+            rows.append((WARN, label, not_run[guard]))
+        elif hook is None:
+            # A by-hand install may carry only some guards; a plugin's hooks.json carries both.
+            absent = f"no {guard} hook {'in the install' if inst or hand else 'installed'} to send the probe to"
+            rows.append((FAIL if p == CANARY or inst else WARN, label, absent))
         else:
-            rows.append((FAIL, "fail-closed", f"`{CANARY}` was not denied {how}: {what}"))
+            t = hook.get("timeout")
+            limit = t if isinstance(t, (int, float)) and not isinstance(t, bool) and t > 0 else HOOK_TIMEOUT
+            denied, what, ms = probe(hook["command"], env, cwd, limit, sent)
+            how = "through the hook command as installed"
+            if denied and p == PARSE:
+                rows.append((OK, label, f"`{sent}` was denied: {what}, {ms} ms"))
+            elif denied:
+                rows.append((OK, label, f"`{sent}` was denied {how}, {ms} ms of {limit:g} s"))
+            else:
+                rows.append((FAIL, label, f"`{sent}` was not denied {how}: {what}"))
 
     if inst:
         v = str(inst.get("version") or "")
