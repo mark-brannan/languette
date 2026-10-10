@@ -9,6 +9,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -80,12 +81,16 @@ def make_path(tmp_path, tools, python):
 
 
 class Machine:
-    path = home = out = None
+    path = home = out = code = None
 
 
 @pytest.fixture
 def machine():
-    return Machine()
+    m = Machine()
+    # Not under /tmp: guard-recursive-delete allows all of /tmp, so the doctor's `rm -rf ~` would pass.
+    m.home = Path(tempfile.mkdtemp(prefix="languette-smoke-home-", dir="/var/tmp"))
+    yield m
+    shutil.rmtree(m.home, ignore_errors=True)
 
 
 @given(parsers.parse("a machine with {name}"))
@@ -100,7 +105,31 @@ def given_machine(machine, name, tmp_path):
         r = subprocess.run([str(d / "python3"), "-I", "-c", f"import {imports}"], capture_output=True, text=True,
                            env={"PATH": str(d), "HOME": str(tmp_path)}, timeout=20)
         assert r.returncode == 0, f"{var} cannot import {imports}: {r.stderr}"
-    machine.path, machine.home = d, tmp_path
+    machine.path = d
+
+
+def stub(machine, name, body):
+    f = machine.path / name
+    f.write_text(f"#!/bin/sh\n{body}\n")
+    f.chmod(0o755)
+
+
+@given("languette is installed as a plugin")
+def given_installed(machine):
+    """Claude Code on this machine lists languette at user scope, from this checkout, with the
+    options a user who wants every guard sets."""
+    entry = {"id": "languette@languette", "version": "cd31356ad5db", "scope": "user", "enabled": True,
+             "installPath": str(ROOT)}
+    stub(machine, "claude", f'[ "$*" = "plugin list --json" ] || exit 2\nprintf %s {shlex.quote(json.dumps([entry]))}')
+    (machine.home / ".claude").mkdir()
+    (machine.home / ".claude/settings.json").write_text(
+        json.dumps({"pluginConfigs": {"languette@languette": {"options": {"guard_worktrees": True}}}}))
+
+
+@given(parsers.re(r"gh is (?P<state>signed in|signed out|not installed)"))
+def given_gh(machine, state):
+    if state != "not installed":
+        stub(machine, "gh", f'[ "$1 $2" = "auth status" ] && exit {0 if state == "signed in" else 1}\nexit 2')
 
 
 @when(parsers.re(r"the agent runs `(?P<command>.*)` there"))
@@ -116,12 +145,11 @@ def run_hook(machine, command):
 
 @when("the doctor runs on that machine")
 def run_doctor(machine):
-    """`languette doctor` from an empty HOME under the same PATH. The Claude
-    Code row is ✗ there and the exit 1; only the parser row is asked about."""
+    """`languette doctor` in the machine's HOME under the same PATH, and nothing else on it."""
     env = {"PATH": str(machine.path), "HOME": str(machine.home), "PYTHONPATH": str(ROOT)}
     r = subprocess.run([str(machine.path / "python3"), "-m", "languette", "doctor"], capture_output=True, text=True,
                        env=env, cwd=machine.home, timeout=60)
-    machine.out = r.stdout + r.stderr
+    machine.out, machine.code = r.stdout + r.stderr, r.returncode
 
 
 @then(parsers.re(r"the hook denies, read by (?P<reader>[^,]+)(?:, at (?P<at>.+))?"))
@@ -141,10 +169,15 @@ def silent(machine):
     assert machine.out is None, machine.out
 
 
-@then(parsers.re(r'its "shell parser" row is (?P<mark>[✓!✗]) matching "(?P<pattern>.*)"'))
-def parser_row(machine, mark, pattern):
+@then(parsers.re(r'its "(?P<label>[^"]+)" row is (?P<mark>[✓!✗]) matching "(?P<pattern>.*)"'))
+def row(machine, label, mark, pattern):
     out = machine.out
-    rows = [m for m in (re.match(r"(\S+)\s+shell parser\s+(.*)$", ln) for ln in out.splitlines()) if m]
-    assert len(rows) == 1, f"one 'shell parser' row in:\n{out}"
+    rows = [m for m in (re.match(r"(\S+)\s+" + re.escape(label) + r"\s+(.*)$", ln) for ln in out.splitlines()) if m]
+    assert len(rows) == 1, f"one {label!r} row in:\n{out}"
     got, text = rows[0].groups()
-    assert (got, re.search(pattern, text) is not None) == (mark, True), f"{got} {text}"
+    assert (got, re.search(pattern, text) is not None) == (mark, True), f"{got} {text}\n{out}"
+
+
+@then(parsers.parse("the doctor exits {code:d}"))
+def exits(machine, code):
+    assert machine.code == code, f"exit {machine.code}:\n{machine.out}"
