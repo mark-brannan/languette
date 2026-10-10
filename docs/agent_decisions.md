@@ -341,3 +341,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261010t070954z
 - The default cwd is scattered outside $HOME as #171 asks; the 83 feature rows that set their own cwd to {HOME}/project explicitly were left as written, so a project under $HOME is still exercised too. Undo: replace {HOME}/project with {CWD} in those rows' cwd column (the three guard features' 350 tests pass that way, run 2026-10-10) ([#172](https://github.com/mark-brannan/languette/pull/172))
+
+### 20261010t080113z
+- The order test replays every wired guard in reverse on a fresh document, not only the guards a call ran Undo: reverse run.GUARDS instead ([#179](https://github.com/mark-brannan/languette/pull/179))
