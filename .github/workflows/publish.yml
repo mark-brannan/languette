@@ -123,11 +123,15 @@ jobs:
         run: |
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag $TAG is not vX.Y.Z" >&2; exit 1; }
           url="https://github.com/$REPO/archive/refs/tags/$TAG.tar.gz"
-          sha=$(curl -fsSL "$url" | sha256sum | cut -d' ' -f1)
+          curl -fsSL -o src.tar.gz "$url"
+          sha=$(sha256sum src.tar.gz | cut -d' ' -f1)
+          rm src.tar.gz
           sed -i -E \
             -e "s|^(  url )\".*\"|\1\"$url\"|" \
             -e "s|^(  sha256 )\".*\"|\1\"$sha\"|" \
             Formula/languette.rb
+          grep -qxF "  url \"$url\"" Formula/languette.rb && grep -qxF "  sha256 \"$sha\"" Formula/languette.rb ||
+            { echo "formula url/sha256 lines not found or not updated" >&2; exit 1; }
           git diff --exit-code --quiet Formula/languette.rb && { echo "formula already at $TAG"; exit 0; }
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
