@@ -135,10 +135,20 @@ def _load(path):
     return rules
 
 
+def project_rules(payload, env):
+    """The project's own rules, gathered: () when it has no list, Refuse when
+    the list is malformed. guard-secrets judges with them and so does the
+    decision record, which masks what the guard would deny."""
+    path = yield from _config(payload, env)
+    return (yield from _load(path)) if path else ()
+
+
 def _scans(doc):
     """Every text the command may run or feed, read the way it will be: the
     command with heredocs stripped and its nested shell strings as shell,
-    each heredoc body as lines of data."""
+    each heredoc body as lines of data. The document's scans, so no text is
+    read twice; the decision record reads the command again (secrets.scans),
+    after the verdict."""
     return [doc.scan(text) for text, _ in doc.texts()] + [secrets.Text(h) for h in doc.heredoc_bodies()]
 
 
@@ -153,8 +163,7 @@ def check(doc):
     if not cmd:
         return None
     try:
-        path = yield from _config(payload, env)
-        extra = (yield from _load(path)) if path else ()
+        extra = yield from project_rules(payload, env)
     except Refuse as e:
         return deny(f"guard-secrets: {CONFIG} is {e}, so the project's secret patterns cannot be read. "
                     f"Fix the file; until then every Bash command is denied.")

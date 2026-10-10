@@ -137,10 +137,22 @@ def respond(stdin_text, env, only=None):
         world.act(a)
     if record.wanted(env):
         try:
-            world.keep(record.build(payload, env, only, findings, _verdict(out)))
+            world.keep(record.build(payload, env, only, findings, _verdict(out), extra=_project_rules(world, payload, env)))
         except Exception:  # noqa: BLE001 -- a record never changes the verdict
             pass
     return out
+
+
+def _project_rules(world, payload, env):
+    """The project's secret rules for the record's mask, gathered through the
+    world as guard-secrets gathers them; None when they cannot be read, and the
+    record then drops what it cannot mask."""
+    if env.get(record.RAW) == "true":
+        return ()
+    try:
+        return _drive(guard_secrets.project_rules(payload, env), world, [])
+    except Exception:  # noqa: BLE001 -- a malformed list costs the record its text, never the verdict
+        return None
 
 
 def _verdict(out):
