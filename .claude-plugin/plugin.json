@@ -1,5 +1,6 @@
 {
   "name": "languette",
+  "version": "0.0.2",
   "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for the commands that could ruin a day, such as recursive rm, a disk wipe, a shutdown or a credential pasted into a command.",
   "author": {
     "name": "Mark Brannan"
