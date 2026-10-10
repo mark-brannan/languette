@@ -10,8 +10,8 @@ parse check denies before any guard reads it. The feature's name is the guard's 
 require-well-formed, which has its own guard. @python_only narrows a scenario to the
 awk rung. @family marks a feature named for a family of guards, not one guard:
 its scenarios run against every guard. @planned marks verdicts no guard gives
-yet, on a feature or one scenario: it runs against every guard and is expected
-to fail (xfail, not strict).
+yet, on a feature or one scenario: it is expected to fail (xfail, not strict),
+and on a feature it runs against every guard.
 """
 
 import builtins

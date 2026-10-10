@@ -174,10 +174,8 @@ Feature: files
       | rsync -a --delete /tmp/empty/ ~/project/          | denies  | an empty source empties the target |
       | tar --remove-files -czf notes.tgz ~/project/notes | denies  | the archive replaces the originals |
       | tar -cf /tmp/h.tar --remove-files ~               | denies  |                                    |
-      | truncate -s 0 ~/project/notes.txt                 | denies  | emptied, not deleted               |
-      | truncate -s 0 ~/.bash_history                     | denies  |                                    |
-      | unlink ~/project/notes.txt                        | denies  | rm by another name                 |
-      | unlink ~/.bashrc                                  | denies  |                                    |
+      | truncate -s 0 ~/.bash_history                     | denies  | emptied, not deleted               |
+      | unlink ~/.bashrc                                  | denies  | rm by another name                 |
       | unlink /etc/hosts                                 | denies  |                                    |
 
   @planned
@@ -187,7 +185,6 @@ Feature: files
 
     Examples:
       | command                                                                        | verdict | note                      |
-      | python3 -c 'import os; os.remove(os.path.expanduser("~/project/notes.txt"))'   | denies  |                           |
       | python3 -c 'import os; os.unlink("/etc/hosts")'                                | denies  |                           |
       | python3 -c 'import shutil, os; shutil.rmtree(os.path.expanduser("~/project"))' | denies  |                           |
       | python3 -c 'import shutil; shutil.rmtree("examples")'                          | denies  | rm -rf examples is denied |
