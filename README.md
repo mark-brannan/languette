@@ -110,9 +110,8 @@ Each guard checks for one kind of hazard:
   applying a label that waives a CI gate, such as `churn-ok`
 - [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push direct to
   main where pull requests are normally required (agents could potentially bypass using your credentials)
-- [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to
-  another session; it asks first, and in `bypassPermissions` mode it denies a
-  message sent after it read anything from the network
+- [`guard-cross-session-send`](features/guard-cross-session-send.feature): prevents
+  sending messages to another session with the option to ask first or deny outright
 - [`guard-git-stacked-base`](features/guard-git-stacked-base.feature): deleting a
   remote branch an open PR is based on (GitHub silently closes the PR)
 - [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
