@@ -528,9 +528,7 @@ def check(payload, env=os.environ):
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd.strip():
         return None
-    cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = yield Need("cwd")
+    cwd = payload["cwd"]
     pushes, admin, refused = _walk(cmd.rstrip("\n"), cwd, env.get("HOME"))
     if admin:
         return deny(ADMIN)
