@@ -6,6 +6,7 @@
   },
   "repository": "https://github.com/mark-brannan/languette",
   "homepage": "https://github.com/mark-brannan/languette",
+  "license": "AGPL-3.0-or-later",
   "keywords": [
     "hooks",
     "guards",
