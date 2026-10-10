@@ -24,6 +24,22 @@ jobs:
         with:
           python-version: "3.13"
       - run: python -m pip install build twine
+      # PyPI resolves the README's relative links against pypi.org, so
+      # point them at this commit on GitHub; the repo keeps them relative.
+      - env:
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          python - <<'EOF'
+          import os, re, pathlib
+          repo, sha = os.environ["REPO"], os.environ["SHA"]
+          raw = f"https://raw.githubusercontent.com/{repo}/{sha}/"
+          blob = f"https://github.com/{repo}/blob/{sha}/"
+          def fix(m):
+              return f"{m[1]}{m[2]}({(raw if m[1] else blob)}{m[3].removeprefix('./')})"
+          p = pathlib.Path("README.md")
+          p.write_text(re.sub(r"(!?)(\[[^\]]*\])\((?!https?:|#|mailto:)([^)\s]+)\)", fix, p.read_text()))
+          EOF
       - run: python -m build
       - run: twine check dist/*
       # PyPI versions cannot be reused, so a tag that disagrees with
