@@ -332,3 +332,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261010t044548z
 - publish.yml is dispatched on a release tag only, matching the shared release workflow; a release trigger too would race it Undo: add a release: published trigger to the on: block ([#154](https://github.com/mark-brannan/languette/pull/154))
+
+### 20261010t044555z
+- both steps in the pypi job (download-artifact, gh-action-pypi-publish) are pinned to commits, since the whole job holds id-token Undo: go back to the v4 and release/v1 refs ([#154](https://github.com/mark-brannan/languette/pull/154))
