@@ -51,7 +51,7 @@ try:
                                   guard_protected_services, guard_recursive_delete, guard_scheduled_jobs, guard_secrets,
                                   require_well_formed, guard_worktrees, prose_budget_commit)
     from languette import record
-    from languette.verdict import Act, Need, allow, ask, context, deny
+    from languette.verdict import Act, Need, deny, verdict
     from languette.world import ACTS, World
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
@@ -190,7 +190,7 @@ def _respond(stdin_text, env, only):
         if judged_once and judged_once[0]:
             guards = [g for g in guards if g is require_well_formed]
     world = World(env, payload)
-    reasons, asks, notes, rewrites, findings, acts = [], [], [], [], [], []
+    findings, acts = [], []
     for g in guards:
         crashed = False
         try:
@@ -203,28 +203,9 @@ def _respond(stdin_text, env, only):
         except Exception as e:  # noqa: BLE001
             r, crashed = deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
         findings.append((g.NAME, r, crashed))
-        if not r:
-            continue
-        if r.get("permissionDecision") == "deny":
-            reasons.append(r["permissionDecisionReason"])
-        if r.get("permissionDecision") == "ask":
-            asks.append(r["permissionDecisionReason"])
-        if r.get("permissionDecision") == "allow" and "updatedInput" in r:
-            rewrites.append(r["updatedInput"])
-        if r.get("additionalContext"):
-            notes.append(r["additionalContext"])
     judged = (world, payload, findings, acts)
-    if event != "PreToolUse":                  # state-keeping events: nothing to decide
-        return "", judged
-    if reasons:
-        return _out(event, deny("\n\n".join(reasons))), judged
-    if asks:
-        return _out(event, ask("\n\n".join(asks))), judged
-    if rewrites:                               # the first rewrite wins; two cannot both apply
-        return _out(event, {**allow(rewrites[0]), **(context("\n\n".join(notes)) if notes else {})}), judged
-    if notes:
-        return _out(event, context("\n\n".join(notes))), judged
-    return "", judged
+    fields = verdict(event, findings)
+    return (_out(event, fields) if fields else ""), judged
 
 
 def main(argv):
