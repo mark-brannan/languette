@@ -3,7 +3,8 @@ Feature: guard-disks
   The commands that overwrite a disk are denied.
   mkfs, wipefs and shred pass on an image file in the agent's own area
   (the scratchpad, an agent worktree, /tmp); the rest have no such area.
-  The working directory is {HOME}/project unless a scenario says otherwise.
+  The working directory is {CWD}, a directory outside $HOME, unless a
+  scenario says otherwise; {UP} is the ../ for each of its levels.
 
   Scenario Outline: writing onto a device is denied, however it is spelled
     When the agent runs `<command>`
@@ -33,7 +34,7 @@ Feature: guard-disks
       | cat disk.img > /dev//sda               | writes onto a disk device    | the path is judged as the filesystem sees it |
       | cat disk.img > /dev/./sda              | writes onto a disk device    |                                            |
       | cat disk.img > /tmp/../dev/sda         | writes onto a disk device    |                                            |
-      | cat disk.img > ../../../../dev/sda     | writes onto a disk device    | relative to the working directory          |
+      | cat disk.img > {UP}dev/sda             | writes onto a disk device    | relative to the working directory          |
       | cat disk.img \| tee /dev//sda          | writes onto a disk device    | tee is judged the same way                 |
       | cat disk.img \| tee /tmp/../dev/sda    | writes onto a disk device    |                                            |
       | echo x > /dev/mem                      | writes onto a disk device    | memory and RAM devices                     |
@@ -50,7 +51,7 @@ Feature: guard-disks
       | cd /dev; echo x \| tee sda              | denies, naming "`cd` earlier"               | tee                                    |
       | cd /dev && dd if=x of=sda               | denies, naming "`cd` earlier"               | dd                                     |
       | pushd /dev/disk && cat x > by-id/y      | denies, naming "`cd` earlier"               | pushd                                  |
-      | cd ../../../../dev && cat x > sda       | denies, naming "`cd` earlier"               | a relative cd that lands in /dev       |
+      | cd {UP}dev && cat x > sda               | denies, naming "`cd` earlier"               | a relative cd that lands in /dev       |
       | cd "$D" && cat x > sda                  | denies, naming "`cd` earlier"               | a cd the hook cannot resolve           |
       | cd - && cat x > sda                     | denies, naming "`cd` earlier"               |                                        |
       | popd && cat x > sda                     | denies, naming "`cd` earlier"               |                                        |
