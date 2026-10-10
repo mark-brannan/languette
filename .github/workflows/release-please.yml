@@ -1,0 +1,22 @@
+name: Release
+
+# A merge to main updates a standing "chore: release" pull request; merging
+# that pull request, squashed, is the release. The shared workflow explains
+# the mechanism. Version policy lives in release-please-config.json.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  release:
+    uses: mark-brannan/.github/.github/workflows/release-please.yml@main
+    secrets:
+      RELEASE_PLEASE_APP_CLIENT_ID: ${{ secrets.RELEASE_PLEASE_APP_CLIENT_ID }}
+      RELEASE_PLEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
