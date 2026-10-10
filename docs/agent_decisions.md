@@ -344,3 +344,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261010t080113z
 - The order test replays every wired guard in reverse on a fresh document, not only the guards a call ran Undo: reverse run.GUARDS instead ([#179](https://github.com/mark-brannan/languette/pull/179))
+
+### 20261010t080121z
+- scan.texts_of takes read= so the document shares its scan memo Undo: copy texts_of into document.py ([#179](https://github.com/mark-brannan/languette/pull/179))
