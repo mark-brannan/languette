@@ -7,16 +7,22 @@
 Before a coding agent runs a shell command, a languette guard reads it and
 answers: *allow*, *ask*, or **deny**.
 
-Nothing external like a cloud/web service decides, nor any ML or AI models.
-The critical execution path is [deterministic](https://en.wikipedia.org/wiki/Deterministic_algorithm), and even uses ["pure functions"](https://en.wikipedia.org/wiki/Pure_function) where possible.
+Nothing external decides: no web services, nothing cloud-based, and no ML or AI models.
+The critical execution path is [deterministic](https://en.wikipedia.org/wiki/Deterministic_algorithm), and uses ["pure functions"](https://en.wikipedia.org/wiki/Pure_function) where possible.
 
-**Whose is this for?** You, a real human being. A big AI vendor's safeguards
-are its product decision, changed at whim; don't take them on trust. `languette`
-is a guard you can read: **trust, but verify**. Copying it is welcome.
+### Who is this for?
+
+**You!** *...assuming you are a real human being.* A big AI
+vendor's safeguards are its product decision, changed on a whim.  We don't have to trust them blindly.
+Languette is a guard you can read, test, and understand for yourself: **trust,
+but verify**. Any vendor that wants to adopt it is welcome to, under the
+terms of the AGPL.
+
+### What's with the name?
 
 *Languette* is French for "little tongue". On a halberd the languette (or 'langet')
 is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
-the pole. These guards are that strip: protecting your work, strengthening your tools, while holding back certain agentic hazards that could ruin your day.
+the pole. These guards are that strip: protecting your work, strengthening your tools, holding back specific agentic hazards that could ruin your day.
 
 It's also a play on words: Shell is a little language, and languette listens for the
 few words in a shell command that can do damage. When it hears one, it tells the errant agent
