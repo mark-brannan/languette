@@ -21,7 +21,6 @@ import os
 import time
 
 from languette import scan, secrets
-from languette.guards import guard_secrets
 
 VERSION = 1
 ON = "CLAUDE_PLUGIN_OPTION_RECORD_DECISIONS"
@@ -43,7 +42,7 @@ def mask(text):
     command): it cannot be placed, so a record with a hole beats one with a
     secret or a command that no longer reads as it ran."""
     out, secret, lost = text, set(), False
-    for s in guard_secrets.scans(text):
+    for s in secrets.scans(text):
         found = secrets.findings(s, mask_only=True)
         redacted = secrets.redact(s, found, MASK)
         for i in sorted({f.index for f in found}):

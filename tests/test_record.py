@@ -95,7 +95,7 @@ def test_a_secret_too_short_to_swap_safely_drops_the_text_not_the_command():
 
 def test_a_secret_the_command_does_not_spell_that_way_drops_the_text_not_the_secret(monkeypatch):
     # The shell reads `"gh""p_..."` as one word; the raw text holds no such substring to mask.
-    monkeypatch.setattr(record.guard_secrets, "scans", lambda text: [record.secrets.Text(f"DB_PASSWORD={PW}")])
+    monkeypatch.setattr(record.secrets, "scans", lambda text: [record.secrets.Text(f"DB_PASSWORD={PW}")])
     assert record.mask("echo hi") == (None, 1)
 
 

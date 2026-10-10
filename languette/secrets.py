@@ -30,6 +30,7 @@ import math
 import re
 from collections import namedtuple
 
+from languette import scan as sw
 from languette import secret_rules
 
 # how: "shape" (a known token format) or "context" (named as a credential).
@@ -189,6 +190,15 @@ def _glued_mysql_p(scan, i):
             return 2, len(scan.w[i])
         j -= 1
     return None
+
+
+def scans(cmd):
+    """Every text the command may run or feed, read the way it will be: the
+    command with heredocs stripped and its nested shell strings as shell,
+    each heredoc body as lines of data."""
+    body = cmd + "\n"
+    return ([sw.Scan(text) for text, _ in sw.texts_of(sw.strip_heredocs(body))]
+            + [Text(h) for h in sw.heredoc_bodies(body)])
 
 
 def findings(scan, extra=(), mask_only=False):
