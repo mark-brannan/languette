@@ -127,7 +127,6 @@ interface is; this file says who decided it and why, one line each.
   Work piles up in it until then; nothing ships on a schedule.
 - Pull request titles, and so the squashed commits, carry a conventional
   type with the area as its scope: `fix(doctor): …`, not `doctor: …`.
-  release-please reads nothing else.
 - Docs changes count toward a release, so a README fix can open the
   release pull request. Opening it obliges nothing.
 
