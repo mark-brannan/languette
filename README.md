@@ -108,9 +108,8 @@ Each guard checks for one kind of hazard:
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
   applying a label that waives a CI gate, such as `churn-ok`
-- [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push to
-  the default branch when GitHub says it requires a pull request, or `gh pr merge --admin`; the
-  agent holds your credentials, so it holds your bypass
+- [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push direct to
+  main where pull requests are normally required (agents could potentially bypass using your credentials)
 - [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to
   another session; it asks first, and in `bypassPermissions` mode it denies a
   message sent after it read anything from the network
