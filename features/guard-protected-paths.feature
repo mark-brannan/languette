@@ -27,7 +27,7 @@ Feature: guard-protected-paths
   @planned
   Scenario Outline: an agent write to a listed path is denied
     When the agent runs `<command>`
-    Then the guard <verdict>
+    Then the guard <verdict>, naming "protected path"
 
     Examples:
       | command                          | verdict | note                         |
