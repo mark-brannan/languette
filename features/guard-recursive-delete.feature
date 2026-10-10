@@ -293,6 +293,37 @@ Feature: guard-recursive-delete
       """
     Then the guard denies, naming "rm -r examples"
 
+  Scenario: a backslash continuation on the opener line keeps the next line as commands
+    When the agent runs:
+      """
+      cat <<EOF; \
+      rm -rf examples
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a double-quoted string running past the opener line puts the body after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo "
+      text
+      "; rm -rf examples
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a single-quoted string running past the opener line puts the body after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo '
+      text
+      '; rm -rf examples
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
   Scenario: a here-string is not a heredoc opener
     When the agent runs:
       """

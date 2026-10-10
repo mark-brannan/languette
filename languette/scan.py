@@ -119,6 +119,46 @@ def _qopen(t):
     return "", -1
 
 
+def _line_end(t):
+    """Index of the newline that ends t's first logical line, or -1, read by
+    the lexer's own rules (_qopen): a newline inside a quote, after a
+    backslash, or in `$'...'` goes on, and `#` comments to the end of its line
+    only before a word has begun. A heredoc body begins on the line after it.
+    A quote left open to the end of t gives -1, so nothing after it is taken
+    for a body and every word stays in the text."""
+    L, i, have, dollar = len(t), 0, False, False
+    while i < L:
+        c, after_dollar, dollar = t[i], dollar, False
+        if c == "\\":
+            have = have or (i + 1 < L and t[i + 1] != "\n")
+            i += 2
+            continue
+        if c == "\n":
+            return i
+        if c in "'\"":
+            have = True
+            if c == "'" and not after_dollar:
+                e = t.find("'", i + 1)
+                i = L if e < 0 else e
+            else:                                  # "...", and $'...' with its escapes
+                i += 1
+                while i < L and t[i] != c:
+                    i += 2 if t[i] == "\\" else 1
+            if i >= L:
+                return -1
+            i += 1
+            continue
+        if c == "#" and not have:
+            return t.find("\n", i)
+        if c in " \t;|&()`<>":
+            have = False
+        elif c not in "{}" or have:
+            have = True
+        dollar = c == "$" and not after_dollar
+        i += 1
+    return -1
+
+
 def heredoc_subs(s):
     """The $(...) and `...` command substitutions in an unquoted heredoc's body,
     each on a line of its own with any quote it leaves open closed (_qclose),
@@ -497,7 +537,9 @@ def _words(node, out):
 def _heredocs(b):
     """(stripped, [(body, quoted)]) -- the awk's sw_heredocs walk. Every opener
     on a line takes its body in turn from the lines below; the rest of the
-    opener line stays. quoted says the delimiter was quoted, so the shell
+    opener line stays. The opener's line runs to the first newline outside a
+    quote and after no backslash (_line_end); a quote that never closes leaves
+    the rest of the text as commands. quoted says the delimiter was quoted, so the shell
     expands nothing in it; an unquoted one's body keeps its command
     substitutions (heredoc_subs). A body whose closing line never comes stays
     in the text as commands. body is "" when the opener ends the text. The
@@ -509,7 +551,7 @@ def _heredocs(b):
         if not m:
             return done + b, docs
         head, b = b[:m.start()], b[m.start():]
-        nl = b.find("\n")
+        nl = _line_end(b)             # the opener's logical line, not its first physical one
         seg, tail = (b, "") if nl < 0 else (b[:nl], b[nl + 1:])
         delims = []
 

@@ -98,6 +98,26 @@ Feature: scanner
       """
     Then its texts are ["0:cat  HEREDOC \n$(date +%F)\n`id -u`\n"]
 
+  Scenario: a backslash continuation keeps the next line as part of the opener line
+    When the scanner reads:
+      """
+      cat <<EOF; \
+      rm -rf x
+      EOF
+      """
+    Then its texts are ["0:cat  HEREDOC ; \\\nrm -rf x\n"]
+
+  Scenario: a quote running past the opener line keeps its lines, and the body starts after its end
+    When the scanner reads:
+      """
+      cat <<EOF; echo "
+      text
+      "; rm -rf x
+      never run
+      EOF
+      """
+    Then its texts are ["0:cat  HEREDOC ; echo \"\ntext\n\"; rm -rf x\n"]
+
   Scenario: two openers on one line keep the line and take their bodies in turn
     When the scanner reads:
       """
