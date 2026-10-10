@@ -1,11 +1,13 @@
 {
   "name": "languette",
+  "version": "0.0.1",
   "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for the commands that could ruin a day, such as recursive rm, a disk wipe, a shutdown or a credential pasted into a command.",
   "author": {
     "name": "Mark Brannan"
   },
   "repository": "https://github.com/mark-brannan/languette",
   "homepage": "https://github.com/mark-brannan/languette",
+  "license": "AGPL-3.0-or-later",
   "keywords": [
     "hooks",
     "guards",
