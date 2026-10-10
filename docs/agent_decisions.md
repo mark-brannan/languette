@@ -338,3 +338,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261010t060850z
 - sections.max_words 288 -> 300 applies to all section targets, not the preamble alone Undo: set max_words back to 288 in docs/budgets.json ([#167](https://github.com/mark-brannan/languette/pull/167))
+
+### 20261010t070954z
+- The default cwd is scattered outside $HOME as #171 asks; the 83 feature rows that set their own cwd to {HOME}/project explicitly were left as written, so a project under $HOME is still exercised too. Undo: replace {HOME}/project with {CWD} in those rows' cwd column (the three guard features' 350 tests pass that way, run 2026-10-10) ([#172](https://github.com/mark-brannan/languette/pull/172))
