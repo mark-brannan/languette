@@ -160,8 +160,8 @@ check allow 'clean body, public names and URLs' "$(bash_in "$PUB" 'gh issue crea
 check allow 'no scannable text'      "$(bash_in "$PUB" 'gh pr merge 12 --squash --delete-branch')"
 check allow 'echo mentioning a gh write' "$(bash_in "$PUB" 'echo "gh issue create --body hi"')"
 check allow 'unrelated command'      "$(bash_in "$PUB" 'ls -la')"
-check allow 'empty command'          "$(jq -n '{tool_name:"Bash",tool_input:{}}')"
-check allow 'other tool'             "$(jq -n '{tool_name:"Read",tool_input:{file_path:"/x"}}')"
+check allow 'empty command'          "$(jq -n '{tool_name:"Bash",cwd:"/x",tool_input:{}}')"
+check allow 'other tool'             "$(jq -n '{tool_name:"Read",cwd:"/x",tool_input:{file_path:"/x"}}')"
 
 # --- the gate is loud when it cannot see ------------------------------------------
 check deny '-F - with no heredoc'    "$(bash_in "$PUB" 'cat notes.md | gh issue create -t x -F -')"

@@ -1,8 +1,8 @@
 @python
 Feature: guard-recursive-delete
   Recursive rm and find -delete are denied unless every target is a generated
-  directory or the agent's own area. The working directory is {HOME}/project
-  unless a scenario says otherwise.
+  directory or the agent's own area. The working directory is {CWD}, a
+  directory outside $HOME, unless a scenario says otherwise.
 
   # The README's table under the promise is generated from these rows
   # (python3 tests/readme_table.py). The two known gaps: deletion from inside

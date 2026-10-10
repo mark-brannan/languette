@@ -1,8 +1,7 @@
 """Path words, as the guards that judge a target path share them: resolve one
 word of a command to a single absolute path, or say why it cannot be one; the
-agent's own areas. What the disk says about a path is asked for as a Need:
-physical and own_roots are generators, for a guard to `yield from`.
-Standard library only."""
+agent's own areas. What the disk says about a path is a Need("physical", p),
+which a guard plans and the runner answers. Standard library only."""
 
 import re
 
@@ -12,18 +11,6 @@ from languette.verdict import Need
 
 class Unresolved(Exception):
     """A word that cannot be resolved to one path; str() says what the guard saw."""
-
-
-def physical(p):
-    """The longest existing prefix resolved through symlinks, the rest
-    appended as written. "" for /."""
-    rest = ""
-    while p != "/" and not (yield Need("path", "lexists", p)):
-        head, _, base = p.rpartition("/")
-        rest = "/" + base + rest
-        p = head or "/"
-    r = yield Need("path", "realpath", p)
-    return ("" if r == "/" else r) + rest
 
 
 def normalize(p):
@@ -74,14 +61,27 @@ def resolve(word, quoted, cwd, home, moved):
     return normalize(t)
 
 
-def own_roots(home, extra=()):
-    """Where the agent works and nothing of the user's lives, as written and
-    as the filesystem has them (/tmp is /private/tmp on macOS)."""
-    base = ["/tmp", home + "/.local/state/claude-tmpdir", home + "/.claude/worktrees"]
-    resolved = []
-    for r in base:
-        resolved.append((yield from physical(r)))
-    return base + resolved + list(extra)
+def own_bases(home):
+    """Where the agent works and nothing of the user's lives, as written."""
+    return ["/tmp", home + "/.local/state/claude-tmpdir", home + "/.claude/worktrees"]
+
+
+def own_roots(home, physical, extra=()):
+    """own_bases, as written and as the filesystem has them (/tmp is
+    /private/tmp on macOS); `physical` maps a path to its physical answer."""
+    base = own_bases(home)
+    return base + [physical(r) for r in base] + list(extra)
+
+
+def physical_of(answers):
+    """Path -> its planned Need("physical") answer. One the world could not
+    have is raised, as the runner once threw it into the guard."""
+    def physical(p):
+        got = answers[Need("physical", p)]
+        if isinstance(got, Exception):
+            raise got
+        return got
+    return physical
 
 
 def under(p, roots):

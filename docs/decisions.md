@@ -120,3 +120,8 @@ interface is; this file says who decided it and why, one line each.
 - The first release is 0.0.1, carrying `languette doctor`.
 - Every release bumps the patch number only, until Solace says otherwise. No
   semver; a review that asks for a minor or major bump is out of scope.
+
+## Trust and licence riders: Solace, 2026-10-09
+
+- No licence rider against AI companies: AGPL answers hosting, and no licence
+  answers training. The README states the distrust as a position, not a condition.

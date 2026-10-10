@@ -37,9 +37,9 @@ def _normalize(p):
     return out or "/"
 
 
-def _parse_allow(value, home, home_p):
-    """LANGUETTE_RM_ALLOW -> (extra_roots, extra_names, error or None). A generator:
-    each path entry is resolved through the disk by a Need."""
+def _parse_allow(value, home, home_p, physical):
+    """LANGUETTE_RM_ALLOW -> (extra_roots, extra_names, error or None).
+    `physical` resolves each path entry through the disk."""
     roots, names = [], []
     for ent in value.split(":"):
         if ent == "":
@@ -53,7 +53,7 @@ def _parse_allow(value, home, home_p):
                 ent = ent[:-1]
             if ent in ("", home):
                 return roots, names, f"'{ent}' is / or $HOME"
-            ent_p = yield from paths.physical(ent)
+            ent_p = physical(ent)
             if ent_p in ("", home, home_p):
                 return roots, names, f"'{ent}' resolves to / or $HOME"
             roots += [ent, ent_p]
@@ -167,26 +167,53 @@ class _Judge:
                     self.segment(s, a, b, nested)
 
 
-def check(payload, env=os.environ):
+def parse(payload, env=os.environ):
+    """The command read into what plan and judge need; "found" is a finding
+    parse alone comes to."""
+    out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None}
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if cmd is None or cmd is False:
-        return None
+        return out
     if not isinstance(cmd, str):
         cmd = json.dumps(cmd)                  # as `jq -r` would print it
     cmd = cmd.rstrip("\n")                     # as $(...) would leave it
     if not cmd:
-        return None
-    cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = yield Need("cwd")
+        return out
+    cwd = payload["cwd"]
     home = env.get("HOME", "")
     if not home.startswith("/"):
-        return deny("guard-recursive-delete: $HOME is not an absolute path, cannot resolve targets")
+        out["found"] = deny("guard-recursive-delete: $HOME is not an absolute path, cannot resolve targets")
+        return out
+    judge = _Judge(cwd, home)
+    try:
+        judge.run(cmd + "\n")
+    except Refuse as e:
+        out["refused"] = str(e)
+    out.update(home=home, allow=env.get("LANGUETTE_RM_ALLOW") or None, targets=judge.targets)
+    return out
 
+
+def plan(parsed):
+    """The physical path of $HOME and each allow entry, when LANGUETTE_RM_ALLOW is set;
+    of the agent's own areas and every target, when there are targets to judge."""
+    if parsed["found"] or parsed["home"] is None:
+        return []
+    home, want = parsed["home"], []
+    if parsed["allow"]:
+        want.append(home)
+        _parse_allow(parsed["allow"], home, home, lambda p: want.append(p) or p)
+    if parsed["refused"] is None and parsed["targets"]:
+        want += paths.own_bases(home) + [t for t, _, _ in parsed["targets"]]
+    return [Need("physical", p) for p in dict.fromkeys(want)]
+
+
+def judge(parsed, answers):
+    if parsed["found"] or parsed["home"] is None:
+        return parsed["found"]
+    home, physical = parsed["home"], paths.physical_of(answers)
     extra_roots, extra_names, allow_err = [], [], None
-    if env.get("LANGUETTE_RM_ALLOW"):
-        home_p = yield from paths.physical(home)
-        extra_roots, extra_names, allow_err = yield from _parse_allow(env["LANGUETTE_RM_ALLOW"], home, home_p)
+    if parsed["allow"]:
+        extra_roots, extra_names, allow_err = _parse_allow(parsed["allow"], home, physical(home), physical)
     allow_msg = None
     if allow_err:
         allow_msg = (f"LANGUETTE_RM_ALLOW is malformed ({allow_err}). Recursive rm and find -delete are "
@@ -194,12 +221,8 @@ def check(payload, env=os.environ):
                      "list of directory names (dist) or absolute paths (/srv/scratch), using only letters, "
                      "digits and . _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.")
 
-    judge, refused = _Judge(cwd, home), None
-    try:
-        judge.run(cmd + "\n")
-    except Refuse as e:
-        refused = str(e)
-    if refused is None and not judge.targets:
+    refused = parsed["refused"]
+    if refused is None and not parsed["targets"]:
         return context("guard-recursive-delete: " + allow_msg) if allow_msg else None
     if allow_msg:
         return deny("guard-recursive-delete: " + allow_msg)
@@ -207,7 +230,7 @@ def check(payload, env=os.environ):
         return deny(refused)
 
     names = GENERATED_NAMES + tuple(extra_names)
-    roots = yield from paths.own_roots(home, extra_roots)
+    roots = paths.own_roots(home, physical, extra_roots)
 
     def is_generated(p):
         if p.startswith(home + "/"):
@@ -220,7 +243,7 @@ def check(payload, env=os.environ):
     def allowed(p):
         return any(p == r or p.startswith(r + "/") for r in roots) or is_generated(p)
 
-    for abs_, kind, raw in judge.targets:
+    for abs_, kind, raw in parsed["targets"]:
         what = f"find {raw} -delete" if kind == "find" else f"rm -r {raw}"
         if not allowed(abs_):
             return deny(
@@ -229,7 +252,7 @@ def check(payload, env=os.environ):
                 f"recursively, and {abs_} is none of those. `git status --short {raw}` and `git clean -n {raw}` "
                 "show what is there; `git rm` tracked files by path, and hand anything untracked to the user "
                 "-- a directory they own can hold downloads and logs no session knows about.")
-        phys = yield from paths.physical(abs_)
+        phys = physical(abs_)
         if phys != abs_ and not allowed(phys):
             return deny(
                 f"`{what}` is blocked: {abs_} resolves through a symlink to {phys}, which is not a generated "

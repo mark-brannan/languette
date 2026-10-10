@@ -204,9 +204,7 @@ def check(payload, env):
     cmd = ti.get("command") if isinstance(ti, dict) else None
     if not isinstance(cmd, str) or not cmd:
         return None
-    cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = yield Need("cwd")
+    cwd = payload["cwd"]
     engine = yield from _engine(env, cwd)
     if engine is None:
         return None

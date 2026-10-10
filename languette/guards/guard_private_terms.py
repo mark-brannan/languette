@@ -423,9 +423,7 @@ def check(payload, env):
     tool = payload.get("tool_name")
     if not isinstance(tool, str) or not tool:
         return None
-    cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd:
-        cwd = yield Need("cwd")
+    cwd = payload["cwd"]
     ti = payload.get("tool_input")
     ti = ti if isinstance(ti, dict) else {}
     if tool == "Bash":

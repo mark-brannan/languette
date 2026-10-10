@@ -3,6 +3,8 @@ and the facts a guard may ask for.
 
 A guard's check returns deny(reason), ask(reason), context(text), allow(input)
 or None; or it is a generator that yields Needs and Acts and returns one of those.
+A plan / judge guard instead lists its Needs up front (plan) and gets every
+answer at once (judge), keyed by the Need.
 Refuse is how a guard's internals say "deny, for this reason" from deep inside
 a walk; check catches it and returns deny. Standard library only.
 """
@@ -25,7 +27,8 @@ class Need:
                                              when it is not regular or past limit bytes
         path          op, path            -> os.path.<op>(path): isdir, isfile, islink, exists,
                                              lexists, realpath; or executable
-        cwd                               -> the hook process's own directory
+        physical      path                -> the longest existing prefix of path resolved through
+                                             symlinks, the rest appended as written; "" for /
         ruleset-cache slug, branch        -> (mtime, text), or None
         clock                             -> seconds since the epoch
         worktree      op, *args           -> guard-worktrees' per-session record: arrive rec, top
@@ -46,6 +49,12 @@ class Need:
 
     def __init__(self, kind, *args):
         self.kind, self.args = kind, args
+
+    def __eq__(self, other):
+        return type(other) is type(self) and (other.kind, other.args) == (self.kind, self.args)
+
+    def __hash__(self):
+        return hash((type(self), self.kind, self.args))
 
     def __repr__(self):
         return f"{type(self).__name__}({self.kind!r}{''.join(', ' + repr(a) for a in self.args)})"
@@ -82,3 +91,33 @@ def context(text):
 def allow(updated_input):
     """Let the call run with its input rewritten to `updated_input`."""
     return {"permissionDecision": "allow", "updatedInput": updated_input}
+
+
+def verdict(event, findings):
+    """The one decision for a call, from every guard's finding: the fields of
+    hookSpecificOutput, or None for silence. `findings` is [(guard name, result,
+    crashed)] in the order the guards judged. A deny outranks an ask, an ask a
+    rewrite; the first rewrite wins, since two cannot both apply."""
+    if event != "PreToolUse":                  # state-keeping events: nothing to decide
+        return None
+    reasons, asks, notes, rewrites = [], [], [], []
+    for _, r, _ in findings:
+        if not r:
+            continue
+        if r.get("permissionDecision") == "deny":
+            reasons.append(r["permissionDecisionReason"])
+        if r.get("permissionDecision") == "ask":
+            asks.append(r["permissionDecisionReason"])
+        if r.get("permissionDecision") == "allow" and "updatedInput" in r:
+            rewrites.append(r["updatedInput"])
+        if r.get("additionalContext"):
+            notes.append(r["additionalContext"])
+    if reasons:
+        return deny("\n\n".join(reasons))
+    if asks:
+        return ask("\n\n".join(asks))
+    if rewrites:
+        return {**allow(rewrites[0]), **(context("\n\n".join(notes)) if notes else {})}
+    if notes:
+        return context("\n\n".join(notes))
+    return None

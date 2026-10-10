@@ -105,5 +105,5 @@ def test_two_guards_wanting_one_label_for_one_command_need_one_click(tmp_path, m
     guards = tuple(SimpleNamespace(NAME=f"g{i}", check=check) for i in range(2))
     monkeypatch.setattr(run, "GUARDS", (("PreToolUse", re.compile(r"Bash\Z"), guards),))
     payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "npm run e2e"},
-               "transcript_path": str(tp), "tool_use_id": "toolu_B1"}
+               "cwd": "/", "transcript_path": str(tp), "tool_use_id": "toolu_B1"}
     assert run.respond(json.dumps(payload), {}) == ""

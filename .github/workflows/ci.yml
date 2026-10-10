@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -47,8 +47,8 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q shfmt jq
       - run: pip install -r requirements-dev.txt
-      # test_smoke.py builds its own PATHs and venvs: the smoke job runs it.
-      - run: python -m pytest -q --ignore=tests/test_smoke.py
+      # smoke_steps.py builds its own PATHs and venvs: the smoke job runs it.
+      - run: python -m pytest -q
       # The long tail of shell shapes for two guards, until features/ holds
       # them (~40 s: guard-worktrees builds a fixture repo with worktrees).
       - run: bash tests/guard-private-terms.test.sh
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -84,7 +84,7 @@ jobs:
           python -m venv "$v/ts" && "$v/ts/bin/pip" install -q tree-sitter==0.26.0 tree-sitter-bash==0.25.1
           LANGUETTE_SMOKE_BASHLEX_PY=$v/bashlex/bin/python \
           LANGUETTE_SMOKE_TREESITTER_PY=$v/ts/bin/python \
-            python -m pytest -q -rxX tests/test_smoke.py
+            python -m pytest -q -rxX tests/smoke_steps.py
 
   shellcheck:
     runs-on: ubuntu-latest

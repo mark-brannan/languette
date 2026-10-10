@@ -1,3 +1,26 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "languette"
+version = "0.0.1"
+description = "Fail-closed guards against risky actions by coding agents, and a doctor that says whether they are on."
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE", "LICENSE-CC-BY-SA"]
+authors = [{ name = "Mark Brannan" }]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/mark-brannan/languette"
+
+[project.scripts]
+languette = "languette.__main__:main"
+
+[tool.setuptools]
+packages = ["languette", "languette.guards"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-markers"
@@ -10,4 +33,5 @@ markers = [
   "no_shfmt: run the scenario on every engine but the shfmt rung, whose parse check denies it first",
   "table: the scenario's examples are the README's table",
   "planned: a verdict no guard gives yet; expected to fail, never fails the run",
+  "known_gap: a strict xfail, red the day the gap closes (features/smoke.feature)",
 ]

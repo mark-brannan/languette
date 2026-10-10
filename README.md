@@ -7,19 +7,29 @@
 Before a coding agent runs a shell command, a languette guard reads it and
 answers: *allow*, *ask*, or **deny**.
 
-Nothing external like a cloud/web service decides, nor any ML or AI models.
-The critical execution path is [deterministic](https://en.wikipedia.org/wiki/Deterministic_algorithm), and even uses ["pure functions"](https://en.wikipedia.org/wiki/Pure_function) where possible.
+Nothing external decides: no web services, nothing cloud-based, and no ML or AI models.
+The critical execution path is [deterministic](https://en.wikipedia.org/wiki/Deterministic_algorithm), and uses ["pure functions"](https://en.wikipedia.org/wiki/Pure_function) where possible.
+
+### Who is this for?
+
+**You!** *...assuming you are a real human being.* A big AI
+vendor's safeguards are its product decision, changed on a whim.  We don't have to trust them blindly.
+Languette is a guard you can read, test, and understand for yourself: **trust,
+but verify**. Any vendor that wants to adopt it is welcome to, under the
+terms of the AGPL.
+
+### What's with the name?
 
 *Languette* is French for "little tongue". On a halberd the languette (or 'langet')
-it is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
-the pole. These guards are that strip: protecting your work, strengthening your tools, while holding back certain agentic hazards that could ruin your day.
+is the strip of iron that runs down the shaft from the head, so a stray blow can't cut through
+the pole. These guards are that strip: protecting your work, strengthening your tools, and holding back specific agentic hazards that could ruin your day.
 
 It's also a play on words: Shell is a little language, and languette listens for the
 few words in a shell command that can do damage. When it hears one, it tells the errant agent
 "hold your tongue!"
 
 > *"The wise speak only of what they know, Gríma son of Gálmód. A witless worm have you become. Therefore be silent, and keep your forked tongue behind your teeth. I have not passed through fire and death to bandy crooked words with a serving-man till the lightning falls."*
-— **Gandalf**, in J.R.R Tolkein's *The Two Towers*, Book 3, Chapter 6
+— **Gandalf**, in J.R.R. Tolkien's *The Two Towers*, Book 3, Chapter 6
 
 ## Install
 
@@ -30,7 +40,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 ### Claude Code
 
 ```
-/plugin marketplace add mark-brannan/languette
+/plugin marketplace add mark-brannan/languette#release
 /plugin install languette@languette
 ```
 
@@ -54,7 +64,7 @@ languette install && languette doctor
 
 ### Windows without WSL
 
-languette protects Claude Code inside WSL: run `wsl --install`, then the
+Languette protects Claude Code inside WSL: run `wsl --install`, then the
 Claude Code block above. An agent running natively in PowerShell is not protected.
 
 ### Devcontainer, Codespace and CI (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
@@ -71,44 +81,46 @@ Without the plugin system or the installer, see [Installing by hand](#installing
 
 Each guard checks for one kind of hazard:
 
+- [`ask-first`](#ask-first): a command the repo lists as costly, until you
+  approve that one run
 - [`require-well-formed`](features/require-well-formed.feature): a Bash command that
   doesn't parse; the other guards skip it
-- [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
-  `find -delete` outside a generated or agent-owned directory
+- [`guard-disks`](features/guard-disks.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
+- [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub issue create, transfer
+  or delete in one human turn, or any inside a loop
+- [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb, `systemctl stop sshd`
+- [`guard-infra`](languette/guards/guard_infra.py): `terraform destroy`, `kubectl delete` and
+  other infrastructure destroys, until you approve that one run
 - [`guard-permissions`](features/guard-permissions.feature): recursive `chmod`,
   `chown`, `chgrp` or `chmod 777` outside agent-owned or
   `LANGUETTE_PERM_ALLOW` directories
 - [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`, `sh <(curl ..)`,
   `eval "$(wget ..)"`
-- [`guard-disks`](features/guard-disks.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
-- [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb, `systemctl stop sshd`
-- [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
-- [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
-  `stash pop`, force-push, `reset --hard` and other moves that throw work away
-- [`guard-git-stacked-base`](features/guard-git-stacked-base.feature): deleting a
-  remote branch an open PR is based on (GitHub silently closes the PR)
-- [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push to
-  a branch GitHub says requires a pull request, or `gh pr merge --admin`; the
-  agent holds your credentials, so it holds your bypass
-- [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub issue create, transfer
-  or delete in one human turn, or any inside a loop
 - [`guard-private-terms`](#settings-for-guard-private-terms): a term from your
   private list, posted to a public repo (off until given the list)
+- [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
+  `find -delete` outside a generated or agent-owned directory
+- [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
+- [`guard-secrets`](languette/guards/guard_secrets.py): a pasted credential
 - [`guard-worktrees`](features/guard-worktrees-checkout-home.feature): opt-in; a branch switch in a `$HOME`
   that is a worktree, or a [reach into another session's worktree](features/guard-worktrees-foreign.feature)
-- [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
-  applying a label that waives a CI gate, such as `churn-ok`
-- [`guard-secrets`](languette/guards/guard_secrets.py): a pasted credential
-- [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to another session: asks; in `bypassPermissions`, denies after a network read
-- `guard-protected-paths`, `guard-databases` (planned)
-- [`ask-first`](#ask-first): a command the repo lists as costly, until you
-  approve that one run
 - [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
-- [`guard-infra`](languette/guards/guard_infra.py): `terraform destroy`, `kubectl delete` and
-  other infrastructure destroys, until you approve that one run
+- [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
+  applying a label that waives a CI gate, such as `churn-ok`
+- [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push direct to
+  main where pull requests are normally required (agents could potentially bypass using your credentials)
+- [`guard-cross-session-send`](features/guard-cross-session-send.feature): prevents
+  sending messages to another session with the option to ask first or deny outright
+- [`guard-git-stacked-base`](features/guard-git-stacked-base.feature): deleting a
+  remote branch an open PR is based on (GitHub silently closes the PR)
+- [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
+  `stash pop`, force-push, `reset --hard` and other moves that throw work away
+- [`guard-protected-services`](features/guard-protected-services.feature): `systemctl stop postgresql`, for the services you list
 - [`prose-budget-commit`](features/prose-budget-commit.feature): a `git commit` whose
   staged prose runs over the repo's word budgets
+- `guard-databases` (planned)
+- `guard-protected-paths` (planned)
 
 ## The promise
 
@@ -135,15 +147,13 @@ scenarios for a command run in `~/project`, and CI fails if the table drifts:
 <!-- /fixtures-table -->
 
 With `shfmt` 3.6 or later on `PATH`, the `require-well-formed` guard denies a
-command that doesn't parse. Without `shfmt`, `bash -n` decides; tree-sitter-bash
-or bashlex, if installed, only add the column; below both, its own lexer.
+command that doesn't parse. Without `shfmt`, it falls back to `bash -n`, then
+to its own lexer.
 In a replay of 101,671 agent commands, about 1 in 3,000 didn't parse, and
 each [would have broken](features/require-well-formed.feature).
 Bash runs a broken command in part, the lines before the error or prose in
 backticks as a command; the deny stops all of it, so the agent looks again.
-Over 64 KB or a nesting weight of 10,000, a command is denied unread: a
-limit holds on any machine. 10,000 takes shfmt ~450 ms on a quarter CPU, a
-fourth of its timeout; the heaviest of 83,430 agent commands weighs 1,022.
+A command over 64 KB, or nested too deeply to parse quickly, is denied unread.
 
 ## Ask first
 
@@ -291,7 +301,7 @@ for beyond the command, it declares:
 | `guard-infra` | the transcript, the approvals spent |
 | `guard-git-stacked-base` | GitHub, through `gh` |
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
-| `guard-github-issues` | the payload's `session_id`, and a door file in `$TMPDIR` |
+| `guard-github-issues` | the payload's `session_id`, the transcript, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
@@ -302,7 +312,7 @@ A guard that cannot decide denies and says what it saw. A guard that crashes
 is a deny naming the guard; the runner holds that rule, so no guard has to.
 
 The contract is written as "[gherkin](https://en.wikipedia.org/wiki/Cucumber_(software)#Gherkin_language)" scenarios, in the words a person uses to state the
-rule.  These are still completely deterministic tests, they're just easy for non-technical folks to read.
+rule. They're still completely deterministic tests, just easy for non-technical folks to read.
 
 ```gherkin
 Scenario: a target the guard cannot resolve is denied on sight
@@ -311,16 +321,12 @@ Scenario: a target the guard cannot resolve is denied on sight
   Then the guard denies, naming "variable or command substitution"
 ```
 
-The scenarios are the seam between the people who set the rules and the code
-that enforces them: a reviewer reads them, and the code is judged against
-them. The road ahead runs toward properties checked over generated commands,
-then a model of each guard from which the scenarios are derived and against
-which the code is proven.
-
 ## Installing by hand
 
-Clone the repo and copy the entries from `hooks/hooks.json` into
-`settings.json`, wrapper and all. The wrapper is what makes a missing or
+Clone the repo and add one entry per guard in `hooks/hooks.json` to
+`settings.json`, shaped like the one below. Replace `${CLAUDE_PLUGIN_ROOT}`
+with the path to your clone, since it is unset outside the plugin, and keep
+the wrapper. The wrapper is what makes a missing or
 crashing guard a deny: without it, a missing script is a non-blocking error
 to Claude Code, and every command goes through. One entry:
 
@@ -352,3 +358,9 @@ test, which installs the plugin in a scratch project and confirms a recursive
 verdict out. The guards began as shell scripts copied from
 [mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles); they run
 in Python now, and this repo is where they are maintained.
+
+## License
+
+Markdown files are [CC BY-SA 4.0](LICENSE-CC-BY-SA); everything else is
+[AGPL-3.0-or-later](LICENSE), except where a file carries its own notice.
+Copyright 2026 Mark Brannan. Credit "Mark Brannan" and link this repository.

@@ -15,8 +15,10 @@ scenarios run against every guard and are expected to fail (xfail, not strict).
 import builtins
 import json
 import os
+import random
 import re
 import shutil
+import string
 import subprocess
 import sys
 import tempfile
@@ -27,6 +29,7 @@ from hamcrest import assert_that, equal_to
 from pytest_bdd import given, parsers, then, when
 
 from matchers import Verdict, asks, denies, is_silent, warns_about
+from doctor_steps import *  # noqa: F401,F403  (features/doctor.feature)
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -45,13 +48,20 @@ _REAL_HOME = os.environ.get("HOME")
 EVENTS = {"prompt": "UserPromptSubmit", "post": "PostToolUse"}
 
 
+_ELSEWHERE = None                              # the run's root for directories outside $HOME
+
+
 def pytest_configure(config):
     # A throwaway $HOME for the whole run, so no verdict depends on, and no
-    # step can touch, the real one. {HOME}/project is the default cwd. Not
-    # under /tmp: guard-recursive-delete allows all of /tmp, so every target would pass.
+    # step can touch, the real one; {HOME}/project for a row that names it.
+    # The default cwd and the hook process's own directory are elsewhere (see
+    # scattered). Not under /tmp: guard-recursive-delete allows all of /tmp,
+    # so every target would pass.
+    global _ELSEWHERE
     home = tempfile.mkdtemp(prefix="languette-home-", dir="/var/tmp")
     os.mkdir(os.path.join(home, "project"))
     os.environ["HOME"] = home
+    _ELSEWHERE = tempfile.mkdtemp(prefix="languette-elsewhere-", dir="/var/tmp")
 
 
 def pytest_unconfigure(config):
@@ -62,6 +72,21 @@ def pytest_unconfigure(config):
         os.environ["HOME"] = _REAL_HOME
     if os.path.basename(home).startswith("languette-home-"):
         shutil.rmtree(home, ignore_errors=True)
+    if _ELSEWHERE:
+        shutil.rmtree(_ELSEWHERE, ignore_errors=True)
+
+
+def scattered(seed, role):
+    """A fresh directory under the run's root, outside $HOME: a random name
+    at a random depth, seeded from `seed` (the test's id), so a failure
+    reproduces. `role` keeps the scenario's directories apart: none is
+    another's ancestor, and none is $HOME's."""
+    rng = random.Random(f"{seed}\0{role}")
+    parts = ["".join(rng.choices(string.ascii_lowercase + string.digits, k=rng.randint(3, 10)))
+             for _ in range(rng.randint(1, 5))]
+    d = Path(_ELSEWHERE, role, *parts)
+    d.mkdir(parents=True, exist_ok=True)
+    return str(d)
 
 
 def pytest_generate_tests(metafunc):
@@ -148,9 +173,12 @@ def writes_in_acts(engine, monkeypatch):
 
 
 class Ctx:
-    def __init__(self, engine):
+    def __init__(self, engine, seed):
         self.engine, self.guard = engine, None
-        self.cwd = "{HOME}/project"
+        # The payload's cwd and the hook process's own directory: unrelated
+        # to each other and to $HOME, so a guard that assumes otherwise fails.
+        self.cwd = self.default_cwd = scattered(seed, "cwd")
+        self.process_dir = scattered(seed, "process")
         self.env = {}                          # name -> value, or None for unset
         self.proj = self.tmp = self.stub_log = self.bare = self.cache = None
         self.project_env = True
@@ -183,7 +211,8 @@ class Ctx:
         if "{PROJ}" in s:
             assert self.proj, f"test setup: {s!r} names {{PROJ}} but the scenario has no project directory"
             s = s.replace("{PROJ}", str(self.proj))
-        s = s.replace("{HOME}", os.environ["HOME"])
+        s = s.replace("{HOME}", os.environ["HOME"]).replace("{CWD}", self.default_cwd)
+        s = s.replace("{UP}", "../" * self.default_cwd.count("/"))
         if "{TMP}" in s:
             self.tmp = self.tmp or self.mkdtemp()
             s = s.replace("{TMP}", self.tmp)
@@ -203,9 +232,11 @@ class Ctx:
              "session_id": self.session, "tool_use_id": f"toolu_call{self.calls}"}
         if self.proj:
             p["transcript_path"] = f"{self.proj}/t.jsonl"
-        return json.dumps(self.moded(p))
+        return json.dumps(self.as_sent(p))
 
-    def moded(self, p):
+    def as_sent(self, p):
+        """`p` with what Claude Code puts in every payload: the cwd, and the mode when set."""
+        p.setdefault("cwd", self.expand(self.cwd))
         if self.mode is not None:
             p["permission_mode"] = self.mode
         return p
@@ -236,7 +267,12 @@ class Ctx:
             if self.arg:
                 # The event is in the payload, as Claude Code sends it.
                 stdin = json.dumps({**json.loads(stdin), "hook_event_name": EVENTS[self.arg]})
-            self.verdict = Verdict(run.respond(stdin, env, only=self.guard))
+            here = os.getcwd()
+            os.chdir(self.process_dir)
+            try:
+                self.verdict = Verdict(run.respond(stdin, env, only=self.guard))
+            finally:
+                os.chdir(here)
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
         path = env["PATH"]
@@ -251,7 +287,8 @@ class Ctx:
         argv = ["sh", "-c", self.hook]
         env.update(self.scenario_env())
         try:
-            r = subprocess.run(argv, input=stdin, env=env, capture_output=True, text=True, timeout=5)
+            r = subprocess.run(argv, input=stdin, env=env, cwd=self.process_dir, capture_output=True, text=True,
+                               timeout=5)
             self.verdict = Verdict(r.stdout, r.returncode, r.stderr)
         except subprocess.TimeoutExpired:
             self.verdict = Verdict("", 124, "TIMEOUT after 5 s")
@@ -264,8 +301,8 @@ class Ctx:
 
 
 @pytest.fixture
-def ctx(engine):
-    c = Ctx(engine)
+def ctx(engine, request):
+    c = Ctx(engine, request.node.nodeid)
     yield c
     c.cleanup()
 
@@ -516,7 +553,7 @@ def _hooks_json_event(ctx, event, guard):
 
 @when(parsers.parse('Claude Code fires {event} for tool "{tool}"'))
 def _fires(ctx, event, tool):
-    ctx.run(json.dumps(ctx.moded({"hook_event_name": event, "session_id": ctx.session, "tool_name": tool,
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": event, "session_id": ctx.session, "tool_name": tool,
                                   "tool_input": {}, "tool_response": "..."})))
 
 
@@ -578,6 +615,15 @@ def _post(ctx, event):
     pre, p = ctx.verdict, json.loads(ctx.stdin)
     ctx.run(json.dumps({**p, "hook_event_name": event, "tool_response": "..."}))
     assert ctx.verdict.stdout == "", f"{event} hook printed {ctx.verdict.stdout!r}"
+    ctx.verdict = pre
+
+
+@when(parsers.re(r"the agent runs `(?P<command>.*)`, its post hook carrying no working directory", flags=re.S))
+def _runs_post_no_cwd(ctx, command):
+    ctx.run(ctx.payload(command))
+    pre, p = ctx.verdict, json.loads(ctx.stdin)
+    del p["cwd"]
+    ctx.run(json.dumps({**p, "hook_event_name": "PostToolUse", "tool_response": "..."}))
     ctx.verdict = pre
 
 
@@ -675,7 +721,8 @@ def _call_declined(ctx):
 @when("the human speaks, opening the door")
 def _open_door(ctx):
     ctx.arg = "prompt"
-    ctx.run(json.dumps({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session, "prompt": "yes, file it"}))
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
+                                    "prompt": "yes, file it"})))
     ctx.arg = None
 
 
@@ -684,19 +731,20 @@ def _open_door_via_hooks_json(ctx):
     # The UserPromptSubmit command exactly as hooks.json writes it, run the way
     # Claude Code runs it; the PreToolUse hook is restored for the next step.
     pretool, ctx.hook = ctx.hook, hooks_json_prompt_command()
-    ctx.run(json.dumps({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session, "prompt": "yes, file it"}))
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
+                                    "prompt": "yes, file it"})))
     ctx.hook = pretool
 
 
 @when(parsers.re(r'the agent calls MCP tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
 def _mcp_call(ctx, tool, inp):
-    ctx.run(json.dumps(ctx.moded({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)})))
+    ctx.run(json.dumps(ctx.as_sent({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)})))
     _ran(ctx)
 
 
 @when(parsers.re(r'the agent calls tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
 def _tool_call(ctx, tool, inp):
-    ctx.run(json.dumps(ctx.moded({"session_id": ctx.session, "tool_name": tool,
+    ctx.run(json.dumps(ctx.as_sent({"session_id": ctx.session, "tool_name": tool,
                                   "tool_input": json.loads(ctx.expand(inp)), "cwd": ctx.expand(ctx.cwd)})))
     _ran(ctx)
 
@@ -714,7 +762,7 @@ def _no_mode(ctx):
 
 @when("the human speaks")
 def _speaks(ctx):
-    ctx.run(json.dumps(ctx.moded({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
                                   "prompt": "go on"})))
     assert ctx.verdict.stdout == "", f"UserPromptSubmit printed {ctx.verdict.stdout!r}"
 
@@ -722,13 +770,13 @@ def _speaks(ctx):
 @given(parsers.parse('the session starts from "{source}"'))
 @when(parsers.parse('the session starts from "{source}"'))
 def _session_starts(ctx, source):
-    ctx.run(json.dumps(ctx.moded({"hook_event_name": "SessionStart", "session_id": ctx.session, "source": source})))
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "SessionStart", "session_id": ctx.session, "source": source})))
     assert ctx.verdict.stdout == "", f"SessionStart printed {ctx.verdict.stdout!r}"
 
 
 @when(parsers.parse('the agent spawns a subagent named "{name}", given id "{agent}"'))
 def _spawns(ctx, name, agent):
-    ctx.run(json.dumps(ctx.moded({"hook_event_name": "PostToolUse", "session_id": ctx.session, "tool_name": "Agent",
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "PostToolUse", "session_id": ctx.session, "tool_name": "Agent",
                                   "tool_input": {"name": name, "prompt": "p", "description": "d"},
                                   "tool_response": {"status": "async_launched", "agentId": agent}})))
     assert ctx.verdict.stdout == "", f"PostToolUse printed {ctx.verdict.stdout!r}"
@@ -745,14 +793,14 @@ def _team(ctx, name):
 
 @when(parsers.parse('subagent "{agent}" starts'))
 def _subagent_starts(ctx, agent):
-    ctx.run(json.dumps(ctx.moded({"hook_event_name": "SubagentStart", "session_id": ctx.session,
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "SubagentStart", "session_id": ctx.session,
                                   "agent_id": agent, "agent_type": "general-purpose"})))
     assert ctx.verdict.stdout == "", f"SubagentStart printed {ctx.verdict.stdout!r}"
 
 
 def _send(ctx, to, message, **extra):
     ctx.calls += 1
-    ctx.run(json.dumps(ctx.moded({"hook_event_name": "PreToolUse", "session_id": ctx.session, "tool_name": "SendMessage",
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "PreToolUse", "session_id": ctx.session, "tool_name": "SendMessage",
                                   "tool_input": {"to": to, "message": message},
                                   "tool_use_id": f"toolu_call{ctx.calls}", **extra})))
 
