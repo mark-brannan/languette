@@ -2,9 +2,10 @@
 
 Blocks the commands that take the machine down: shutdown, reboot, halt and
 poweroff, at command position or as the one-word script of `sh -c`, the
-fork-bomb shape, and a `systemctl` verb (or the SysV `service <unit> stop`) that takes the host down or stops a
-service the user's session runs on (ssh, login, dbus, the network, the display
-manager). The user's own `--user` manager and a remote `-H`/`-M` host are not
+fork-bomb shape, and a `systemctl` verb (or the SysV `service`, `invoke-rc.d`,
+`rc-service` and `/etc/init.d/<unit>` stop and restart) that takes the host down
+or stops a service the user's session runs on (ssh, login, dbus, the network,
+the display manager). The user's own `--user` manager and a remote `-H`/`-M` host are not
 the host. Any other service is the agent's to stop, unless the user lists it
 in guard-protected-services.
 """
@@ -20,8 +21,9 @@ NAME = "guard-host-availability"
 
 _POWER = re.compile(r"(?:^|/)(?:shutdown|reboot|halt|poweroff)\Z")
 _CTL = re.compile(r"(?:^|/)systemctl\Z")
-_SERVICE = re.compile(r"(?:^|/)service\Z")
-_SERVICE_STOP = {"stop", "restart", "force-reload", "try-restart"}
+_SYSV = re.compile(r"(?:^|/)(?:service|invoke-rc\.d|rc-service)\Z")
+_INITD = re.compile(r"(?:^|/)etc/init\.d/[^/]+\Z")
+_SERVICE_STOP = {"stop", "restart", "force-reload", "try-restart", "--full-restart"}
 _CTL_OTHER = {"--user", "-H", "--host", "-M", "--machine"}
 _CTL_HOST = {"isolate", "rescue", "emergency", "halt", "poweroff", "reboot", "kexec", "soft-reboot"}
 _CTL_STOP = {"stop", "restart", "try-restart", "reload-or-restart", "try-reload-or-restart", "kill"}
@@ -102,15 +104,24 @@ def service_stop(s, a, b, hit, host_verbs=_CTL_HOST):
 
 
 def sysv_stop(s, a, b):
-    """`service <unit> <verb>` when the segment's SysV `service` stops or restarts a unit the session
-    runs on; else None."""
-    g = sw.cmd_index(s, a, b, _SERVICE, True)
-    if g is None:
+    """`<command> <unit> <verb>` when the segment's SysV `service`, `invoke-rc.d`, `rc-service` or
+    `/etc/init.d/<unit>` stops or restarts a unit the session runs on; else None. The verb is any word
+    of the segment (`service ssh --full-restart`, `service -v ssh stop`), not only the second."""
+    g = sw.cmd_index(s, a, b, _SYSV, True)
+    init = g is None
+    if init:
+        g = sw.cmd_index(s, a, b, _INITD, True)
+        if g is None:
+            return None
+    words = [s.w[i] for i in range(g + 1, b + 1) if s.k[i] == "w"]
+    verb = next((w for w in words if w in _SERVICE_STOP), None)
+    if verb is None:
         return None
-    pos = [s.w[i] for i in range(g + 1, b + 1) if s.k[i] == "w" and not s.w[i].startswith("-")]
-    if len(pos) >= 2 and pos[1] in _SERVICE_STOP and _core_unit(pos[0]):
-        return f"service {pos[0]} {pos[1]}"
-    return None
+    units = [os.path.basename(s.w[g])] if init else [w for w in words if not w.startswith("-")]
+    unit = next((u for u in units if u != verb and _core_unit(u)), None)
+    if unit is None:
+        return None
+    return f"{os.path.basename(s.w[g])} {unit} {verb}" if not init else f"{s.w[g]} {verb}"
 
 
 def judge(doc):

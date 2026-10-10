@@ -61,6 +61,17 @@ Feature: guard-host-availability
       | systemctl isolate graphical.target       | systemctl isolate              |                                       |
       | service ssh stop                         | service ssh stop               | the SysV form                         |
       | sudo service networking restart          | service networking restart     | the SysV form behind sudo             |
+      | service sshd force-reload                | service sshd force-reload      | every verb in the set                 |
+      | service dbus try-restart                 | service dbus try-restart       | every verb in the set                 |
+      | service ssh --full-restart               | service ssh --full-restart     | the verb is an option                 |
+      | service -v ssh stop                      | service ssh stop               | an option before the unit             |
+      | service --full-restart ssh               | service ssh --full-restart     | the verb before the unit              |
+      | invoke-rc.d ssh stop                     | invoke-rc.d ssh stop           | the Debian wrapper                    |
+      | sudo invoke-rc.d networking restart      | invoke-rc.d networking restart | the Debian wrapper behind sudo        |
+      | rc-service sshd restart                  | rc-service sshd restart        | the OpenRC form                       |
+      | rc-service -v dbus stop                  | rc-service dbus stop           | the OpenRC form with an option        |
+      | /etc/init.d/ssh stop                     | /etc/init.d/ssh stop           | the init script itself                |
+      | sudo /etc/init.d/networking restart      | /etc/init.d/networking restart | the init script behind sudo           |
 
   Scenario: a fork bomb on a later line is still seen
     When the agent runs:
@@ -101,4 +112,9 @@ Feature: guard-host-availability
       | systemctl stop nginx                             | not a service the session runs on              |
       | systemctl restart myapp.service                  | not a service the session runs on              |
       | service nginx stop                               | not a service the session runs on              |
+      | service ssh status                               | a verb outside the set on a core unit          |
+      | invoke-rc.d nginx stop                           | not a service the session runs on              |
+      | rc-service nginx restart                         | not a service the session runs on              |
+      | /etc/init.d/nginx stop                           | not a service the session runs on              |
+      | /etc/init.d/ssh status                           | a verb outside the set on a core unit          |
       | systemctl disable sshd                           | disable without --now stops nothing            |
