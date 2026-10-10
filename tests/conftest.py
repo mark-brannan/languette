@@ -8,8 +8,10 @@ Claude Code runs it (wiring.feature). @shfmt_only narrows a scenario to the
 shfmt rung; @no_shfmt drops the shfmt rung, for a row its
 parse check denies before any guard reads it. The feature's name is the guard's name, except
 require-well-formed, which has its own guard. @python_only narrows a scenario to the
-awk rung. @planned marks a feature of verdicts no guard gives yet: its
-scenarios run against every guard and are expected to fail (xfail, not strict).
+awk rung. @family marks a feature named for a family of guards, not one guard:
+its scenarios run against every guard. @planned marks verdicts no guard gives
+yet, on a feature or one scenario: it is expected to fail (xfail, not strict),
+and on a feature it runs against every guard.
 """
 
 import builtins
@@ -314,7 +316,7 @@ def pytest_collection_modifyitems(items):
 
 
 def pytest_bdd_before_scenario(request, feature, scenario):
-    every = feature.name == "require-well-formed" or "planned" in feature.tags
+    every = feature.name == "require-well-formed" or {"planned", "family"} & set(feature.tags)
     request.getfixturevalue("ctx").guard = None if every else feature.name
 
 
