@@ -1,12 +1,13 @@
 name: Publish
 
-# A published GitHub release goes to PyPI by trusted publishing (OIDC): no
-# stored token. The `pypi` environment and this filename are what the PyPI
-# publisher is registered against; renaming either breaks the upload.
+# Dispatched on a release tag, as the shared release workflow does
+# (`gh workflow run publish.yml --ref vX.Y.Z`), this uploads to PyPI by
+# trusted publishing (OIDC): no stored token. The `pypi` environment and this
+# filename are what the PyPI publisher is registered against; renaming either
+# breaks the upload.
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: read
