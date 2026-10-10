@@ -882,7 +882,7 @@ def seg_cmd(s, a, b):
     return None
 
 
-def texts_of(text, prose=PROSE):
+def texts_of(text, prose=PROSE, read=None):
     """[(text, nested)]: the text itself plus, recursively, every quoted string
     in it that holds whitespace and may run. A segment's quoted strings are
     skipped only when it is led by a prose consumer, holds no executor, and no
@@ -892,7 +892,8 @@ def texts_of(text, prose=PROSE):
     widens the consumer set for a guard whose command names also appear as
     arguments (pkill -f). Past NESTED_CAP texts it raises TooMany rather
     than read some and pass the rest unread, so a pathological command can
-    neither spin nor hide its last string."""
+    neither spin nor hide its last string. `read` scans each text, Scan when
+    None: languette.document passes its own, which scans each text once."""
     out = [(text, False)]
 
     def add(t):
@@ -901,7 +902,7 @@ def texts_of(text, prose=PROSE):
         out.append((t, True))
     x = 0
     while x < len(out):
-        s = Scan(out[x][0])
+        s = (read or Scan)(out[x][0])
         for a, b in s.segments():
             c = seg_cmd(s, a, b)
             ex = s.shellseg or any(s.k[j] == "w" and s.w[j] in EXEC for j in range(a, b + 1))

@@ -15,7 +15,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Need, Refuse, context, deny
+from languette.verdict import Need, Refuse, context, deny, planned
 
 NAME = "guard-permissions"
 
@@ -160,9 +160,8 @@ class _Judge:
         if g is not None:
             self.perm(s, g, b, sweep)
 
-    def run(self, text):
-        texts = sw.texts_of(sw.strip_heredocs(text))
-        scans = [(sw.Scan(t), nested) for t, nested in texts]
+    def run(self, doc):
+        scans = [(doc.scan(t), nested) for t, nested in doc.texts()]
         self.moved = paths.moves_directory(scans)
         for s, nested in scans:
             for a, b in s.segments():
@@ -170,9 +169,10 @@ class _Judge:
                     self.segment(s, a, b, nested)
 
 
-def parse(payload, env=os.environ):
+def parse(doc):
     """The command read into what plan and judge need; "found" is a finding
     parse alone comes to."""
+    payload, env = doc.payload, doc.env
     out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None}
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if cmd is None or cmd is False:
@@ -189,7 +189,7 @@ def parse(payload, env=os.environ):
         return out
     judge = _Judge(cwd, home)
     try:
-        judge.run(cmd + "\n")
+        judge.run(doc)
     except Refuse as e:
         out["refused"] = str(e)
     out.update(home=home, allow=env.get("LANGUETTE_PERM_ALLOW") or None, targets=judge.targets)
@@ -242,3 +242,7 @@ def judge(parsed, answers):
             return deny(f"`{what} {raw}` is blocked: {abs_} resolves through a symlink to {phys}, which is not "
                         f"the scratchpad, /tmp or an agent worktree. {_WAY_OUT}")
     return None
+
+
+def check(doc):
+    return (yield from planned(doc, parse, plan, judge))

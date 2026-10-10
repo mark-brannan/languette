@@ -75,14 +75,14 @@ def _expand_home(raw, home):
 
 # --- checkout-home --------------------------------------------------------
 
-def _home_events(cmd):
+def _home_events(doc):
     """The command's moves, in order: ("DENY",) for a yadm checkout/switch,
     ("CD", v), ("ENV", kind, v) for a GIT_DIR=/GIT_WORK_TREE= outside a git
     segment, and ("G", [(kind, v)]) for one git checkout/switch with its
     -C/GITDIR/WORKTREE targets in order."""
     out = []
-    for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
-        s = sw.Scan(text)
+    for text, nested in doc.texts():
+        s = doc.scan(text)
         for a, b in s.segments():
             if a > b:
                 continue
@@ -180,11 +180,12 @@ def _generic(prog):
                   f"  {prog} worktree add -b <branch> <path> main\nthen cd into it and work there.")
 
 
-def _checkout_home(payload, env):
+def _checkout_home(doc):
+    payload, env = doc.payload, doc.env
     cmd = (payload.get("tool_input") or {}).get("command")
     if not isinstance(cmd, str) or not cmd:
         return
-    events = _home_events(cmd)
+    events = _home_events(doc)
     if not events:
         return
     if not (yield Need("which", "git")):
@@ -271,13 +272,13 @@ def _pathish(t):
     return t if "/" in t else ""
 
 
-def _foreign_words(cmd):
+def _foreign_words(doc):
     """("T",) where a text begins (its shell starts in the payload cwd),
     ("C", w) for a cd/pushd target, ("W", w) for any other path-shaped word or
     the word after -C, in order."""
     out = []
-    for x, (text, nested) in enumerate(sw.texts_of(sw.strip_heredocs(cmd + "\n"))):
-        s = sw.Scan(text)
+    for x, (text, nested) in enumerate(doc.texts()):
+        s = doc.scan(text)
         out.append(("T",))
         ncd, seen = 0, set()
         for a, b in s.segments():
@@ -409,7 +410,8 @@ def _resolve_dir(raw, base, home):
     return (yield Need("path", "realpath", r)), rest
 
 
-def _foreign(payload, env):
+def _foreign(doc):
+    payload, env = doc.payload, doc.env
     # git is what every foreignness answer is asked of: without it, every path
     # would read as nobody's worktree.
     if not (yield Need("which", "git")):
@@ -468,7 +470,7 @@ def _foreign(payload, env):
     if not isinstance(cmd, str) or not cmd:
         return
     arrivals, vcwd, n = [], pcwd, 0
-    for ev in _foreign_words(cmd):
+    for ev in _foreign_words(doc):
         if ev[0] == "T":
             vcwd = pcwd
             continue
@@ -501,15 +503,14 @@ CONTROLS = (("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME", _checkout_hom
             ("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_FOREIGN", _foreign))
 
 
-def check(payload, env=None):
-    env = env if env is not None else os.environ
-    if not isinstance(payload, dict):
+def check(doc):
+    if not isinstance(doc.payload, dict):
         return None
     for option, control in CONTROLS:
-        if env.get(option) == "false":
+        if doc.env.get(option) == "false":
             continue
         try:
-            yield from control(payload, env)
+            yield from control(doc)
         except Refuse as r:
             return deny(str(r))
     return None

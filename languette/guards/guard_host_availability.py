@@ -99,10 +99,10 @@ def service_stop(s, a, b, hit, host_verbs=_CTL_HOST):
     return None
 
 
-def judge(text):
-    """The deny reason for `text`, or None."""
-    for t, _ in sw.texts_of(sw.strip_heredocs(text)):
-        s = sw.Scan(t)
+def judge(doc):
+    """The deny reason for the command, or None."""
+    for t, _ in doc.texts():
+        s = doc.scan(t)
         segs = [(a, b) for a, b in s.segments() if a <= b]
         for a, b in segs:
             what = _power(s, a, b)
@@ -122,7 +122,8 @@ def judge(text):
     return None
 
 
-def check(payload, env=os.environ):
+def check(doc):
+    payload = doc.payload
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if cmd is None or cmd is False:
         return None
@@ -131,5 +132,5 @@ def check(payload, env=os.environ):
     cmd = cmd.rstrip("\n")                     # as $(...) would leave it
     if not cmd:
         return None
-    why = judge(cmd + "\n")
+    why = judge(doc)
     return deny(f"{NAME}: {why}") if why else None
