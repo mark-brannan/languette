@@ -32,5 +32,6 @@ markers = [
   "python_only: run the scenario against the awk rung only",
   "no_shfmt: run the scenario on every engine but the shfmt rung, whose parse check denies it first",
   "table: the scenario's examples are the README's table",
+  "planned: a verdict no guard gives yet; expected to fail, never fails the run",
   "known_gap: a strict xfail, red the day the gap closes (features/smoke.feature)",
 ]

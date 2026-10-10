@@ -8,7 +8,8 @@ Claude Code runs it (wiring.feature). @shfmt_only narrows a scenario to the
 shfmt rung; @no_shfmt drops the shfmt rung, for a row its
 parse check denies before any guard reads it. The feature's name is the guard's name, except
 require-well-formed, which has its own guard. @python_only narrows a scenario to the
-awk rung.
+awk rung. @planned marks a feature of verdicts no guard gives yet: its
+scenarios run against every guard and are expected to fail (xfail, not strict).
 """
 
 import builtins
@@ -306,8 +307,15 @@ def ctx(engine, request):
     c.cleanup()
 
 
+def pytest_collection_modifyitems(items):
+    for item in items:
+        if item.get_closest_marker("planned"):
+            item.add_marker(pytest.mark.xfail(reason="planned: no guard gives this verdict yet", strict=False))
+
+
 def pytest_bdd_before_scenario(request, feature, scenario):
-    request.getfixturevalue("ctx").guard = None if feature.name == "require-well-formed" else feature.name
+    every = feature.name == "require-well-formed" or "planned" in feature.tags
+    request.getfixturevalue("ctx").guard = None if every else feature.name
 
 
 # --- Given ---------------------------------------------------------------
