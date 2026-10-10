@@ -25,7 +25,7 @@ SPENT = ".languette-ask"            # appended to the transcript path
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
-KINDS = frozenset("git gh-api pr-list which read path cwd clock ruleset-cache claim worktree run door "
+KINDS = frozenset("git gh-api pr-list which read path physical cwd clock ruleset-cache claim worktree run door "
                   "send-state".split())
 ACTS = {"ruleset-keep": "_ruleset_keep", "send-keep": "_send_keep", "worktree-keep": "_wt_keep",
         "worktree-leave": "_wt_leave", "door-open": "_door_open", "door-spend": "_door_spend"}
@@ -106,6 +106,15 @@ class World:
         if op not in ("isdir", "isfile", "islink", "exists", "lexists", "realpath"):
             raise ValueError(f"no path fact {op!r}")
         return getattr(os.path, op)(path)
+
+    def _physical(self, p):
+        rest = ""
+        while p != "/" and not os.path.lexists(p):
+            head, _, base = p.rpartition("/")
+            rest = "/" + base + rest
+            p = head or "/"
+        r = os.path.realpath(p)
+        return ("" if r == "/" else r) + rest
 
     def _run(self, cwd, timeout, *argv):
         r = subprocess.run(list(argv), cwd=cwd, env=self.env, capture_output=True, timeout=timeout,
