@@ -77,7 +77,9 @@ jobs:
   # The plugin directory follows the `release` branch: the tagged tree, with
   # the tag's version written into plugin.json. Main carries no version, so an
   # install from main updates on every commit; an install from `release`
-  # updates only on a release, at the version PyPI has.
+  # updates only on a release, at the version PyPI has. If this job fails after
+  # the upload, re-run only this job: a fresh dispatch stops at PyPI, which
+  # refuses a version it already has.
   plugin-release:
     needs: pypi
     runs-on: ubuntu-latest
