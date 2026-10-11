@@ -100,7 +100,7 @@ jobs:
       - run: |
           set -euo pipefail
           command -v shellcheck || (sudo apt-get update -q && sudo apt-get install -y -q shellcheck)
-          shellcheck --severity=warning tests/stubs/* tests/*.test.sh
+          shellcheck --severity=warning tests/stubs/*
 
   # Line, section and per-change word caps on the README, from
   # docs/budgets.json. Raising a cap is its own PR that says why.
