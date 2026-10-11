@@ -58,8 +58,6 @@ jobs:
       - run: pip install -r requirements-dev.txt
       # smoke_steps.py builds its own PATHs and venvs: the smoke job runs it.
       - run: python -m pytest -q
-      # The long tail of guard-private-terms' shell shapes, until features/ holds them.
-      - run: bash tests/guard-private-terms.test.sh
 
   # The parser ladder's promise end to end: require-well-formed's hooks.json
   # command under PATHs holding only shfmt, only bash, only python3, or a
@@ -102,7 +100,7 @@ jobs:
       - run: |
           set -euo pipefail
           command -v shellcheck || (sudo apt-get update -q && sudo apt-get install -y -q shellcheck)
-          shellcheck --severity=warning tests/stubs/* tests/*.test.sh
+          shellcheck --severity=warning tests/stubs/*
 
   # Line, section and per-change word caps on the README, from
   # docs/budgets.json. Raising a cap is its own PR that says why.
