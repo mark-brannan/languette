@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.3](https://github.com/mark-brannan/languette/compare/v0.0.2...v0.0.3) (2026-10-11)
+
+
+### Features
+
+* **guards:** guard-host-availability denies SysV service stop and restart ([#185](https://github.com/mark-brannan/languette/issues/185)) ([fb0eee8](https://github.com/mark-brannan/languette/commit/fb0eee87d71d94b6a834267ce631f33d77ee90e6))
+
 ## [0.0.2](https://github.com/mark-brannan/languette/compare/v0.0.1...v0.0.2) (2026-10-10)
 
 
