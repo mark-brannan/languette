@@ -36,7 +36,6 @@ try:
 except ImportError:                          # pragma: no cover -- 3.10 and before
     import sre_parse as _sre
 
-from languette import scan as sw
 from languette import secrets
 from languette.verdict import Need, Refuse, ask, deny
 
@@ -136,16 +135,25 @@ def _load(path):
     return rules
 
 
-def _scans(cmd):
+def project_rules(payload, env):
+    """The project's own rules, gathered: () when it has no list, Refuse when
+    the list is malformed. guard-secrets judges with them and so does the
+    decision record, which masks what the guard would deny."""
+    path = yield from _config(payload, env)
+    return (yield from _load(path)) if path else ()
+
+
+def _scans(doc):
     """Every text the command may run or feed, read the way it will be: the
     command with heredocs stripped and its nested shell strings as shell,
-    each heredoc body as lines of data."""
-    body = cmd + "\n"
-    return ([sw.Scan(text) for text, _ in sw.texts_of(sw.strip_heredocs(body))]
-            + [secrets.Text(h) for h in sw.heredoc_bodies(body)])
+    each heredoc body as lines of data. The document's scans, so no text is
+    read twice; the decision record reads the command again (secrets.scans),
+    after the verdict."""
+    return [doc.scan(text) for text, _ in doc.texts()] + [secrets.Text(h) for h in doc.heredoc_bodies()]
 
 
-def check(payload, env=os.environ):
+def check(doc):
+    payload, env = doc.payload, doc.env
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if cmd is None or cmd is False:
         return None
@@ -155,14 +163,13 @@ def check(payload, env=os.environ):
     if not cmd:
         return None
     try:
-        path = yield from _config(payload, env)
-        extra = (yield from _load(path)) if path else ()
+        extra = yield from project_rules(payload, env)
     except Refuse as e:
         return deny(f"guard-secrets: {CONFIG} is {e}, so the project's secret patterns cannot be read. "
                     f"Fix the file; until then every Bash command is denied.")
     desc = {r.id: r.description for r in tuple(secrets.secret_rules.RULES) + tuple(extra)}
     shapes, contexts = [], []
-    for s in _scans(cmd):
+    for s in _scans(doc):
         for f in secrets.findings(s, extra):
             item = f"`{secrets.shown(s, f)}` ({desc.get(f.rule, f.rule.replace('context:', 'named by '))})"
             (shapes if f.how == "shape" else contexts).append(item)

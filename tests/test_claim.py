@@ -65,7 +65,7 @@ def test_the_same_call_claims_once(tmp_path):
     _result("toolu_B1", "The user doesn't want to proceed with this tool use. The tool use was rejected.",
             tur="User rejected tool use"),
     _result("toolu_B1", "PreToolUse:Bash hook error: `dd` is blocked."),
-    _result("toolu_B1", "guard-disk: dd onto /dev/sda overwrites a whole disk."),
+    _result("toolu_B1", "guard-disks: dd onto /dev/sda overwrites a whole disk."),
     _result("toolu_B1", "Permission for this action was denied by the Claude Code auto mode classifier."),
 ], ids=["declined", "hook-error", "guard-deny", "classifier"])
 def test_a_call_that_never_ran_gives_its_click_back(tmp_path, result):
@@ -98,12 +98,12 @@ def test_a_spend_from_before_calls_were_recorded_stays_spent(tmp_path):
 def test_two_guards_wanting_one_label_for_one_command_need_one_click(tmp_path, monkeypatch):
     tp = _transcript(tmp_path)
 
-    def check(payload, env):
+    def check(doc):
         approved, spent = yield Need("claim", {"Run e2e": 1})
         return None if spent else {"permissionDecision": "deny", "permissionDecisionReason": "no click"}
 
     guards = tuple(SimpleNamespace(NAME=f"g{i}", check=check) for i in range(2))
     monkeypatch.setattr(run, "GUARDS", (("PreToolUse", re.compile(r"Bash\Z"), guards),))
     payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "npm run e2e"},
-               "transcript_path": str(tp), "tool_use_id": "toolu_B1"}
+               "cwd": "/", "transcript_path": str(tp), "tool_use_id": "toolu_B1"}
     assert run.respond(json.dumps(payload), {}) == ""

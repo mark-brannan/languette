@@ -163,13 +163,13 @@ def _hit(entry, name, rest):
     return ok
 
 
-def _matches(entry, text):
-    """(how many times `text` runs entry, whether any of it sits in a loop)."""
+def _matches(doc, entry):
+    """(how many times the command runs entry, whether any of it sits in a loop)."""
     names = {entry["cmd"]} | LAUNCH | (PM if entry["cmd"] in PM else set())
     rx = re.compile(r"(?:^|/)(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\Z")
     n, loop = 0, False
-    for t, nested in sw.texts_of(sw.strip_heredocs(text), PROSE):
-        s = sw.Scan(t)
+    for t, nested in doc.texts(PROSE):
+        s = doc.scan(t)
         loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
         for a, b in s.segments():
             if a > b:
@@ -198,7 +198,8 @@ def claim(wants):
     return (yield Need("claim", dict(wants)))
 
 
-def check(payload, env=os.environ):
+def check(doc):
+    payload, env = doc.payload, doc.env
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd.strip():
         return None
@@ -216,7 +217,7 @@ def check(payload, env=os.environ):
                      "the Edit tool, or tell the user.")
     runs, looped = {}, []
     for c in commands:
-        m = [_matches(e, cmd + "\n") for e in c["match"]]
+        m = [_matches(doc, e) for e in c["match"]]
         # Entries may describe the same run two ways (npm run x, tsx x.ts); count the widest.
         n = max(k for k, _ in m)
         if n:

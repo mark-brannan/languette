@@ -106,14 +106,14 @@ def _args(s, g, b):
     return fields, inputs, words
 
 
-def _calls(command, cwd, home):
+def _calls(doc, command, cwd, home):
     """One record per gh call that may reach the GraphQL endpoint and is not
     a plain read: its literal text, its query's text, the files it reads
     (the query's apart), and why it cannot be read, or None. The files are
     read by _resolves, through the runner."""
-    buf = command + "\n"
-    hd = "\n".join(_decoded(b) for b in sw.heredoc_bodies(buf))
-    scans = [(sw.Scan(t), nested) for t, nested in sw.texts_of(sw.strip_heredocs(buf))]
+    buf = command.replace("HEREDOC", "HEREDOC_") + "\n"      # a typed HEREDOC must not pass for scan's mark
+    hd = "\n".join(_decoded(b) for b in doc.heredoc_bodies(buf))
+    scans = [(doc.scan(t), nested) for t, nested in doc.texts(text=buf)]
     alone, moved = _alone(scans), paths.moves_directory(scans)
     out = []
     for s, nested in scans:
@@ -178,11 +178,11 @@ def _read(p):
         return None
 
 
-def _resolves(command, cwd, home=""):
+def _resolves(doc, command, cwd, home=""):
     """(thread ids, why): the PRRT_ ids each resolving gh call in `command`
     names, in order, and why one of them cannot be read, or None."""
     ids = []
-    for rec in _calls(command, cwd, home):
+    for rec in _calls(doc, command, cwd, home):
         if rec["why"]:
             return ids, rec["why"]
         text, query = rec["text"], rec["query"]
@@ -258,13 +258,13 @@ def _thread(cwd, tid):
     return viewer, [c for c in comments if isinstance(c, dict)]
 
 
-def check(payload, env=None):
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
+def check(doc):
+    cmd = doc.command
     if not isinstance(cmd, str):
         return None
-    cwd = payload.get("cwd")
+    cwd = doc.payload.get("cwd")
     cwd = cwd if isinstance(cwd, str) and cwd.startswith("/") else ""
-    ids, why = yield from _resolves(cmd, cwd, (env or {}).get("HOME") or "")
+    ids, why = yield from _resolves(doc, cmd, cwd, (doc.env or {}).get("HOME") or "")
     if why:
         return deny(f"{NAME}: this graphql call may resolve a review thread, and the guard cannot tell which review "
                     f"thread ({why}), so it cannot check that a bot's finding was answered. Put the query and any "

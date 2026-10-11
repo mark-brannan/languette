@@ -189,6 +189,7 @@ Feature: guard-review-threads
     Examples:
       | command                                                                                                      | note                      |
       | echo '{"query":"mutation{resolveReviewThread(input:{threadId:\"PRRT_t1\"}){thread{id}}}"}' \| gh api graphql --input - | piped stdin, no heredoc |
+      | echo '{"query":"mutation{resolveReviewThread(input:{threadId:\"PRRT_t1\"}){thread{id}}}"}' \| gh api graphql --input - HEREDOC | piped stdin, a typed HEREDOC word |
       | Q='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}'; gh api graphql -f query="$Q"       | the query in a variable   |
       | gh api graphql -F query=@m.graphql -f id=PRRT_t1                                                              | the query in a missing file |
       | gh api graphql --input m.json -f id=PRRT_t1                                                                   | the payload in a file     |

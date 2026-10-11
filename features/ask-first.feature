@@ -177,7 +177,7 @@ Feature: ask-first
         """
       When the agent runs `npm run e2e && dd if=/dev/zero of=/dev/sda`
       Then the guard is silent
-      When Claude Code records that call's result as "guard-disk: dd onto /dev/sda wipes a disk."
+      When Claude Code records that call's result as "guard-disks: dd onto /dev/sda wipes a disk."
       And the agent runs `npm run e2e`
       Then the guard is silent
       When the agent runs it again

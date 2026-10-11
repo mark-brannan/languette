@@ -16,6 +16,12 @@ Three layers, in the order prior art (gitleaks, detect-secrets) uses them:
 - entropy: only confirms a shape or context hit, never fires alone, so
   `GITHUB_TOKEN=ghp_xxxxxxxx...` (a placeholder) is no finding.
 
+A fourth, mask-only tier is for a writer's eyes alone: rules `redact` applies
+when findings() is asked for them (`mask_only=True`) that a guard never
+denies or asks on, because on a verdict they would be noise (a long mixed-case
+run is a build hash as often as a key). A record would rather mask too much
+than too little.
+
 A finding names the word by index, so a writer redacts by position in the
 word stream, never by regex over the raw text. Standard library only.
 """
@@ -24,6 +30,7 @@ import math
 import re
 from collections import namedtuple
 
+from languette import scan as sw
 from languette import secret_rules
 
 # how: "shape" (a known token format) or "context" (named as a credential).
@@ -63,6 +70,14 @@ _USER_OPTS = frozenset("-u --user --username --userinfo".split())
 _SCHEME = re.compile(r"(?i)(?:bearer|basic|token|apikey)\s+")
 # user:password@ in a URL; the password is the secret.
 _URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s/:@]+:([^\s/@]+)@")
+# Mask-only shapes: a long random-looking run with letters and digits, not a hex hash.
+MASK_ONLY = (Rule("mask-only:long-random-run", "A long random-looking string; masked in a record, never denied.",
+                  re.compile(r"(?<![\w/.-])(?![0-9a-f]{32,}\b)(?=[A-Za-z0-9+/_=-]*[0-9])(?=[A-Za-z0-9+/_=-]*[A-Z])"
+                             r"(?=[A-Za-z0-9+/_=-]*[a-z])[A-Za-z0-9+/_=-]{32,}"), 0.0),)
+# Mask-only context: `mysql -psecret`, the password glued to its flag. Short
+# options are too many other things (mkdir -p) to read so on a verdict.
+_MYSQL = frozenset("mysql mariadb mysqldump mysqladmin".split())
+_GLUED_P = re.compile(r"^-p(?=.)")
 # A value that is clearly not a literal secret: a variable, a placeholder, a path.
 _NOT_LITERAL = re.compile(r"^(?:\$|<|\{|\.{2,}$|/|~/)")
 
@@ -164,11 +179,34 @@ class Text:
         self.k = ["q"] * len(self.q)
 
 
-def findings(scan, extra=()):
+def _glued_mysql_p(scan, i):
+    """(start, end) of the password in word i when it is `-psecret` in a
+    segment that runs a mysql client; else None."""
+    if scan.k[i] != "w" or not _GLUED_P.match(scan.w[i]):
+        return None
+    j = i - 1
+    while j >= 0 and scan.k[j] != ";":
+        if scan.k[j] == "w" and scan.w[j].rsplit("/", 1)[-1] in _MYSQL:
+            return 2, len(scan.w[i])
+        j -= 1
+    return None
+
+
+def scans(cmd):
+    """Every text the command may run or feed, read the way it will be: the
+    command with heredocs stripped and its nested shell strings as shell,
+    each heredoc body as lines of data."""
+    body = cmd + "\n"
+    return ([sw.Scan(text) for text, _ in sw.texts_of(sw.strip_heredocs(body))]
+            + [Text(h) for h in sw.heredoc_bodies(body)])
+
+
+def findings(scan, extra=(), mask_only=False):
     """Every Finding in scan's words: each known shape in a word, or, when it
     holds none, at most one context finding. `extra` is the caller's own rules
-    (a project's list), tried after the shipped ones."""
-    rules = tuple(secret_rules.RULES) + tuple(extra)
+    (a project's list), tried after the shipped ones. mask_only adds the
+    mask-only tier, for a writer; a guard leaves it off."""
+    rules = tuple(secret_rules.RULES) + tuple(extra) + (MASK_ONLY if mask_only else ())
     out = []
     for i in range(len(scan.w)):
         if scan.k[i] == ";":
@@ -182,6 +220,8 @@ def findings(scan, extra=()):
         hit = _context(text, prev)
         if hit:
             out.append(Finding(i, hit[0], "context", hit[1]))
+        elif mask_only and (span := _glued_mysql_p(scan, i)):
+            out.append(Finding(i, "mask-only:mysql-p", "context", span))
     return out
 
 

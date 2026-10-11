@@ -37,7 +37,8 @@ from languette.verdict import Need, allow, deny
 NAME = "guard-private-terms"
 _MCP = ("create_issue|update_issue|issue_write|add_issue_comment|create_pull_request|update_pull_request|"
         "add_pull_request_review_comment|create_pull_request_review|pull_request_review_write|"
-        "add_comment_to_pending_review|create_and_submit_pull_request_review|submit_pending_pull_request_review")
+        "add_comment_to_pending_review|create_and_submit_pull_request_review|submit_pending_pull_request_review|"
+        "add_reply_to_pull_request_comment|update_issue_comment")
 # The tools hooks.json wires this guard to; the MCP ones by their name's tail.
 TOOLS = re.compile(rf"(?:Bash|mcp__.*__(?:{_MCP}))\Z")
 _MCP_TOOL = re.compile(rf"mcp__.*__(?:{_MCP})\Z")
@@ -110,7 +111,7 @@ class _Meta:
     F / FX file (FX: in nested text) | CDTO dir | CDPUSH / CDPOP | A NAME=VALUE |
     HFED path a heredoc writes | STDIN | OPAQUE value | HEREDOC | CD | UNSEEN flag."""
 
-    def __init__(self, command):
+    def __init__(self, doc, command):
         self.out = []
         buf = self.orig = command + "\n"
         counts = {}
@@ -119,14 +120,13 @@ class _Meta:
         for p in writes(buf, True):
             if counts.get(p) == 1:
                 self.add("HFED", p)
-        stripped = sw.strip_heredocs(buf)
-        if stripped != buf:
+        if doc.heredocs():
             self.add("HEREDOC")
-        for body in sw.heredoc_bodies(buf):
+        for body in doc.heredoc_bodies():
             for line in body.split("\n") if body else ():
                 self.add("HDTXT", line)
-        for text, nested in sw.texts_of(stripped):
-            s = self.s = sw.Scan(text)
+        for text, nested in doc.texts():
+            s = self.s = doc.scan(text)
             for i in range(len(s.w)):
                 if s.k[i] == "w" and s.w[i] in ("cd", "pushd", "popd"):
                     self.add("CD")
@@ -415,23 +415,22 @@ class _Replay:
         return normpath(self.vcwd + "/" + p) if self.vcwd else None
 
 
-def check(payload, env):
+def check(doc):
+    payload, env = doc.payload, doc.env
     terms_file = env.get("CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE") or ""
     if not terms_file:
         return None                              # inert until the user names a terms file
     tool = payload.get("tool_name")
     if not isinstance(tool, str) or not tool:
         return None
-    cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd:
-        cwd = yield Need("cwd")
+    cwd = payload["cwd"]
     ti = payload.get("tool_input")
     ti = ti if isinstance(ti, dict) else {}
     if tool == "Bash":
         cmd = ti.get("command")
         if not isinstance(cmd, str) or not cmd:
             return None
-        meta = _Meta(cmd).out
+        meta = _Meta(doc, cmd).out
         # The tokeniser can lose a segment behind an odd construct; the raw string is
         # the backstop, so a gh write it names is scanned with the repo unknown.
         if not any(k == "R" for k, _ in meta) and _BACKSTOP.search(cmd):

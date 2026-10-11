@@ -77,15 +77,15 @@ def _has_dl(s, a, b, nested):
     return sw.cmd_index(s, a, b, _DL, nested) is not None
 
 
-def _text_downloads(raw):
+def _text_downloads(doc, raw):
     """A quoted word's text runs a download inside a substitution."""
     if "$(" not in raw and "`" not in raw:
         return False
-    s = sw.Scan(raw)
+    s = doc.scan(raw)
     return any(a <= b and _has_dl(s, a, b, False) for a, b in s.segments())
 
 
-def _judge(s, nested):
+def _judge(doc, s, nested):
     """The reason this scanned text is a pipe-to-shell, or None."""
     segs = {a: b for a, b in s.segments() if a <= b}
     carried = False
@@ -104,10 +104,10 @@ def _judge(s, nested):
             given, ops = _program(s, g, b)
             if fed and (given or not ops):
                 return f"`{name}` run on a download substituted into its command line"
-            if given and any(s.k[i] == "q" and _text_downloads(s.q[i]) for i in range(g + 1, b + 1)):
+            if given and any(s.k[i] == "q" and _text_downloads(doc, s.q[i]) for i in range(g + 1, b + 1)):
                 return f"`{name} -c` run on a download substituted into its command line"
         if c is not None and s.w[c] == "eval":
-            if fed or any(s.k[i] == "q" and _text_downloads(s.q[i]) for i in range(c + 1, b + 1)):
+            if fed or any(s.k[i] == "q" and _text_downloads(doc, s.q[i]) for i in range(c + 1, b + 1)):
                 return "`eval` of a download"
         if c is not None and s.w[c] in ("source", ".") and fed and len(s.w[c + 1:b + 1]) == 0:
             return f"`{s.w[c]}` of a download"
@@ -116,7 +116,8 @@ def _judge(s, nested):
     return None
 
 
-def check(payload, env=os.environ):
+def check(doc):
+    payload = doc.payload
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if cmd is None or cmd is False:
         return None
@@ -125,8 +126,8 @@ def check(payload, env=os.environ):
     cmd = cmd.rstrip("\n")                     # as $(...) would leave it
     if not cmd:
         return None
-    for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
-        why = _judge(sw.Scan(text), nested)
+    for text, nested in doc.texts():
+        why = _judge(doc, doc.scan(text), nested)
         if why:
             return deny(f"guard-pipe-to-shell: {why} runs whatever the server sends, unread. {_WAY_OUT}")
     return None

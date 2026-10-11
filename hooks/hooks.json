@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_UNPARSABLE-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-unparsable; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-unparsable and was not found on PATH. This is a gate and fails closed: install python3, or set guard_unparsable=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-unparsable) is missing from the plugin directory or crashed, so a command that does not parse could not be caught. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard require-well-formed; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for require-well-formed and was not found on PATH. This is a gate and fails closed: install python3, or set require_well_formed=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (require-well-formed) is missing from the plugin directory or crashed, so a command that does not parse could not be caught. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking that the command parses"
           },
           {
@@ -31,13 +31,18 @@
           },
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_DISK-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-disk; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-disk and was not found on PATH. This is a gate and fails closed: install python3, or set guard_disk=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-disk) is missing from the plugin directory or crashed, so a disk wipe could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_DISKS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-disks; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-disks and was not found on PATH. This is a gate and fails closed: install python3, or set guard_disks=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-disks) is missing from the plugin directory or crashed, so a disk wipe could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for a disk wipe"
           },
           {
             "type": "command",
             "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-host-availability; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-host-availability and was not found on PATH. This is a gate and fails closed: install python3, or set guard_host_availability=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-host-availability) is missing from the plugin directory or crashed, so a shutdown or a fork bomb could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for a shutdown or a fork bomb"
+          },
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_PROTECTED_SERVICES-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-protected-services; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-protected-services and was not found on PATH. This is a gate and fails closed: install python3, or set guard_protected_services=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-protected-services) is missing from the plugin directory or crashed, so a stop of a protected service could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for a stop of a protected service"
           },
           {
             "type": "command",
@@ -97,7 +102,7 @@
         ]
       },
       {
-        "matcher": "Bash|mcp__.*__(create_issue|update_issue|issue_write|add_issue_comment|create_pull_request|update_pull_request|add_pull_request_review_comment|create_pull_request_review|pull_request_review_write|add_comment_to_pending_review|create_and_submit_pull_request_review|submit_pending_pull_request_review)",
+        "matcher": "Bash|mcp__.*__(create_issue|update_issue|issue_write|add_issue_comment|create_pull_request|update_pull_request|add_pull_request_review_comment|create_pull_request_review|pull_request_review_write|add_comment_to_pending_review|create_and_submit_pull_request_review|submit_pending_pull_request_review|add_reply_to_pull_request_comment|update_issue_comment)",
         "hooks": [
           {
             "type": "command",

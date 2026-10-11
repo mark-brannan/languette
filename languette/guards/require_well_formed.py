@@ -1,4 +1,4 @@
-"""guard-unparsable: a Bash command the parser refuses is denied, whole, before
+"""require-well-formed: a Bash command the parser refuses is denied, whole, before
 anything in it runs.
 
 The parser is languette/scan.py's ladder, read top down: shfmt, `bash -n`,
@@ -17,33 +17,25 @@ deny it a second time on a weaker reading.
 from languette import scan
 from languette.verdict import deny
 
-NAME = "guard-unparsable"
+NAME = "require-well-formed"
 
 
-def judge(command):
-    """The deny for `command`, or None when it reads. The ladder runs once
-    here: a timeout or a kill need not repeat, so run.py reuses this verdict
-    rather than asking the parser twice."""
-    try:
-        scan.check(command)
-        scan.texts_of(scan.strip_heredocs(command + "\n"))
-    except scan.TooMany as e:
-        return deny(f"guard-unparsable: this command is too big to check: {e}. Nothing ran. "
+def check(doc):
+    """The deny for the Bash command, or None when it reads. The ladder runs
+    once per call, in the document: a timeout or a kill need not repeat, and
+    run.py drops the other guards on this same reading."""
+    e = doc.refusal
+    if isinstance(e, scan.TooMany):
+        return deny(f"require-well-formed: this command is too big to check: {e}. Nothing ran. "
                     "Every quoted string that may run as shell, and every $( ) inside double quotes, "
                     "is one; the guards read only so many. Split it into several smaller commands, "
                     "or put the script in a file and run that")
-    except scan.TooBig as e:
-        return deny(f"guard-unparsable: this command is too big to check: {e}. Nothing ran. "
+    if isinstance(e, scan.TooBig):
+        return deny(f"require-well-formed: this command is too big to check: {e}. Nothing ran. "
                     "Every $( ), ( ), { }, backtick, if, case and do adds the depth it stands at, "
                     "and so does every &&, || and | (a chain nests one level per operator). "
                     "Split it into several smaller commands, or nest less")
-    except scan.Unparseable as e:
-        return deny(f"guard-unparsable: this command does not parse ({e.rung}: {e}). Nothing ran: "
+    if e is not None:
+        return deny(f"require-well-formed: this command does not parse ({e.rung}: {e}). Nothing ran: "
                     "bad input is a deny; fix the syntax and run it again")
     return None
-
-
-def check(payload, env):
-    ti = payload.get("tool_input")
-    command = ti.get("command") if isinstance(ti, dict) else None
-    return judge(command) if isinstance(command, str) else None
