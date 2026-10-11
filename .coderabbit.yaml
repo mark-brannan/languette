@@ -1,0 +1,19 @@
+# CodeRabbit config. The GitHub App needs a one-time install; this file only
+# tunes it. The prose rules below are an inline digest of the owner's
+# writing rules, which CodeRabbit cannot read from here.
+
+language: en-US
+
+reviews:
+  path_instructions:
+    - path: "{**/README*,**/CHANGELOG*,docs/**,**/SKILL.md}"
+      instructions: >
+        Human-facing prose. Flag in added lines only: a list item or table
+        row over 110 rendered characters (link syntax stripped) or longer
+        than the shortest neighbour; flags, fields, env vars or scar stories
+        in a README (they belong in the code header); a table whose columns
+        repeat each other; a parenthetical that restates its bullet; AI-tell
+        words (delve, leverage, seamless, robust, comprehensive, foster,
+        elevate, unlock) and "it's worth noting"/"not just X, but Y". Flag
+        edits to existing README/CHANGELOG prose beyond correcting a false
+        claim. A length complaint means delete, never add a clause.
