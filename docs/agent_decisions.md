@@ -350,3 +350,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261010t080128z
 - tests/test_claim.py's fake guard is check(doc); no two-argument shim in the runner Undo: restore the fake and the shim ([#179](https://github.com/mark-brannan/languette/pull/179))
+
+### 20261013t190358z
+- guard-signed-comments is configurable through two settings: signed_comments_opening (the first line's prefix) and signed_comments_signature (a regex the last line matches whole, {session} expanding to the session's eight hex) Undo: drop the two options and keep the constants ([#119](https://github.com/mark-brannan/languette/pull/119))
