@@ -26,8 +26,9 @@ question.
 Which guard goes where is in #198. A guard may use more than one engine:
 recursive-delete is a command rule that hands its targets to write targets.
 
-Every engine is pure and sits in step 4, guard. Its rules are data, read in
-gather like any other fact. A rule runs no code and names no program to run.
+Every engine is pure: it plans in step 2, the facts and paths it needs, and
+judges in step 4, guard. Its rules are data, read in gather like any other
+fact. A rule runs no code and names no program to run.
 Each rule that matches is one finding; verdict combines findings as it does
 today. A rule only tightens: its action is `deny` or `ask-once`, never allow, so
 a repo's rule set adds to what languette judges and takes nothing from it.
@@ -73,7 +74,7 @@ deny-always is then ask-first with the action set to deny, and its list is the
 repo's. guard-sudo is one rule whose `cmd` is a list: `sudo`, `su`, `doas`
 and `pkexec`.
 
-### Facts a condition may name
+## Facts a condition may name
 
 A condition's fact is one of a closed list, each a Need kind and a pure
 shaping of its answer: the repo a cwd's origin names, whether a path exists.
