@@ -1,7 +1,6 @@
 # Git and GitHub guards: the regex guard's rules beside ours, clustered by harm
 
-Step one of #134. Nothing here is a name or a shape ruling. Every name is a
-candidate; `docs/approved-guard-names.md` governs approval.
+Step one of #134. Every guard name below is a candidate; none is approved.
 
 ## Sources
 
