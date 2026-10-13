@@ -51,7 +51,6 @@ _GH = re.compile(r"(?:^|/)gh\Z")
 _CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 _EXPORT = frozenset("export declare typeset".split())
 _GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
-_GIT_VALUED = frozenset("-C -c --git-dir --work-tree --namespace --config-env".split())
 _PUSH_VALUED = frozenset("-o --push-option --repo --receive-pack --exec".split())
 _ALL = frozenset("--all --branches --mirror".split())
 _UNREADABLE = re.compile(r"[$`*?\[{]")
@@ -195,8 +194,8 @@ def _push(s, a, b, nested, here, lits=None):
     prog = "yadm" if s.w[g].endswith("yadm") else "git"
     if any(s.w[i].startswith(_GIT_ENV) for i in range(a, g)):
         here = None
-    i = g + 1
-    while i <= b and s.w[i] != "push":
+    sub = sw.git_subcommand(s, g, b)
+    for i in sw.git_options(s, g, sub):
         x = s.w[i]
         if x == "-C" and i + 1 <= b:
             lit = lits and s.live[i + 1] and lits.word(i + 1, a)
@@ -207,16 +206,14 @@ def _push(s, a, b, nested, here, lits=None):
         if cfg and (cfg.startswith("alias.") or "insteadof" in cfg):
             raise Refuse("a `-c` override of an alias or a URL rewrite can turn any subcommand into a push, "
                          "or any remote into another")
-        if x in _GIT_VALUED:
-            i += 2
-        elif x.startswith("-"):
-            i += 1
-        elif s.live[i] or _UNREADABLE.search(x):
-            raise Refuse(f"the subcommand `{x}` is built at run time")
-        else:
-            return None                        # another subcommand
+    i = sub
     if i > b:
         return None
+    x = s.w[i]
+    if x != "push":
+        if s.live[i] or _UNREADABLE.search(x):
+            raise Refuse(f"the subcommand `{x}` is built at run time")
+        return None                            # another subcommand
     remote, pos, all_, tags, dry, dashdash = None, [], False, False, False, False
     i += 1
     while i <= b:
