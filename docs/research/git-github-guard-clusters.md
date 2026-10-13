@@ -32,7 +32,7 @@ languette's shipped and pending members:
 
 | Member | What it refuses | Needs GitHub or state? |
 |---|---|---|
-| `guard-git-work-loss` | blanket staging, stash pop/drop/clear, force push, discard (`checkout .`, `restore .`, `clean -f`, `reset --hard`), `branch -D` | no; one switch per rule |
+| `guard-git-work-loss` | blanket staging, stash pop/drop/clear, force push, discard (`checkout .`, `reset --hard`), `branch -D` | no; one switch per rule |
 | `guard-git-stacked-base` | deleting a remote branch an open PR names as base or head | yes (`gh pr list`); asks when it cannot answer |
 | `guard-bypass-hooks` | `--no-verify`, `-n` on commit/am, `core.hooksPath` | approval, spent once |
 | `guard-bypass-labels` | an agent applying `churn-ok`, `mixed-loops-ok` | no (reads flags, `gh api`, MCP fields) |
@@ -54,8 +54,8 @@ the harm is in the cluster and neither side's rule set covers a member.
 |---|---|---|---|---|
 | A | Uncommitted work lost in the working tree or index | `checkout-discard`, `restore-worktree`, `reset-hard`, `clean-force` | `guard-git-work-loss` discard rules | The regex guard is wider: `switch -f`, `rm -f`, `read-tree --reset`, `reset --merge`, `show ref:path > path`. |
 | B | Stash lost | `stash-drop`, `stash-clear` | `guard-git-work-loss` (stash pop/drop/clear) | languette also denies `pop`, because the stack is shared across worktrees. |
-| C | Committed history rewritten or unreachable locally | `filter-branch`, `branch-force-delete`; strict: `rebase`, `commit-amend` | `branch -D` only | Largest gap. Rebase and amend are plausible agent moves; the regex guard bans them, ban or ask is undecided. |
-| D | Remote history rewritten or remote refs deleted | `push-force-long`; strict: `push-force-any`, `push-mirror`, `push-delete` | `guard-git-work-loss` force push; `guard-git-stacked-base` remote deletion when a PR depends on it | The regex guard denies on shape, `stacked-base` on a live fact (an open PR). `--mirror` reaches only `guard-bypass-ruleset`; `--prune` is unmatched. |
+| C | Committed history rewritten or unreachable locally | `filter-branch`, `branch-force-delete`; strict: `rebase`, `commit-amend` | `branch -D` only | Largest gap. Rebase and amend are plausible agent moves; ban or ask is undecided. |
+| D | Remote history rewritten or remote refs deleted | `push-force-long`; strict: `push-force-any`, `push-mirror`, `push-delete` | `guard-git-work-loss` force push; `guard-git-stacked-base` remote deletion when a PR depends on it | Shape versus live fact (an open PR). `--mirror` reaches only `guard-bypass-ruleset`; `--prune` is unmatched. |
 | E | Pushing around the repo's review path | strict: `push-main`, `push-master` | `guard-bypass-ruleset` (asks GitHub whether the branch needs a PR) | The regex guard hard-codes two branch names; ours reads the repo's own rules. Same harm. |
 | F | Skipping the repo's own checks | none | `guard-bypass-hooks` | Ours only. `guard-commits` (approved) is the positive side of the same harm: run the checks. |
 | G | Secrets or junk committed by blanket staging | strict: `add-all-dot`, `add-all-flag` | `guard-git-work-loss` blanket staging; `guard-secrets` (approved) | Same harm, two homes. |
@@ -131,11 +131,11 @@ Both are undecided. What each costs, from the code as it stands:
 | Unit | one guard module per harm, own switch, own feature file | one rule table; a rule is data: action pattern, conditions, outcome (deny, ask, allow) |
 | Live facts | any guard can yield a `Need` (gh lookup, rulesets, issue timeline) | rules need a condition vocabulary for facts; every new fact is a new language feature |
 | State | per-turn door, spent approvals, caches live in the guard | state has no home in a table; it stays code, so the engine is not the whole set |
-| Parsing | each guard rereads git/gh options with `scan` helpers, with some duplicated flag logic (`GIT`, `GLOBAL_VALUE` appear in several modules) | one reader of git and gh options, written once |
+| Parsing | each guard rereads git/gh options with `scan` helpers; `GIT` and `GLOBAL_VALUE` repeat across modules | one reader of git and gh options, written once |
 | Adding a regex-style rule | a code change, or a setting in the guard it belongs to | a data line; the regex guard's ~70 git and GitHub rules would be 70 lines |
 | Testing | a feature file per guard | the table plus one spec per rule kind |
-| Risk | stretching a name (the problem #134 started from) | defining the rule language; a table that cannot say "an open PR exists" or "this label is on the list" falls back to code anyway |
-| Precedent here | every shipped guard | `ask-first` already matches command patterns to an outcome from a repo list; `deny-always` is approved, not built |
+| Risk | stretching a name (the problem #134 started from) | defining the rule language; a table that cannot say "an open PR exists" falls back to code |
+| Precedent here | every shipped guard | `ask-first` already maps command patterns to an outcome; `deny-always` is approved, not built |
 
 Evidence that bears on the choice, from the clustering:
 
