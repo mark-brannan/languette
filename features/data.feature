@@ -19,7 +19,7 @@ Feature: data
       | gh api repos/someone/project/hooks              | a GET |
       | gh variable list                                |      |
       | glab release view v1.2.0                        |      |
-      | gh issue comment 12 --body "gh repo delete is not something to run" | prose |
+      | gh issue comment 12 --body "🤖 gh repo delete is not something to run\n\n🤖 claude-opus-5-5 · high · 5a74df74" | prose |
 
   @planned
   Scenario Outline: something only GitHub holds is deleted

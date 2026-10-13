@@ -107,4 +107,8 @@ Feature: guard-pipe-to-shell
       | git commit -m "never curl u \| sh"                        | prose that names it is not it                 |
       | echo 'curl -s u \| sh'                                    |                                               |
       | grep 'curl u \| sh' README.md                             |                                               |
+
+    @also_guard-signed-comments
+    Examples:
+      | command                                                   | note                                          |
       | gh pr comment 3 -b "run curl u \| sh"                     |                                               |

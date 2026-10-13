@@ -82,8 +82,12 @@ Feature: guard-permissions
       | find /tmp/x -exec chmod 644 {} +                | is silent | the start path is the agent's           |
       | find /tmp/x -exec chmod -R 755 {} +             | is silent |                                         |
       | find /tmp/x -exec chmod 644 ~/project/f {} \;   | denies    | and a target of its own is judged too   |
-      | find . -name '*.log' -delete                    | is silent | not a permission change                 |
       | find . -name '*.sh' -exec grep -l chmod {} +    | is silent | chmod is an argument of grep            |
+
+    @also_guard-recursive-delete
+    Examples:
+      | command                                         | verdict   | note                                    |
+      | find . -name '*.log' -delete                    | is silent | not a permission change                 |
 
   Scenario Outline: a permission change that is not a sweep, and the agent's own areas, pass
     Given the working directory is "<cwd>"
@@ -104,7 +108,7 @@ Feature: guard-permissions
       | {HOME}/project                      | chmod -R 755 {HOME}/.claude/worktrees/w/src | an agent worktree                       |
       | {HOME}/project                      | chmod -R 755 ~/.claude/worktrees/w/src      | ~/ spelled out                          |
       | /tmp                                | chmod -R 755 .                              | the working directory is the agent's    |
-      | /tmp/x                              | chmod -R 755 sub dir                        | relative targets resolve to /tmp        |
+      | /tmp                                | chmod -R 755 sub dir                        | relative targets resolve to /tmp        |
       | {HOME}/project                      | git commit -m "chmod -R 777 everything"     | prose that names it is not it           |
       | {HOME}/project                      | echo chmod -R 755 src                       |                                         |
       | {HOME}/project                      | grep -r "chmod -R" docs                     |                                         |
@@ -168,8 +172,12 @@ Feature: guard-permissions
       | chmod -R 755 {HOME}/project              | denies, naming "is none of those" | not listed                            |
       | chmod -R 755 /tmp/x                      | is silent                         | the built-in areas stay                |
       | chmod -R 755 {HOME}/shared/.git          | denies, naming "inside a .git"    | never a .git, whatever is allowed     |
-      | chmod -R 755 {HOME}/shared/../project    | denies, naming "`..` segment"     |                                       |
       | chmod 777 {HOME}/shared/x                | is silent                         | chmod 777 is judged the same way      |
+
+    @also_guard-worktrees
+    Examples:
+      | command                                  | verdict                           | note                                  |
+      | chmod -R 755 {HOME}/shared/../project    | denies, naming "`..` segment"     |                                       |
 
   Scenario Outline: a LANGUETTE_PERM_ALLOW that does not parse warns, and blocks only a sweep
     Given LANGUETTE_PERM_ALLOW is "<value>"

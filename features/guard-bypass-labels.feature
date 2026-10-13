@@ -29,12 +29,16 @@ Feature: guard-bypass-labels
         | gh pr create -t t -b b -lchurn-ok                     | churn-ok       |
         | gh pr create -t t -b b -l=churn-ok                    | churn-ok       |
         | gh pr new -t t -b b --label churn-ok                  | churn-ok       |
-        | gh issue create -t t -b b --label=churn-ok            | churn-ok       |
         | gh issue edit 3 --add-label mixed-loops-ok            | mixed-loops-ok |
         | gh pr edit 12 --add-label "ready,churn-ok"            | churn-ok       |
         | gh pr edit 12 --add-label "ready, churn-ok"           | churn-ok       |
         | gh pr edit 12 --body "x" --add-label 'churn-ok'       | churn-ok       |
         | gh pr edit 12 --add-label ready --add-label churn-ok  | churn-ok       |
+
+      @also_guard-github-issues
+      Examples:
+        | command                                               | label          |
+        | gh issue create -t t -b b --label=churn-ok            | churn-ok       |
 
     Scenario Outline: the reason says whose label it is, public repo or private
       When the agent runs `gh pr edit 4 -R <repo> --add-label <label>`
@@ -56,7 +60,6 @@ Feature: guard-bypass-labels
         | timeout 30 gh pr edit 12 --add-label churn-ok                |
         | /usr/bin/gh pr edit 12 --add-label churn-ok                  |
         | sh -c "gh pr edit 12 --add-label churn-ok"                   |
-        | bash -c 'git push && gh pr edit 12 --add-label churn-ok'     |
         | eval "gh pr edit 12 --add-label churn-ok"                    |
         | env gh pr edit 12 --add-label churn-ok                       |
         | command gh pr edit 12 --add-label churn-ok                   |
@@ -71,6 +74,11 @@ Feature: guard-bypass-labels
         | gh pr edit 12 --add-label 'churn'-ok                         |
         | gh pr edit 12 --add-label churn\-ok                          |
         | gh pr edit 12 --add-label churn-ok 2>/dev/null               |
+
+      @also_guard-bypass-ruleset
+      Examples:
+        | command                                                      |
+        | bash -c 'git push && gh pr edit 12 --add-label churn-ok'     |
 
     Scenario Outline: a heredoc fed to a shell is code
       When the agent runs:
@@ -123,7 +131,6 @@ Feature: guard-bypass-labels
         | gh api repos/o/r/issues/12/labels -F 'labels[]=Mixed-Loops-OK'            | mixed-loops-ok |
         | gh api -X PUT repos/o/r/issues/12/labels --field labels[]=churn-ok        | churn-ok       |
         | gh api --method PATCH repos/o/r/issues/12 -f labels[]=ready -f labels[]=churn-ok | churn-ok |
-        | gh api repos/o/r/issues -f title=t -f body=b -f 'labels[]=churn-ok'       | churn-ok       |
         | gh api /repos/o/r/issues/12/labels --raw-field=labels[]=churn-ok          | churn-ok       |
         | gh api https://api.github.com/repos/o/r/issues/12/labels -flabels[]=churn-ok | churn-ok    |
         | gh api repos/o/r/issues/12/labels -f labels=churn-ok                      | churn-ok       |
@@ -131,6 +138,11 @@ Feature: guard-bypass-labels
         | gh api -X PUT repos/o/r/issues/12/labels -f labels[]="churn-ok "          | churn-ok       |
         | gh api repos/o/r/issues/12/labels -f=labels[]=churn-ok                    | churn-ok       |
         | gh api -X=PUT repositories/1/issues/12/labels -f labels[]=churn-ok        | churn-ok       |
+
+      @also_guard-github-issues
+      Examples:
+        | command                                                                   | label          |
+        | gh api repos/o/r/issues -f title=t -f body=b -f 'labels[]=churn-ok'       | churn-ok       |
 
     Scenario: a labels payload in the file --input names is read
       Given a project directory
@@ -245,6 +257,10 @@ Feature: guard-bypass-labels
         | gh api graphql -f query='mutation { updateLabel(input:{id:"x",name:"churn-ok"}) { label { id } } }'        | label IDs   |
         | gh api graphql -F query=@mut.graphql                                                                        | label IDs   |
         | gh api graphql --input mut.json                                                                             | label IDs   |
+
+      @also_guard-review-threads
+      Examples:
+        | command                                                                                                     | why         |
         | gh api graphql -F query=@missing.graphql                                                                    | missing.graphql |
 
   Rule: a bypass label applied through an MCP tool's labels field is denied
@@ -257,8 +273,6 @@ Feature: guard-bypass-labels
         | tool                                     | input                                                                           | label          |
         | mcp__github__update_pull_request         | {"owner":"o","repo":"r","pullNumber":12,"labels":["ready","mixed-loops-ok"]}    | mixed-loops-ok |
         | mcp__github__update_issue                | {"owner":"mark-brannan","repo":"claude_prompts_scratch","issue_number":12,"labels":["Churn-OK"]} | churn-ok |
-        | mcp__github__issue_write                 | {"method":"create","owner":"o","repo":"r","title":"t","labels":["churn-ok"]}    | churn-ok       |
-        | mcp__plugin_github_github__create_issue  | {"owner":"o","repo":"r","title":"t","labels":["MIXED-LOOPS-OK"]}                | mixed-loops-ok |
         | mcp__gitea__edit_issue                   | {"owner":"o","repo":"r","index":3,"labels":"ready,churn-ok"}                    | churn-ok       |
         | mcp__github__add_labels                  | {"owner":"o","repo":"r","issue_number":12,"labels":["churn-ok"]}                | churn-ok       |
         | mcp__github__update_issue                | {"owner":"o","repo":"r","issue_number":12,"labels":[{"name":"churn-ok"}]}       | churn-ok       |
@@ -270,6 +284,12 @@ Feature: guard-bypass-labels
         | mcp__some_server__some_tool              | {"ops":[{"add":{"labels":"churn-ok"}}]}                                         | churn-ok       |
         | mcp__github__add_label                   | {"owner":"o","repo":"r","issue_number":12,"name":"churn-ok"}                    | churn-ok       |
         | mcp__gitea__addIssueLabels               | {"owner":"o","repo":"r","index":3,"value":["churn-ok"]}                         | churn-ok       |
+
+      @also_guard-github-issues
+      Examples:
+        | tool                                     | input                                                                           | label          |
+        | mcp__github__issue_write                 | {"method":"create","owner":"o","repo":"r","title":"t","labels":["churn-ok"]}    | churn-ok       |
+        | mcp__plugin_github_github__create_issue  | {"owner":"o","repo":"r","title":"t","labels":["MIXED-LOOPS-OK"]}                | mixed-loops-ok |
 
     Scenario Outline: a tool reads only when its name leads with a read verb and says no write; an unknown tool writes
       When the agent calls MCP tool "<tool>" with input `{"owner":"o","repo":"r","labels":["churn-ok"]}`
@@ -300,11 +320,15 @@ Feature: guard-bypass-labels
         | command                                                       | why                  |
         | gh pr edit 12 --add-label "$LABEL"                            | built at run time    |
         | gh pr edit 12 --add-label "$(cat label.txt)"                  | built at run time    |
-        | gh issue create -t t -b b -l "$L"                             | built at run time    |
         | gh api repos/o/r/issues/12/labels -f "labels[]=$L"            | built at run time    |
         | gh api repos/o/r/issues/12/labels -F labels[]=@label.txt      | label.txt            |
         | gh api repos/o/r/issues/12/labels --input missing.json        | missing.json         |
         | gh api repos/o/r/issues/12/labels --input -                   | stdin                |
+
+      @also_guard-github-issues
+      Examples:
+        | command                                                       | why                  |
+        | gh issue create -t t -b b -l "$L"                             | built at run time    |
 
     Scenario Outline: an MCP labels field that is not a list of names
       When the agent calls MCP tool "mcp__github__update_issue" with input `<input>`
@@ -339,10 +363,8 @@ Feature: guard-bypass-labels
 
       Examples:
         | command                                                          | note                              |
-        | gh pr comment 12 -b "this needs the churn-ok label"              | named in a comment                |
         | gh pr create -t t -b "needs churn-ok; please add it by hand"     | named in a PR body                |
         | gh pr edit 12 --body "churn-ok waived by hand" --title t         | named in an edited body           |
-        | gh issue create -t "add mixed-loops-ok to the docs" -b b         | named in a title                  |
         | git commit -m "say why churn-ok is needed"                       | named in a commit message         |
         | echo "gh pr edit 12 --add-label churn-ok"                        | prose that quotes the command     |
         | gh pr view 12                                                    | a read                            |
@@ -369,8 +391,18 @@ Feature: guard-bypass-labels
         | gh api graphql -f query='mutation { createLabel(input:{name:"churn-ok",repositoryId:"x",color:"fff"}) { label { id } } }' | creating it through graphql |
         | gh alias set co 'pr checkout $1'                                 | an alias that applies no label    |
         | gh api repos/o/r/issues/12/labels -f labels[]=ready              | an unrelated label through gh api |
-        | gh api repos/o/r/issues/12/comments -f body="needs churn-ok"     | named in a comment through gh api |
         | ls -la                                                           | no gh at all                      |
+
+      @also_guard-signed-comments
+      Examples:
+        | command                                                          | note                              |
+        | gh pr comment 12 -b "this needs the churn-ok label"              | named in a comment                |
+        | gh api repos/o/r/issues/12/comments -f body="needs churn-ok"     | named in a comment through gh api |
+
+      @also_guard-github-issues
+      Examples:
+        | command                                                          | note                              |
+        | gh issue create -t "add mixed-loops-ok to the docs" -b b         | named in a title                  |
 
     Scenario Outline: a label named in a heredoc body is text
       When the agent runs:
@@ -420,7 +452,6 @@ Feature: guard-bypass-labels
       Examples:
         | tool                                 | input                                                                 |
         | mcp__github__update_issue            | {"owner":"o","repo":"r","issue_number":12,"labels":["ready"]}         |
-        | mcp__github__add_issue_comment       | {"owner":"o","repo":"r","issue_number":12,"body":"needs churn-ok"}    |
         | mcp__github__create_pull_request     | {"owner":"o","repo":"r","title":"t","body":"waive churn-ok by hand"}  |
         | mcp__github__list_issues             | {"owner":"o","repo":"r","labels":["churn-ok"]}                        |
         | mcp__github__search_issues           | {"query":"label:churn-ok","labels":["churn-ok"]}                      |
@@ -430,6 +461,11 @@ Feature: guard-bypass-labels
         | mcp__x__update_issue                 | {"owner":"o","repo":"r","issue_number":12,"valid_labels":["ready"]}   |
         | mcp__x__update_issue                 | {"owner":"o","repo":"r","guidelines_labels":["ready"]}                |
         | mcp__github__add_label               | {"owner":"o","repo":"r","issue_number":12,"name":"ready"}             |
+
+      @also_guard-signed-comments
+      Examples:
+        | tool                                 | input                                                                 |
+        | mcp__github__add_issue_comment       | {"owner":"o","repo":"r","issue_number":12,"body":"needs churn-ok"}    |
 
     Scenario: a tool that is neither Bash nor MCP is silent
       When the agent calls tool "Write" with input `{"file_path":"/tmp/x.md","content":"gh pr edit 1 --add-label churn-ok"}`

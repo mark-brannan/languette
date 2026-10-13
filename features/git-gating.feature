@@ -50,7 +50,7 @@ Feature: git-gating
       | echo "git checkout -- . throws away edits"                 | echo prints          |
       | grep -n "git add -A" notes.md                              | grep's pattern       |
       | printf '%s\n' "git push -f origin topic"                   |                      |
-      | gh pr comment 12 --body "rebased; git push --force-with-lease next" |             |
+      | gh pr comment 12 --body "🤖 rebased; git push --force-with-lease next\n\n🤖 claude-opus-5-5 · high · 5a74df74" |             |
 
   @planned
   Scenario Outline: local work beyond the reach of a one-path undo

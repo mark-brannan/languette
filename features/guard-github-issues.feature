@@ -43,7 +43,6 @@ Feature: guard-github-issues
       | command                                                |
       | gh issue view 12 -R o/r                                |
       | gh issue list --state open                             |
-      | gh issue comment 12 --body "progress"                  |
       | gh issue edit 12 --add-label x                          |
       | gh pr create --title t --body "fixes the issue create path" |
       | gh api repos/o/r/issues                                |
@@ -51,6 +50,11 @@ Feature: guard-github-issues
       | echo "run gh issue create later" > note.md             |
       | grep -n "gh issue create" CLAUDE.md                    |
       | ugh issue create                                       |
+
+    @also_guard-signed-comments
+    Examples:
+      | command                                                |
+      | gh issue comment 12 --body "progress"                  |
       | gh api repos/o/r/issues/12/comments -f body=hi         |
 
   Scenario Outline: an identifier write with the door shut is denied, however it is reached
@@ -71,12 +75,17 @@ Feature: guard-github-issues
       | eval "gh issue transfer 4 o/x"                      |
       | url=$(gh issue create -t t -b b)                     |
       | gh api repos/o/r/issues -f title=t                  |
+
+    @also_guard-bypass-labels
+    Examples:
+      | command                                            |
       | gh api -X POST repos/o/r/issues --input body.json   |
 
   Scenario: a graphql createIssue mutation is denied, door shut
     When the agent runs `gh api graphql -f query='mutation { createIssue(input:{}) { issue { id } } }'`
     Then the guard denies
 
+  @also_guard-bypass-labels
   Scenario: a graphql mutation on its own line in a heredoc is denied, door shut
     When the agent runs:
       """

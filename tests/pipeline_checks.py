@@ -109,6 +109,7 @@ def pipeline(engine, request, monkeypatch):
         _seen.setdefault(key, {})[engine] = got
         return
     want = _pinned.get(key, {})
+    want = want.get(engine, {}) if set(want) & {"python", "shfmt"} else want
     assert got == want, (f"{key}: programs and GitHub calls {got}, pinned {want} in {PINS.name}. One more git or "
                          "network call per guard shows here; if it is meant, LANGUETTE_PIN_IO=update pytest "
                          "tests/test_features.py")
@@ -128,13 +129,11 @@ def pytest_collection_modifyitems(items):
 def pytest_sessionfinish(session):
     if not _UPDATE or not _seen:
         return
-    split = {k: v for k, v in _seen.items() if len({json.dumps(c, sort_keys=True) for c in v.values()}) > 1}
-    if split:
-        raise pytest.UsageError(f"engines disagree on a scenario's I/O, so it cannot be pinned: {split}")
     files = {k.split("::")[0] for k in _seen}
     pins = {k: v for k, v in _pinned.items() if k.split("::")[0] not in files or k in _collected}
     for k, v in _seen.items():
-        c = next(iter(v.values()))
+        # Engines that disagree are pinned one by one, so the split shows in the file.
+        c = next(iter(v.values())) if len({json.dumps(c, sort_keys=True) for c in v.values()}) == 1 else v
         if c:
             pins[k] = c
         else:

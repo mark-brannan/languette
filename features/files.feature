@@ -77,7 +77,7 @@ Feature: files
       | echo "Remove-Item -Recurse -Force C:\data"               |                    |
       | echo ':(){ :\|:& };:'                                    | a fork bomb string |
       | grep -rn "zfs destroy" docs                              |                    |
-      | gh pr comment 12 --body "lvremove vg0/data is gated now" |                    |
+      | gh pr comment 12 --body "🤖 lvremove vg0/data is gated now\n\n🤖 claude-opus-5-5 · high · 5a74df74" |                    |
 
   @planned
   Scenario Outline: a disk, partition or block device is erased, rewritten or detached

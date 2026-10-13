@@ -176,6 +176,7 @@ Feature: prose-budget-commit
       | git commit -m x -- README.md          | pathspec after --         |
       | git add README.md && git commit -m x  | add, then commit, in one  |
 
+  @also_guard-git-work-loss
   Scenario: a `-a`/`--all` commit checks every unstaged tracked change, not just what's staged
     Given the file "README.md" holds:
       """
@@ -192,6 +193,7 @@ Feature: prose-budget-commit
     And the stub "prose-budget" was called with "--file "
     And the stub "prose-budget" was called with "README.md"
 
+  @also_guard-git-work-loss
   Scenario: a `-a` commit with several changed files checks each one, not their names run together
     Given the file "NOTES.md" holds:
       """
@@ -216,6 +218,7 @@ Feature: prose-budget-commit
     And the stub "prose-budget" was called with "/NOTES.md /"
     And the stub "prose-budget" was called with "/README.md"
 
+  @also_guard-git-work-loss
   Scenario: an `add` by pattern checks several new files, a non-ASCII name among them
     Given the file "NOTES.md" holds:
       """
@@ -239,6 +242,7 @@ Feature: prose-budget-commit
     Then the guard is silent
     And the stub "prose-budget" was called with "--file README.md"
 
+  @also_guard-git-work-loss
   Scenario: an `add` by pattern also checks a brand-new, still-untracked file
     Given the file "NOTES.md" holds:
       """
@@ -272,6 +276,7 @@ Feature: prose-budget-commit
     Then the guard is silent
     And the stub "prose-budget" was called with "README.md"
 
+  @also_guard-git-work-loss
   Scenario: a repo root git cannot find still leaves the files the commit names to be checked
     Given the file "README.md" holds:
       """
@@ -282,6 +287,7 @@ Feature: prose-budget-commit
     Then the guard is silent
     And the stub "prose-budget" was called with "--file README.md"
 
+  @also_guard-git-work-loss
   Scenario: a failed listing still leaves the files the commit names to be checked
     Given the file "README.md" holds:
       """
@@ -382,6 +388,7 @@ Feature: prose-budget-commit
       | git commit -m a && git -C sub commit -m b    | -C on the second     |
       | git commit -m a && yadm commit -m b          | git, then yadm       |
 
+  @also_guard-worktrees
   Scenario: with no engine configured or on PATH the guard is silent
     Given no engine is configured
     And PATH holds only "sh"
