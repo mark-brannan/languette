@@ -11,9 +11,12 @@ but was never spent belongs to a call another guard denied: it never ran, and
 the next write takes the claim over. A claim with no result yet is in flight.
 
 A shut door has a second key: the user's yes, through AskUserQuestion, to an
-option labelled exactly APPROVE_LABEL. Each yes allows one write and is spent
-the way ask-first spends one (languette.guards.ask_first.claim), so filing
-several in a row takes one question each.
+option labelled exactly as `_label` names the write: its verb, and the issue
+number when the call names one ("File this issue", "Delete issue 7"). A yes
+to file opens no delete, and a yes to delete issue 7 opens no other. Each yes
+allows one write and is spent the way ask-first spends one
+(languette.guards.ask_first.claim), so several in a row take one question
+each.
 
 Counts as an identifier write: `gh issue create|new|transfer|delete`; `gh api`
 POST to repos/o/r/issues; a graphql createIssue, transferIssue or deleteIssue;
@@ -30,7 +33,6 @@ from languette.guards.ask_first import claim
 from languette.verdict import Act, Need, deny
 
 NAME = "guard-github-issues"
-APPROVE_LABEL = "File this issue"
 # The tools hooks.json wires this guard to; the MCP ones by their name's tail.
 TOOLS = re.compile(r"(?:Bash|mcp__.*__(?:create_issue|issue_write|transfer_issue|delete_issue))\Z")
 _MCP_WRITE = re.compile(r"mcp__.*__(?:create_issue|transfer_issue|delete_issue)\Z")
@@ -39,12 +41,24 @@ GH = re.compile(r"(?:^|/)gh\Z")
 _REPEATS = re.compile(r"(?:^|/)(?:xargs|parallel|find)\Z")
 _LOOP = frozenset("for while until select".split())
 _LEAD = frozenset("do then else elif ! time { (".split())
-_MUTATION = re.compile(r"(?:create|transfer|delete)Issue\s*\(")
+_MUTATION = re.compile(r"(create|transfer|delete)Issue\s*\(")
 _SKIP_VALUE = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 SHUT = ("the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or "
-        "the human has not spoken since. Show the human the draft and wait for their yes: call "
-        f"AskUserQuestion with the title and repo, one option labelled exactly \"{APPROVE_LABEL}\" and one "
-        "to decline. One yes is one write; ask again for the next.")
+        "the human has not spoken since.")
+_NUMBER = re.compile(r"#?(\d+)|https?://\S*/issues/(\d+)/?")
+
+
+def _label(verb, number):
+    """The option a yes to this write must carry: its verb, and its issue number when known."""
+    if verb == "create":
+        return "File this issue"
+    return f"{verb.title()} issue {number}" if number else f"{verb.title()} this issue"
+
+
+def _ask(label):
+    return ("Show the human the draft and wait for their yes: call AskUserQuestion with the title or number "
+            f"and the repo, one option labelled exactly \"{label}\" and one to decline. One yes is one write; "
+            "ask again for the next.")
 
 
 def _deny(why):
@@ -71,11 +85,12 @@ def _skip_r(s, lo, hi):
 
 
 class _Writes:
-    """Walks a command for identifier writes: `n` of them, `loop` when one sits
-    in a loop body or after a word that repeats it."""
+    """Walks a command for identifier writes: `found`, a (verb, issue number or
+    None) per write, and `loop` when one sits in a loop body or after a word that
+    repeats it."""
 
     def __init__(self, doc):
-        self.n, self.loop = 0, False
+        self.found, self.loop = [], False
         self.hd = "".join(b + "\n" for b in doc.heredoc_bodies())
         for text, nested in doc.texts():
             s = doc.scan(text)
@@ -84,8 +99,8 @@ class _Writes:
                 if a <= b:
                     self._segment(s, a, b, nested)
 
-    def _emit(self, rep):
-        self.n += 1
+    def _emit(self, rep, verb, number=None):
+        self.found.append((verb, number))
         if self.depth > 0 or rep:
             self.loop = True
 
@@ -112,16 +127,20 @@ class _Writes:
             return
         if s.w[sub1] == "issue":
             sub2 = _skip_r(s, sub1 + 1, hi)
-            if sub2 is not None and s.w[sub2] in ("create", "new", "transfer", "delete"):
-                self._emit(rep)
+            if sub2 is not None and s.w[sub2] in ("create", "new"):
+                self._emit(rep, "create")
+            elif sub2 is not None and s.w[sub2] in ("transfer", "delete"):
+                arg = _skip_r(s, sub2 + 1, hi)
+                hit = _NUMBER.fullmatch(_wv(s, arg)) if arg is not None else None
+                self._emit(rep, s.w[sub2], hit and (hit[1] or hit[2]))
             return
         if s.w[sub1] != "api":
             return
-        path, method, fields, m = "", "", False, 0
+        path, method, fields, m = "", "", False, []
         i = sub1 + 1
         while i <= hi:
             t = _wv(s, i)
-            m += len(_MUTATION.findall(t))
+            m += _MUTATION.findall(t)
             if t in ("-X", "--method"):
                 if i < hi:
                     i += 1
@@ -134,7 +153,7 @@ class _Writes:
                 fields = True
                 if i < hi:
                     i += 1
-                    m += len(_MUTATION.findall(_wv(s, i)))
+                    m += _MUTATION.findall(_wv(s, i))
             elif re.match(r"-[fF].|--(?:field|raw-field|input)=", t):
                 fields = True
             elif t in _SKIP_VALUE:
@@ -144,16 +163,16 @@ class _Writes:
             i += 1
         path = re.sub(r"^/+", "", re.sub(r"^https?://[^/]+/", "", path, count=1), count=1)
         if re.fullmatch(r"repos/[^/]+/[^/]+/issues/?", path) and (method == "POST" or (method == "" and fields)):
-            self._emit(rep)
+            self._emit(rep, "create")
         if path == "graphql":
-            m += len(_MUTATION.findall(self.hd))
+            m += _MUTATION.findall(self.hd)
             self.hd = ""
-            for _ in range(m):
-                self._emit(rep)
+            for verb in m:
+                self._emit(rep, verb)
 
 
 def _writes(doc):
-    """(identifier writes in this call, whether one is in a loop)."""
+    """([(verb, issue number or None)] for this call's identifier writes, whether one is in a loop)."""
     payload = doc.payload
     tool = payload.get("tool_name")
     ti = payload.get("tool_input")
@@ -161,14 +180,17 @@ def _writes(doc):
     if tool == "Bash":
         command = ti.get("command")
         if not isinstance(command, str):
-            return 0, False
+            return [], False
         w = _Writes(doc)
-        return w.n, w.loop
+        return w.found, w.loop
     if isinstance(tool, str) and _MCP_WRITE.match(tool):
-        return 1, False
+        verb = re.search(r"(create|transfer|delete)_issue\Z", tool)[1]
+        number = ti.get("issue_number")
+        number = str(number) if isinstance(number, int) or (isinstance(number, str) and number.isdigit()) else None
+        return [(verb, number)], False
     if isinstance(tool, str) and _MCP_ISSUE_WRITE.match(tool):
-        return (1 if ti.get("method") == "create" else 0), False
-    return 0, False
+        return ([("create", None)] if ti.get("method") == "create" else []), False
+    return [], False
 
 
 def _session(payload):
@@ -195,16 +217,17 @@ def check(doc):
         # failed create cannot be followed by a second in the same turn. A call
         # that cannot be read spends it too.
         try:
-            n, _ = _writes(doc)
+            found, _ = _writes(doc)
         except Exception:  # noqa: BLE001
-            n = 1
-        if n:
+            found = [None]
+        if found:
             yield Act("door-spend", session)
         return None
     try:
-        n, loop = _writes(doc)
+        found, loop = _writes(doc)
     except Exception as e:  # noqa: BLE001 -- fails closed
         return _deny(f"the command could not be read ({type(e).__name__}), so this call could not be checked")
+    n = len(found)
     if n == 0:
         return None
     if n > 1:
@@ -214,11 +237,13 @@ def check(doc):
     why = yield from _door(payload, session)
     if why is None:
         return None
+    label = _label(*found[0])
     try:
-        _, spent = yield from claim({APPROVE_LABEL: 1})
+        _, spent = yield from claim({label: 1})
     except (OSError, ValueError) as e:
-        return _deny(f"cannot read the session transcript to look for the user's yes, or record it as spent ({e}). {why}")
-    return None if spent else _deny(why)
+        return _deny(f"cannot read the session transcript to look for the user's yes, or record it as spent ({e}). "
+                     f"{why} {_ask(label)}")
+    return None if spent else _deny(f"{why} {_ask(label)}")
 
 
 def _door(payload, session):

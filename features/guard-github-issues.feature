@@ -33,10 +33,13 @@ Feature: guard-github-issues
   plugin's UserPromptSubmit spend the other's door.
 
   A shut door has a second key: the user's yes through AskUserQuestion, to
-  an option labelled exactly "File this issue". The label, not the question,
-  is the yes, so an answer to some other question opens nothing. Each yes is
-  one write, spent the way ask-first spends an approval; several issues in a
-  row take one question each.
+  an option labelled exactly for the write: its verb, and the issue number
+  when the call names one. "File this issue" opens a create, "Delete issue 7"
+  a delete of issue 7 and no other, "Transfer this issue" a transfer that
+  names no number. The label, not the question, is the yes, so an answer to
+  some other question opens nothing. Each yes is one write, spent the way
+  ask-first spends an approval; several issues in a row take one question
+  each.
 
   This is a gate, so it fails closed: a call that mentions an issue and
   cannot be read is denied.
@@ -292,12 +295,42 @@ Feature: guard-github-issues
       When the agent runs `gh issue create -t t -b b`
       Then the guard denies
 
-    Scenario: a yes opens the door for a delete, as the human's turn does
+    Scenario: a yes to delete issue 7 opens its delete
       Given a project directory
       And the transcript holds:
         """
-        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Delete issue 7 in o/r?", "header": "Issue", "multiSelect": false, "options": [{"label": "File this issue", "description": "deletes it"}, {"label": "Don't", "description": ""}]}]}}]}}
-        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Delete issue 7 in o/r?\"=\"File this issue\". You can now continue with the user's answers in mind."}]}}
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Delete issue 7 in o/r?", "header": "Issue", "multiSelect": false, "options": [{"label": "Delete issue 7", "description": ""}, {"label": "Don't", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Delete issue 7 in o/r?\"=\"Delete issue 7\". You can now continue with the user's answers in mind."}]}}
         """
       When the agent runs `gh issue delete 7 --yes`
+      Then the guard is silent
+
+    Scenario: a yes to file opens no delete
+      Given a project directory
+      And the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "File issue t in o/r?", "header": "Issue", "multiSelect": false, "options": [{"label": "File this issue", "description": ""}, {"label": "Don't", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"File issue t in o/r?\"=\"File this issue\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `gh issue delete 7 --yes`
+      Then the guard denies, naming "Delete issue 7"
+
+    Scenario: a yes to delete issue 7 opens no other delete
+      Given a project directory
+      And the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Delete issue 7 in o/r?", "header": "Issue", "multiSelect": false, "options": [{"label": "Delete issue 7", "description": ""}, {"label": "Don't", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Delete issue 7 in o/r?\"=\"Delete issue 7\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `gh issue delete https://github.com/o/r/issues/8 --yes`
+      Then the guard denies, naming "Delete issue 8"
+
+    Scenario: a transfer that names no number asks for a yes to the verb
+      Given a project directory
+      And the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Transfer an issue in o/r?", "header": "Issue", "multiSelect": false, "options": [{"label": "Transfer this issue", "description": ""}, {"label": "Don't", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Transfer an issue in o/r?\"=\"Transfer this issue\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `gh api graphql -f query='mutation { transferIssue(input: {}) { issue { id } } }'`
       Then the guard is silent
