@@ -216,8 +216,8 @@ def check(doc):
         return None
     try:
         _, spent = yield from claim({APPROVE_LABEL: 1})
-    except (OSError, ValueError):
-        spent = False
+    except (OSError, ValueError) as e:
+        return _deny(f"cannot read the session transcript to look for the user's yes, or record it as spent ({e}). {why}")
     return None if spent else _deny(why)
 
 

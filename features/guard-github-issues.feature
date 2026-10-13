@@ -291,3 +291,13 @@ Feature: guard-github-issues
         """
       When the agent runs `gh issue create -t t -b b`
       Then the guard denies
+
+    Scenario: a yes opens the door for a delete, as the human's turn does
+      Given a project directory
+      And the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Delete issue 7 in o/r?", "header": "Issue", "multiSelect": false, "options": [{"label": "File this issue", "description": "deletes it"}, {"label": "Don't", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Delete issue 7 in o/r?\"=\"File this issue\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `gh issue delete 7 --yes`
+      Then the guard is silent
