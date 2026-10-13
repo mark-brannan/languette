@@ -38,6 +38,7 @@ Feature: guard-bypass-ruleset
       | git push https://GitHub.com/o/r main          | the host in another case           |
       | git push ssh://git@github.com:22/o/r.git main | a URL with a port                  |
       | (cd {TMP}/r && git push origin main)          | a cd inside the push's own subshell |
+      | git --attr-source HEAD push origin main       | a global option's value            |
 
     @also_guard-git-work-loss
     Examples:

@@ -154,14 +154,10 @@ class _Commits:
         if g is None:
             return
         self.bin = s.w[g]
-        i, d = g + 1, ""
-        while i <= hi and s.w[i].startswith("-"):
-            if s.w[i] == "-C":
-                d = _join(d, self._w(i + 1))
-                i += 1
-            elif s.w[i] in ("-c", "--git-dir", "--work-tree", "--namespace"):
-                i += 1
-            i += 1
+        i, d = sw.git_subcommand(s, g, hi), ""
+        for j in sw.git_options(s, g, i):
+            if s.w[j] == "-C":
+                d = _join(d, self._w(j + 1))
         if i <= hi and s.w[i] in ("add", "stage"):
             self.addseen, self.addctx = True, (self.cd, d)
             self._collect_add(i + 1, hi)

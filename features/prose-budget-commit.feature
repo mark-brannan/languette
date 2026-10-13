@@ -52,6 +52,8 @@ Feature: prose-budget-commit
       | git -C {PROJ} commit -m x                   | -C dir                   |
       | cd {PROJ} && git commit -m x                | cd dir && commit         |
       | git merge --continue                        | finishing a merge        |
+      | git --attr-source HEAD commit -m x          | a global option's value  |
+      | git --config-env core.x=VAR commit -m x     | a global option's value  |
 
   Scenario Outline: prose outside a real commit is not a commit
     Given PROSE_BUDGET_FAIL is "1"
