@@ -43,7 +43,6 @@ Feature: guard-github-issues
       | command                                                |
       | gh issue view 12 -R o/r                                |
       | gh issue list --state open                             |
-      | gh issue comment 12 --body "progress"                  |
       | gh issue edit 12 --add-label x                          |
       | gh pr create --title t --body "fixes the issue create path" |
       | gh api repos/o/r/issues                                |
@@ -51,6 +50,11 @@ Feature: guard-github-issues
       | echo "run gh issue create later" > note.md             |
       | grep -n "gh issue create" CLAUDE.md                    |
       | ugh issue create                                       |
+
+    @also_guard-signed-comments
+    Examples:
+      | command                                                |
+      | gh issue comment 12 --body "progress"                  |
       | gh api repos/o/r/issues/12/comments -f body=hi         |
 
   Scenario Outline: an identifier write with the door shut is denied, however it is reached

@@ -169,7 +169,6 @@ Feature: guard-cross-session-send
       | git status                                |
       | git fetch origin main                     |
       | git -C /w fetch --prune                   |
-      | gh pr comment 7 -b done                   |
       | gh api graphql -f query='mutation { x }'  |
       | gh run list                               |
       | gh run rerun 123                          |
@@ -177,6 +176,11 @@ Feature: guard-cross-session-send
       | C=curl; $C -s u                           |
       | echo "gh issue view 12"                   |
       | ugh issue view 3                          |
+
+    @also_guard-signed-comments
+    Examples:
+      | command                                   |
+      | gh pr comment 7 -b done                   |
 
     @also_guard-github-issues
     Examples:

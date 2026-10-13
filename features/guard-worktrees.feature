@@ -165,6 +165,10 @@ Feature: guard-worktrees
         | ./yadm checkout some-branch                      |
         | /usr/bin/git checkout some-branch                |
         | yadm     checkout    some-branch                 |
+
+      @also_guard-git-work-loss
+      Examples:
+        | command                                          |
         | yadm checkout .                                  |
 
     # yadm hardcodes --work-tree=$HOME into every invocation, so where it is
@@ -180,6 +184,10 @@ Feature: guard-worktrees
         | /tmp   | yadm checkout some-branch        |
         | {PROJ} | yadm switch some-branch          |
         | /tmp   | sh -c 'yadm checkout some-branch' |
+
+      @also_ask-first
+      Examples:
+        | cwd    | command                          |
         | /nonexistent | yadm checkout some-branch  |
 
     Scenario Outline: plain git reaches $HOME's worktree only if git resolves there
@@ -234,11 +242,15 @@ Feature: guard-worktrees
 
       Examples:
         | cwd          | command                                     |
-        | /nonexistent | git checkout some-branch                    |
         | {PROJ}       | cd "$SOMEWHERE" && git checkout some-branch |
         | {PROJ}       | cd - && git checkout some-branch            |
         | {PROJ}       | git -C "$SOMEWHERE" -C sub checkout x       |
         | {PROJ}       | cd "$X" && cd sub && git checkout some-branch |
+
+      @also_ask-first
+      Examples:
+        | cwd          | command                                     |
+        | /nonexistent | git checkout some-branch                    |
 
     # A --git-dir or --work-tree that does not resolve pins nothing: it could
     # name $HOME's repo or work tree, so it is a deny like any other directory
@@ -255,6 +267,10 @@ Feature: guard-worktrees
         | {PROJ}       | git --work-tree=/nonexistent checkout some-branch           |
         | {PROJ}       | git --git-dir={PROJ}/.git --work-tree="$X" checkout some-branch |
         | {PROJ}       | git --git-dir=nope/.git checkout some-branch                |
+
+      @also_ask-first
+      Examples:
+        | cwd          | command                                                     |
         | /nonexistent | git --git-dir=rel/.git checkout some-branch                 |
 
     # Git is how every answer here is found: without it nothing resolves to
@@ -475,6 +491,10 @@ Feature: guard-worktrees
       Examples:
         | home         |
         | /nonexistent |
+
+      @also_guard-disks @also_guard-permissions @also_guard-recursive-delete
+      Examples:
+        | home         |
         |              |
 
     # --- other ways of reaching in ------------------------------------------------
@@ -577,8 +597,12 @@ Feature: guard-worktrees
       Examples:
         | command                                                                     |
         | git commit -m "worktree {TMP}/repo/.claude/worktrees/theirs is stale"       |
-        | gh issue comment 1 -b "old work is in {TMP}/repo/.claude/worktrees/theirs"  |
         | echo "see {TMP}/repo/.claude/worktrees/theirs for the old work"             |
+
+      @also_guard-signed-comments
+      Examples:
+        | command                                                                     |
+        | gh issue comment 1 -b "old work is in {TMP}/repo/.claude/worktrees/theirs"  |
 
     Scenario: cd - names no path, so it is allowed
       When the agent runs `cd -`

@@ -163,6 +163,10 @@ Feature: guard-review-threads
       | command                                                                                                       | note                    |
       | gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}' -f id="$T" | the id built at run time |
       | gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}'            | no id at all            |
+
+    @also_guard-bypass-labels
+    Examples:
+      | command                                                                                                       | note                    |
       | gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}' -F id=@ids.txt | the id read from a file |
       | gh api graphql -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}' --field=note=@n.txt | another field from a file |
 
@@ -188,21 +192,30 @@ Feature: guard-review-threads
 
     Examples:
       | command                                                                                                      | note                      |
+      | Q='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}'; gh api graphql -f query="$Q"       | the query in a variable   |
+      | gh api graphql -f query="query Q{viewer{login}} $M" -f operationName=M                                     | a run-time read that names its operation |
+      | gh api graphql -f "$K=mutation{resolveReviewThread(input:{threadId:\"PRRT_t1\"}){thread{id}}}"             | a field name built at run time |
+
+    @also_guard-bypass-labels @also_guard-signed-comments
+    Examples:
+      | command                                                                                                      | note                      |
       | echo '{"query":"mutation{resolveReviewThread(input:{threadId:\"PRRT_t1\"}){thread{id}}}"}' \| gh api graphql --input - | piped stdin, no heredoc |
       | echo '{"query":"mutation{resolveReviewThread(input:{threadId:\"PRRT_t1\"}){thread{id}}}"}' \| gh api graphql --input - HEREDOC | piped stdin, a typed HEREDOC word |
-      | Q='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}'; gh api graphql -f query="$Q"       | the query in a variable   |
       | gh api graphql -F query=@m.graphql -f id=PRRT_t1                                                              | the query in a missing file |
       | gh api graphql --input m.json -f id=PRRT_t1                                                                   | the payload in a file     |
       | gh api graphql -F query=@m.graphql -f id="$ID"                                                                | a file, the id run-time   |
       | gh api graphql --input payload.json                                                                           | everything in a file      |
       | gh api graphql -F query=@q.graphql -F owner=o                                                                 | a missing file, whatever it holds |
-      | gh api graphql -f query="mutation{addComment(input:{subjectId:\"$S\",body:\"x\"}){clientMutationId}}"    | a mutation built at run time |
-      | gh api graphql -f query="query Q{viewer{login}} $M" -f operationName=M                                     | a run-time read that names its operation |
-      | gh api graphql -f "$K=mutation{resolveReviewThread(input:{threadId:\"PRRT_t1\"}){thread{id}}}"             | a field name built at run time |
       | gh api graphql --input=m.json -f id=PRRT_t1                                                                   | --input=, a file          |
       | gh api /graphql --input m.json                                                                                | the /graphql path         |
       | gh api https://api.github.com/graphql --input m.json                                                          | the endpoint's full URL   |
 
+    @also_guard-signed-comments
+    Examples:
+      | command                                                                                                      | note                      |
+      | gh api graphql -f query="mutation{addComment(input:{subjectId:\"$S\",body:\"x\"}){clientMutationId}}"    | a mutation built at run time |
+
+  @also_guard-bypass-labels @also_guard-signed-comments
   Scenario: a heredoc fed to another command does not make --input FILE readable
     When the agent runs:
       """
@@ -213,6 +226,7 @@ Feature: guard-review-threads
       """
     Then the guard denies, naming "cannot tell which review thread"
 
+  @also_guard-signed-comments
   Scenario: a heredoc fed to another command does not make piped stdin readable
     When the agent runs:
       """
@@ -267,6 +281,10 @@ Feature: guard-review-threads
       | gh api "$BASE/graphql" -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}' |
       | gh api "https://$HOST/api/graphql" -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}' |
       | gh api "${BASE}/v4/graphql" -f id=PRRT_t1                                                        |
+
+    @also_guard-bypass-ruleset
+    Examples:
+      | command                                                                                          |
       | gh "$S" graphql -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}'  |
 
   Scenario Outline: a REST path built at run time is not this guard's
@@ -293,6 +311,10 @@ Feature: guard-review-threads
       | setup                                  | note                                  |
       | GH_FAIL is "1"                         | gh fails: signed out, offline         |
       | GH_LOGIN is "me"                       | no such thread                        |
+
+    @also_guard-worktrees
+    Examples:
+      | setup                                  | note                                  |
       | PATH holds only "sh"                   | no gh at all                          |
 
   Scenario Outline: what resolves no thread is not this guard's
@@ -304,14 +326,18 @@ Feature: guard-review-threads
       | command                                                                                                         | note                          |
       | gh api graphql -f query='mutation{unresolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}'              | reopening a thread            |
       | gh api graphql -f query='query{node(id:"PRRT_t1"){... on PullRequestReviewThread{isResolved}}}'                 | reading a thread              |
-      | gh api graphql -f query='mutation{addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:"PRRT_t1",body:"x"}){comment{id}}}' | a reply |
       | echo 'gh api graphql -f query=resolveReviewThread -f id=PRRT_t1'                                                | text, not a call              |
       | git commit -m 'guard resolveReviewThread on PRRT_t1'                                                            | a commit message              |
       | gh api graphql -f query="{repository(owner:\"o\",name:\"$R\"){pullRequest(number:$N){id}}}"               | a read filled at run time     |
       | gh api graphql -f query="query{node(id:\"$T\"){id}}" --jq .data                                            | a named read filled at run time |
       | gh api graphql -f query=@m.graphql -f id=PRRT_t1                                                                | -f sends @m.graphql as text   |
-      | gh api graphql -f query='mutation($id:ID!,$b:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$b}){comment{url}}}' -f id=PRRT_t1 -f b='resolveReviewThread is guarded now' | a reply that names the mutation |
       | gh pr view 5                                                                                                    | another gh call               |
+
+    @also_guard-signed-comments
+    Examples:
+      | command                                                                                                         | note                          |
+      | gh api graphql -f query='mutation{addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:"PRRT_t1",body:"x"}){comment{id}}}' | a reply |
+      | gh api graphql -f query='mutation($id:ID!,$b:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$b}){comment{url}}}' -f id=PRRT_t1 -f b='resolveReviewThread is guarded now' | a reply that names the mutation |
 
   Scenario Outline: a file a field or --input names is read, when gh runs alone
     Given a project directory
@@ -344,10 +370,18 @@ Feature: guard-review-threads
 
     Examples:
       | command                                                                                         | verdict                                          | note                       |
-      | gh api graphql -F query=@reply.graphql -f id=PRRT_t1 -F b=@ids.txt                             | is silent                                        | a reply from a file        |
       | gh api graphql -F query=@resolve.graphql -f id=PRRT_t1                                         | denies, naming "no reply from me after"          | a resolve from a file      |
       | gh api graphql --input resolve.json                                                            | denies, naming "no reply from me after"          | a resolve from --input     |
       | gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}} # PRRT_ok' -F id=@ids.txt | denies, naming "PRRT_t1" | the id from a file, past a decoy |
+
+    @also_guard-signed-comments
+    Examples:
+      | command                                                                                         | verdict                                          | note                       |
+      | gh api graphql -F query=@reply.graphql -f id=PRRT_t1 -F b=@ids.txt                             | is silent                                        | a reply from a file        |
+      | gh api graphql -F query=@reply.graphql -f id="$T" -F b=@ids.txt                                | is silent                                        | a reply, whatever its id   |
+
+    @also_guard-bypass-labels @also_guard-signed-comments
+    Examples:
+      | command                                                                                         | verdict                                          | note                       |
       | cd sub && gh api graphql -F query=@../resolve.graphql -f id=PRRT_t1                            | denies, naming "cannot tell which review thread" | a cd moves the file        |
       | echo x > resolve.graphql; gh api graphql -F query=@resolve.graphql -f id=PRRT_t1               | denies, naming "cannot tell which review thread" | another command could rewrite it |
-      | gh api graphql -F query=@reply.graphql -f id="$T" -F b=@ids.txt                                | is silent                                        | a reply, whatever its id   |

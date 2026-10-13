@@ -244,8 +244,16 @@ Feature: guard-signed-comments
         | gh pr comment 1 --body-file {HOME}/no-such-reply.md            |
         | echo Done \| gh pr comment 1 -F -                              |
         | gh api repos/o/r/issues/1/comments -f body="$(cat reply.md)"   |
+
+      @also_guard-review-threads
+      Examples:
+        | command                                                        |
         | gh api graphql -f query="$q" -f body=Done                      |
         | gh api graphql -f query="$q" -f text=Done                      |
+
+      @also_guard-bypass-labels
+      Examples:
+        | command                                                        |
         | gh api graphql -f query='mutation { addComment(input:$in) { clientMutationId } }' -F in=@x.json |
 
     Scenario: a variable assigned twice, or after its use, cannot be read
@@ -272,7 +280,6 @@ Feature: guard-signed-comments
         | command                                                                                                         |
         | gh pr edit 116 --body "Replacement is the intent"                                                               |
         | gh pr create -t t -b "Replacement is the intent"                                                                |
-        | gh issue create -t t -b x                                                                                       |
         | gh pr review 4 --approve                                                                                        |
         | gh pr review 4 --approve --body ""                                                                              |
         | gh pr comment 1 --web                                                                                           |
@@ -284,11 +291,20 @@ Feature: guard-signed-comments
         | gh api -X PATCH repos/o/r/pulls/1 -f body="Replacement is the intent"                                           |
         | gh api repos/o/r/issues/comments/5/reactions -f content=+1                                                      |
         | gh api graphql -f query='query { viewer { login } }'                                                            |
-        | gh api graphql -f query="$q"                                                                                    |
-        | gh api graphql -f query='mutation { resolveReviewThread(input:{threadId:"T"}) { thread { isResolved } } }'      |
         | gh api graphql -f query='mutation { submitPullRequestReview(input:{pullRequestReviewId:"R", event:APPROVE}) { clientMutationId } }' |
         | git commit -m "gh pr comment 1 -b Done"                                                                         |
         | echo 'gh pr comment 1 -b Done'                                                                                  |
+
+      @also_guard-github-issues
+      Examples:
+        | command                                                                                                         |
+        | gh issue create -t t -b x                                                                                       |
+
+      @also_guard-review-threads
+      Examples:
+        | command                                                                                                         |
+        | gh api graphql -f query="$q"                                                                                    |
+        | gh api graphql -f query='mutation { resolveReviewThread(input:{threadId:"T"}) { thread { isResolved } } }'      |
 
   Rule: the opening and the signature are settings
 

@@ -151,6 +151,10 @@ Feature: guard-bypass-ruleset
     Examples:
       | command                      |
       | gh pr $m 5 --admin           |
+
+    @also_guard-review-threads
+    Examples:
+      | command                      |
       | p=pr; gh $p merge 5 --admin  |
 
   Scenario: an admin merge with a split flag is denied
@@ -196,12 +200,16 @@ Feature: guard-bypass-ruleset
       | git --config-env=alias.p=V p origin main | the same, --config-env attached |
       | git -c url.https://github.com/o/r.insteadOf=foo push foo main | a URL rewrite |
       | gh pr merge 5 "$flags"            | a flag built at run time              |
-      | gh $p merge 5                     | a gh subcommand built at run time     |
       | gh pr $v 5                        | a pr subcommand built at run time     |
       | gh -R o/r $p merge 5              | a run-time group behind a repo flag   |
       | gh --repo o/r pr $v 5             | a run-time verb behind a repo flag    |
-      | gh -R $R api x                    | a run-time repo value may split into a group |
       | export GIT_DIR=/x; git push origin main | another repository, exported       |
+
+    @also_guard-review-threads
+    Examples:
+      | command                           | note                                  |
+      | gh $p merge 5                     | a gh subcommand built at run time     |
+      | gh -R $R api x                    | a run-time repo value may split into a group |
 
   Scenario Outline: a cd the shell may undo before the push asks
     Given a clone of "https://gitlab.com/o/r.git" at "{TMP}/g" on branch "main"

@@ -31,6 +31,10 @@ Feature: guard-secrets
       | export SESSION_JWT=eyJRdHtmHvLUbHdl0nl2wCb.eyJK7DB82GL3AQ8h7mDXT9j.MBBc58LOBUxytTVN3hRhwllh | gitleaks:allow |
       | AGE_KEY=AGE-SECRET-KEY-1M3QJM0F9LDM85ZRJLWWFSA6GY6DJDRXUEY6DSXELLN40HVPQ9Y36J2CNYY ./run | gitleaks:allow |
       | ssh host 'export GH_TOKEN=ghp_WIGVIY73i8FbiZaMfOrZmcKUHMmOPgxrVYyx'                                      | nested shell text: gitleaks:allow      |
+
+    @also_guard-signed-comments
+    Examples:
+      | command                                                              | note                                   |
       | gh issue comment 1 --body "use ghp_WIGVIY73i8FbiZaMfOrZmcKUHMmOPgxrVYyx"                                 | posted: gitleaks:allow                 |
 
   Scenario: a heredoc body is read
