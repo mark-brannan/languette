@@ -26,6 +26,7 @@ OPT_IN = {"guard_worktrees", "guard_review_threads", "guard_signed_comments"}
 # Options that are not a guard's on/off toggle: name -> type.
 OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string",
                  "protected_services": "string", "prose_budget_command": "string",
+                 "signed_comments_opening": "string", "signed_comments_signature": "string",
                  "record_decisions": "boolean", "record_raw_commands": "boolean"}
 # Per-rule switches inside one guard: boolean, on by default.
 RULE_OPTIONS = {f"guard_git_work_loss_{r}" for r in ("blanket_staging", "stash", "force_push", "discard", "branch_delete")} | {

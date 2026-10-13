@@ -192,7 +192,7 @@ meant. Spent approvals are kept beside the session transcript, in
 ## Configuration
 
 Every guard is on by default except `guard-worktrees`,
-`guard-review-threads` and `guard-signed-comments`, which are opt-in. Turn one off (or those on) with
+`guard-review-threads` and `guard-signed-comments`, which are opt-in; the last is experimental. Turn one off (or those on) with
 `/plugin configure languette@languette`,
 or at install, by its name with underscores:
 
@@ -304,7 +304,7 @@ for beyond the command, it declares:
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
 | `guard-github-issues` | the payload's `session_id`, the transcript, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
-| `guard-signed-comments` | the files a comment's body is read from |
+| `guard-signed-comments` | the files a comment's body is read from, and the `signed_comments_opening` and `signed_comments_signature` settings |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
 | `guard-worktrees` | `$HOME` and what `git rev-parse --show-toplevel` resolves to; git, for where each path lands, and a record per session in `$TMPDIR` |

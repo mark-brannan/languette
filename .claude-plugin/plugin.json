@@ -175,9 +175,23 @@
     },
     "guard_signed_comments": {
       "type": "boolean",
-      "title": "Sign an agent's GitHub comments as an agent's",
-      "description": "Opt-in, off by default. Deny a PR or issue comment, review or review-thread reply posted through gh, gh api or a GitHub MCP tool unless its body's first line starts with the robot emoji and its last line is the agent signature (model, effort, session). The agent posts under your login; the signature keeps its words from being read as yours. Turn on if your agents sign their comments that way.",
+      "title": "Experimental, opt-in: sign an agent's GitHub comments as an agent's",
+      "description": "Experimental and off by default: the signature is one workflow's convention, and the general shape is open (mark-brannan/languette#194). Deny a PR or issue comment, review or review-thread reply posted through gh, gh api or a GitHub MCP tool unless its body's first line starts with signed_comments_opening and its last line matches signed_comments_signature. The agent posts under your login; the signature keeps its words from being read as yours. Turn on if your agents sign their comments that way.",
       "default": false
+    },
+    "signed_comments_opening": {
+      "type": "string",
+      "title": "Signed comments: opening",
+      "description": "The text a signed comment's first line starts with. Empty means the default, the robot emoji and a space.",
+      "default": "🤖 ",
+      "required": false
+    },
+    "signed_comments_signature": {
+      "type": "string",
+      "title": "Signed comments: signature",
+      "description": "A regular expression a signed comment's last non-empty line must match whole; {session} in it is the first eight hex of the session id. Empty means the default, the robot emoji, model, effort and session. A pattern that does not compile denies every comment.",
+      "default": "🤖 \\S+ · (?:low|medium|high|xhigh|max|-) · {session}",
+      "required": false
     },
     "guard_cross_session_send": {
       "type": "boolean",
