@@ -19,8 +19,8 @@ Step one of #134. Every guard name below is a candidate; none is approved.
 | Regex-guard pack | Opt-in? | Reads as |
 |---|---|---|
 | `core.git` | always on | discard uncommitted work, rewrite history, force push, delete refs, drop stashes, LFS loss |
-| `strict_git` | opt-in | every force push, every push that deletes a remote ref, rebase, amend, cherry-pick, `gc`, worktree removal, blanket `add`, direct push to main or master |
-| `platform.github` | opt-in | `gh` deletes (repo, gist, release, asset, issue, key, secret, variable, deploy key), visibility change, archive, run cancel, `gh api DELETE` on repos, hooks, keys, releases, actions |
+| `strict_git` | opt-in | every force push and ref delete, rebase, amend, cherry-pick, `gc`, `add .`, push to main |
+| `platform.github` | opt-in | `gh` deletes (repo, gist, release, issue, keys, secrets), visibility, archive, run cancel |
 | `cicd.github_actions` | opt-in | secret and variable removal, workflow disable, run cancel, `gh api DELETE` on actions |
 
 The regex guard decides one command at a time, with a hand-written safe pattern
@@ -52,16 +52,16 @@ the harm is in the cluster and neither side's rule set covers a member.
 
 | # | Harm | Regex-guard rules | languette today | Gap or overlap |
 |---|---|---|---|---|
-| A | Uncommitted work lost in the working tree or index | `checkout-discard`, `-ref-discard`, `-discard-cwd`, `-force`; `switch-discard`; `restore-worktree`, `-explicit`; `reset-hard`, `reset-merge`; `clean-force`; `rm-force`; `read-tree-reset`; `show-redirect-overwrite-source` | `guard-git-work-loss` discard rules | The regex guard is wider: `switch -f`, `rm -f`, `read-tree --reset`, `reset --merge`, `show ref:path > path`. Safe forms (`checkout -b`, `restore --staged`, `clean -n`) are its explicit allowances. |
+| A | Uncommitted work lost in the working tree or index | `checkout-discard`, `restore-worktree`, `reset-hard`, `clean-force` | `guard-git-work-loss` discard rules | The regex guard is wider: `switch -f`, `rm -f`, `read-tree --reset`, `reset --merge`, `show ref:path > path`. |
 | B | Stash lost | `stash-drop`, `stash-clear` | `guard-git-work-loss` (stash pop/drop/clear) | languette also denies `pop`, because the stack is shared across worktrees. |
-| C | Committed history rewritten or unreachable locally | `filter-branch`, `reflog-expire-now`, `lfs-migrate-rewrite`, `update-ref-delete`, `branch-force-delete`; strict: `rebase`, `commit-amend`, `cherry-pick`, `filter-repo`, `reflog-expire`, `gc-aggressive`, `submodule-deinit`, `worktree-remove` | `branch -D` only | Largest gap on our side. Strict-mode members are plausible agent moves (rebase, amend) that the regex guard bans outright; whether to ban or ask is not decided. |
-| D | Remote history rewritten or remote refs deleted | `push-force-long`, `-short`, `-refspec`; strict: `push-force-any`, `push-mirror`, `push-delete`, `push-delete-refspec`, `push-prune`, `push-dynamic-argument` | `guard-git-work-loss` force push; `guard-git-stacked-base` remote deletion when a PR depends on it | Overlap with a different test: the regex guard denies on shape, `stacked-base` denies on a live fact (an open PR). `--mirror` and `--prune` are unmatched here. |
+| C | Committed history rewritten or unreachable locally | `filter-branch`, `branch-force-delete`; strict: `rebase`, `commit-amend` | `branch -D` only | Largest gap. Rebase and amend are plausible agent moves; the regex guard bans them, ban or ask is undecided. |
+| D | Remote history rewritten or remote refs deleted | `push-force-long`; strict: `push-force-any`, `push-mirror`, `push-delete` | `guard-git-work-loss` force push; `guard-git-stacked-base` remote deletion when a PR depends on it | The regex guard denies on shape, `stacked-base` on a live fact (an open PR). `--mirror` reaches only `guard-bypass-ruleset`; `--prune` is unmatched. |
 | E | Pushing around the repo's review path | strict: `push-main`, `push-master` | `guard-bypass-ruleset` (asks GitHub whether the branch needs a PR) | The regex guard hard-codes two branch names; ours reads the repo's own rules. Same harm. |
 | F | Skipping the repo's own checks | none | `guard-bypass-hooks` | Ours only. `guard-commits` (approved) is the positive side of the same harm: run the checks. |
 | G | Secrets or junk committed by blanket staging | strict: `add-all-dot`, `add-all-flag` | `guard-git-work-loss` blanket staging; `guard-secrets` (approved) | Same harm, two homes. |
 | H | Git LFS data lost | `lfs-prune`, `lfs-uninstall`, `lfs-migrate-rewrite` | none | Gap. No evidence an agent session meets LFS. |
-| I | A GitHub object destroyed for good | `gh-repo-delete`, `-gist-delete`, `-release-delete`, `-release-delete-asset`, `-issue-delete`, `gh-api-delete-repo`, `-release`, `curl-api-delete-repo`, `gh-api-delete-generic` | `guard-github-issues` covers issue delete only, and as a count | Large gap. Repo, release and gist deletion are unguarded. |
-| J | Access or CI configuration removed or changed | `gh-ssh-key-delete`, `gh-repo-deploy-key-delete`, `gh-secret-delete`, `gh-variable-delete`, `gh-api-delete-hook`, `-deploy-key`, `-actions-secret`, `-actions-variable`; `gh-repo-visibility-change`, `gh-repo-archive`; gha: `secret-remove`, `variable-remove`, `workflow-disable`, `api-delete-*` | `guard-bypass-ruleset`, `guard-bypass-labels` guard the gates, not the config | Gap. Visibility change also touches `guard-private-terms`' premise (public vs private). |
+| I | A GitHub object destroyed for good | `gh-repo-delete`, `gh-api-delete-repo`, `curl-api-delete-repo`, `gh-api-delete-generic` | `guard-github-issues` covers issue delete only, and as a count | Large gap. Repo, release and gist deletion are unguarded. |
+| J | Access or CI configuration removed or changed | `gh-secret-delete`, `gh-repo-deploy-key-delete`, `gh-repo-visibility-change`; gha: `workflow-disable` | `guard-bypass-ruleset`, `guard-bypass-labels` guard the gates, not the config | Gap. Visibility change also touches `guard-private-terms`' premise (public vs private). |
 | K | A running job interrupted | `gh-run-cancel`, `gh-actions-run-cancel` | none | Gap; the regex guard itself calls it reversible. |
 | L | A gate waived by the gated party | none | `guard-bypass-labels`, `guard-bypass-ruleset` (`--admin`), `guard-bypass-hooks` | Ours only; this is the cluster the regex guard has no concept for, because its actor is anonymous. |
 | M | An agent's words taken as the user's | none | #119 signed comments, #118 review threads | Ours only. |
@@ -69,10 +69,34 @@ the harm is in the cluster and neither side's rule set covers a member.
 | O | Identifiers minted that cannot be recalled | none (`gh-issue-delete` is the nearest) | `guard-github-issues`, #125 duplicate PR | Ours only. |
 | P | Another session's work disturbed | none | `guard-worktrees` | Ours only. |
 
+<details>
+<summary>All regex-guard rule ids behind the trimmed rows (A, C, D, I, J)</summary>
+
+```
+A  checkout-discard, -ref-discard, -discard-cwd, -force; switch-discard;
+   restore-worktree, -explicit; reset-hard, reset-merge; clean-force;
+   rm-force; read-tree-reset; show-redirect-overwrite-source
+C  filter-branch, reflog-expire-now, lfs-migrate-rewrite, update-ref-delete,
+   branch-force-delete; strict: rebase, commit-amend, cherry-pick,
+   filter-repo, reflog-expire, gc-aggressive, submodule-deinit,
+   worktree-remove
+D  push-force-long, -short, -refspec; strict: push-force-any, push-mirror,
+   push-delete, push-delete-refspec, push-prune, push-dynamic-argument
+I  gh-repo-delete, -gist-delete, -release-delete, -release-delete-asset,
+   -issue-delete, gh-api-delete-repo, -release, curl-api-delete-repo,
+   gh-api-delete-generic
+J  gh-ssh-key-delete, gh-repo-deploy-key-delete, gh-secret-delete,
+   gh-variable-delete, gh-api-delete-hook, -deploy-key, -actions-secret,
+   -actions-variable; gh-repo-visibility-change, gh-repo-archive;
+   gha: secret-remove, variable-remove, workflow-disable, api-delete-*
+```
+
+</details>
+
 Reading the table: A through E and I through K are about destroying state, and
-the regex guard has the longer list. F, L through P are about the agent acting as the user,
-and only languette has them. That split is the useful finding: the two are
-different kinds of rule (see below).
+the regex guard has the longer list. F and L through P turn on a fact, a count or an
+actor that a pattern cannot see, and only languette has them. That split is the
+useful finding: the two are different kinds of rule (see below).
 
 ## Candidate names
 
@@ -111,17 +135,17 @@ Both are undecided. What each costs, from the code as it stands:
 | Adding a regex-style rule | a code change, or a setting in the guard it belongs to | a data line; the regex guard's ~70 git and GitHub rules would be 70 lines |
 | Testing | a feature file per guard | the table plus one spec per rule kind |
 | Risk | stretching a name (the problem #134 started from) | defining the rule language; a table that cannot say "an open PR exists" or "this label is on the list" falls back to code anyway |
-| Precedent here | every shipped guard | `ask-first` and `deny-always` already match command patterns to an outcome from a repo list |
+| Precedent here | every shipped guard | `ask-first` already matches command patterns to an outcome from a repo list; `deny-always` is approved, not built |
 
 Evidence that bears on the choice, from the clustering:
 
 - Clusters A through E, I through K are pattern to outcome. A table fits them,
-  and `ask-first`/`deny-always` already host that shape. These are the clusters
+  and `ask-first` already hosts that shape (`deny-always` is approved, not built). These are the clusters
   the regex guard is strong in.
 - Clusters F, L through P turn on a lookup, a count, a signature or a record
   of approval. A table does not hold them without a condition vocabulary.
 - A hybrid is possible: the pattern-to-outcome clusters as data (possibly just
-  more entries for the existing `deny-always`/`ask-first` lists, shipped as a
+  more entries for the existing `ask-first` list, shipped as a
   default git/GitHub list), the fact-bearing clusters as domain guards. This is
   a guess, not tested; it leaves the rule-language cost small because the
   language never needs conditions.
