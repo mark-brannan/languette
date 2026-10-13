@@ -356,3 +356,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261013t190402z
 - guard-signed-comments is marked experimental in words only: the option title and description, the README and the module docstring; no mechanism Undo: remove those words ([#119](https://github.com/mark-brannan/languette/pull/119))
+
+### 20261013t191418z
+- guard-signed-comments listed under code guards in #198's engine table Undo: move its row in #198 ([#198](https://github.com/mark-brannan/languette/issues/198)) (no PR, branch claude/guard-rules-engine-design-517fb2)
