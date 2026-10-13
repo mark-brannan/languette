@@ -10,6 +10,11 @@ others' verdicts, so a claim whose call has an error result in the transcript
 but was never spent belongs to a call another guard denied: it never ran, and
 the next write takes the claim over. A claim with no result yet is in flight.
 
+A shut door has a second key: the user's yes, through AskUserQuestion, to an
+option labelled exactly APPROVE_LABEL. Each yes allows one write and is spent
+the way ask-first spends one (languette.guards.ask_first.claim), so filing
+several in a row takes one question each.
+
 Counts as an identifier write: `gh issue create|new|transfer|delete`; `gh api`
 POST to repos/o/r/issues; a graphql createIssue, transferIssue or deleteIssue;
 the MCP create_issue, transfer_issue, delete_issue, and issue_write with
@@ -21,9 +26,11 @@ so the two never spend each other's (languette.world.DOOR).
 import re
 
 from languette import scan as sw
+from languette.guards.ask_first import claim
 from languette.verdict import Act, Need, deny
 
 NAME = "guard-github-issues"
+APPROVE_LABEL = "File this issue"
 # The tools hooks.json wires this guard to; the MCP ones by their name's tail.
 TOOLS = re.compile(r"(?:Bash|mcp__.*__(?:create_issue|issue_write|transfer_issue|delete_issue))\Z")
 _MCP_WRITE = re.compile(r"mcp__.*__(?:create_issue|transfer_issue|delete_issue)\Z")
@@ -35,7 +42,9 @@ _LEAD = frozenset("do then else elif ! time { (".split())
 _MUTATION = re.compile(r"(?:create|transfer|delete)Issue\s*\(")
 _SKIP_VALUE = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 SHUT = ("the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or "
-        "the human has not spoken since. Show the human the draft and wait for their yes.")
+        "the human has not spoken since. Show the human the draft and wait for their yes: call "
+        f"AskUserQuestion with the title and repo, one option labelled exactly \"{APPROVE_LABEL}\" and one "
+        "to decline. One yes is one write; ask again for the next.")
 
 
 def _deny(why):
@@ -202,30 +211,42 @@ def check(doc):
         return _deny(f"{n} issue creates, transfers or deletes in one call. One per human turn, never a batch.")
     if loop:
         return _deny("an issue create, transfer or delete inside a loop. One per human turn, never a batch.")
+    why = yield from _door(payload, session)
+    if why is None:
+        return None
+    try:
+        _, spent = yield from claim({APPROVE_LABEL: 1})
+    except (OSError, ValueError):
+        spent = False
+    return None if spent else _deny(why)
+
+
+def _door(payload, session):
+    """None when this call took the human turn's door; else why it could not."""
     call = payload.get("tool_use_id")
     call = re.sub(r"[^A-Za-z0-9_-]", "", call) if isinstance(call, str) else ""
     try:
         got = yield Need("door", "claim", session, call)
     except Exception:  # noqa: BLE001
-        return _deny(SHUT)
+        return SHUT
     if got is True:
         return None
     if got is False:
-        return _deny(f"an issue create, transfer or delete is already in flight this turn. {SHUT}")
+        return f"an issue create, transfer or delete is already in flight this turn. {SHUT}"
     # A standing claim: its call ran if it was spent; still holding with an error
     # result means it was refused and never ran. No result yet: in flight. A
     # result that is not an error ran, whatever its post hook did.
     tp = payload.get("transcript_path")
     if not got or not isinstance(tp, str) or not tp:
-        return _deny(SHUT)
+        return SHUT
     try:
         transcript = yield Need("read", tp)
     except Exception:  # noqa: BLE001
-        return _deny(SHUT)
+        return SHUT
     if not _never_ran(transcript, got):
-        return _deny(SHUT)
+        return SHUT
     try:
         took = yield Need("door", "take", session, call)
     except Exception:  # noqa: BLE001
         took = False
-    return None if took else _deny(SHUT)
+    return None if took else SHUT

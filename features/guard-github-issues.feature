@@ -32,6 +32,12 @@ Feature: guard-github-issues
   same session_id can run both plugins, and a shared name would let one
   plugin's UserPromptSubmit spend the other's door.
 
+  A shut door has a second key: the user's yes through AskUserQuestion, to
+  an option labelled exactly "File this issue". The label, not the question,
+  is the yes, so an answer to some other question opens nothing. Each yes is
+  one write, spent the way ask-first spends an approval; several issues in a
+  row take one question each.
+
   This is a gate, so it fails closed: a call that mentions an issue and
   cannot be read is denied.
 
@@ -227,3 +233,61 @@ Feature: guard-github-issues
     Then the door file is a plain file and "{TMP}/victim" still holds "keep"
     When the agent runs `gh issue create -t t -b b`
     Then the guard is silent
+
+  Rule: a shut door opens once for each yes the user gives through AskUserQuestion
+
+    Scenario: a yes after the turn's door is spent allows one more
+      Given a project directory
+      And the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "File issue t in o/r?", "header": "Issue", "multiSelect": false, "options": [{"label": "File this issue", "description": "files it"}, {"label": "Don't file", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"File issue t in o/r?\"=\"File this issue\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the human speaks, opening the door
+      And the agent runs `gh issue create -t one -b b`
+      And the agent runs `gh issue create -t t -b b`
+      Then the guard is silent
+
+    Scenario: one yes is one write
+      Given a project directory
+      And the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "File issue t in o/r?", "header": "Issue", "multiSelect": false, "options": [{"label": "File this issue", "description": "files it"}, {"label": "Don't file", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"File issue t in o/r?\"=\"File this issue\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `gh issue create -t t -b b`
+      And the agent runs `gh issue create -t u -b b`
+      Then the guard denies, naming "File this issue"
+
+    Scenario: two yeses are two writes
+      Given a project directory
+      And the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "File issue t in o/r?", "header": "Issue", "multiSelect": false, "options": [{"label": "File this issue", "description": "files it"}, {"label": "Don't file", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"File issue t in o/r?\"=\"File this issue\". You can now continue with the user's answers in mind."}]}}
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_B", "name": "AskUserQuestion", "input": {"questions": [{"question": "File issue t in o/r?", "header": "Issue", "multiSelect": false, "options": [{"label": "File this issue", "description": "files it"}, {"label": "Don't file", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_B", "content": "User has answered your questions: \"File issue t in o/r?\"=\"File this issue\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `gh issue create -t t -b b`
+      And the agent runs `gh issue create -t u -b b`
+      Then the guard is silent
+
+    Scenario: a no opens nothing
+      Given a project directory
+      And the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "File issue t in o/r?", "header": "Issue", "multiSelect": false, "options": [{"label": "File this issue", "description": "files it"}, {"label": "Don't file", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"File issue t in o/r?\"=\"Don't file\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `gh issue create -t t -b b`
+      Then the guard denies
+
+    Scenario: another label opens nothing
+      Given a project directory
+      And the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "File issue t in o/r?", "header": "Issue", "multiSelect": false, "options": [{"label": "File this issue", "description": "files it"}, {"label": "Don't file", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"File issue t in o/r?\"=\"Yes, file it\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `gh issue create -t t -b b`
+      Then the guard denies
