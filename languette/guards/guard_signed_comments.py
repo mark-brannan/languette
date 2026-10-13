@@ -1,10 +1,16 @@
 """guard-signed-comments: a comment an agent posts to GitHub is signed as an
 agent's. The spec is features/guard-signed-comments.feature.
 
+Experimental: the convention is one workflow's; the general shape is mark-brannan/languette#194.
+
 An agent posts under the user's own login, so without a mark a review bot and
 the next agent read its reply as the user's ruling. The body's first line
 begins with `🤖 ` and its last non-empty line is `🤖 <model> · <effort> ·
-<eight hex>`; the hex is the payload's session id's, when it has one.
+<eight hex>`; the hex is the payload's session id's, when it has one. Both
+are settings: signed_comments_opening is the text the first line starts with,
+and signed_comments_signature a regular expression the last line matches
+whole, its `{session}` the payload's eight hex (any eight without one). Unset
+or empty is the default; a signature that does not compile is a deny.
 
 Fires on Bash `gh pr comment`, `gh issue comment`, `gh pr review` with a body,
 `gh pr|issue close|reopen --comment`, `gh api` writing a body to a path with a
@@ -37,8 +43,11 @@ _MCP = ("add_issue_comment|add_reply_to_pull_request_comment|add_comment_to_pend
 TOOLS = re.compile(rf"(?:Bash|mcp__.*__(?:{_MCP}))\Z")
 _MCP_TOOL = re.compile(rf"mcp__.*__(?:{_MCP})\Z")
 GH = re.compile(r"(?:^|/)gh\Z")
+OPENING = "CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING"
+SIGNATURE = "CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE"
 FIRST = "🤖 "
-SIGNATURE = re.compile(r"🤖 \S+ · (?:low|medium|high|xhigh|max|-) · ([0-9a-f]{8})")
+SIGNED = r"🤖 \S+ · (?:low|medium|high|xhigh|max|-) · {session}"
+_ANY_HEX = "[0-9a-f]{8}"
 _MUTATION = re.compile(r"\b(?:addComment|addPullRequestReviewComment|addPullRequestReviewThreadReply|"
                        r"addPullRequestReview|submitPullRequestReview|updateIssueComment|"
                        r"updatePullRequestReviewComment|updatePullRequestReview|addDiscussionComment|"
@@ -274,7 +283,23 @@ def check(doc):
         return None
     sid = payload.get("session_id")
     hexid = sid[:8] if isinstance(sid, str) and re.fullmatch(r"[0-9a-f]{8}", sid[:8]) else None
-    example = _EXAMPLE.format(hex=hexid or "<first 8 hex of the session id>")
+    first, pattern = env.get(OPENING) or FIRST, env.get(SIGNATURE) or SIGNED
+    try:
+        # One for this session, one for any: a line only the second matches names another session.
+        sig = re.compile(pattern.replace("{session}", hexid or _ANY_HEX))
+        loose = re.compile(pattern.replace("{session}", _ANY_HEX))
+    except re.error as e:
+        return deny(f"{NAME}: the signed_comments_signature setting `{pattern}` is not a regular expression "
+                    f"({e}), so no comment's signature can be checked. Fix the setting, or empty it for the default.")
+    if first == FIRST and pattern == SIGNED:
+        example = _EXAMPLE.format(hex=hexid or "<first 8 hex of the session id>")
+        signed = f"A signed body:\n\n{example}"
+        shape = (f"Start the first line with `{FIRST}` and end with the line `🤖 <model id> · "
+                 f"<low|medium|high|xhigh|max|-> · <first 8 hex of the session id>`:\n\n{example}")
+    else:
+        shape = (f"Start the first line with `{first}` and end with a line that matches `{pattern}` whole"
+                 + (", where {session} is the first 8 hex of the session id." if "{session}" in pattern else "."))
+        signed = "A signed body, as the settings have it: " + shape[0].lower() + shape[1:]
     cwd = payload.get("cwd")
     if not isinstance(cwd, str) or not cwd:
         cwd = yield Need("cwd")
@@ -390,22 +415,21 @@ def check(doc):
             try:
                 got = yield from bodies(src)
             except _Unread as e:
-                return deny(f"{NAME}: {e}\n\nA signed body:\n\n{example}")
+                return deny(f"{NAME}: {e}\n\n{signed}")
             for body in got:
                 if not body.strip():
                     continue           # nothing posted as text: gh refuses it, or a review posts no comment
                 lines = body.split("\n")
                 last = ([ln.rstrip() for ln in lines if ln.strip()] or [""])[-1]
-                if not lines[0].startswith(FIRST):
-                    problems.append(f"the first line does not start with `{FIRST}`: `{_short(lines[0])}`")
-                sig = SIGNATURE.fullmatch(last)
-                if not sig:
-                    problems.append(f"the last line is not the signature: `{_short(last)}`")
-                elif hexid and sig.group(1) != hexid:
+                if not lines[0].startswith(first):
+                    problems.append(f"the first line does not start with `{first}`: `{_short(lines[0])}`")
+                if sig.fullmatch(last):
+                    continue
+                if loose.fullmatch(last):
                     problems.append(f"the last line's hex is not this session's ({hexid}): `{_short(last)}`")
+                else:
+                    problems.append(f"the last line is not the signature: `{_short(last)}`")
     if not problems:
         return None
     return deny(f"{NAME}: this posts a GitHub comment under the user's login, so it must be signed as an agent's, "
-                f"or a reader takes it for the user's own words. Here {'; '.join(problems)}. Start the first line "
-                f"with `{FIRST}` and end with the line `🤖 <model id> · <low|medium|high|xhigh|max|-> · <first 8 "
-                f"hex of the session id>`:\n\n{example}")
+                f"or a reader takes it for the user's own words. Here {'; '.join(problems)}. {shape}")

@@ -289,3 +289,83 @@ Feature: guard-signed-comments
         | gh api graphql -f query='mutation { submitPullRequestReview(input:{pullRequestReviewId:"R", event:APPROVE}) { clientMutationId } }' |
         | git commit -m "gh pr comment 1 -b Done"                                                                         |
         | echo 'gh pr comment 1 -b Done'                                                                                  |
+
+  Rule: the opening and the signature are settings
+
+    Scenario: a custom signature posts a body it matches and denies one it does not
+      Given CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is "Signed: \S+ \(\w+\)"
+      When the agent runs:
+        """
+        gh pr comment 1 -b "🤖 Done.
+
+        Signed: claude-opus-5-5 (high)"
+        """
+      Then the guard is silent
+      When the agent runs:
+        """
+        gh pr comment 1 -b "🤖 Done.
+
+        🤖 claude-opus-5-5 · high · 5a74df74"
+        """
+      Then the guard denies, naming "the last line is not the signature"
+      And the guard denies, naming "Signed: \S+ \(\w+\)"
+
+    Scenario: {session} in the signature is this session's hex
+      Given the session is "0badcafe-1234"
+      And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is "Signed: \S+ {session}"
+      When the agent runs:
+        """
+        gh pr comment 1 -b "🤖 Done.
+
+        Signed: claude-opus-5-5 0badcafe"
+        """
+      Then the guard is silent
+      When the agent runs:
+        """
+        gh pr comment 1 -b "🤖 Done.
+
+        Signed: claude-opus-5-5 5a74df74"
+        """
+      Then the guard denies, naming "not this session's (0badcafe)"
+
+    Scenario: a custom opening
+      Given CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING is "[agent] "
+      When the agent runs:
+        """
+        gh pr comment 1 -b "[agent] Done.
+
+        🤖 claude-opus-5-5 · high · 5a74df74"
+        """
+      Then the guard is silent
+      When the agent runs:
+        """
+        gh pr comment 1 -b "🤖 Done.
+
+        🤖 claude-opus-5-5 · high · 5a74df74"
+        """
+      Then the guard denies, naming "the first line does not start with"
+      And the guard denies, naming "[agent]"
+
+    Scenario: a signature that is not a regular expression is a deny that names the setting
+      Given CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is "🤖 (unclosed"
+      When the agent runs:
+        """
+        gh pr comment 1 -b "🤖 Done.
+
+        🤖 claude-opus-5-5 · high · 5a74df74"
+        """
+      Then the guard denies, naming "the signed_comments_signature setting"
+      And the guard denies, naming "is not a regular expression"
+
+    Scenario: an empty setting is the default
+      Given CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING is ""
+      And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is ""
+      When the agent runs:
+        """
+        gh pr comment 1 -b "🤖 Done.
+
+        🤖 claude-opus-5-5 · high · 5a74df74"
+        """
+      Then the guard is silent
+      When the agent runs `gh pr comment 1 -b "Replacement is the intent"`
+      Then the guard denies, naming "🤖 claude-opus-5-5 · high ·"
