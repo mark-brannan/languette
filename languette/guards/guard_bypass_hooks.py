@@ -29,7 +29,6 @@ from languette.verdict import deny
 NAME = "guard-bypass-hooks"
 APPROVE_LABEL = "Skip hooks once"
 
-GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 # git's global options that take a value as the next word.
 GLOBAL_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
 # Options that take the next word as a value, so a message that is just
@@ -90,7 +89,7 @@ def _runs(doc):
         for a, b in s.segments():
             if a > b:
                 continue
-            g = sw.cmd_index(s, a, b, GIT, nested)
+            g = sw.cmd_index(s, a, b, sw.GIT, nested)
             if g is None:
                 continue
             i, hooks_path = g + 1, False

@@ -8,7 +8,6 @@ an interpreter that reads its program from stdin (`curl u | sh`, `| sudo bash
 ...`, `| node -e ...`, `| sh install.sh`) is not reading the download as code.
 """
 
-import json
 import os
 import re
 
@@ -117,14 +116,7 @@ def _judge(doc, s, nested):
 
 
 def check(doc):
-    payload = doc.payload
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if cmd is None or cmd is False:
-        return None
-    if not isinstance(cmd, str):
-        cmd = json.dumps(cmd)                  # as `jq -r` would print it
-    cmd = cmd.rstrip("\n")                     # as $(...) would leave it
-    if not cmd:
+    if doc.text is None:
         return None
     for text, nested in doc.texts():
         why = _judge(doc, doc.scan(text), nested)

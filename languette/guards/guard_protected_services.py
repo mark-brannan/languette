@@ -9,15 +9,13 @@ services a session runs on (ssh, the network) are guard-host-availability's.
 """
 
 import fnmatch
-import json
 import re
 
 from languette.guards.guard_host_availability import service_stop, unit_names
-from languette.verdict import deny
+from languette.verdict import WAY_USER, deny
 
 NAME = "guard-protected-services"
 OPTION = "CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES"
-_WAY_USER = "That is the user's to run, not an agent's: say what you need and hand them the exact command."
 
 
 def protected(env):
@@ -41,19 +39,12 @@ def judge(doc):
             verb = a <= b and service_stop(s, a, b, hit, host_verbs=())
             if verb:
                 return (f"`systemctl {verb}` is blocked: it stops a protected service, one the user's machine "
-                        f"depends on (the protected_services setting). {_WAY_USER}")
+                        f"depends on (the protected_services setting). {WAY_USER}")
     return None
 
 
 def check(doc):
-    payload = doc.payload
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if cmd is None or cmd is False:
-        return None
-    if not isinstance(cmd, str):
-        cmd = json.dumps(cmd)                  # as `jq -r` would print it
-    cmd = cmd.rstrip("\n")                     # as $(...) would leave it
-    if not cmd:
+    if doc.text is None:
         return None
     why = judge(doc)
     return deny(f"{NAME}: {why}") if why else None

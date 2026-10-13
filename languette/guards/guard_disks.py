@@ -7,7 +7,6 @@ resolve to one allowed path is denied on sight, with a reason naming what it
 saw.
 """
 
-import json
 import os
 import re
 
@@ -196,13 +195,7 @@ class _Judge:
 def parse(doc):
     """The command's targets, or the finding parse alone comes to: (finding, home, targets)."""
     payload, env = doc.payload, doc.env
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if cmd is None or cmd is False:
-        return None, None, []
-    if not isinstance(cmd, str):
-        cmd = json.dumps(cmd)                  # as `jq -r` would print it
-    cmd = cmd.rstrip("\n")                     # as $(...) would leave it
-    if not cmd:
+    if doc.text is None:
         return None, None, []
     cwd = payload["cwd"]
     home = env.get("HOME", "")

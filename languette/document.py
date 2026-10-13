@@ -51,6 +51,12 @@ class Document:
         return got
 
     @property
+    def text(self):
+        """The Bash call's command as the shell would see it (trailing newlines
+        gone), or None when the call has none to judge."""
+        return self._text.rstrip("\n") or None
+
+    @property
     def refusal(self):
         """The scan.Unparseable the ladder or the nested-text cap refuses the
         Bash command with, or None when it reads (or there is no command). Any

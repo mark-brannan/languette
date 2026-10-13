@@ -44,7 +44,6 @@ from languette.verdict import Act, Need, Refuse, deny
 
 NAME = "guard-worktrees"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES"
-GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 MAX_CANDIDATES = 48
 _HOMEISH = re.compile(r"(?:/|~\Z|~/|\$HOME\Z|\$HOME/|\$\{HOME\}\Z|\$\{HOME\}/)")
@@ -91,7 +90,7 @@ def _home_events(doc):
                           if s.k[i] == "w" and (not s.w[i].startswith("-") or s.w[i] == "-")), "")
                 out.append(("CD", "-" if s.w[c] == "popd" else v))
                 continue
-            g = sw.cmd_index(s, a, b, GIT, nested)
+            g = sw.cmd_index(s, a, b, sw.GIT, nested)
             if g is None:
                 for i in range(a, b + 1):
                     if s.k[i] == "w" and s.w[i].startswith("GIT_DIR="):

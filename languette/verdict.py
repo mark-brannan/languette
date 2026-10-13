@@ -10,6 +10,8 @@ Refuse is how a guard's internals say "deny, for this reason" from deep inside
 a walk; check catches it and returns deny. Standard library only.
 """
 
+WAY_USER = "That is the user's to run, not an agent's: say what you need and hand them the exact command."
+
 
 class Refuse(Exception):
     pass
