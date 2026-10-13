@@ -123,7 +123,8 @@ def given_installed(machine):
     stub(machine, "claude", f'[ "$*" = "plugin list --json" ] || exit 2\nprintf %s {shlex.quote(json.dumps([entry]))}')
     (machine.home / ".claude").mkdir()
     (machine.home / ".claude/settings.json").write_text(
-        json.dumps({"pluginConfigs": {"languette@languette": {"options": {"guard_worktrees": True}}}}))
+        json.dumps({"pluginConfigs": {"languette@languette": {"options": {
+            "guard_worktrees": True, "guard_review_threads": True, "guard_signed_comments": True}}}}))
 
 
 @given(parsers.re(r"gh is (?P<state>signed in|signed out|not installed)"))

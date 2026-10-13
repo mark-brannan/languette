@@ -47,7 +47,6 @@ from languette.verdict import Act, Need, Refuse, ask, deny
 NAME = "guard-bypass-ruleset"
 TTL = 3600
 
-_GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 _GH = re.compile(r"(?:^|/)gh\Z")
 _CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 _EXPORT = frozenset("export declare typeset".split())
@@ -190,7 +189,7 @@ def _opt(x, full):
 
 
 def _push(s, a, b, nested, here, lits=None):
-    g = sw.cmd_index(s, a, b, _GIT, nested)
+    g = sw.cmd_index(s, a, b, sw.GIT, nested)
     if g is None:
         return None
     prog = "yadm" if s.w[g].endswith("yadm") else "git"

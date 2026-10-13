@@ -31,7 +31,6 @@ OPTION = "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"
 DEFAULT = "prose-budget"
 ENGINE_TIMEOUT = 50                 # under Claude Code's 60 s hook timeout; past it the engine counts as crashed
 GIT_TIMEOUT = 10
-GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 _ADD_QUIET = re.compile(r"-[nv]+\Z|--(?:dry-run|verbose)\Z")
 _VALUED = frozenset("-m --message -F --file -C --reuse-message -c --reedit-message --fixup --squash --author "
                     "--date --template".split())
@@ -151,7 +150,7 @@ class _Commits:
         s = self.s
         if s.w[lo] == "cd" and lo + 1 < len(s.w) and s.k[lo + 1] == "w":
             self.cd = _join(self.cd, s.w[lo + 1])
-        g = sw.cmd_index(s, lo, hi, GIT, nested)
+        g = sw.cmd_index(s, lo, hi, sw.GIT, nested)
         if g is None:
             return
         self.bin = s.w[g]

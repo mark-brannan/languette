@@ -45,7 +45,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 ```
 
 It needs `python3`, standard library only. `shfmt` (the parser it trusts
-most) and `gh` (for the two guards that ask GitHub) are optional.
+most) and `gh` (for the guards that ask GitHub) are optional.
 
 ### macOS (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
 
@@ -102,8 +102,8 @@ Each guard checks for one kind of hazard:
   `find -delete` outside a generated or agent-owned directory
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
 - [`guard-secrets`](languette/guards/guard_secrets.py): a pasted credential
-- [`guard-worktrees`](features/guard-worktrees-checkout-home.feature): opt-in; a branch switch in a `$HOME`
-  that is a worktree, or a [reach into another session's worktree](features/guard-worktrees-foreign.feature)
+- [`guard-worktrees`](features/guard-worktrees.feature): opt-in; a branch switch in a `$HOME`
+  that is a worktree, or a reach into another session's worktree
 - [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
@@ -191,8 +191,8 @@ meant. Spent approvals are kept beside the session transcript, in
 
 ## Configuration
 
-Every guard is on by default except `guard-worktrees`, which is opt-in. Turn
-one off (or that one on) with
+Every guard is on by default except `guard-worktrees`,
+`guard-review-threads` and `guard-signed-comments`, which are opt-in; the last is experimental. Turn one off (or those on) with
 `/plugin configure languette@languette`,
 or at install, by its name with underscores:
 
@@ -202,10 +202,10 @@ claude plugin install languette@languette --config guard_recursive_delete=false
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
-`guard_worktrees` is the reverse: it runs only when its setting is exactly
-`true`, so a misconfiguration leaves it off. Its two controls,
-`guard_worktrees_checkout_home` and `guard_worktrees_foreign`, are each on
-unless set to `false`.
+`guard_worktrees`, `guard_review_threads` and `guard_signed_comments` are the reverse: each runs only
+when its setting is exactly `true`, so a misconfiguration leaves it off. The
+first's two controls, `guard_worktrees_checkout_home` and
+`guard_worktrees_foreign`, are each on unless set to `false`.
 
 ### One setting per `guard-git-work-loss` rule
 
@@ -300,9 +300,11 @@ for beyond the command, it declares:
 | `guard-secrets` | the repo's `.languette/secrets.json`, when it has one |
 | `guard-infra` | the transcript, the approvals spent |
 | `guard-git-stacked-base` | GitHub, through `gh` |
+| `guard-review-threads` | the files a graphql call reads; each thread it resolves, and the gh login, from GitHub through `gh` |
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
 | `guard-github-issues` | the payload's `session_id`, the transcript, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
+| `guard-signed-comments` | the files a comment's body is read from, and the `signed_comments_opening` and `signed_comments_signature` settings |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
 | `guard-worktrees` | `$HOME` and what `git rev-parse --show-toplevel` resolves to; git, for where each path lands, and a record per session in `$TMPDIR` |

@@ -24,7 +24,6 @@ from languette import scan as sw
 from languette.verdict import Need, ask, deny
 
 NAME = "guard-git-stacked-base"
-GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 GH = re.compile(r"(?:^|/)(?:gh|glab)\Z")
 _UNRESOLVED = re.compile(r"[$`*?\[]")
 _REPO = re.compile(r"(?:^|/)repos/[^/]+/[^/]+/")
@@ -43,7 +42,7 @@ def _emit(out, repo, ref):
 
 
 def _git_push(s, a, b, nested, out):
-    g = sw.cmd_index(s, a, b, GIT, nested)
+    g = sw.cmd_index(s, a, b, sw.GIT, nested)
     if g is None:
         return
     p = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and s.w[i] == "push"), None)

@@ -49,7 +49,7 @@ IN_PROCESS = {"python": ("awk",), "shfmt": ("shfmt",)}   # engine -> scan.RUNGS
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "LANGUETTE_PERM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
          "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH", "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND",
-         "CLAUDE_CODE_TMPDIR", "GH_RULES", "GH_PROTECTION", "XDG_CACHE_HOME")
+         "CLAUDE_CODE_TMPDIR", "GH_RULES", "GH_PROTECTION", "GH_LOGIN", "GH_THREADS", "XDG_CACHE_HOME")
 
 
 _REAL_HOME = os.environ.get("HOME")
@@ -202,7 +202,8 @@ class Ctx:
         self.stubs = False
         self.hook = None                       # a hooks.json command, for wiring
         self.arg = None                        # the hook event, as Claude Code names it, for the guard to read
-        self.session = "s1"                    # session_id in the payload, for guard-github-issues
+        self.session = "s1"                    # session_id in the payload, for guard-github-issues; None leaves it out
+        self.agent = None                      # agent_id in the payload: a subagent's call, for guard-worktrees
         self.mode = None                       # permission_mode in the payload, for guard-cross-session-send
         self._doordir = None
         self.calls = 0                         # tool_use_id in the payload: one per call, as Claude Code gives
@@ -254,6 +255,10 @@ class Ctx:
     def as_sent(self, p):
         """`p` with what Claude Code puts in every payload: the cwd, and the mode when set."""
         p.setdefault("cwd", self.expand(self.cwd))
+        if self.session is None:
+            p.pop("session_id", None)
+        if self.agent:
+            p["agent_id"] = self.agent
         if self.mode is not None:
             p["permission_mode"] = self.mode
         return p
@@ -382,6 +387,24 @@ def _cwd(ctx, path):
     ctx.cwd = path
 
 
+@given("the payload carries no session id")
+@when("the payload carries no session id")
+def _no_session(ctx):
+    ctx.session = None
+
+
+@given(parsers.parse('the call comes from subagent "{agent}"'))
+@when(parsers.parse('the call comes from subagent "{agent}"'))
+def _from_subagent(ctx, agent):
+    ctx.agent = agent
+
+
+@given("the call comes from the session itself")
+@when("the call comes from the session itself")
+def _from_session(ctx):
+    ctx.agent = None
+
+
 @given(parsers.parse('the session is "{session}"'))
 @when(parsers.parse('the session is "{session}"'))
 def _session(ctx, session):
@@ -408,9 +431,11 @@ def _corrupt_index(ctx):
 
 @given(parsers.parse('the file "{rel}" holds:'))
 def _file(ctx, rel, docstring):
-    f = ctx.proj / rel
+    # A path under {HOME} or {TMP} is absolute once expanded; any other is the project's.
+    assert ctx.proj or Path(ctx.expand(rel)).is_absolute(), f"{rel!r} needs a project"
+    f = Path(ctx.proj or "/", ctx.expand(rel))
     f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_text(docstring)
+    f.write_text(ctx.expand(docstring))
 
 
 @given(parsers.parse('the file "{rel}" is committed'))
@@ -531,6 +556,22 @@ def _gh_stub_python(ctx):
     ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
     ctx.env["PATH"] = str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
     ctx.env["LANGUETTE_STUB_LOG"] = ctx.stub_log
+
+
+@given(parsers.parse('review thread "{tid}" holds:'))
+def _review_thread(ctx, tid, datatable):
+    # What the gh stub answers for this thread id, as GitHub's GraphQL shapes
+    # it: an author column, an optional type (User unless it says Bot), a body.
+    # A blank author is a deleted account, which GitHub gives no author.
+    head, *rows = datatable
+    if "GH_THREADS" not in ctx.env:
+        ctx.env["GH_THREADS"] = ctx.mkdtemp()
+    nodes = []
+    for n, row in enumerate(rows):
+        r = dict(zip(head, row))
+        author = {"login": r["author"], "__typename": r.get("type") or "User"} if r["author"] else None
+        nodes.append({"author": author, "body": r["body"], "createdAt": f"2026-10-08T00:00:{n:02d}Z"})
+    Path(ctx.env["GH_THREADS"], f"{tid}.json").write_text(json.dumps({"comments": {"nodes": nodes}}))
 
 
 @given(parsers.parse('a clone of "{url}" at "{path}" on branch "{branch}"'))
@@ -794,7 +835,7 @@ def _open_door_via_hooks_json(ctx):
 
 @when(parsers.re(r'the agent calls MCP tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
 def _mcp_call(ctx, tool, inp):
-    ctx.run(json.dumps(ctx.as_sent({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)})))
+    ctx.run(json.dumps(ctx.as_sent({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(ctx.expand(inp))})))
     _ran(ctx)
 
 
@@ -974,6 +1015,12 @@ def _denies_naming(ctx, text):
     assert_that(ctx.verdict, denies(naming=ctx.expand(text)))
 
 
+@then(parsers.re(r'the guard denies, not naming "(?P<text>.*)"'))
+def _denies_not_naming(ctx, text):
+    assert_that(ctx.verdict, denies())
+    assert ctx.expand(text) not in ctx.verdict.reason, f"the reason names {text!r}: {ctx.verdict.reason}"
+
+
 @then(parsers.re(r'the guard asks, naming "(?P<text>.*)"'))
 def _asks_naming(ctx, text):
     assert_that(ctx.verdict, asks(naming=ctx.expand(text)))
@@ -999,6 +1046,13 @@ def _rewrites(ctx, text):
     assert ctx.verdict.decision == "allow", ctx.verdict.show()
     got = ctx.verdict.out.get("updatedInput", {}).get("command")
     assert got == ctx.expand(text), f"rewritten to {got!r}, want {ctx.expand(text)!r}"
+
+
+@then(parsers.re(r'the guard allows, rewriting the input field "(?P<key>[a-z_]+)" to "(?P<text>.*)"'))
+def _rewrites_field(ctx, key, text):
+    assert ctx.verdict.decision == "allow", ctx.verdict.show()
+    got = ctx.verdict.out.get("updatedInput", {}).get(key)
+    assert got == ctx.expand(text), f"{key} rewritten to {got!r}, want {ctx.expand(text)!r}"
 
 
 @then(parsers.re(r'the stub "(?P<name>[a-z-]+)" was called with "(?P<text>.*)"'))
