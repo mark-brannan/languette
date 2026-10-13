@@ -353,3 +353,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261013t190358z
 - guard-signed-comments is configurable through two settings: signed_comments_opening (the first line's prefix) and signed_comments_signature (a regex the last line matches whole, {session} expanding to the session's eight hex) Undo: drop the two options and keep the constants ([#119](https://github.com/mark-brannan/languette/pull/119))
+
+### 20261013t190402z
+- guard-signed-comments is marked experimental in words only: the option title and description, the README and the module docstring; no mechanism Undo: remove those words ([#119](https://github.com/mark-brannan/languette/pull/119))
