@@ -10,12 +10,11 @@ host are not the host. Any other service is the agent's to stop, unless the
 user lists it in guard-protected-services.
 """
 
-import json
 import os
 import re
 
 from languette import scan as sw
-from languette.verdict import deny
+from languette.verdict import WAY_USER, bash_command, deny
 
 NAME = "guard-host-availability"
 
@@ -46,7 +45,6 @@ _CTL_READ = {"status", "show", "cat", "help", "list-units", "list-unit-files", "
              "is-active", "is-enabled", "is-failed", "is-system-running", "show-environment", "get-default",
              "start", "reload", "enable", "reenable", "daemon-reload"}
 _FORK = re.compile(r"([A-Za-z_:][A-Za-z0-9_:]*)\s*\(\s*\)\s*\{\s*\1\s*\|\s*\1\s*&")
-_WAY_USER = "That is the user's to run, not an agent's: say what you need and hand them the exact command."
 
 
 def _power(s, a, b):
@@ -132,35 +130,28 @@ def judge(doc):
         for a, b in segs:
             what = _power(s, a, b)
             if what:
-                return f"`{what}` is blocked: it takes the machine down, with the user's session on it. {_WAY_USER}"
+                return f"`{what}` is blocked: it takes the machine down, with the user's session on it. {WAY_USER}"
         for a, b in segs:
             verb = service_stop(s, a, b, _core_unit)
             if verb:
                 return (f"`systemctl {verb}` is blocked: it takes down the host or a service the "
-                        f"user's session runs on. {_WAY_USER}")
+                        f"user's session runs on. {WAY_USER}")
         for a, b in segs:
             verb = sysv_stop(s, a, b)
             if verb:
                 return (f"`{verb}` is blocked: it takes down a service the "
-                        f"user's session runs on. {_WAY_USER}")
+                        f"user's session runs on. {WAY_USER}")
         # The fork bomb is raw text, so a commit message that quotes it must not trip it:
         # only a text with a segment that is not led by a prose consumer is read.
         if any(sw.seg_cmd(s, a, b) is None or s.w[sw.seg_cmd(s, a, b)] not in sw.PROSE or s.shellseg
                for a, b in segs) and _FORK.search(t):
             return ("`:(){ :|:& };:` is blocked: that is the fork-bomb shape, a function that pipes itself into "
-                    f"itself in the background, and it freezes the machine. {_WAY_USER}")
+                    f"itself in the background, and it freezes the machine. {WAY_USER}")
     return None
 
 
 def check(doc):
-    payload = doc.payload
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if cmd is None or cmd is False:
-        return None
-    if not isinstance(cmd, str):
-        cmd = json.dumps(cmd)                  # as `jq -r` would print it
-    cmd = cmd.rstrip("\n")                     # as $(...) would leave it
-    if not cmd:
+    if bash_command(doc) is None:
         return None
     why = judge(doc)
     return deny(f"{NAME}: {why}") if why else None

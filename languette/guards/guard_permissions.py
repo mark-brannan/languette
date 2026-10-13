@@ -9,13 +9,12 @@ anything inside a .git. A target this guard cannot resolve to one allowed path
 is denied on sight, with a reason naming what it saw.
 """
 
-import json
 import os
 import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Need, Refuse, context, deny, planned
+from languette.verdict import Need, Refuse, bash_command, context, deny, planned
 
 NAME = "guard-permissions"
 
@@ -174,13 +173,7 @@ def parse(doc):
     parse alone comes to."""
     payload, env = doc.payload, doc.env
     out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None}
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if cmd is None or cmd is False:
-        return out
-    if not isinstance(cmd, str):
-        cmd = json.dumps(cmd)                  # as `jq -r` would print it
-    cmd = cmd.rstrip("\n")                     # as $(...) would leave it
-    if not cmd:
+    if bash_command(doc) is None:
         return out
     cwd = payload["cwd"]
     home = env.get("HOME", "")
