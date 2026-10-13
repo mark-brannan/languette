@@ -20,5 +20,6 @@ A countable thing is plural (`guard-secrets`); an act or a mass noun is singular
 | `guard-recursive-delete` | directory trees | recursive `rm`, `find -delete` |
 | `guard-scheduled-jobs` | scheduled work | wiping cron entries or timers |
 | `guard-secrets` | credentials | one committed, printed into the transcript, or posted |
+| `guard-signed-comments` | an agent's words read as the user's | a GitHub comment an agent posts under the user's login without its agent signature |
 | `guard-sudo` | acting as root | `sudo`, `su`, `doas`, `pkexec` |
 | `guard-worktrees` | worktree isolation | a branch switch in a `$HOME` worktree; another session's worktree |
