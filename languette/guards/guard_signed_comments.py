@@ -90,7 +90,7 @@ class _Read:
                     self.fed[p] = int(ks[0])
         self.cd = False
         self.posts = []
-        for text, nested in doc.texts(text=buf):
+        for text, nested in doc.texts(text=stripped):
             s = self.s = doc.scan(text)
             self.cd = self.cd or any(s.k[i] == "w" and s.w[i] in ("cd", "pushd", "popd") for i in range(len(s.w)))
             for a, b in s.segments():
