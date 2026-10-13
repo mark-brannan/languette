@@ -12,9 +12,9 @@ Feature: doctor
 
   Scenario: a plugin install whose hooks deny both probes
     Given languette "cd31356ad5db" is installed at user scope
-    And the languette options are `{"guard_worktrees": true, "guard_review_threads": true}`
+    And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true}`
     When the doctor runs
-    Then the "Claude Code" row is ✓ "plugin cd31356, user scope; 22 guards on, 0 off"
+    Then the "Claude Code" row is ✓ "plugin cd31356, user scope; 23 guards on, 0 off"
     And the "shell parser" row is there
     And the "Claude Code" row comes before the "version" row
     And the "version" row comes before the "shell parser" row
@@ -35,11 +35,11 @@ Feature: doctor
 
     Examples:
       | options                                           | counts                               |
-      | {"guard_review_threads": true}                    | 21 guards on, 1 off: guard_worktrees |
-      | {"guard_worktrees": true, "guard_review_threads": true, "guard_disks": false}   | 21 guards on, 1 off: guard_disks     |
-      | {"guard_worktrees": true, "guard_review_threads": true, "guard_disks": "false"} | 21 guards on, 1 off: guard_disks     |
-      | {"guard_worktrees": true, "guard_review_threads": true, "guard_disks": "no"}    | 22 guards on, 0 off                  |
-      | {"guard_worktrees": "yes", "guard_review_threads": true} | 21 guards on, 1 off: guard_worktrees |
+      | {"guard_review_threads": true, "guard_signed_comments": true} | 22 guards on, 1 off: guard_worktrees |
+      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_disks": false}   | 22 guards on, 1 off: guard_disks     |
+      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_disks": "false"} | 22 guards on, 1 off: guard_disks     |
+      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_disks": "no"}    | 23 guards on, 0 off                  |
+      | {"guard_worktrees": "yes", "guard_review_threads": true, "guard_signed_comments": true} | 22 guards on, 1 off: guard_worktrees |
 
   Scenario: gh signed out is a warning, not a failure
     Given languette "cd31356ad5db" is installed at user scope
@@ -143,10 +143,10 @@ Feature: doctor
 
   Scenario: without the claude CLI the doctor reads installed_plugins.json
     Given languette "cd31356ad5db" is installed at user scope
-    And the languette options are `{"guard_worktrees": true, "guard_review_threads": true}`
+    And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true}`
     And claude plugin list fails
     When the doctor runs
-    Then the "Claude Code" row is ✓ "plugin cd31356, user scope; 22 guards on, 0 off"
+    Then the "Claude Code" row is ✓ "plugin cd31356, user scope; 23 guards on, 0 off"
     And the doctor exits 0
 
   Scenario Outline: what the doctor cannot read is a warning row, never a traceback
