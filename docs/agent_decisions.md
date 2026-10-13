@@ -362,3 +362,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261013t192341z
 - guard-rules design: PR-shaped facts are a closed fact list grown on a second asker, not a fifth engine Undo: delete the 'Facts a condition may name' section of docs/design/guard-rules.md ([#199](https://github.com/mark-brannan/languette/pull/199#discussion_r4263029258)) ([#199](https://github.com/mark-brannan/languette/pull/199))
+
+### 20261013t192353z
+- guard-rules design: a rule only tightens, deny or ask-once, never allow Undo: delete the 'A rule only tightens' sentence in docs/design/guard-rules.md ([#199](https://github.com/mark-brannan/languette/pull/199#discussion_r4263030426)) ([#199](https://github.com/mark-brannan/languette/pull/199))
