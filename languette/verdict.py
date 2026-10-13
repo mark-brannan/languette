@@ -10,8 +10,6 @@ Refuse is how a guard's internals say "deny, for this reason" from deep inside
 a walk; check catches it and returns deny. Standard library only.
 """
 
-import json
-
 WAY_USER = "That is the user's to run, not an agent's: say what you need and hand them the exact command."
 
 
@@ -79,19 +77,6 @@ class Act(Need):
     """
 
     __slots__ = ()
-
-
-def bash_command(doc):
-    """The Bash call's command text as the shell would see it, or None when the
-    call has none to judge."""
-    payload = doc.payload
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if cmd is None or cmd is False:
-        return None
-    if not isinstance(cmd, str):
-        cmd = json.dumps(cmd)                  # as `jq -r` would print it
-    cmd = cmd.rstrip("\n")                     # as $(...) would leave it
-    return cmd or None
 
 
 def planned(doc, parse, plan, judge):

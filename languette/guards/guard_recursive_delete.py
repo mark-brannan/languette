@@ -12,7 +12,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Need, Refuse, bash_command, context, deny, planned
+from languette.verdict import Need, Refuse, context, deny, planned
 
 NAME = "guard-recursive-delete"
 
@@ -169,7 +169,7 @@ def parse(doc):
     parse alone comes to."""
     payload, env = doc.payload, doc.env
     out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None}
-    if bash_command(doc) is None:
+    if doc.text is None:
         return out
     cwd = payload["cwd"]
     home = env.get("HOME", "")

@@ -12,7 +12,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Need, Refuse, bash_command, deny, planned
+from languette.verdict import Need, Refuse, deny, planned
 
 NAME = "guard-disks"
 
@@ -195,7 +195,7 @@ class _Judge:
 def parse(doc):
     """The command's targets, or the finding parse alone comes to: (finding, home, targets)."""
     payload, env = doc.payload, doc.env
-    if bash_command(doc) is None:
+    if doc.text is None:
         return None, None, []
     cwd = payload["cwd"]
     home = env.get("HOME", "")

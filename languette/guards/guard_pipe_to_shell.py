@@ -12,7 +12,7 @@ import os
 import re
 
 from languette import scan as sw
-from languette.verdict import bash_command, deny
+from languette.verdict import deny
 
 NAME = "guard-pipe-to-shell"
 
@@ -116,7 +116,7 @@ def _judge(doc, s, nested):
 
 
 def check(doc):
-    if bash_command(doc) is None:
+    if doc.text is None:
         return None
     for text, nested in doc.texts():
         why = _judge(doc, doc.scan(text), nested)

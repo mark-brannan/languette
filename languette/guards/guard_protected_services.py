@@ -12,7 +12,7 @@ import fnmatch
 import re
 
 from languette.guards.guard_host_availability import service_stop, unit_names
-from languette.verdict import WAY_USER, bash_command, deny
+from languette.verdict import WAY_USER, deny
 
 NAME = "guard-protected-services"
 OPTION = "CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES"
@@ -44,7 +44,7 @@ def judge(doc):
 
 
 def check(doc):
-    if bash_command(doc) is None:
+    if doc.text is None:
         return None
     why = judge(doc)
     return deny(f"{NAME}: {why}") if why else None
