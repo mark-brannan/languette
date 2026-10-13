@@ -81,11 +81,11 @@ def _skips(sub, args):
     return False
 
 
-def _runs(text):
-    """(how many times `text` skips the hooks, whether any of it is in a loop)."""
+def _runs(doc):
+    """(how many times the command skips the hooks, whether any of it is in a loop)."""
     n, loop = 0, False
-    for t, nested in sw.texts_of(sw.strip_heredocs(text)):
-        s = sw.Scan(t)
+    for t, nested in doc.texts():
+        s = doc.scan(t)
         loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
         for a, b in s.segments():
             if a > b:
@@ -107,11 +107,12 @@ def _runs(text):
     return n, loop
 
 
-def check(payload, env=None):
+def check(doc):
+    payload = doc.payload
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd.strip():
         return None
-    runs, looped = _runs(cmd + "\n")
+    runs, looped = _runs(doc)
     if not runs:
         return None
     if looped:

@@ -1,8 +1,8 @@
 @python
 Feature: guard-recursive-delete
   Recursive rm and find -delete are denied unless every target is a generated
-  directory or the agent's own area. The working directory is {HOME}/project
-  unless a scenario says otherwise.
+  directory or the agent's own area. The working directory is {CWD}, a
+  directory outside $HOME, unless a scenario says otherwise.
 
   # The README's table under the promise is generated from these rows
   # (python3 tests/readme_table.py). The two known gaps: deletion from inside
@@ -293,6 +293,80 @@ Feature: guard-recursive-delete
       """
     Then the guard denies, naming "rm -r examples"
 
+  Scenario: a backslash continuation on the opener line keeps the next line as commands
+    When the agent runs:
+      """
+      cat <<EOF; \
+      rm -rf examples
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a double-quoted string running past the opener line puts the body after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo "
+      text
+      "; rm -rf examples
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a single-quoted string running past the opener line puts the body after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo '
+      text
+      '; rm -rf examples
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: an escaped quote in $'...' on the opener line does not close it, so the body starts after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo $'it\'s
+      x'; rm -rf examples
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a $(...) running past the opener line puts the body after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo $(
+      rm -rf examples
+      )
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a case inside a $(...) on the opener line keeps the rest as commands
+    When the agent runs:
+      """
+      cat <<EOF; echo $(case x in a) :;; esac
+      rm -rf examples
+      )
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a backtick substitution running past the opener line puts the body after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo `
+      rm -rf examples
+      `
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
   Scenario: a here-string is not a heredoc opener
     When the agent runs:
       """
@@ -322,7 +396,7 @@ Feature: guard-recursive-delete
       """
     Then the guard is silent
 
-  # On the shfmt rung run.py's parse check denies it first (guard-unparsable).
+  # On the shfmt rung run.py's parse check denies it first (require-well-formed).
   @no_shfmt
   Scenario: a heredoc that never closes is read as commands
     When the agent runs:
@@ -422,7 +496,7 @@ Feature: guard-recursive-delete
       """
     Then the guard denies, naming "rm -r examples"
 
-  # On the shfmt rung run.py's parse check denies it first (guard-unparsable).
+  # On the shfmt rung run.py's parse check denies it first (require-well-formed).
   @no_shfmt
   Scenario: an escaped ; before # in a kept backtick substitution does not hide the commands after it
     When the agent runs:

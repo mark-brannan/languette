@@ -15,7 +15,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Refuse, context, deny
+from languette.verdict import Need, Refuse, context, deny, planned
 
 NAME = "guard-permissions"
 
@@ -34,8 +34,9 @@ _WAY_OUT = ("Spell the files out: chmod or chown the paths themselves, without -
             "LANGUETTE_PERM_ALLOW.")
 
 
-def _parse_allow(value, home, home_p):
-    """LANGUETTE_PERM_ALLOW -> (extra_roots, error or None): absolute paths only."""
+def _parse_allow(value, home, home_p, physical):
+    """LANGUETTE_PERM_ALLOW -> (extra_roots, error or None): absolute paths only.
+    `physical` resolves each entry through the disk."""
     roots = []
     for ent in value.split(":"):
         if ent == "":
@@ -50,7 +51,7 @@ def _parse_allow(value, home, home_p):
             ent = ent[:-1]
         if ent in ("", home):
             return roots, f"'{ent}' is / or $HOME"
-        ent_p = paths.physical(ent)
+        ent_p = physical(ent)
         if ent_p in ("", home, home_p):
             return roots, f"'{ent}' resolves to / or $HOME"
         roots += [ent, ent_p]
@@ -159,9 +160,8 @@ class _Judge:
         if g is not None:
             self.perm(s, g, b, sweep)
 
-    def run(self, text):
-        texts = sw.texts_of(sw.strip_heredocs(text))
-        scans = [(sw.Scan(t), nested) for t, nested in texts]
+    def run(self, doc):
+        scans = [(doc.scan(t), nested) for t, nested in doc.texts()]
         self.moved = paths.moves_directory(scans)
         for s, nested in scans:
             for a, b in s.segments():
@@ -169,26 +169,54 @@ class _Judge:
                     self.segment(s, a, b, nested)
 
 
-def check(payload, env=os.environ):
+def parse(doc):
+    """The command read into what plan and judge need; "found" is a finding
+    parse alone comes to."""
+    payload, env = doc.payload, doc.env
+    out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None}
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if cmd is None or cmd is False:
-        return None
+        return out
     if not isinstance(cmd, str):
         cmd = json.dumps(cmd)                  # as `jq -r` would print it
     cmd = cmd.rstrip("\n")                     # as $(...) would leave it
     if not cmd:
-        return None
-    cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = os.getcwd()
+        return out
+    cwd = payload["cwd"]
     home = env.get("HOME", "")
     if not home.startswith("/"):
-        return deny("guard-permissions: $HOME is not an absolute path, cannot resolve targets")
+        out["found"] = deny("guard-permissions: $HOME is not an absolute path, cannot resolve targets")
+        return out
+    judge = _Judge(cwd, home)
+    try:
+        judge.run(doc)
+    except Refuse as e:
+        out["refused"] = str(e)
+    out.update(home=home, allow=env.get("LANGUETTE_PERM_ALLOW") or None, targets=judge.targets)
+    return out
 
-    home_p = paths.physical(home)
+
+def plan(parsed):
+    """The physical path of $HOME and each allow entry, when LANGUETTE_PERM_ALLOW is set;
+    of the agent's own areas and every target, when there are targets to judge."""
+    if parsed["found"] or parsed["home"] is None:
+        return []
+    home, want = parsed["home"], []
+    if parsed["allow"]:
+        want.append(home)
+        _parse_allow(parsed["allow"], home, home, lambda p: want.append(p) or p)
+    if parsed["refused"] is None and parsed["targets"]:
+        want += paths.own_bases(home) + [t for t, _, _ in parsed["targets"]]
+    return [Need("physical", p) for p in dict.fromkeys(want)]
+
+
+def judge(parsed, answers):
+    if parsed["found"] or parsed["home"] is None:
+        return parsed["found"]
+    home, physical = parsed["home"], paths.physical_of(answers)
     extra_roots, allow_err = [], None
-    if env.get("LANGUETTE_PERM_ALLOW"):
-        extra_roots, allow_err = _parse_allow(env["LANGUETTE_PERM_ALLOW"], home, home_p)
+    if parsed["allow"]:
+        extra_roots, allow_err = _parse_allow(parsed["allow"], home, physical(home), physical)
     allow_msg = None
     if allow_err:
         allow_msg = (f"LANGUETTE_PERM_ALLOW is malformed ({allow_err}). Recursive chown, chgrp and chmod, and "
@@ -196,25 +224,25 @@ def check(payload, env=os.environ):
                      "colon-separated list of absolute paths (/srv/scratch), using only letters, digits and "
                      ". _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.")
 
-    judge, refused = _Judge(cwd, home), None
-    try:
-        judge.run(cmd + "\n")
-    except Refuse as e:
-        refused = str(e)
-    if refused is None and not judge.targets:
+    refused = parsed["refused"]
+    if refused is None and not parsed["targets"]:
         return context("guard-permissions: " + allow_msg) if allow_msg else None
     if allow_msg:
         return deny("guard-permissions: " + allow_msg)
     if refused is not None:
         return deny(refused)
 
-    roots = paths.own_roots(home, extra_roots)
-    for abs_, what, raw in judge.targets:
+    roots = paths.own_roots(home, physical, extra_roots)
+    for abs_, what, raw in parsed["targets"]:
         if not paths.under(abs_, roots):
             return deny(f"`{what} {raw}` is blocked: only the scratchpad, /tmp, agent worktrees and paths named "
                         f"in LANGUETTE_PERM_ALLOW may be swept, and {abs_} is none of those. {_WAY_OUT}")
-        phys = paths.physical(abs_)
+        phys = physical(abs_)
         if phys != abs_ and not paths.under(phys, roots):
             return deny(f"`{what} {raw}` is blocked: {abs_} resolves through a symlink to {phys}, which is not "
                         f"the scratchpad, /tmp or an agent worktree. {_WAY_OUT}")
     return None
+
+
+def check(doc):
+    return (yield from planned(doc, parse, plan, judge))

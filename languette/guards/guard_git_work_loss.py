@@ -24,7 +24,7 @@ from languette.verdict import Refuse, deny
 
 NAME = "guard-git-work-loss"
 GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
-GLOBAL_VALUE = frozenset("-C -c --git-dir --work-tree --namespace".split())
+GLOBAL_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
 RULE = {"add": "BLANKET_STAGING", "commit": "BLANKET_STAGING", "stash": "STASH", "push": "FORCE_PUSH",
         "checkout": "DISCARD", "restore": "DISCARD", "clean": "DISCARD", "reset": "DISCARD",
         "branch": "BRANCH_DELETE"}
@@ -178,14 +178,14 @@ def _segment(s, a, b, nested, env):
         _reset(args)
 
 
-def check(payload, env=None):
-    env = env or {}
+def check(doc):
+    payload, env = doc.payload, doc.env or {}
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd:
         return None
     try:
-        for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
-            s = sw.Scan(text)
+        for text, nested in doc.texts():
+            s = doc.scan(text)
             for a, b in s.segments():
                 if a <= b:
                     _segment(s, a, b, nested, env)

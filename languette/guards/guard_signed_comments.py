@@ -24,10 +24,12 @@ import os
 import re
 
 from languette import scan as sw
+from languette.guards.guard_bypass_labels import MAX_READ
 from languette.guards.guard_private_terms import writes
 from languette.verdict import Need, deny
 
 NAME = "guard-signed-comments"
+OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS"
 _MCP = ("add_issue_comment|add_reply_to_pull_request_comment|add_comment_to_pending_review|"
         "pull_request_review_write|update_issue_comment|add_pull_request_review_comment|create_pull_request_review|"
         "create_and_submit_pull_request_review|submit_pending_pull_request_review")
@@ -68,10 +70,10 @@ class _Read:
     (text, s) | (doc, k) heredoc k | (file, path) | (json, src) | (graphql, qsrc, fields, input) |
     (opaque, why)."""
 
-    def __init__(self, command):
+    def __init__(self, doc, command):
         buf = command + "\n"
-        self.docs = [b for b, _ in sw.heredocs(buf)]
-        stripped = sw.strip_heredocs(buf)
+        self.docs = [b for b, _ in doc.heredocs(buf)]
+        stripped = doc.stripped(buf)
         parts = stripped.split(_MARK)
         # Number each marker so a value, a stdin or a file can name its heredoc.
         if len(parts) - 1 == len(self.docs):
@@ -88,8 +90,8 @@ class _Read:
                     self.fed[p] = int(ks[0])
         self.cd = False
         self.posts = []
-        for text, nested in sw.texts_of(stripped):
-            s = self.s = sw.Scan(text)
+        for text, nested in doc.texts(text=buf):
+            s = self.s = doc.scan(text)
             self.cd = self.cd or any(s.k[i] == "w" and s.w[i] in ("cd", "pushd", "popd") for i in range(len(s.w)))
             for a, b in s.segments():
                 if a <= b:
@@ -253,7 +255,8 @@ def _graphql_string(t):
         return None
 
 
-def check(payload, env):
+def check(doc):
+    payload, env = doc.payload, doc.env or {}
     tool = payload.get("tool_name")
     ti = payload.get("tool_input")
     ti = ti if isinstance(ti, dict) else {}
@@ -261,7 +264,7 @@ def check(payload, env):
         cmd = ti.get("command")
         if not isinstance(cmd, str) or "gh" not in cmd:
             return None
-        r = _Read(cmd)
+        r = _Read(doc, cmd)
         posts = r.posts
     elif isinstance(tool, str) and _MCP_TOOL.match(tool):
         r, posts = None, [[("text", b) for b in _json_bodies(ti)]]
@@ -311,7 +314,7 @@ def check(payload, env):
         else:
             if f not in files:
                 try:
-                    files[f] = yield Need("read", f)
+                    files[f] = yield Need("read", f, MAX_READ)
                 except Exception:  # noqa: BLE001
                     files[f] = None
             if files[f] is None:

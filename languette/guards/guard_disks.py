@@ -1,4 +1,4 @@
-"""guard-disk: features/guard-disk.feature is the spec.
+"""guard-disks: features/guard-disks.feature is the spec.
 
 Blocks the commands that overwrite a disk: `dd` with of= under /dev, mkfs*,
 wipefs and shred on anything but the agent's own area, and a redirection or
@@ -13,9 +13,9 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Refuse, deny
+from languette.verdict import Need, Refuse, deny, planned
 
-NAME = "guard-disk"
+NAME = "guard-disks"
 
 _DD = re.compile(r"(?:^|/)dd\Z")
 _MKFS = re.compile(r"(?:^|/)(?:mkfs(?:\.[A-Za-z0-9]+)?|mke2fs|mkswap|mkdosfs)\Z")
@@ -179,9 +179,9 @@ class _Judge:
                 if s.k[i] == "w" and self.is_device(s.w[i], "tee"):
                     self.refuse(f"tee {s.w[i]}", "it writes onto a disk device")
 
-    def run(self, text):
-        texts = sw.texts_of(sw.strip_heredocs(text))
-        scans = [(sw.Scan(t), nested) for t, nested in texts]
+    def run(self, doc):
+        texts = doc.texts()
+        scans = [(doc.scan(t), nested) for t, nested in texts]
         self.moved = paths.moves_directory(scans)
         self.dev_moved = any(a <= b and self.lands_in_dev(s, a, b) for s, _ in scans for a, b in s.segments())
         for (t, _), (s, nested) in zip(texts, scans):
@@ -193,35 +193,53 @@ class _Judge:
                     self.segment(s, a, b, nested)
 
 
-def check(payload, env=os.environ):
+def parse(doc):
+    """The command's targets, or the finding parse alone comes to: (finding, home, targets)."""
+    payload, env = doc.payload, doc.env
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if cmd is None or cmd is False:
-        return None
+        return None, None, []
     if not isinstance(cmd, str):
         cmd = json.dumps(cmd)                  # as `jq -r` would print it
     cmd = cmd.rstrip("\n")                     # as $(...) would leave it
     if not cmd:
-        return None
-    cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = os.getcwd()
+        return None, None, []
+    cwd = payload["cwd"]
     home = env.get("HOME", "")
     if not home.startswith("/"):
-        return deny("guard-disk: $HOME is not an absolute path, cannot resolve targets")
+        return deny("guard-disks: $HOME is not an absolute path, cannot resolve targets"), None, []
 
     judge = _Judge(cwd, home)
     try:
-        judge.run(cmd + "\n")
+        judge.run(doc)
     except Refuse as e:
-        return deny(f"guard-disk: {e}")
+        return deny(f"guard-disks: {e}"), None, []
+    return None, home, judge.targets
 
-    roots = paths.own_roots(home)
-    for abs_, what, raw in judge.targets:
+
+def plan(parsed):
+    found, home, targets = parsed
+    if found or not targets:
+        return []
+    return [Need("physical", p) for p in dict.fromkeys(paths.own_bases(home) + [t for t, _, _ in targets])]
+
+
+def judge(parsed, answers):
+    found, home, targets = parsed
+    if found or not targets:
+        return found
+    physical = paths.physical_of(answers)
+    roots = paths.own_roots(home, physical)
+    for abs_, what, raw in targets:
         if not paths.under(abs_, roots):
             kind = "a device node" if abs_.startswith("/dev/") else "outside the scratchpad, /tmp and agent worktrees"
-            return deny(f"guard-disk: `{what} {raw}` is blocked: {abs_} is {kind}. {_WAY_OUT}")
-        phys = paths.physical(abs_)
+            return deny(f"guard-disks: `{what} {raw}` is blocked: {abs_} is {kind}. {_WAY_OUT}")
+        phys = physical(abs_)
         if phys != abs_ and not paths.under(phys, roots):
-            return deny(f"guard-disk: `{what} {raw}` is blocked: {abs_} resolves through a symlink to {phys}, "
+            return deny(f"guard-disks: `{what} {raw}` is blocked: {abs_} resolves through a symlink to {phys}, "
                         f"which is not the scratchpad, /tmp or an agent worktree. {_WAY_OUT}")
     return None
+
+
+def check(doc):
+    return (yield from planned(doc, parse, plan, judge))

@@ -1,5 +1,5 @@
 @python
-Feature: guard-unparsable
+Feature: require-well-formed
   A Bash command the parser refuses is denied, whole, naming shfmt's line:col
   and what it found, and saying nothing ran. The other guards skip such a
   command rather than deny it again. Without shfmt, a lower rung reads it:
@@ -84,6 +84,16 @@ Feature: guard-unparsable
       | command                       | found                                  |
       | echo "unclosed                | awk: the " opened at `"unclosed`       |
       | git commit -m 'half; rm -rf x | awk: the ' opened at `'half; rm -rf x` |
+
+  @python_only
+  Scenario: on the awk rung alone, a quote left open on a heredoc opener line is denied, the lines after it unstripped
+    When the agent runs:
+      """
+      cat <<EOF; echo "
+      rm -rf examples
+      EOF
+      """
+    Then the guard denies, naming "awk: the " opened at `"`"
 
   @shfmt_only
   Scenario: a substitution in a heredoc with no closing line is denied

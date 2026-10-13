@@ -187,6 +187,12 @@ Feature: guard-cross-session-send
     And the agent sends "api-worker" the message `see above`
     Then the guard denies, naming "gh issue view"
 
+  Scenario: a read whose post hook carries no working directory still opens the door
+    Given the permission mode is "bypassPermissions"
+    When the agent runs `gh issue view 12 -R o/r`, its post hook carrying no working directory
+    And the agent sends "api-worker" the message `see above`
+    Then the guard denies, naming "gh issue view"
+
   Scenario: the human's next turn does not close the door: the text is still in context
     Given the permission mode is "bypassPermissions"
     When the agent calls tool "WebFetch" with input `{"url":"https://example.com"}`

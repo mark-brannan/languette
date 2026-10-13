@@ -108,6 +108,8 @@ Feature: guard-secrets
       | curl "https://example.com/v1?page=2&per_page=100"            | a query with no credential key         |
       | helm install app chart --set auth.enabled=true                 | a key that only starts with auth       |
       | sed -i 's/password=.*/password=REDACTED/' app.env              | a pattern, after a slash               |
+      | mysql -u root -phunter2 db                                     | masked in a decision record, never judged here |
+      | echo Zq9kLm2pQ7rXv4TnWb8Yc3Hd5Fg6Js1Ae0Ux                      | a long mixed run: masked in a record, never judged here: gitleaks:allow |
       | echo done                                                      |                                        |
 
   Scenario: the project's own patterns extend the list

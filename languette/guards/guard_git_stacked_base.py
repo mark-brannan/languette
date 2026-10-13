@@ -28,6 +28,8 @@ GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 GH = re.compile(r"(?:^|/)(?:gh|glab)\Z")
 _UNRESOLVED = re.compile(r"[$`*?\[]")
 _REPO = re.compile(r"(?:^|/)repos/[^/]+/[^/]+/")
+_PUSH_VALUED = ("--push-option", "--repo", "--receive-pack", "--exec")   # --exec is --receive-pack
+_SHORT_O = re.compile(r"-[^o=-]*o\Z")   # -o, or a cluster ending in it (-fo): the value is the next word
 TIMEOUT = 20
 LIST = "  gh pr list --state open --json number,baseRefName,headRefName"
 
@@ -52,7 +54,17 @@ def _git_push(s, a, b, nested, out):
         repo = "?"
     if any(s.k[i] == "w" and (s.w[i] == "-C" or s.w[i].startswith("--git-dir")) for i in range(g + 1, p)):
         repo = "?"
-    words = [s.w[i] for i in range(p + 1, b + 1) if s.k[i] == "w"]
+    words, skip = [], False
+    for i in range(p + 1, b + 1):
+        if s.k[i] != "w":
+            continue
+        w = s.w[i]
+        if skip:                               # the value of -o, --repo, ...: not the remote, not a ref
+            skip = False
+        elif _SHORT_O.match(w) or (len(w) >= 3 and "=" not in w and any(v.startswith(w) for v in _PUSH_VALUED)):
+            skip = True                        # git takes any unambiguous prefix of a long option
+        else:
+            words.append(w)
     delete = any(w in ("--delete", "-d") for w in words)
     seen_remote = False
     for w in words:
@@ -101,13 +113,13 @@ def _gh_api(s, a, b, nested, out):
         _emit(out, repo, w[w.index("refs/heads/") + len("refs/heads/"):])
 
 
-def deletions(cmd):
-    """[(repo, branch)] for each remote-branch deletion in `cmd`, in order: repo
+def deletions(doc):
+    """[(repo, branch)] for each remote-branch deletion in the command, in order: repo
     is "-" for the cwd's repository, "owner/name" when the command names one,
     "?" when git is pointed elsewhere; a branch of "?" is not a literal name."""
     out = []
-    for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
-        s = sw.Scan(text)
+    for text, nested in doc.texts():
+        s = doc.scan(text)
         for a, b in s.segments():
             if a <= b:
                 _git_push(s, a, b, nested, out)
@@ -128,11 +140,12 @@ def _unreadable(b):
                f"hand first:\n{LIST}")
 
 
-def check(payload, env=None):
+def check(doc):
+    payload = doc.payload
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd or ("push" not in cmd and "refs/heads/" not in cmd):
         return None
-    found = deletions(cmd)
+    found = deletions(doc)
     if not found:
         return None
     if any(b == "?" for _, b in found):
@@ -155,9 +168,7 @@ def check(payload, env=None):
         return ask(f"{NAME}: this deletes a remote branch, but neither `timeout` nor `gtimeout` is installed "
                    "(macOS: `brew install coreutils`), so the open-PR list can't be read without risking a hang. "
                    f"Deleting a branch an open PR points at closes that PR silently. Confirm by hand first:\n{LIST}")
-    cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd:
-        cwd = yield Need("cwd")
+    cwd = payload["cwd"]
     for repo, b in dict.fromkeys(found):
         for side, field in (("--base", "baseRefName"), ("--head", "headRefName")):
             argv = [bound, str(TIMEOUT), "gh", "pr", "list", "--state", "open"]

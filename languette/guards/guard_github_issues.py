@@ -65,12 +65,11 @@ class _Writes:
     """Walks a command for identifier writes: `n` of them, `loop` when one sits
     in a loop body or after a word that repeats it."""
 
-    def __init__(self, command):
+    def __init__(self, doc):
         self.n, self.loop = 0, False
-        buf = command + "\n"
-        self.hd = "".join(b + "\n" for b in sw.heredoc_bodies(buf))
-        for text, nested in sw.texts_of(sw.strip_heredocs(buf)):
-            s = sw.Scan(text)
+        self.hd = "".join(b + "\n" for b in doc.heredoc_bodies())
+        for text, nested in doc.texts():
+            s = doc.scan(text)
             self.depth = 0
             for a, b in s.segments():
                 if a <= b:
@@ -144,8 +143,9 @@ class _Writes:
                 self._emit(rep)
 
 
-def _writes(payload):
+def _writes(doc):
     """(identifier writes in this call, whether one is in a loop)."""
+    payload = doc.payload
     tool = payload.get("tool_name")
     ti = payload.get("tool_input")
     ti = ti if isinstance(ti, dict) else {}
@@ -153,7 +153,7 @@ def _writes(payload):
         command = ti.get("command")
         if not isinstance(command, str):
             return 0, False
-        w = _Writes(command)
+        w = _Writes(doc)
         return w.n, w.loop
     if isinstance(tool, str) and _MCP_WRITE.match(tool):
         return 1, False
@@ -174,7 +174,8 @@ def _never_ran(transcript, call):
     return any(pat.search(line) and re.search(r'"is_error": ?true', line) for line in transcript.splitlines())
 
 
-def check(payload, env):
+def check(doc):
+    payload = doc.payload
     event = payload.get("hook_event_name") or "PreToolUse"
     session = _session(payload)
     if event == "UserPromptSubmit":
@@ -185,14 +186,14 @@ def check(payload, env):
         # failed create cannot be followed by a second in the same turn. A call
         # that cannot be read spends it too.
         try:
-            n, _ = _writes(payload)
+            n, _ = _writes(doc)
         except Exception:  # noqa: BLE001
             n = 1
         if n:
             yield Act("door-spend", session)
         return None
     try:
-        n, loop = _writes(payload)
+        n, loop = _writes(doc)
     except Exception as e:  # noqa: BLE001 -- fails closed
         return _deny(f"the command could not be read ({type(e).__name__}), so this call could not be checked")
     if n == 0:
