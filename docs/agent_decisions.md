@@ -365,3 +365,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261013t192353z
 - guard-rules design: a rule only tightens, deny or ask-once, never allow Undo: delete the 'A rule only tightens' sentence in docs/design/guard-rules.md ([#199](https://github.com/mark-brannan/languette/pull/199#discussion_r4263030426)) ([#199](https://github.com/mark-brannan/languette/pull/199))
+
+### 20261013t203618z
+- A feature row the awk and shfmt engines make different I/O on is pinned per engine in tests/io_counts.json, not refused Undo: restore the split refusal in tests/pipeline_checks.py and fix #203 first ([#190](https://github.com/mark-brannan/languette/pull/190))
