@@ -23,7 +23,6 @@ from languette import scan as sw
 from languette.verdict import Refuse, deny
 
 NAME = "guard-git-work-loss"
-GLOBAL_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
 RULE = {"add": "BLANKET_STAGING", "commit": "BLANKET_STAGING", "stash": "STASH", "push": "FORCE_PUSH",
         "checkout": "DISCARD", "restore": "DISCARD", "clean": "DISCARD", "reset": "DISCARD",
         "branch": "BRANCH_DELETE"}
@@ -149,9 +148,7 @@ def _segment(s, a, b, nested, env):
     g = sw.cmd_index(s, a, b, sw.GIT, nested)
     if g is None:
         return
-    i = g + 1
-    while i <= b and s.w[i].startswith("-"):
-        i += 1 + (s.w[i] in GLOBAL_VALUE)
+    i = sw.git_subcommand(s, g, b)
     if i > b:
         return
     sub = s.w[i]

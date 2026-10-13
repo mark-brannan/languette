@@ -29,8 +29,6 @@ from languette.verdict import deny
 NAME = "guard-bypass-hooks"
 APPROVE_LABEL = "Skip hooks once"
 
-# git's global options that take a value as the next word.
-GLOBAL_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
 # Options that take the next word as a value, so a message that is just
 # `--no-verify` is a message. Short ones are the letters, tried in a cluster.
 VALUE = {
@@ -92,13 +90,12 @@ def _runs(doc):
             g = sw.cmd_index(s, a, b, sw.GIT, nested)
             if g is None:
                 continue
-            i, hooks_path = g + 1, False
-            while i <= b and s.k[i] == "w" and s.w[i].startswith("-"):
-                w = s.w[i]
+            i, hooks_path = sw.git_subcommand(s, g, b), False
+            for j in sw.git_options(s, g, i):
+                w = s.w[j]
                 v = w[len("--config-env="):] if w.startswith("--config-env=") else (
-                    s.w[i + 1] if w in ("-c", "--config-env") and i < b and s.k[i + 1] == "w" else "")
+                    s.w[j + 1] if w in ("-c", "--config-env") and j < b and s.k[j + 1] == "w" else "")
                 hooks_path = hooks_path or v.split("=", 1)[0].lower() == "core.hookspath"
-                i += 1 + (w in GLOBAL_VALUE)
             if hooks_path:
                 n += 1
             elif i <= b and s.k[i] == "w" and s.w[i] in VALUE and _skips(s.w[i], s.w[i + 1:b + 1]):
