@@ -103,6 +103,15 @@ interface is; this file says who decided it and why, one line each.
 - Whether guards that watch an agent's conduct on GitHub (#118, #119, #125)
   are one concept or several is unruled.
 - Prose now; a check with teeth once the gate's shape is settled.
+- Ruled 2026-10-13: a new guard is written against the shared layer
+  first: Document for the call, scan for the words, verdict for the
+  answer. A primitive the guard needs that two or more guards would share
+  (a program pattern, an option walk, a sentence) goes into scan or
+  verdict in the same PR, and the siblings that repeat it move onto it, or
+  an issue names them. A guard that reads sequential or external facts (PR
+  state, review threads, a transcript) is the exception, not the shape.
+- Current thinking, not settled: guards trend toward a rules engine with a
+  few deep special cases.
 
 ## Base-case guard names: Solace, 2026-10-09
 
