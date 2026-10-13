@@ -32,6 +32,8 @@ _ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _WS = re.compile(r"[ \t\n]")
 
 GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
+# git's global options that take the next word as their value.
+GIT_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
 PROSE = frozenset("grep egrep fgrep rg ag ack echo printf git yadm gh glab sed awk jq yq "
                   "cat tee test [ diff sort head tail wc tr cut less more".split())
 EXEC = frozenset("sh bash zsh dash ksh ash busybox eval exec xargs su ssh sudo doas env nohup "
@@ -948,3 +950,19 @@ def cmd_index(s, a, b, cmd, nested, parents=None, prose=PROSE):
         return None
     return None
 
+
+def git_subcommand(s, g, b):
+    """The index of the subcommand word of the git call at g, past its global options;
+    beyond b when the segment ends first."""
+    i = g + 1
+    while i <= b and s.w[i].startswith("-"):
+        i += 1 + (s.w[i] in GIT_VALUE)
+    return i
+
+
+def git_options(s, g, sub):
+    """The index of each global option word of the git call at g, before its subcommand at sub."""
+    i = g + 1
+    while i < sub:
+        yield i
+        i += 1 + (s.w[i] in GIT_VALUE)
