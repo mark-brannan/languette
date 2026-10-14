@@ -124,10 +124,6 @@ def _glued(t):
     return t[3:] if t[2:3] == "=" else t[2:]
 
 
-def _wv(s, i):
-    return s.q[i] if s.k[i] == "q" else s.w[i]
-
-
 def _read(path, ctx):
     """The text of the file `path` names, as the shell will open it and the
     runner read it (ctx's files); raises Refuse, with what is wrong with the
@@ -224,8 +220,8 @@ def _api(f, s, i, b, ctx):
     method, path, fields, inputs = None, None, [], []
     j = i
     while j <= b:
-        t = _wv(s, j)
-        nxt = (_wv(s, j + 1), s.live[j + 1]) if j < b else None
+        t = sw.word(s, j)
+        nxt = (sw.word(s, j + 1), s.live[j + 1]) if j < b else None
         if t in ("-X", "--method"):
             method, j = (nxt[0].upper() if nxt else method), j + 1
         elif t.startswith("--method="):
@@ -302,12 +298,12 @@ def _gh(f, s, g, b, ctx):
     short = next(x for x in flags if len(x) == 2)
     j = g + 3
     while j <= b:
-        t = _wv(s, j)
+        t = sw.word(s, j)
         if t in flags:
             if j == b:
                 f.unseen.append(f"`{t}` has no value the guard can see")
             else:
-                f.value(_wv(s, j + 1), s.live[j + 1])
+                f.value(sw.word(s, j + 1), s.live[j + 1])
             j += 1
         elif t.startswith(glued):
             f.value(t.split("=", 1)[1], s.live[j])
@@ -323,11 +319,11 @@ def _alias(f, s, g, b, act):
     if act == "set":
         for j in range(g + 4, b + 1):
             if s.live[j]:
-                f.unseen.append(f"the alias expansion `{_wv(s, j)}` is built at run time")
+                f.unseen.append(f"the alias expansion `{sw.word(s, j)}` is built at run time")
             else:
-                f.labels.extend(x for x in re.split(r"[\s,=]+", _wv(s, j)) if x)
+                f.labels.extend(x for x in re.split(r"[\s,=]+", sw.word(s, j)) if x)
     elif act == "import":
-        src = _wv(s, g + 3) if g + 3 <= b else "stdin"
+        src = sw.word(s, g + 3) if g + 3 <= b else "stdin"
         f.unseen.append(f"the alias file `{src}` may define an alias that applies a label")
 
 

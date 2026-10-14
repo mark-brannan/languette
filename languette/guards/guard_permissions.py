@@ -14,7 +14,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Need, Refuse, context, deny, planned
+from languette.verdict import Refuse, context, deny, planned
 
 NAME = "guard-permissions"
 
@@ -148,13 +148,11 @@ class _Judge:
             name = _exec_perm(s, g, b)
             if name is not None:
                 sweep, self.what = True, "find -exec " + name
-                i, starts = g + 1, 0
-                while i <= b and not s.w[i].startswith(("-", "!")):
-                    starts += 1
-                    self.target(s, i)
-                    i += 1
+                starts = paths.find_starts(s, g, b)
                 if not starts:
                     self.blocked("", "with no start path find sweeps the working directory")
+                for i in starts:
+                    self.target(s, i)
         g = sw.cmd_index(s, a, b, _CMD, nested)
         if g is not None:
             self.perm(s, g, b, sweep)
@@ -162,45 +160,15 @@ class _Judge:
     def run(self, doc):
         scans = [(doc.scan(t), nested) for t, nested in doc.texts()]
         self.moved = paths.moves_directory(scans)
-        for s, nested in scans:
-            for a, b in s.segments():
-                if a <= b:
-                    self.segment(s, a, b, nested)
+        paths.judge_segments(self, scans)
 
 
 def parse(doc):
-    """The command read into what plan and judge need; "found" is a finding
-    parse alone comes to."""
-    payload, env = doc.payload, doc.env
-    out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None}
-    if doc.text is None:
-        return out
-    cwd = payload["cwd"]
-    home = env.get("HOME", "")
-    if not home.startswith("/"):
-        out["found"] = deny("guard-permissions: $HOME is not an absolute path, cannot resolve targets")
-        return out
-    judge = _Judge(cwd, home)
-    try:
-        judge.run(doc)
-    except Refuse as e:
-        out["refused"] = str(e)
-    out.update(home=home, allow=env.get("LANGUETTE_PERM_ALLOW") or None, targets=judge.targets)
-    return out
+    return paths.parse_targets(doc, NAME, _Judge, "LANGUETTE_PERM_ALLOW")
 
 
 def plan(parsed):
-    """The physical path of $HOME and each allow entry, when LANGUETTE_PERM_ALLOW is set;
-    of the agent's own areas and every target, when there are targets to judge."""
-    if parsed["found"] or parsed["home"] is None:
-        return []
-    home, want = parsed["home"], []
-    if parsed["allow"]:
-        want.append(home)
-        _parse_allow(parsed["allow"], home, home, lambda p: want.append(p) or p)
-    if parsed["refused"] is None and parsed["targets"]:
-        want += paths.own_bases(home) + [t for t, _, _ in parsed["targets"]]
-    return [Need("physical", p) for p in dict.fromkeys(want)]
+    return paths.plan_targets(parsed, _parse_allow)
 
 
 def judge(parsed, answers):

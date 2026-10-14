@@ -60,10 +60,6 @@ def _deny(why):
     return deny(f"{NAME}: {why}")
 
 
-def _wv(s, i):
-    return s.q[i] if s.k[i] == "q" else s.w[i]
-
-
 def refs(rx, text, repo):
     """[(owner/name, N)] for each reference `rx` finds in `text`, in order; a
     bare #N is on `repo` (None when unknown)."""
@@ -109,11 +105,11 @@ def _pr_create(s, g, hi, repo):
     post = _Post(repo)
     i = g + 3
     while i <= hi:
-        t, live = _wv(s, i), s.live[i]
+        t, live = sw.word(s, i), s.live[i]
         if t in ("-R", "--repo"):
             if i < hi:
                 i += 1
-                post.repo = _wv(s, i)
+                post.repo = sw.word(s, i)
         elif t.startswith("--repo="):
             post.repo = t[7:]
         elif t.startswith("-R") and len(t) > 2:
@@ -121,7 +117,7 @@ def _pr_create(s, g, hi, repo):
         elif t in ("-b", "--body"):
             if i < hi:
                 i += 1
-                _value(post, _wv(s, i), s.live[i])
+                _value(post, sw.word(s, i), s.live[i])
         elif t.startswith("--body="):
             _value(post, t[7:], live)
         elif t.startswith("-b") and len(t) > 2:
@@ -129,7 +125,7 @@ def _pr_create(s, g, hi, repo):
         elif t in ("-F", "--body-file"):
             if i < hi:
                 i += 1
-                _file(post, _wv(s, i), s.live[i])
+                _file(post, sw.word(s, i), s.live[i])
         elif t.startswith("--body-file="):
             _file(post, t[12:], live)
         elif t.startswith("-F") and len(t) > 2:
@@ -145,11 +141,11 @@ def _api(s, g, hi):
     fields = False
     i = g + 2
     while i <= hi:
-        t, live = _wv(s, i), s.live[i]
+        t, live = sw.word(s, i), s.live[i]
         if t in ("-X", "--method"):
             if i < hi:
                 i += 1
-                method = _wv(s, i).upper()
+                method = sw.word(s, i).upper()
         elif t.startswith("--method="):
             method = t[9:].upper()
         elif t.startswith("-X") and len(t) > 2:
@@ -160,7 +156,7 @@ def _api(s, g, hi):
                 if i >= hi:
                     break
                 i += 1
-                kv, live = _wv(s, i), s.live[i]
+                kv, live = sw.word(s, i), s.live[i]
             else:
                 kv = t.split("=", 1)[1] if t.startswith("--") else t[2:]
             key, _, v = kv.partition("=")

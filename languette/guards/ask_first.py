@@ -34,10 +34,9 @@ approvals; one inside a loop or xargs is denied outright, since no count of
 approvals covers it.
 """
 
-import json
-import os
 import re
 
+from languette import paths
 from languette import scan as sw
 from languette.verdict import Need, Refuse, deny
 
@@ -56,28 +55,14 @@ LOOP = frozenset("for while until select xargs parallel watch -exec -execdir -ok
 
 
 def _config(payload, env):
-    """The governing config path, or None when no project has one. The nearest
-    at or above cwd wins, because the agent may have cd'd into another repo;
-    then $CLAUDE_PROJECT_DIR's. Raises Refuse when cwd is unusable and the
-    project dir gives no answer either: unknown is not the same as none."""
-    cwd = payload.get("cwd")
-    if isinstance(cwd, str) and cwd.startswith("/") and (yield Need("path", "isdir", cwd)):
-        d = yield Need("path", "realpath", cwd)
-        while True:
-            if (yield Need("path", "lexists", os.path.join(d, CONFIG))):
-                return os.path.join(d, CONFIG)
-            if (yield Need("path", "lexists", os.path.join(d, ".git"))) or os.path.dirname(d) == d:
-                break
-            d = os.path.dirname(d)
-        cwd = None
-    else:
-        cwd = cwd or "(none)"
-    proj = env.get("CLAUDE_PROJECT_DIR")
-    if proj and (yield Need("path", "lexists", os.path.join(proj, CONFIG))):
-        return os.path.join(proj, CONFIG)
-    if cwd:
-        raise Refuse(f"the payload's cwd {cwd!r} is not a directory, so the repo's list cannot be found")
-    return None
+    """The governing config path, or None when no project has one
+    (paths.project_config). Raises Refuse when cwd is unusable and the project
+    dir gives no answer either: unknown is not the same as none."""
+    path, usable = yield from paths.project_config(payload, env, CONFIG)
+    if path is None and not usable:
+        raise Refuse(f"the payload's cwd {payload.get('cwd') or '(none)'!r} is not a directory, "
+                     "so the repo's list cannot be found")
+    return path
 
 
 def _strs(v, what):
@@ -87,12 +72,7 @@ def _strs(v, what):
 
 
 def _load(path):
-    try:
-        cfg = json.loads((yield Need("read", path)))
-    except ValueError as e:
-        raise Refuse(f"not JSON ({e})")
-    except OSError as e:
-        raise Refuse(f"unreadable ({e.strerror})")
+    cfg = yield from paths.read_json(path)
     if not isinstance(cfg, dict) or not isinstance(cfg.get("commands"), list) or not cfg["commands"]:
         raise Refuse('the top level must be {"commands": [...]} with at least one command')
     seen, labels = set(), set()

@@ -32,6 +32,8 @@ _ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _WS = re.compile(r"[ \t\n]")
 
 GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
+# A word that is cd, pushd or popd: the builtins that move the working directory.
+CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 # git's global options that take the next word as their value.
 GIT_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
 PROSE = frozenset("grep egrep fgrep rg ag ack echo printf git yadm gh glab sed awk jq yq "
@@ -883,6 +885,12 @@ def seg_cmd(s, a, b):
         if not _ASSIGN.match(s.w[i]):
             return i
     return None
+
+
+def word(s, i):
+    """The text of word i: q for a quoted word holding whitespace (the w list
+    has $Q there), w for any other."""
+    return s.q[i] if s.k[i] == "q" else s.w[i]
 
 
 def texts_of(text, prose=PROSE, read=None):

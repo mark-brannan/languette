@@ -12,7 +12,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Need, Refuse, context, deny, planned
+from languette.verdict import Refuse, context, deny, planned
 
 NAME = "guard-recursive-delete"
 
@@ -26,13 +26,7 @@ GENERATED_NAMES = ("node_modules", "dist", "coverage", ".pio")
 _FIND = re.compile(r"(?:^|/)find\Z")
 _RM = re.compile(r"(?:^|/)rm\Z")
 _RM_PARENTS = re.compile(r"^(?:git|yadm|svn|hg|jj|gsutil)\Z")
-_CD = re.compile(r"^(?:cd|pushd|popd)\Z")
 _ALLOW_CHARS = re.compile(r"[A-Za-z0-9._@+/-]*")
-
-
-def _normalize(p):
-    out = "".join("/" + s for s in p.split("/") if s not in ("", "."))
-    return out or "/"
 
 
 def _parse_allow(value, home, home_p, physical):
@@ -69,7 +63,7 @@ class _Judge:
     in the command and either refuse it on sight or return it resolved."""
 
     def __init__(self, cwd, home):
-        self.cwd, self.home, self.homeN = cwd, home, _normalize(home)
+        self.cwd, self.home, self.homeN = cwd, home, paths.normalize(home)
         self.trig, self.moved, self.targets = "rm", False, []
 
     def lab(self, raw):
@@ -109,7 +103,7 @@ class _Judge:
                 self.blocked(t, "a `cd` earlier in this command moves the working directory and the hook "
                                 "cannot follow it; use an absolute path")
             t = self.cwd + "/" + t
-        t = _normalize(t)
+        t = paths.normalize(t)
         if t in ("/", self.homeN):
             self.blocked(raw, "that is " + ("the root of the filesystem" if t == "/" else "$HOME itself"))
         self.targets.append((t, self.trig, raw))
@@ -117,14 +111,11 @@ class _Judge:
     def segment(self, s, a, b, nested):
         g = sw.cmd_index(s, a, b, _FIND, nested)
         if g is not None and "-delete" in s.w[g + 1:b + 1]:
-            self.trig, starts = "find", 0
-            i = g + 1
-            while i <= b and not s.w[i].startswith(("-", "!")):
-                starts += 1
-                self.target(s, i)
-                i += 1
+            self.trig, starts = "find", paths.find_starts(s, g, b)
             if not starts:
                 self.blocked("", "with no start path find deletes under the working directory")
+            for i in starts:
+                self.target(s, i)
             self.trig = "rm"
         g = sw.cmd_index(s, a, b, _RM, nested, _RM_PARENTS)
         if g is None:
@@ -156,47 +147,17 @@ class _Judge:
     def run(self, doc):
         scans = [(doc.scan(t), nested) for t, nested in doc.texts()]
         # Any cd anywhere makes every relative target in the command unresolvable.
-        self.moved = any(a <= b and sw.cmd_index(s, a, b, _CD, True) is not None
+        self.moved = any(a <= b and sw.cmd_index(s, a, b, sw.CD, True) is not None
                          for s, _ in scans for a, b in s.segments())
-        for s, nested in scans:
-            for a, b in s.segments():
-                if a <= b:
-                    self.segment(s, a, b, nested)
+        paths.judge_segments(self, scans)
 
 
 def parse(doc):
-    """The command read into what plan and judge need; "found" is a finding
-    parse alone comes to."""
-    payload, env = doc.payload, doc.env
-    out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None}
-    if doc.text is None:
-        return out
-    cwd = payload["cwd"]
-    home = env.get("HOME", "")
-    if not home.startswith("/"):
-        out["found"] = deny("guard-recursive-delete: $HOME is not an absolute path, cannot resolve targets")
-        return out
-    judge = _Judge(cwd, home)
-    try:
-        judge.run(doc)
-    except Refuse as e:
-        out["refused"] = str(e)
-    out.update(home=home, allow=env.get("LANGUETTE_RM_ALLOW") or None, targets=judge.targets)
-    return out
+    return paths.parse_targets(doc, NAME, _Judge, "LANGUETTE_RM_ALLOW")
 
 
 def plan(parsed):
-    """The physical path of $HOME and each allow entry, when LANGUETTE_RM_ALLOW is set;
-    of the agent's own areas and every target, when there are targets to judge."""
-    if parsed["found"] or parsed["home"] is None:
-        return []
-    home, want = parsed["home"], []
-    if parsed["allow"]:
-        want.append(home)
-        _parse_allow(parsed["allow"], home, home, lambda p: want.append(p) or p)
-    if parsed["refused"] is None and parsed["targets"]:
-        want += paths.own_bases(home) + [t for t, _, _ in parsed["targets"]]
-    return [Need("physical", p) for p in dict.fromkeys(want)]
+    return paths.plan_targets(parsed, _parse_allow)
 
 
 def judge(parsed, answers):

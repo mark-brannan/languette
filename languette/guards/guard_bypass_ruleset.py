@@ -48,7 +48,6 @@ NAME = "guard-bypass-ruleset"
 TTL = 3600
 
 _GH = re.compile(r"(?:^|/)gh\Z")
-_CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 _EXPORT = frozenset("export declare typeset".split())
 _GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
 _PUSH_VALUED = frozenset("-o --push-option --repo --receive-pack --exec".split())
@@ -329,7 +328,7 @@ def _loops_moved(s, segs):
     stack, out = [], set()
     for n, (c, opens, close) in enumerate(segs):
         stack += [[n, loop, False] for loop in opens]
-        if c is not None and _CD.match(s.w[c]):
+        if c is not None and sw.CD.match(s.w[c]):
             for f in stack:
                 f[2] = True
         if close and stack:
@@ -394,7 +393,7 @@ def _walk(doc, cmd, cwd, home=None):
                 here = None                    # the cd inside may not have run
             if kw and a <= b and s.k[a] == "w" and not s.quoted[a] and s.w[a] in ("else", "elif") and kw[-1]:
                 here = None                    # a branch that did not run left no cd behind it
-            if c is not None and _CD.match(s.w[c]):
+            if c is not None and sw.CD.match(s.w[c]):
                 kw = [True] * len(kw)
                 prev = _ops(s.op[a - 1]) if a > 0 else []
                 nxt = _ops(s.op[b + 1]) if b + 1 < len(s) else []
