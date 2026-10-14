@@ -14,7 +14,10 @@ with no step of its own. Each run.respond call the scenario makes is watched:
 
 After a change that means to add or drop such a call, regenerate the pins:
 
-    LANGUETTE_PIN_IO=update python -m pytest tests/test_features.py
+    LANGUETTE_PIN_IO=update python -m pytest -n 0 tests/test_features.py
+
+(-n 0: the suite runs under pytest-xdist by default, and each worker would
+write a partial file, so update refuses to run under it.)
 
 A scenario's pin is the same on every engine (the key drops the engine), and
 one with no such Need has no entry. The @hook engine runs languette in a
@@ -115,6 +118,14 @@ def pipeline(engine, request, monkeypatch):
                          "tests/test_features.py")
 
 
+def refuse_update_under_xdist(config):
+    """Called from conftest.pytest_configure: each xdist worker would write the
+    file with only its share of the scenarios."""
+    if _UPDATE and (os.environ.get("PYTEST_XDIST_WORKER") or getattr(config.option, "numprocesses", 0)):
+        raise pytest.UsageError("LANGUETTE_PIN_IO=update rewrites tests/io_counts.json from one whole run; "
+                                "under pytest-xdist each worker would write a partial file. Run with -n 0.")
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     rep = (yield).get_result()
@@ -142,4 +153,4 @@ def pytest_sessionfinish(session):
     PINS.write_text("{\n" + ",\n".join(f" {json.dumps(k)}: {json.dumps(v)}" for k, v in sorted(pins.items())) + "\n}\n")
 
 
-__all__ = ["pipeline", "pytest_runtest_makereport", "pytest_collection_modifyitems", "pytest_sessionfinish"]
+__all__ = ["pipeline", "refuse_update_under_xdist", "pytest_runtest_makereport", "pytest_collection_modifyitems", "pytest_sessionfinish"]
