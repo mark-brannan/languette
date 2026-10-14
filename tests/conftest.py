@@ -63,7 +63,37 @@ GUARD_NAMES = sorted({g.NAME for _, _, gs in run.GUARDS for g in gs})
 OPT_INS = sorted({g.OPT_IN for _, _, gs in run.GUARDS for g in gs if getattr(g, "OPT_IN", None)})
 
 
+# The suite runs on a small, fixed number of cores (pytest-xdist): this machine
+# runs many sessions at once, and a run on every core has taken a host down
+# before. The default is min(4, cores); LANGUETTE_TEST_WORKERS sets both the
+# default and the ceiling, and an explicit `-n` above the ceiling is clamped to
+# it. `-n 0` runs serially (and is how LANGUETTE_PIN_IO=update runs).
+_WORKER_CAP = 4
+
+
+def _worker_ceiling():
+    raw = os.environ.get("LANGUETTE_TEST_WORKERS", "")
+    return int(raw) if raw.isdigit() and int(raw) > 0 else _WORKER_CAP
+
+
+def pytest_xdist_auto_num_workers(config):
+    return min(_worker_ceiling(), os.cpu_count() or 1)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_cmdline_main(config):
+    # Before xdist's own pytest_cmdline_main turns numprocesses into the list
+    # of workers to start (config.option.tx); clamping later changes nothing.
+    n = getattr(config.option, "numprocesses", None)
+    if isinstance(n, int) and n > _worker_ceiling():
+        config.option.numprocesses = _worker_ceiling()
+        sys.stderr.write(f"languette: -n {n} clamped to {_worker_ceiling()} workers "
+                         "(raise the ceiling with LANGUETTE_TEST_WORKERS)\n")
+
+
+@pytest.hookimpl(tryfirst=True)
 def pytest_configure(config):
+    refuse_update_under_xdist(config)
     for g in GUARD_NAMES:
         config.addinivalue_line("markers", f"also_{g}: the row rightly trips {g} too")
     # A throwaway $HOME for the whole run, so no verdict depends on, and no
