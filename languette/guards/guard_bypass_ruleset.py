@@ -47,12 +47,10 @@ from languette.verdict import Act, Need, Refuse, ask, deny
 NAME = "guard-bypass-ruleset"
 TTL = 3600
 
-_GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 _GH = re.compile(r"(?:^|/)gh\Z")
 _CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 _EXPORT = frozenset("export declare typeset".split())
 _GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
-_GIT_VALUED = frozenset("-C -c --git-dir --work-tree --namespace --config-env".split())
 _PUSH_VALUED = frozenset("-o --push-option --repo --receive-pack --exec".split())
 _ALL = frozenset("--all --branches --mirror".split())
 _UNREADABLE = re.compile(r"[$`*?\[{]")
@@ -190,14 +188,14 @@ def _opt(x, full):
 
 
 def _push(s, a, b, nested, here, lits=None):
-    g = sw.cmd_index(s, a, b, _GIT, nested)
+    g = sw.cmd_index(s, a, b, sw.GIT, nested)
     if g is None:
         return None
     prog = "yadm" if s.w[g].endswith("yadm") else "git"
     if any(s.w[i].startswith(_GIT_ENV) for i in range(a, g)):
         here = None
-    i = g + 1
-    while i <= b and s.w[i] != "push":
+    sub = sw.git_subcommand(s, g, b)
+    for i in sw.git_options(s, g, sub):
         x = s.w[i]
         if x == "-C" and i + 1 <= b:
             lit = lits and s.live[i + 1] and lits.word(i + 1, a)
@@ -208,16 +206,14 @@ def _push(s, a, b, nested, here, lits=None):
         if cfg and (cfg.startswith("alias.") or "insteadof" in cfg):
             raise Refuse("a `-c` override of an alias or a URL rewrite can turn any subcommand into a push, "
                          "or any remote into another")
-        if x in _GIT_VALUED:
-            i += 2
-        elif x.startswith("-"):
-            i += 1
-        elif s.live[i] or _UNREADABLE.search(x):
-            raise Refuse(f"the subcommand `{x}` is built at run time")
-        else:
-            return None                        # another subcommand
+    i = sub
     if i > b:
         return None
+    x = s.w[i]
+    if x != "push":
+        if s.live[i] or _UNREADABLE.search(x):
+            raise Refuse(f"the subcommand `{x}` is built at run time")
+        return None                            # another subcommand
     remote, pos, all_, tags, dry, dashdash = None, [], False, False, False, False
     i += 1
     while i <= b:
@@ -344,7 +340,7 @@ def _loops_moved(s, segs):
     return out
 
 
-def _walk(cmd, cwd, home=None):
+def _walk(doc, cmd, cwd, home=None):
     """(pushes, whether an admin merge was seen, the first Refuse). A Refuse ends only its own
     command, so an admin merge or a push on PR-only main later in the line still denies.
 
@@ -356,8 +352,8 @@ def _walk(cmd, cwd, home=None):
     `then`, `else`, `do` or `!` is seen; past the `else` or `elif` that follows it and past the `fi`
     or `done` that closes it, the directory is unknown, and through a whole loop that holds one, since a later pass starts where it left."""
     pushes, admin, refused = [], False, None
-    for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
-        s, here, moved = sw.Scan(text), cwd, False
+    for text, nested in doc.texts():
+        s, here, moved = doc.scan(text), cwd, False
         lits = None if nested else _Literals(s, cmd)
         # Each open bracket: (here, and the and-or list's state) as it opened. Scan keeps no
         # separator before the first word, so brackets that lead the text are read here. The
@@ -524,14 +520,13 @@ def _judge(p, env):
     return asked
 
 
-def check(payload, env=os.environ):
+def check(doc):
+    payload, env = doc.payload, doc.env
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd.strip():
         return None
-    cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = yield Need("cwd")
-    pushes, admin, refused = _walk(cmd.rstrip("\n"), cwd, env.get("HOME"))
+    cwd = payload["cwd"]
+    pushes, admin, refused = _walk(doc, cmd.rstrip("\n"), cwd, env.get("HOME"))
     if admin:
         return deny(ADMIN)
     asked = None

@@ -1,8 +1,8 @@
 @python
 Feature: guard-recursive-delete
   Recursive rm and find -delete are denied unless every target is a generated
-  directory or the agent's own area. The working directory is {HOME}/project
-  unless a scenario says otherwise.
+  directory or the agent's own area. The working directory is {CWD}, a
+  directory outside $HOME, unless a scenario says otherwise.
 
   # The README's table under the promise is generated from these rows
   # (python3 tests/readme_table.py). The two known gaps: deletion from inside
@@ -35,7 +35,6 @@ Feature: guard-recursive-delete
       | rm -rf ~/Downloads           | denies    |                                                 |
       | rm -rf *                     | denies    |                                                 |
       | rm -rf dist/*                | denies    | a glob could name anything                      |
-      | rm -rf dist/../src           | denies    | a .. segment steps out                          |
       | rm -Rf src                   | denies    | any recursive spelling                          |
       | rm -rf public                | denies    |                                                 |
       | rm -rf .                     | denies    |                                                 |
@@ -53,6 +52,11 @@ Feature: guard-recursive-delete
       | rm -rf -- examples           | denies    |                                                 |
       | rm -rf "$(pwd)/examples"     | denies    | command substitution                            |
       | rm -rf `pwd`/examples        | denies    | backtick substitution                           |
+
+    @also_guard-worktrees
+    Examples:
+      | command                      | verdict   | note                                            |
+      | rm -rf dist/../src           | denies    | a .. segment steps out                          |
 
   Scenario: a recursive rm on a later line is still seen
     When the agent runs:
@@ -103,7 +107,6 @@ Feature: guard-recursive-delete
     Examples:
       | cwd                                 | command                                | note                                            |
       | /tmp                                | rm -rf "/home/user/private dir"        | a quoted path with a space, even from /tmp      |
-      | {HOME}/.local/state/claude-tmpdir/x | rm -rf "my dir"                        | a quoted path with a space, from the scratchpad |
       | {HOME}/project                      | rm -rf examples "a b"                  |                                                 |
       | {HOME}/project                      | sh -c 'rm -rf examples'                |                                                 |
       | {HOME}/project                      | bash -c "cd ~/proj && rm -rf examples" |                                                 |
@@ -115,6 +118,11 @@ Feature: guard-recursive-delete
       | {HOME}/project                      | rm -rf node_modules{,/../examples}     | a brace expansion glued to an allowed name      |
       | {HOME}/project                      | rm -rf {examples,docs}                 | a brace list, no visible target                 |
       | {HOME}/project                      | rm -rf my\ dir                         | an escaped space in the target                  |
+
+    @also_ask-first
+    Examples:
+      | cwd                                 | command                                | note                                            |
+      | {HOME}/.local/state/claude-tmpdir/x | rm -rf "my dir"                        | a quoted path with a space, from the scratchpad |
 
   Scenario: a line continuation does not split rm from its target
     When the agent runs:
@@ -132,12 +140,16 @@ Feature: guard-recursive-delete
     Examples:
       | cwd                                 | command                         | note                                                      |
       | /tmp                                | cd ~/project && rm -rf examples | a cd moves the target out of /tmp                         |
-      | {HOME}/.local/state/claude-tmpdir/x | cd ~/project; rm -rf examples   | a cd moves the target out of the scratchpad               |
       | {HOME}                              | rm -rf .                        | the cwd is $HOME                                          |
       | {HOME}/project                      | rm -rf ~/dist                   | a generated name directly under $HOME is just a directory |
       | {HOME}                              | rm -rf coverage                 | the same, reached from $HOME                              |
       | {HOME}/project                      | rm -rf /dist                    | a generated name directly under /                         |
       | /                                   | rm -rf coverage                 | the same, reached from /                                  |
+
+    @also_ask-first
+    Examples:
+      | cwd                                 | command                         | note                                                      |
+      | {HOME}/.local/state/claude-tmpdir/x | cd ~/project; rm -rf examples   | a cd moves the target out of the scratchpad               |
 
   Scenario Outline: generated directories, the agent's own areas, and anything that is not a recursive rm
     Given the working directory is "<cwd>"
@@ -150,7 +162,6 @@ Feature: guard-recursive-delete
       | {HOME}/project     | rm -rf ./dist coverage                               | is silent |                                                 |
       | {HOME}/project     | rm -rf dist/assets                                   | is silent | a component of the path is allowlisted          |
       | {HOME}/project     | rm -rf -- dist                                       | is silent |                                                 |
-      | /opt/proj          | rm -rf dist                                          | is silent | a generated name nested under /                 |
       | {HOME}/project     | rm -rf {HOME}/.local/state/claude-tmpdir/anything    | is silent | the scratchpad                                  |
       | {HOME}/project     | rm -rf /tmp/whatever                                 | is silent | /tmp is the agent's                             |
       | {HOME}/project     | rm -rf ~/.claude/worktrees/foo                       | is silent | an agent worktree                               |
@@ -163,8 +174,6 @@ Feature: guard-recursive-delete
       | {HOME}/project     | yadm rm -r examples                                  | is silent |                                                 |
       | {HOME}/project     | git rm -r --cached examples && git commit -m x       | is silent |                                                 |
       | {HOME}/project     | docker rm -f mycontainer                             | is silent |                                                 |
-      | {HOME}/project/sub | rm -rf dist                                          | is silent | from a deeper cwd                               |
-      | {HOME}/project/sub | rm -rf {HOME}/.claude/worktrees/x                    | is silent | an absolute worktree, from a deeper cwd         |
       | {HOME}/project     | rm -rf node_modules 2>/dev/null                      | is silent | a redirection is not a target                   |
       | {HOME}/project     | rm -rf node_modules > /dev/null 2>&1                 | is silent |                                                 |
       | {HOME}/project     | find . -name "*.orig" -exec rm -f {} +               | is silent | find -exec rm without -r                        |
@@ -181,6 +190,13 @@ Feature: guard-recursive-delete
       | {HOME}/project     | echo rm -rf examples \| bash                         | denies    |                                                 |
       | {HOME}/project     | python3 -c "import os; os.system('rm -rf examples')" | denies    | an unknown consumer's quoted text is scanned    |
       | {HOME}/project     | mytool --run "rm -rf examples"                       | denies    | an unknown consumer's quoted text is scanned    |
+
+    @also_ask-first
+    Examples:
+      | cwd                | command                                              | verdict   | note                                            |
+      | /opt/proj          | rm -rf dist                                          | is silent | a generated name nested under /                 |
+      | {HOME}/project/sub | rm -rf dist                                          | is silent | from a deeper cwd                               |
+      | {HOME}/project/sub | rm -rf {HOME}/.claude/worktrees/x                    | is silent | an absolute worktree, from a deeper cwd         |
 
   Scenario: a heredoc body is not run
     When the agent runs:
@@ -289,6 +305,80 @@ Feature: guard-recursive-delete
       """
       cat <<EOF && rm -rf examples
       hi
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a backslash continuation on the opener line keeps the next line as commands
+    When the agent runs:
+      """
+      cat <<EOF; \
+      rm -rf examples
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a double-quoted string running past the opener line puts the body after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo "
+      text
+      "; rm -rf examples
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a single-quoted string running past the opener line puts the body after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo '
+      text
+      '; rm -rf examples
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: an escaped quote in $'...' on the opener line does not close it, so the body starts after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo $'it\'s
+      x'; rm -rf examples
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a $(...) running past the opener line puts the body after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo $(
+      rm -rf examples
+      )
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a case inside a $(...) on the opener line keeps the rest as commands
+    When the agent runs:
+      """
+      cat <<EOF; echo $(case x in a) :;; esac
+      rm -rf examples
+      )
+      body
+      EOF
+      """
+    Then the guard denies, naming "rm -r examples"
+
+  Scenario: a backtick substitution running past the opener line puts the body after its end
+    When the agent runs:
+      """
+      cat <<EOF; echo `
+      rm -rf examples
+      `
+      body
       EOF
       """
     Then the guard denies, naming "rm -r examples"

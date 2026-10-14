@@ -12,20 +12,23 @@ from hamcrest import assert_that, contains_string, empty, equal_to, has_length, 
 
 import readme_table
 from conftest import hooks_json_commands, hooks_json_prompt_command
-from languette.guards import guard_duplicate_prs, guard_github_issues, guard_private_terms
+from languette.guards import (guard_duplicate_prs, guard_github_issues, guard_private_terms, guard_protected_services,
+                              guard_signed_comments)
 
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
           "guard-private-terms", "prose-budget-commit", "guard-worktrees",
           "guard-bypass-labels", "require-well-formed", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
           "guard-permissions", "guard-pipe-to-shell", "guard-disks",
-          "guard-host-availability", "guard-scheduled-jobs", "guard-cross-session-send",
-          "guard-secrets", "guard-duplicate-prs"}
+          "guard-host-availability", "guard-protected-services", "guard-scheduled-jobs", "guard-cross-session-send",
+          "guard-secrets", "guard-review-threads", "guard-signed-comments",
+          "guard-duplicate-prs"}
 # Guards that are off unless the user turns them on: their option defaults to false.
-OPT_IN = {"guard_worktrees"}
+OPT_IN = {"guard_worktrees", "guard_review_threads", "guard_signed_comments"}
 # Options that are not a guard's on/off toggle: name -> type.
 OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string",
-                 "prose_budget_command": "string",
+                 "protected_services": "string", "prose_budget_command": "string",
+                 "signed_comments_opening": "string", "signed_comments_signature": "string",
                  "record_decisions": "boolean", "record_raw_commands": "boolean"}
 # Per-rule switches inside one guard: boolean, on by default.
 RULE_OPTIONS = {f"guard_git_work_loss_{r}" for r in ("blanket_staging", "stash", "force_push", "discard", "branch_delete")} | {
@@ -148,6 +151,12 @@ def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():
         want = key not in OPT_IN
         assert opt.get("type") == "boolean" and opt.get("default") is want and opt.get("title") \
             and opt.get("description"), f"userConfig.{key}: want a titled, described boolean defaulting to {str(want).lower()}"
+
+
+def test_protected_services_starts_empty():
+    uc = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())["userConfig"]
+    assert_that(guard_protected_services.protected({guard_protected_services.OPTION: uc["protected_services"]["default"]}),
+                equal_to(()))
 
 
 # The parser ladder's pip parsers (docs/decisions.md, "Runtime dependencies"):
@@ -306,3 +315,27 @@ def test_the_guard_duplicate_pr_matcher_covers_the_tool(tool):
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__update_pull_request", "mcp__github__list_pull_requests"])
 def test_the_guard_duplicate_pr_matcher_leaves_other_tools_alone(tool):
     assert_that(re.fullmatch(_guard_duplicate_pr_matcher(), tool), is_(None))
+
+
+def _guard_signed_comments_matcher():
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
+    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard guard-signed-comments;" in h["command"] for h in e["hooks"])]
+    return e["matcher"]
+
+
+def _mcp_tools_the_guard_signed_comments_handles():
+    # From the guard's own TOOLS, so a tool added there must be matched here.
+    suffixes = _mcp_suffixes(guard_signed_comments.TOOLS)
+    assert suffixes >= {"add_issue_comment", "add_reply_to_pull_request_comment", "add_comment_to_pending_review",
+                        "pull_request_review_write", "update_issue_comment"}
+    return sorted(f"{prefix}{s}" for s in suffixes for prefix in ("mcp__github__", "mcp__plugin_github_github__"))
+
+
+@pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_signed_comments_handles())
+def test_the_guard_signed_comments_matcher_covers_the_tool(tool):
+    assert_that(re.fullmatch(_guard_signed_comments_matcher(), tool), is_not(None))
+
+
+@pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__create_issue"])
+def test_the_guard_signed_comments_matcher_leaves_other_tools_alone(tool):
+    assert_that(re.fullmatch(_guard_signed_comments_matcher(), tool), is_(None))

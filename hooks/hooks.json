@@ -41,6 +41,11 @@
           },
           {
             "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_PROTECTED_SERVICES-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-protected-services; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-protected-services and was not found on PATH. This is a gate and fails closed: install python3, or set guard_protected_services=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-protected-services) is missing from the plugin directory or crashed, so a stop of a protected service could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking for a stop of a protected service"
+          },
+          {
+            "type": "command",
             "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-scheduled-jobs; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-scheduled-jobs and was not found on PATH. This is a gate and fails closed: install python3, or set guard_scheduled_jobs=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-scheduled-jobs) is missing from the plugin directory or crashed, so a crontab deletion could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for a crontab deletion"
           },
@@ -48,6 +53,11 @@
             "type": "command",
             "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-git-stacked-base; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-git-stacked-base and was not found on PATH. This is a gate and fails closed: install python3, or set guard_git_stacked_base=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-git-stacked-base) is missing from the plugin directory or crashed, so a remote-branch deletion could not be checked for open PRs stacked on it. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for open PRs stacked on the branch being deleted"
+          },
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS-}\" != true ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-review-threads; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-review-threads and was not found on PATH. This is a gate and fails closed: install python3, or set guard_review_threads=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-review-threads) is missing from the plugin directory or crashed, so resolving a review thread could not be checked for a reply. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking that a resolved review thread was answered"
           },
           {
             "type": "command",
@@ -108,6 +118,16 @@
             "type": "command",
             "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-duplicate-prs; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-duplicate-prs and was not found on PATH. This is a gate and fails closed: install python3, or set guard_duplicate_prs=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-duplicate-prs) is missing from the plugin directory or crashed, so a second PR on an issue an open PR already references could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
             "statusMessage": "Checking for an open PR already on the issue this PR closes"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|mcp__.*__(add_issue_comment|add_reply_to_pull_request_comment|add_comment_to_pending_review|pull_request_review_write|update_issue_comment|add_pull_request_review_comment|create_pull_request_review|create_and_submit_pull_request_review|submit_pending_pull_request_review)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS-}\" != true ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-signed-comments; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-signed-comments and was not found on PATH. This is a gate and fails closed: install python3, or set guard_signed_comments=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-signed-comments) is missing from the plugin directory or crashed, so a GitHub comment could not be checked for its agent signature. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
+            "statusMessage": "Checking that a GitHub comment is signed as an agent's"
           }
         ]
       },

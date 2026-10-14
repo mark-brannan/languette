@@ -187,13 +187,12 @@ def _api(s, g, hi):
     return post
 
 
-def posts(command):
+def posts(doc):
     """(posts, cd, heredocs): each PR the command opens, whether it runs a cd,
     and its heredoc bodies with whether any is built at run time."""
-    buf = command + "\n"
     out, cd = [], False
-    for text, nested in sw.texts_of(sw.strip_heredocs(buf)):
-        s = sw.Scan(text)
+    for text, nested in doc.texts():
+        s = doc.scan(text)
         if any(s.k[i] == "w" and s.w[i] in ("cd", "pushd", "popd") for i in range(len(s.w))):
             cd = True
         for a, b in s.segments():
@@ -209,7 +208,7 @@ def posts(command):
                 p = _api(s, g, b)
                 if p:
                     out.append(p)
-    return out, cd, sw.heredocs(buf)
+    return out, cd, doc.heredocs()
 
 
 def _fetch(p):
@@ -330,7 +329,8 @@ def _judge(text, slug):
     return asked
 
 
-def check(payload, env):
+def check(doc):
+    payload, env = doc.payload, doc.env
     tool = payload.get("tool_name")
     if not isinstance(tool, str):
         return None
@@ -341,7 +341,7 @@ def check(payload, env):
         cmd = ti.get("command")
         if not isinstance(cmd, str) or ("gh" not in cmd):
             return None
-        found, cd, docs = posts(cmd.rstrip("\n"))
+        found, cd, docs = posts(doc)
         fed = set(writes(cmd + "\n", True))
     elif _MCP.match(tool):
         body, owner, repo = ti.get("body"), ti.get("owner"), ti.get("repo")

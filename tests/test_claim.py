@@ -98,12 +98,12 @@ def test_a_spend_from_before_calls_were_recorded_stays_spent(tmp_path):
 def test_two_guards_wanting_one_label_for_one_command_need_one_click(tmp_path, monkeypatch):
     tp = _transcript(tmp_path)
 
-    def check(payload, env):
+    def check(doc):
         approved, spent = yield Need("claim", {"Run e2e": 1})
         return None if spent else {"permissionDecision": "deny", "permissionDecisionReason": "no click"}
 
     guards = tuple(SimpleNamespace(NAME=f"g{i}", check=check) for i in range(2))
     monkeypatch.setattr(run, "GUARDS", (("PreToolUse", re.compile(r"Bash\Z"), guards),))
     payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "npm run e2e"},
-               "transcript_path": str(tp), "tool_use_id": "toolu_B1"}
+               "cwd": "/", "transcript_path": str(tp), "tool_use_id": "toolu_B1"}
     assert run.respond(json.dumps(payload), {}) == ""

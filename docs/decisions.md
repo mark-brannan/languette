@@ -103,6 +103,15 @@ interface is; this file says who decided it and why, one line each.
 - Whether guards that watch an agent's conduct on GitHub (#118, #119, #125)
   are one concept or several is unruled.
 - Prose now; a check with teeth once the gate's shape is settled.
+- Ruled 2026-10-13: a new guard is written against the shared layer
+  first: Document for the call, scan for the words, verdict for the
+  answer. A primitive the guard needs that two or more guards would share
+  (a program pattern, an option walk, a sentence) goes into scan or
+  verdict in the same PR, and the siblings that repeat it move onto it, or
+  an issue names them. A guard that reads sequential or external facts (PR
+  state, review threads, a transcript) is the exception, not the shape.
+- Current thinking, not settled: guards trend toward a rules engine with a
+  few deep special cases.
 
 ## Base-case guard names: Solace, 2026-10-09
 
@@ -120,3 +129,17 @@ interface is; this file says who decided it and why, one line each.
 - The first release is 0.0.1, carrying `languette doctor`.
 - Every release bumps the patch number only, until Solace says otherwise. No
   semver; a review that asks for a minor or major bump is out of scope.
+
+## Releases and titles: 2026-10-10
+
+- The maintainer ships when ready, by merging the standing release pull request.
+  Work piles up in it until then; nothing ships on a schedule.
+- Pull request titles, and so the squashed commits, carry a conventional
+  type with the area as its scope: `fix(doctor): …`, not `doctor: …`.
+- Docs changes count toward a release, so a README fix can open the
+  release pull request. Opening it obliges nothing.
+
+## Trust and licence riders: Solace, 2026-10-09
+
+- No licence rider against AI companies: AGPL answers hosting, and no licence
+  answers training. The README states the distrust as a position, not a condition.

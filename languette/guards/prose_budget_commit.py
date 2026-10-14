@@ -31,7 +31,6 @@ OPTION = "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"
 DEFAULT = "prose-budget"
 ENGINE_TIMEOUT = 50                 # under Claude Code's 60 s hook timeout; past it the engine counts as crashed
 GIT_TIMEOUT = 10
-GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 _ADD_QUIET = re.compile(r"-[nv]+\Z|--(?:dry-run|verbose)\Z")
 _VALUED = frozenset("-m --message -F --file -C --reuse-message -c --reedit-message --fixup --squash --author "
                     "--date --template".split())
@@ -62,12 +61,12 @@ class _Commits:
     unstaged tracked change (allflag) or untracked files too (allnew); whether a
     pathspec cannot be resolved (bad); whether a second commit runs elsewhere (multi)."""
 
-    def __init__(self, command):
+    def __init__(self, doc):
         self.seen = self.multi = self.allflag = self.allnew = self.bad = self.addseen = False
         self.paths, self.cd, self.ctx = [], "", None
         self.ccd = self.cdir = self.cbin = self.addctx = None
-        for text, nested in sw.texts_of(sw.strip_heredocs(command + "\n")):
-            s = self.s = sw.Scan(text)
+        for text, nested in doc.texts():
+            s = self.s = doc.scan(text)
             for a, b in s.segments():
                 if a <= b:
                     self._segment(a, b, nested)
@@ -151,18 +150,14 @@ class _Commits:
         s = self.s
         if s.w[lo] == "cd" and lo + 1 < len(s.w) and s.k[lo + 1] == "w":
             self.cd = _join(self.cd, s.w[lo + 1])
-        g = sw.cmd_index(s, lo, hi, GIT, nested)
+        g = sw.cmd_index(s, lo, hi, sw.GIT, nested)
         if g is None:
             return
         self.bin = s.w[g]
-        i, d = g + 1, ""
-        while i <= hi and s.w[i].startswith("-"):
-            if s.w[i] == "-C":
-                d = _join(d, self._w(i + 1))
-                i += 1
-            elif s.w[i] in ("-c", "--git-dir", "--work-tree", "--namespace"):
-                i += 1
-            i += 1
+        i, d = sw.git_subcommand(s, g, hi), ""
+        for j in sw.git_options(s, g, i):
+            if s.w[j] == "-C":
+                d = _join(d, self._w(j + 1))
         if i <= hi and s.w[i] in ("add", "stage"):
             self.addseen, self.addctx = True, (self.cd, d)
             self._collect_add(i + 1, hi)
@@ -197,20 +192,19 @@ def _engine(env, cwd):
     return None
 
 
-def check(payload, env):
+def check(doc):
+    payload, env = doc.payload, doc.env
     if payload.get("tool_name") != "Bash":
         return None
     ti = payload.get("tool_input")
     cmd = ti.get("command") if isinstance(ti, dict) else None
     if not isinstance(cmd, str) or not cmd:
         return None
-    cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = yield Need("cwd")
+    cwd = payload["cwd"]
     engine = yield from _engine(env, cwd)
     if engine is None:
         return None
-    c = _Commits(cmd)
+    c = _Commits(doc)
     if not c.seen:
         return None
     if c.multi:                         # one check cannot serve two repositories

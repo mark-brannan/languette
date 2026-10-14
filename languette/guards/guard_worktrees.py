@@ -1,6 +1,5 @@
 """guard-worktrees: two controls over where a session's git work lands. The
-specs are features/guard-worktrees-checkout-home.feature and
-features/guard-worktrees-foreign.feature.
+spec is features/guard-worktrees.feature.
 
   checkout-home  a `git`/`yadm` checkout or switch that would move the branch
                  checked out in $HOME, when $HOME is itself a worktree
@@ -45,7 +44,6 @@ from languette.verdict import Act, Need, Refuse, deny
 
 NAME = "guard-worktrees"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES"
-GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 MAX_CANDIDATES = 48
 _HOMEISH = re.compile(r"(?:/|~\Z|~/|\$HOME\Z|\$HOME/|\$\{HOME\}\Z|\$\{HOME\}/)")
@@ -75,14 +73,14 @@ def _expand_home(raw, home):
 
 # --- checkout-home --------------------------------------------------------
 
-def _home_events(cmd):
+def _home_events(doc):
     """The command's moves, in order: ("DENY",) for a yadm checkout/switch,
     ("CD", v), ("ENV", kind, v) for a GIT_DIR=/GIT_WORK_TREE= outside a git
     segment, and ("G", [(kind, v)]) for one git checkout/switch with its
     -C/GITDIR/WORKTREE targets in order."""
     out = []
-    for text, nested in sw.texts_of(sw.strip_heredocs(cmd + "\n")):
-        s = sw.Scan(text)
+    for text, nested in doc.texts():
+        s = doc.scan(text)
         for a, b in s.segments():
             if a > b:
                 continue
@@ -92,7 +90,7 @@ def _home_events(cmd):
                           if s.k[i] == "w" and (not s.w[i].startswith("-") or s.w[i] == "-")), "")
                 out.append(("CD", "-" if s.w[c] == "popd" else v))
                 continue
-            g = sw.cmd_index(s, a, b, GIT, nested)
+            g = sw.cmd_index(s, a, b, sw.GIT, nested)
             if g is None:
                 for i in range(a, b + 1):
                     if s.k[i] == "w" and s.w[i].startswith("GIT_DIR="):
@@ -180,11 +178,12 @@ def _generic(prog):
                   f"  {prog} worktree add -b <branch> <path> main\nthen cd into it and work there.")
 
 
-def _checkout_home(payload, env):
+def _checkout_home(doc):
+    payload, env = doc.payload, doc.env
     cmd = (payload.get("tool_input") or {}).get("command")
     if not isinstance(cmd, str) or not cmd:
         return
-    events = _home_events(cmd)
+    events = _home_events(doc)
     if not events:
         return
     if not (yield Need("which", "git")):
@@ -271,13 +270,13 @@ def _pathish(t):
     return t if "/" in t else ""
 
 
-def _foreign_words(cmd):
+def _foreign_words(doc):
     """("T",) where a text begins (its shell starts in the payload cwd),
     ("C", w) for a cd/pushd target, ("W", w) for any other path-shaped word or
     the word after -C, in order."""
     out = []
-    for x, (text, nested) in enumerate(sw.texts_of(sw.strip_heredocs(cmd + "\n"))):
-        s = sw.Scan(text)
+    for x, (text, nested) in enumerate(doc.texts()):
+        s = doc.scan(text)
         out.append(("T",))
         ncd, seen = 0, set()
         for a, b in s.segments():
@@ -409,17 +408,15 @@ def _resolve_dir(raw, base, home):
     return (yield Need("path", "realpath", r)), rest
 
 
-def _foreign(payload, env):
+def _foreign(doc):
+    payload, env = doc.payload, doc.env
     # git is what every foreignness answer is asked of: without it, every path
     # would read as nobody's worktree.
     if not (yield Need("which", "git")):
         raise Refuse(f"{NAME}: git is missing, so worktree ownership cannot be checked. This is a gate and fails "
                      "closed.")
     tool = payload.get("tool_name")
-    pcwd = payload.get("cwd")
-    if not isinstance(pcwd, str) or not pcwd:
-        raise Refuse(f"{NAME}: the payload names no working directory, so worktree ownership cannot be checked. "
-                     "This is a gate and fails closed.")
+    pcwd = payload["cwd"]
     home = yield from _canon(env.get("HOME") or "")
     if not home:
         raise Refuse(f"{NAME}: $HOME does not resolve, so worktree ownership cannot be checked. This is a gate "
@@ -471,7 +468,7 @@ def _foreign(payload, env):
     if not isinstance(cmd, str) or not cmd:
         return
     arrivals, vcwd, n = [], pcwd, 0
-    for ev in _foreign_words(cmd):
+    for ev in _foreign_words(doc):
         if ev[0] == "T":
             vcwd = pcwd
             continue
@@ -504,15 +501,14 @@ CONTROLS = (("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME", _checkout_hom
             ("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_FOREIGN", _foreign))
 
 
-def check(payload, env=None):
-    env = env if env is not None else os.environ
-    if not isinstance(payload, dict):
+def check(doc):
+    if not isinstance(doc.payload, dict):
         return None
     for option, control in CONTROLS:
-        if env.get(option) == "false":
+        if doc.env.get(option) == "false":
             continue
         try:
-            yield from control(payload, env)
+            yield from control(doc)
         except Refuse as r:
             return deny(str(r))
     return None

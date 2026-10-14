@@ -31,6 +31,9 @@ _OPENER = re.compile(r"(?<!<)<<-?[ \t]*(?:[A-Za-z_]|" + _DPART + r")(?:[A-Za-z0-
 _ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _WS = re.compile(r"[ \t\n]")
 
+GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
+# git's global options that take the next word as their value.
+GIT_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
 PROSE = frozenset("grep egrep fgrep rg ag ack echo printf git yadm gh glab sed awk jq yq "
                   "cat tee test [ diff sort head tail wc tr cut less more".split())
 EXEC = frozenset("sh bash zsh dash ksh ash busybox eval exec xargs su ssh sudo doas env nohup "
@@ -117,6 +120,62 @@ def _qopen(t):
         dollar = c == "$" and not after_dollar  # one unescaped $: `\$` went by above, `$$` is a PID
         i += 1
     return "", -1
+
+
+def _line_end(t):
+    """Index of the newline that ends t's first logical line, or -1, read by
+    the lexer's own rules (_qopen): a newline inside a quote, after a
+    backslash, in `$'...'`, or in a `$(...)` or `...` substitution goes on,
+    and `#` comments to the end of its line only before a word has begun. A
+    heredoc body begins on the line after it. A quote or substitution left
+    open to the end of t gives -1, so nothing after it is taken for a body and
+    every word stays in the text."""
+    L, i, have, dollar, subs = len(t), 0, False, False, []
+    while i < L:
+        c, after_dollar, dollar = t[i], dollar, False
+        if c == "\\":
+            have = have or (i + 1 < L and t[i + 1] != "\n")
+            i += 2
+            continue
+        if c == "\n":
+            if not subs:
+                return i
+            have = False
+            i += 1
+            continue
+        if c in "'\"":
+            have = True
+            if c == "'" and not after_dollar:
+                e = t.find("'", i + 1)
+                i = L if e < 0 else e
+            else:                                  # "...", and $'...' with its escapes
+                i += 1
+                while i < L and t[i] != c:
+                    i += 2 if t[i] == "\\" else 1
+            if i >= L:
+                return -1
+            i += 1
+            continue
+        if c == "#" and not have:
+            i = t.find("\n", i)
+            if i < 0 or not subs:
+                return i
+            continue
+        if subs and not have and re.match(r"case[ \t\n]", t[i:i + 5]):
+            return -1                              # a pattern's ) would close $( early: fail closed
+        if c == "(" and (after_dollar or subs[-1:] == [")"]):
+            subs.append(")")                       # $( opens, ( nests inside one
+        elif c == ")" and subs[-1:] == [")"] or c == "`" and subs[-1:] == ["`"]:
+            subs.pop()
+        elif c == "`":
+            subs.append("`")
+        if c in " \t;|&()`<>":
+            have = False
+        elif c not in "{}" or have:
+            have = True
+        dollar = c == "$" and not after_dollar
+        i += 1
+    return -1
 
 
 def heredoc_subs(s):
@@ -497,8 +556,11 @@ def _words(node, out):
 def _heredocs(b):
     """(stripped, [(body, quoted)]) -- the awk's sw_heredocs walk. Every opener
     on a line takes its body in turn from the lines below; the rest of the
-    opener line stays. quoted says the delimiter was quoted, so the shell
-    expands nothing in it; an unquoted one's body keeps its command
+    opener line stays. The opener's line runs to the first newline outside a
+    quote or substitution and after no backslash (_line_end); one that never
+    closes leaves the rest of the text as commands. quoted says the delimiter
+    was quoted, so the shell expands nothing in it; an unquoted one's body
+    keeps its command
     substitutions (heredoc_subs). A body whose closing line never comes stays
     in the text as commands. body is "" when the opener ends the text. The
     search resumes after each heredoc, never inside what it kept, so a `<<X`
@@ -509,7 +571,7 @@ def _heredocs(b):
         if not m:
             return done + b, docs
         head, b = b[:m.start()], b[m.start():]
-        nl = b.find("\n")
+        nl = _line_end(b)             # the opener's logical line, not its first physical one
         seg, tail = (b, "") if nl < 0 else (b[:nl], b[nl + 1:])
         delims = []
 
@@ -823,7 +885,7 @@ def seg_cmd(s, a, b):
     return None
 
 
-def texts_of(text, prose=PROSE):
+def texts_of(text, prose=PROSE, read=None):
     """[(text, nested)]: the text itself plus, recursively, every quoted string
     in it that holds whitespace and may run. A segment's quoted strings are
     skipped only when it is led by a prose consumer, holds no executor, and no
@@ -833,7 +895,8 @@ def texts_of(text, prose=PROSE):
     widens the consumer set for a guard whose command names also appear as
     arguments (pkill -f). Past NESTED_CAP texts it raises TooMany rather
     than read some and pass the rest unread, so a pathological command can
-    neither spin nor hide its last string."""
+    neither spin nor hide its last string. `read` scans each text, Scan when
+    None: languette.document passes its own, which scans each text once."""
     out = [(text, False)]
 
     def add(t):
@@ -842,7 +905,7 @@ def texts_of(text, prose=PROSE):
         out.append((t, True))
     x = 0
     while x < len(out):
-        s = Scan(out[x][0])
+        s = (read or Scan)(out[x][0])
         for a, b in s.segments():
             c = seg_cmd(s, a, b)
             ex = s.shellseg or any(s.k[j] == "w" and s.w[j] in EXEC for j in range(a, b + 1))
@@ -887,3 +950,19 @@ def cmd_index(s, a, b, cmd, nested, parents=None, prose=PROSE):
         return None
     return None
 
+
+def git_subcommand(s, g, b):
+    """The index of the subcommand word of the git call at g, past its global options;
+    beyond b when the segment ends first."""
+    i = g + 1
+    while i <= b and s.w[i].startswith("-"):
+        i += 1 + (s.w[i] in GIT_VALUE)
+    return i
+
+
+def git_options(s, g, sub):
+    """The index of each global option word of the git call at g, before its subcommand at sub."""
+    i = g + 1
+    while i < sub:
+        yield i
+        i += 1 + (s.w[i] in GIT_VALUE)

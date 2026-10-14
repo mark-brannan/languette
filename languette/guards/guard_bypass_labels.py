@@ -39,7 +39,7 @@ import os
 import re
 
 from languette import scan as sw
-from languette.verdict import Need, Refuse, deny
+from languette.verdict import Need, Refuse, deny, planned
 
 NAME = "guard-bypass-labels"
 OPTION = "CLAUDE_PLUGIN_OPTION_BYPASS_LABELS"
@@ -93,7 +93,7 @@ class _Found:
     """What a command or call applies: label names, and the reasons some
     label could not be read. `files` is what the runner read so far, path ->
     text or the Refuse it came to; a path the walk needs and `files` lacks
-    goes on `wanted`, for check to ask for and walk the command again."""
+    goes on `wanted`, for plan to ask for and judge to walk the command again."""
 
     def __init__(self, files):
         self.labels, self.unseen = [], []
@@ -148,24 +148,25 @@ def _read(path, ctx):
         p = os.path.join(cwd, p)
     if p not in ctx["files"]:
         ctx["wanted"].append(p)
-        raise Refuse("is not read yet")        # check asks for it and walks the command again
+        raise Refuse("is not read yet")        # plan asks for it, judge walks the command again
     got = ctx["files"][p]
     if isinstance(got, Refuse):
         raise Refuse(str(got))
     return got
 
 
-def _fetch(p):
-    """The text of the file `p`, as the runner reads it, or the Refuse it
-    comes to."""
-    try:
-        return (yield Need("read", p, MAX_READ))
-    except UnicodeDecodeError as e:
-        return Refuse(f"cannot be read ({e})")
-    except OSError as e:
-        return Refuse(f"cannot be read ({e.strerror or e})")
-    except ValueError as e:                    # not a regular file, or past MAX_READ
-        return Refuse(str(e))
+def _text(got):
+    """A planned read's answer: the file's text, or the Refuse the world's
+    exception comes to."""
+    if isinstance(got, UnicodeDecodeError):
+        return Refuse(f"cannot be read ({got})")
+    if isinstance(got, OSError):
+        return Refuse(f"cannot be read ({got.strerror or got})")
+    if isinstance(got, ValueError):            # not a regular file, or past MAX_READ
+        return Refuse(str(got))
+    if isinstance(got, Exception):
+        raise got
+    return got
 
 
 def _payloads(src, live, ctx):
@@ -377,11 +378,9 @@ def _runs_quoted(s, c, b, w):
     return False
 
 
-def _bash(f, cmd, cwd, env, depth=0, alone=True):
-    text = sw.strip_heredocs(cmd + "\n")
-    texts = sw.texts_of(text)
-    scans = [(sw.Scan(t), nested) for t, nested in texts]
-    bodies = sw.heredocs(cmd + "\n")
+def _bash(f, doc, cmd, cwd, env, depth=0, alone=True):
+    scans = [(doc.scan(t), nested) for t, nested in doc.texts(text=cmd)]
+    bodies = doc.heredocs(cmd)
     ctx = {"cwd": cwd, "env": env, "bodies": bodies, "files": f.files, "wanted": f.wanted,
            "moved": any(k == "w" and w in ("cd", "pushd", "popd") for s, _ in scans for k, w in zip(s.k, s.w)),
            "alone": alone and _alone(scans)}
@@ -407,7 +406,7 @@ def _bash(f, cmd, cwd, env, depth=0, alone=True):
                     if bodies[k][1]:
                         f.unseen.append("the heredoc fed to a shell is built at run time (an unquoted delimiter and a $ or backtick)")
                     else:
-                        _bash(f, bodies[k][0], cwd, env, depth + 1, ctx["alone"])
+                        _bash(f, doc, bodies[k][0], cwd, env, depth + 1, ctx["alone"])
                 k += 1
 
 
@@ -433,7 +432,11 @@ def _mcp(f, v, any_string, depth=0):
         f.labels.extend(_split(v))
 
 
-def check(payload, env=os.environ):
+def parse(doc):
+    """One walk of the call with no file read yet: (what it found, the
+    document, Bash command and cwd to walk again once its files are read, or
+    None; env)."""
+    payload, env = doc.payload, doc.env
     tool = payload.get("tool_name")
     inp = payload.get("tool_input")
     f = _Found({})
@@ -441,22 +444,31 @@ def check(payload, env=os.environ):
         cmd = inp.get("command") if isinstance(inp, dict) else None
         if not isinstance(cmd, str) or not cmd.strip():
             return None
-        # The walk is pure: each pass asks for the files the last one could
-        # not read, until a pass reads nothing new.
-        while True:
-            _bash(f, cmd, payload.get("cwd"), env)
-            new = [p for p in dict.fromkeys(f.wanted) if p not in f.files]
-            if not new:
-                break
-            for p in new:
-                f.files[p] = yield from _fetch(p)
-            f = _Found(f.files)
-    elif isinstance(tool, str) and tool.startswith("mcp__"):
+        _bash(f, doc, cmd, payload.get("cwd"), env)
+        return f, (doc, cmd, payload.get("cwd")), env
+    if isinstance(tool, str) and tool.startswith("mcp__"):
         if not isinstance(inp, dict) or _reads(tool):
             return None
         _mcp(f, inp, "label" in _words(tool.rsplit("__", 1)[-1]) or "labels" in _words(tool.rsplit("__", 1)[-1]))
-    else:
+        return f, None, env
+    return None
+
+
+def plan(parsed):
+    """The files the walk could not read."""
+    if parsed is None:
+        return []
+    return [Need("read", p, MAX_READ) for p in dict.fromkeys(parsed[0].wanted)]
+
+
+def judge(parsed, answers):
+    if parsed is None:
         return None
+    f, rewalk, env = parsed
+    if f.wanted:
+        # No file's contents lead to another read: one more walk, with every file, is the last.
+        f = _Found({p: _text(answers[Need("read", p, MAX_READ)]) for p in f.wanted})
+        _bash(f, *rewalk, env)
     bad = bypass_labels(env)
     hit = next((x.casefold() for x in f.labels if x.casefold() in bad), None)
     if hit:
@@ -469,3 +481,7 @@ def check(payload, env=os.environ):
                     f"({', '.join(bad)}). Write the label literally in the command, or leave it for the "
                     "user to add.")
     return None
+
+
+def check(doc):
+    return (yield from planned(doc, parse, plan, judge))

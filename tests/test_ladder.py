@@ -345,14 +345,20 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens_and_operato
     # lines. Otherwise, a GraphQL query: never run as a command.
     by_design = set(feature_commands([ROOT / "features/require-well-formed.feature"]))
     refused = [c for c in refused if c not in by_design and not re.fullmatch(r"[^\n]*<<'?EOF'?[^\n]*", c)]
-    assert refused == ["mutation { addLabelsToLabelable(input:{labelableId:\"x\",labelIds:[\"y\"]}) "
-                       "{ clientMutationId } }"]
+    assert sorted(refused) == sorted([
+        "mutation { addLabelsToLabelable(input:{labelableId:\"x\",labelIds:[\"y\"]}) { clientMutationId } }",
+        "mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}",
+        "mutation($id:ID!,$b:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$b})"
+        "{comment{url}}}"])
     # A ' in a heredoc body: the awk lexer, reading the raw command, opens a
     # quote to the end; the shfmt rung resumes at the next Word. Every guard
     # strips heredoc bodies first, so neither reading reaches one. A " inside
     # a $(...) inside double quotes: the awk lexer closes the quote there, the
-    # shfmt rung does not; both queue the substitution's body (texts_of).
+    # shfmt rung does not; both queue the substitution's body (texts_of). A
+    # \' in $'...': the awk lexer closes the quote there; heredoc stripping
+    # (_line_end) does not, so every guard reads it as the shell does.
     assert differ == ["cat <<EOF\n$(echo \"it's\") don't\nEOF\nrm -rf examples",
+                      "cat <<EOF; echo $'it\\'s\nx'; rm -rf examples\nbody\nEOF",
                       "cat <<\\<<< EOF\n<\necho it's\nEOF\nrm -rf examples",
                       'echo "$(echo "x"; rm -rf examples)"',
                       'echo "a $(echo "$(rm -rf examples)") b"']

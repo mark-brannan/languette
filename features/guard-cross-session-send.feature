@@ -169,10 +169,6 @@ Feature: guard-cross-session-send
       | git status                                |
       | git fetch origin main                     |
       | git -C /w fetch --prune                   |
-      | gh issue create -t t -b b                 |
-      | gh pr comment 7 -b done                   |
-      | gh api -X POST repos/o/r/issues -f title=t |
-      | gh api repos/o/r/issues -f title=t         |
       | gh api graphql -f query='mutation { x }'  |
       | gh run list                               |
       | gh run rerun 123                          |
@@ -181,9 +177,27 @@ Feature: guard-cross-session-send
       | echo "gh issue view 12"                   |
       | ugh issue view 3                          |
 
+    @also_guard-signed-comments
+    Examples:
+      | command                                   |
+      | gh pr comment 7 -b done                   |
+
+    @also_guard-github-issues
+    Examples:
+      | command                                   |
+      | gh issue create -t t -b b                 |
+      | gh api -X POST repos/o/r/issues -f title=t |
+      | gh api repos/o/r/issues -f title=t         |
+
   Scenario: a read that failed still opens the door
     Given the permission mode is "bypassPermissions"
     When the agent runs `gh issue view 12 -R o/r; false`, which fails
+    And the agent sends "api-worker" the message `see above`
+    Then the guard denies, naming "gh issue view"
+
+  Scenario: a read whose post hook carries no working directory still opens the door
+    Given the permission mode is "bypassPermissions"
+    When the agent runs `gh issue view 12 -R o/r`, its post hook carrying no working directory
     And the agent sends "api-worker" the message `see above`
     Then the guard denies, naming "gh issue view"
 

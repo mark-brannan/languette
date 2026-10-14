@@ -22,6 +22,15 @@ jobs:
       contents: read
     uses: mark-brannan/.github/.github/workflows/nonempty-diff.yml@main
 
+  # The squash title is the commit release-please reads, so it carries a
+  # conventional type: `fix(doctor): ...`, not `doctor: ...`.
+  pr-title:
+    permissions:
+      pull-requests: read
+    uses: mark-brannan/.github/.github/workflows/pr-title.yml@main
+    with:
+      conventional: true
+
   # Every scenario in features/, under the Python engine on its awk rung and
   # on its shfmt rung, plus the hooks.json commands run as Claude Code runs
   # them. The same run checks the hooks.json shape (`claude plugin validate
@@ -34,25 +43,21 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: requirements-dev.txt
       # shfmt for the Python engine's shfmt rung: noble's is 3.8, past the 3.6 floor.
-      # jq for the two bash suites' payloads.
+      # jq for the bash suite's payloads.
       - name: Install shfmt and jq
         run: |
           set -euo pipefail
           sudo apt-get update -q
           sudo apt-get install -y -q shfmt jq
       - run: pip install -r requirements-dev.txt
-      # test_smoke.py builds its own PATHs and venvs: the smoke job runs it.
-      - run: python -m pytest -q --ignore=tests/test_smoke.py
-      # The long tail of shell shapes for two guards, until features/ holds
-      # them (~40 s: guard-worktrees builds a fixture repo with worktrees).
-      - run: bash tests/guard-private-terms.test.sh
-      - run: bash tests/guard-worktrees.test.sh
+      # smoke_steps.py builds its own PATHs and venvs: the smoke job runs it.
+      - run: python -m pytest -q
 
   # The parser ladder's promise end to end: require-well-formed's hooks.json
   # command under PATHs holding only shfmt, only bash, only python3, or a
@@ -64,7 +69,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -84,7 +89,7 @@ jobs:
           python -m venv "$v/ts" && "$v/ts/bin/pip" install -q tree-sitter==0.26.0 tree-sitter-bash==0.25.1
           LANGUETTE_SMOKE_BASHLEX_PY=$v/bashlex/bin/python \
           LANGUETTE_SMOKE_TREESITTER_PY=$v/ts/bin/python \
-            python -m pytest -q -rxX tests/test_smoke.py
+            python -m pytest -q -rxX tests/smoke_steps.py
 
   shellcheck:
     runs-on: ubuntu-latest
@@ -95,7 +100,7 @@ jobs:
       - run: |
           set -euo pipefail
           command -v shellcheck || (sudo apt-get update -q && sudo apt-get install -y -q shellcheck)
-          shellcheck --severity=warning tests/stubs/* tests/*.test.sh
+          shellcheck --severity=warning tests/stubs/*
 
   # Line, section and per-change word caps on the README, from
   # docs/budgets.json. Raising a cap is its own PR that says why.
@@ -122,8 +127,22 @@ jobs:
           git fetch -q --depth=1 origin "$BASE"
           python3 tests/new_guard_names.py "$BASE"
 
+  # A measurement, not a gate, so it stays out of ci-gate's needs.
+  complexity:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: mark-brannan/.github/.github/workflows/complexity.yml@main
+
+  # The copies a pull request adds, base to head. Also a measurement.
+  duplication:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: mark-brannan/.github/.github/workflows/duplication.yml@main
+
   ci-gate:
-    needs: [nonempty, tests, smoke, shellcheck, prose-budget, new-guard-names]
+    needs: [nonempty, pr-title, tests, smoke, shellcheck, prose-budget, new-guard-names]
     if: always()
     permissions: {}
     uses: mark-brannan/.github/.github/workflows/ci-gate.yml@main

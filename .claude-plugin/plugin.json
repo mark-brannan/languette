@@ -1,11 +1,12 @@
 {
   "name": "languette",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for recursive rm, permission sweeps, downloads piped into a shell, disk wipes, shutdowns, crontab deletion, git footguns, deleting a branch an open PR is stacked on, a second PR on an issue an open PR already references, a session applying a label that waives a CI gate, costly commands the repo says to ask about first, commands that destroy infrastructure, untrusted text relayed to another of your sessions, and a credential pasted into a command.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for the commands that could ruin a day, such as recursive rm, a disk wipe, a shutdown or a credential pasted into a command.",
   "author": {
     "name": "Mark Brannan"
   },
   "repository": "https://github.com/mark-brannan/languette",
   "homepage": "https://github.com/mark-brannan/languette",
+  "license": "AGPL-3.0-or-later",
   "keywords": [
     "hooks",
     "guards",
@@ -87,6 +88,19 @@
       "description": "Deny shutdown, reboot, halt, poweroff and the fork-bomb shape. Leave on unless you want an agent able to take the machine down.",
       "default": true
     },
+    "guard_protected_services": {
+      "type": "boolean",
+      "title": "Block stopping a protected service",
+      "description": "Deny a systemctl stop, restart or kill of a service named in protected_services. Leave on unless you want an agent able to stop the services your machine depends on.",
+      "default": true
+    },
+    "protected_services": {
+      "type": "string",
+      "title": "Protected services",
+      "description": "Services an agent may not stop, restart or kill with systemctl: unit names, comma-separated, a trailing .service optional, * globs allowed. A name also covers its socket and its @instances. Empty protects none; ssh, the network and the display manager are already guard-host-availability's.",
+      "default": "",
+      "required": false
+    },
     "guard_scheduled_jobs": {
       "type": "boolean",
       "title": "Block deleting the crontab",
@@ -104,6 +118,12 @@
       "title": "Block a second PR on an issue",
       "description": "Deny opening a PR that closes an issue an open PR already references, unless the body says it supersedes that PR; ask when GitHub can't say. Leave on unless you want parallel sessions able to open duplicate PRs.",
       "default": true
+    },
+    "guard_review_threads": {
+      "type": "boolean",
+      "title": "Block resolving an unanswered bot review thread",
+      "description": "Opt-in, off by default. Deny resolving a review thread a bot commented on unless your reply after the bot's last comment names the fix commit or links the record the dismissal rests on. Turn on if review bots comment on your pull requests and a dismissal should point at a record.",
+      "default": false
     },
     "guard_bypass_ruleset": {
       "type": "boolean",
@@ -157,6 +177,26 @@
       "type": "string",
       "title": "Private repos",
       "description": "Repos whose issue and PR text is never scanned, as owner/name, comma-separated. Empty by default: every repo is scanned.",
+      "required": false
+    },
+    "guard_signed_comments": {
+      "type": "boolean",
+      "title": "Experimental, opt-in: sign an agent's GitHub comments as an agent's",
+      "description": "Experimental and off by default: the signature is one workflow's convention, and the general shape is open (mark-brannan/languette#194). Deny a PR or issue comment, review or review-thread reply posted through gh, gh api or a GitHub MCP tool unless its body's first line starts with signed_comments_opening and its last line matches signed_comments_signature. The agent posts under your login; the signature keeps its words from being read as yours. Turn on if your agents sign their comments that way.",
+      "default": false
+    },
+    "signed_comments_opening": {
+      "type": "string",
+      "title": "Signed comments: opening",
+      "description": "The text a signed comment's first line starts with. Empty means the default, the robot emoji and a space.",
+      "default": "🤖 ",
+      "required": false
+    },
+    "signed_comments_signature": {
+      "type": "string",
+      "title": "Signed comments: signature",
+      "description": "A regular expression a signed comment's last non-empty line must match whole; {session} in it is the first eight hex of the session id. Empty means the default, the robot emoji, model, effort and session. A pattern that does not compile denies every comment.",
+      "default": "🤖 \\S+ · (?:low|medium|high|xhigh|max|-) · {session}",
       "required": false
     },
     "guard_cross_session_send": {

@@ -47,28 +47,94 @@ def test_a_deny_is_recorded_with_the_command_and_reason_whole(tmp_path):
     assert rec["command"] == {"text": RM, "masked": 0, "programs": ["rm", "git"]}
 
 
+# Built at run time, as in test_secrets.py, so no literal token sits in the repo.
+PAT = "ghp_" + "Zq9kLm2pQ7rXv4TnWb8Yc3Hd5Fg6Js1Ae0Ux"  # gitleaks:allow
+PW = "Zq9kLm2pQ7rXv4Tn"  # gitleaks:allow
 SECRET = [
-    ("GITHUB_TOKEN=ghp_abc123 gh api repos/acme/app", "GITHUB_TOKEN=<secret> gh api repos/acme/app"),
-    ("export OPENAI_API_KEY='sk-x y'", "export OPENAI_API_KEY=<secret>"),
-    ("docker login -u acme --password Hunter2", "docker login -u acme --password <secret>"),
-    ("gh auth login --with-token=abc", "gh auth login --with-token=<secret>"),
-    ("curl -H 'Authorization: Bearer abc123' https://x", "curl -H 'Authorization: Bearer <secret>' https://x"),
-    ("curl -u acme:" + "pw https://x", "curl -u acme:<secret> https://x"),
-    ("git clone https://acme:pw@git.example.com/a.git", "git clone https://acme:<secret>@git.example.com/a.git"),
-    ("mysql -u root -phunter2 db", "mysql -u root -p<secret> db"),
-    ("echo ghp_" + "a1" * 18, "echo <secret>"),
-    ("echo AKIA" + "ABCD1234" * 2, "echo <secret>"),
-    ("echo " + "Ab3" * 12, "echo <secret>"),
+    (f"GITHUB_TOKEN={PAT} gh api repos/acme/app", "GITHUB_TOKEN=<secret> gh api repos/acme/app"),
+    (f"export OPENAI_API_KEY='{PW}'", "export OPENAI_API_KEY='<secret>'"),
+    (f"docker login -u acme --password {PW}", "docker login -u acme --password <secret>"),
+    (f"gh auth login --with-token={PW}", "gh auth login --with-token=<secret>"),
+    (f"curl -H 'Authorization: Bearer {PW}' https://x", "curl -H 'Authorization: Bearer <secret>' https://x"),
+    (f"curl -u acme:{PW} https://x", "curl -u acme:<secret> https://x"),  # gitleaks:allow
+    (f"git clone https://acme:{PW}@git.example.com/a.git", "git clone https://acme:<secret>@git.example.com/a.git"),
+    (f"echo {PAT}", "echo <secret>"),
+    (f"mysql -u root -p{PW} db", "mysql -u root -p<secret> db"),  # mask-only: guard-secrets stays silent
+    ("echo " + "Ab3" * 12, "echo <secret>"),                          # mask-only: a long mixed-case run
+    (f"bash -c 'export T={PAT}'", "bash -c 'export T=<secret>'"),
+    (f"cat <<EOF\nDB_PASSWORD={PW}\nEOF", "cat <<EOF\nDB_PASSWORD=<secret>\nEOF"),
 ]
 KEPT = ["git checkout " + "3f2a9c1e" * 5, "rm -rf ~/secret-project && git push", "mkdir -p a/b",
-        "cat ~/.ssh/id_rsa", "aws s3 cp x s3://bucket --profile prod", "ls /usr/lib/x86_64-linux-gnu/libpython3.12.so"]
+        "cat ~/.ssh/id_rsa", "aws s3 cp x s3://bucket --profile prod", "ls /usr/lib/x86_64-linux-gnu/libpython3.12.so",
+        "GITHUB_TOKEN=" + "x" * 40 + " gh api user"]
 
 
-def test_only_secret_looking_values_are_masked():
+def test_only_what_the_detector_names_is_masked():
     for before, after in SECRET:
-        assert record.scrub(before)[0] == after, before
+        assert record.mask(before) == (after, 1), before
     for kept in KEPT:
-        assert record.scrub(kept) == (kept, 0), kept
+        assert record.mask(kept) == (kept, 0), kept
+
+
+def test_the_record_masks_the_command(tmp_path):
+    run.respond(_payload(f"rm -rf ~/x && echo {PAT}"), _env(tmp_path), "guard-recursive-delete")
+    [rec] = _records(tmp_path)
+    assert rec["command"]["text"] == "rm -rf ~/x && echo <secret>" and rec["command"]["masked"] == 1
+    assert PAT not in json.dumps(rec)
+
+
+def test_a_reason_is_masked_as_lines_of_data():
+    r = {"permissionDecision": "deny", "permissionDecisionReason": f"a\nDB_PASSWORD={PW}\nb"}
+    assert record._finding("guard-x", r, False, False)["reason"] == "a\nDB_PASSWORD=<secret>\nb"
+
+
+def test_a_secret_too_short_to_swap_safely_drops_the_text_not_the_command():
+    # Swapping the one character "a" would rewrite every "a" in the command.
+    assert record.mask("mysql -u root -pa db") == (None, 1)
+
+
+def test_a_secret_the_command_does_not_spell_that_way_drops_the_text_not_the_secret(monkeypatch):
+    # The shell reads `"gh""p_..."` as one word; the raw text holds no such substring to mask.
+    monkeypatch.setattr(record.secrets, "scans", lambda text: [record.secrets.Text(f"DB_PASSWORD={PW}")])
+    assert record.mask("echo hi") == (None, 1)
+
+
+ACME = "acme_skzop8bx8jbs1x04d6233g6w"  # gitleaks:allow
+
+
+def _project(tmp_path, config):
+    d = tmp_path / "proj"
+    (d / ".languette").mkdir(parents=True)
+    (d / ".languette" / "secrets.json").write_text(config)
+    return str(d)
+
+
+def test_the_projects_own_patterns_mask_the_record(tmp_path):
+    cwd = _project(tmp_path, json.dumps({"patterns": [{"id": "acme-key", "regex": "acme_[a-z0-9]{24}"}]}))
+    out = run.respond(_payload(f"echo {ACME}", cwd=cwd), _env(tmp_path), "guard-secrets")
+    [rec] = _records(tmp_path)
+    assert json.loads(out) and rec["verdict"] == "deny"
+    assert rec["command"]["text"] == "echo <secret>" and rec["command"]["masked"] == 1
+    assert ACME not in json.dumps(rec)
+
+
+def test_a_project_list_that_cannot_be_read_drops_the_text_and_leaves_the_verdict(tmp_path):
+    cwd = _project(tmp_path, "not json")
+    want = run.respond(_payload(f"echo {ACME}", cwd=cwd), _env(tmp_path, on=False), "guard-secrets")
+    assert run.respond(_payload(f"echo {ACME}", cwd=cwd), _env(tmp_path), "guard-secrets") == want
+    [rec] = _records(tmp_path)
+    assert rec["command"] == {"text": None, "masked": None, "programs": ["echo"]}
+    assert ACME not in json.dumps(rec) and "reason" not in rec["findings"][0]
+
+
+def test_a_masking_failure_leaves_the_verdict_alone(tmp_path, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("detector broke")
+    want = run.respond(_payload(RM), _env(tmp_path, on=False), "guard-recursive-delete")
+    monkeypatch.setattr(record.secrets, "findings", boom)
+    assert run.respond(_payload(RM), _env(tmp_path), "guard-recursive-delete") == want
+    [rec] = _records(tmp_path)
+    assert rec["command"]["text"] is None and "reason" not in rec["findings"][0]
 
 
 def test_a_command_every_guard_let_through_is_recorded(tmp_path):
