@@ -12,7 +12,8 @@ the next write takes the claim over. A claim with no result yet is in flight.
 
 A shut door has a second key: the user's yes, through AskUserQuestion, to an
 option labelled exactly as `_label` names the write: its verb, and the issue
-number when the call names one ("File this issue", "Delete issue 7"). A yes
+when the call names one, with its repo when the call does too ("File this
+issue", "Delete issue o/r#7", "Delete issue 7"). A yes
 to file opens no delete, and a yes to delete issue 7 opens no other. Each yes
 allows one write and is spent the way ask-first spends one
 (languette.guards.ask_first.claim), so several in a row take one question
@@ -45,14 +46,27 @@ _MUTATION = re.compile(r"(create|transfer|delete)Issue\s*\(")
 _SKIP_VALUE = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 SHUT = ("the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or "
         "the human has not spoken since.")
-_NUMBER = re.compile(r"#?(\d+)|https?://\S*/issues/(\d+)/?")
+_NUMBER = re.compile(r"#?(\d+)|https?://[^/\s]+/([^/\s]+/[^/\s]+)/issues/(\d+)/?")
 
 
-def _label(verb, number):
-    """The option a yes to this write must carry: its verb, and its issue number when known."""
+def _label(verb, number, repo=None):
+    """The option a yes to this write must carry: its verb, and its issue (repo#number) when known."""
     if verb == "create":
         return "File this issue"
-    return f"{verb.title()} issue {number}" if number else f"{verb.title()} this issue"
+    if not number:
+        return f"{verb.title()} this issue"
+    return f"{verb.title()} issue {repo}#{number}" if repo else f"{verb.title()} issue {number}"
+
+
+def _repo_flag(s, lo, hi):
+    """The repo a -R/--repo flag names between lo and hi, or None."""
+    for i in range(lo, hi + 1):
+        t = _wv(s, i)
+        if t in ("-R", "--repo") and i < hi:
+            return _wv(s, i + 1)
+        if t.startswith("--repo="):
+            return t[7:]
+    return None
 
 
 def _ask(label):
@@ -86,7 +100,7 @@ def _skip_r(s, lo, hi):
 
 class _Writes:
     """Walks a command for identifier writes: `found`, a (verb, issue number or
-    None) per write, and `loop` when one sits in a loop body or after a word that
+    None, repo or None) per write, and `loop` when one sits in a loop body or after a word that
     repeats it."""
 
     def __init__(self, doc):
@@ -99,8 +113,8 @@ class _Writes:
                 if a <= b:
                     self._segment(s, a, b, nested)
 
-    def _emit(self, rep, verb, number=None):
-        self.found.append((verb, number))
+    def _emit(self, rep, verb, number=None, repo=None):
+        self.found.append((verb, number, repo))
         if self.depth > 0 or rep:
             self.loop = True
 
@@ -132,7 +146,9 @@ class _Writes:
             elif sub2 is not None and s.w[sub2] in ("transfer", "delete"):
                 arg = _skip_r(s, sub2 + 1, hi)
                 hit = _NUMBER.fullmatch(_wv(s, arg)) if arg is not None else None
-                self._emit(rep, s.w[sub2], hit and (hit[1] or hit[2]))
+                number = hit and (hit[1] or hit[3])
+                repo = number and ((hit[2] if hit else None) or _repo_flag(s, g + 1, hi))
+                self._emit(rep, s.w[sub2], number, repo)
             return
         if s.w[sub1] != "api":
             return
@@ -172,7 +188,7 @@ class _Writes:
 
 
 def _writes(doc):
-    """([(verb, issue number or None)] for this call's identifier writes, whether one is in a loop)."""
+    """([(verb, issue number or None, repo or None)] for this call's identifier writes, whether one is in a loop)."""
     payload = doc.payload
     tool = payload.get("tool_name")
     ti = payload.get("tool_input")
@@ -187,9 +203,11 @@ def _writes(doc):
         verb = re.search(r"(create|transfer|delete)_issue\Z", tool)[1]
         number = ti.get("issue_number")
         number = str(number) if isinstance(number, int) or (isinstance(number, str) and number.isdigit()) else None
-        return [(verb, number)], False
+        owner, name = ti.get("owner"), ti.get("repo")
+        repo = f"{owner}/{name}" if isinstance(owner, str) and isinstance(name, str) and owner and name else None
+        return [(verb, number, number and repo)], False
     if isinstance(tool, str) and _MCP_ISSUE_WRITE.match(tool):
-        return ([("create", None)] if ti.get("method") == "create" else []), False
+        return ([("create", None, None)] if ti.get("method") == "create" else []), False
     return [], False
 
 
