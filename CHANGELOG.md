@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.0.3](https://github.com/mark-brannan/languette/compare/v0.0.2...v0.0.3) (2026-10-14)
+
+
+### Features
+
+* **guard-duplicate-prs:** a second PR on an issue an open PR already closes ([#125](https://github.com/mark-brannan/languette/issues/125)) ([2964565](https://github.com/mark-brannan/languette/commit/2964565d0ff792580be2dc36e9cc63ef3a0d34a7))
+* **guard-github-issues:** a yes through AskUserQuestion opens a shut door once ([#202](https://github.com/mark-brannan/languette/issues/202)) ([ffab211](https://github.com/mark-brannan/languette/commit/ffab211740bc00693a5c01c26fc4bb9c864d4ca9))
+* **guard-review-threads:** a bot's thread is resolved only on a fix or a record ([#118](https://github.com/mark-brannan/languette/issues/118)) ([8f6a459](https://github.com/mark-brannan/languette/commit/8f6a459901203e41a17aafb3b8fe15aae2276384))
+* **guard-signed-comments:** a comment an agent posts to GitHub is signed as an agent's ([#119](https://github.com/mark-brannan/languette/issues/119)) ([eb9527f](https://github.com/mark-brannan/languette/commit/eb9527f14095c19d95193b37f2b5964c095831d9))
+* **guards:** guard-host-availability denies SysV service stop and restart ([#185](https://github.com/mark-brannan/languette/issues/185)) ([fb0eee8](https://github.com/mark-brannan/languette/commit/fb0eee87d71d94b6a834267ce631f33d77ee90e6))
+
+
+### Performance
+
+* **hooks:** one hooks.json entry per event ([#209](https://github.com/mark-brannan/languette/issues/209)) ([eacc6de](https://github.com/mark-brannan/languette/commit/eacc6deb054e9cc41de42ff66f8668f18acd42a0))
+
+
+### Documentation
+
+* **decisions:** new guards build on the shared layer first ([#200](https://github.com/mark-brannan/languette/issues/200)) ([730725e](https://github.com/mark-brannan/languette/commit/730725e9b2c58e2235b6d727f8dacd869277079e))
+* **design:** guard rules, four engines a guard is written on ([#199](https://github.com/mark-brannan/languette/issues/199)) ([5b951ce](https://github.com/mark-brannan/languette/commit/5b951cef706986492bc3dfc206cab338477de501))
+* **research:** cluster the regex guard's git and GitHub rules beside ours by harm ([#134](https://github.com/mark-brannan/languette/issues/134)) ([#187](https://github.com/mark-brannan/languette/issues/187)) ([30bff66](https://github.com/mark-brannan/languette/commit/30bff66dd4292721327c7255f6d25bd73368bcf3))
+
 ## [0.0.2](https://github.com/mark-brannan/languette/compare/v0.0.1...v0.0.2) (2026-10-10)
 
 
