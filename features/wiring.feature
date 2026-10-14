@@ -305,6 +305,9 @@ Feature: wiring
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | no    | gh pr edit 4 --add-label churn-ok | denies  |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | true  | gh pr edit 4 --add-label churn-ok | denies  |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | 1     | gh pr edit 4 --add-label churn-ok | denies  |
+      | require-well-formed | CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED | true | echo "unterminated | denies |
+      | guard-secrets | CLAUDE_PLUGIN_OPTION_GUARD_SECRETS | true | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 | denies |
+      | guard-bypass-ruleset | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_RULESET | true | git push origin HEAD:$b | asks |
 
   # guard-worktrees is opt-in, the reverse of the guards above: it runs only
   # when its option is exactly "true", so a misconfiguration leaves it off.

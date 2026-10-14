@@ -171,6 +171,19 @@ Feature: guard-worktrees
         | command                                          |
         | yadm checkout .                                  |
 
+    @python_only
+    Scenario Outline: a branch switch in $HOME follows the guard's option and its checkout-home part
+      Given the working directory is "{TMP}"
+      And <setting> is "<value>"
+      When the agent runs `git switch some-branch`
+      Then the guard <verdict>
+
+      Examples:
+        | setting                                            | value | verdict   |
+        | CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME | true  | denies    |
+        | CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME | false | is silent |
+        | CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES               | false | is silent |
+
     # yadm hardcodes --work-tree=$HOME into every invocation, so where it is
     # run from does not matter.
     Scenario Outline: yadm ignores the working directory, so it is denied anywhere
@@ -363,6 +376,17 @@ Feature: guard-worktrees
       And the directory "{TMP}/repo/.claude/worktrees/theirs/sub"
       And a git repository at "{TMP}/other-clone"
       And the working directory is "{TMP}/repo/.claude/worktrees/mine"
+
+    @python_only
+    Scenario Outline: reaching into another worktree follows the foreign part's setting
+      Given CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_FOREIGN is "<value>"
+      When the agent runs `git -C ../theirs status`
+      Then the guard <verdict>
+
+      Examples:
+        | value | verdict   |
+        | true  | denies    |
+        | false | is silent |
 
     Scenario Outline: reaching into another worktree is denied
       When the agent runs `<command>`

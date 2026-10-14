@@ -213,7 +213,7 @@ def _respond(stdin_text, env, only):
     guards = [g for g in wired(event, tool) if only == g.NAME or (only is None and _on(g, env))]
     doc = Document(payload, env)
     if (guards and event == "PreToolUse" and doc.command is not None
-            and env.get("CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED") != "false"):
+            and _on(require_well_formed, env)):
         # A command that does not parse is require-well-formed's to deny; the others
         # would only read it again through a weaker parser. With require-well-formed
         # off, nothing would deny it, so the others read it on the awk rung. The
@@ -240,7 +240,7 @@ def _state_failed(payload, env):
     guard-cross-session-send's file saying the session has read something unknown, so
     its door stays shut rather than open on a stale record. With that guard's option
     off, nothing reads the file, so none is written (hooks.json's sh fallback agrees)."""
-    if env.get("CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND") == "false":
+    if not _on(guard_cross_session_send, env):
         return
     sid = payload.get("session_id") if isinstance(payload, dict) else None
     if not isinstance(sid, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", sid):
