@@ -48,8 +48,6 @@ DEFAULT = ("churn-ok", "mixed-loops-ok")
 GH = re.compile(r"(?:^|/)gh\Z")
 WRITES = frozenset("create new edit".split())
 LABEL_FLAGS = frozenset("--label --add-label -l".split())
-# gh api flags whose value is not a field, a method or the path.
-API_VALUED = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 # Paths whose write can carry labels in an --input payload.
 REPO = r"(?:repos/[^/]+/[^/]+|repositories/[^/]+)"
 LABEL_PATH = re.compile(REPO + r"/(?:issues(?:/[^/]+(?:/labels)?)?|labels/[^/]+)/?")
@@ -240,7 +238,7 @@ def _api(f, s, i, b, ctx):
             j += 1
         elif t.startswith("--input="):
             inputs.append((t[8:], s.live[j]))
-        elif t in API_VALUED:
+        elif t in sw.GH_API_VALUED:
             j += 1
         elif not t.startswith("-") and s.k[j] != ";" and path is None:
             path = t

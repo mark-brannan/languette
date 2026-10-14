@@ -43,7 +43,6 @@ _REPEATS = re.compile(r"(?:^|/)(?:xargs|parallel|find)\Z")
 _LOOP = frozenset("for while until select".split())
 _LEAD = frozenset("do then else elif ! time { (".split())
 _MUTATION = re.compile(r"(create|transfer|delete)Issue\s*\(")
-_SKIP_VALUE = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 SHUT = ("the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or "
         "the human has not spoken since.")
 _NUMBER = re.compile(r"#?(\d+)|https?://[^/\s]+/([^/\s]+/[^/\s]+)/issues/(\d+)/?")
@@ -59,14 +58,14 @@ def _label(verb, number, repo=None):
 
 
 def _repo_flag(s, lo, hi):
-    """The repo a -R/--repo flag names between lo and hi, or None."""
-    for i in range(lo, hi + 1):
-        t = sw.word(s, i)
-        if t in ("-R", "--repo") and i < hi:
-            return sw.word(s, i + 1)
-        if t.startswith("--repo="):
-            return t[7:]
-    return None
+    """The repo a -R/--repo flag names between lo and hi, the last one as gh
+    reads them; or None."""
+    repo, i = None, lo
+    while i <= hi:
+        if r := sw.gh_repo_flag(s, i, hi, repo):
+            repo, i = r
+        i += 1
+    return repo
 
 
 def _ask(label):
@@ -84,7 +83,7 @@ def _skip_r(s, lo, hi):
     i = lo
     while i <= hi:
         t = sw.word(s, i)
-        if t in ("-R", "--repo"):
+        if t in sw.GH_REPO_FLAGS:
             i += 2
             continue
         if t.startswith("-"):
@@ -153,14 +152,8 @@ class _Writes:
         while i <= hi:
             t = sw.word(s, i)
             m += _MUTATION.findall(t)
-            if t in ("-X", "--method"):
-                if i < hi:
-                    i += 1
-                    method = s.w[i].upper()
-            elif t.startswith("--method="):
-                method = t[9:].upper()
-            elif t.startswith("-X") and len(t) > 2:
-                method = t[2:].upper()
+            if mf := sw.gh_method_flag(s, i, hi, method):
+                method, i = mf
             elif t in ("-f", "-F", "--field", "--raw-field", "--input"):
                 fields = True
                 if i < hi:
@@ -168,12 +161,10 @@ class _Writes:
                     m += _MUTATION.findall(sw.word(s, i))
             elif re.match(r"-[fF].|--(?:field|raw-field|input)=", t):
                 fields = True
-            elif t in _SKIP_VALUE:
-                i += 1
-            elif not t.startswith("-") and path == "":
-                path = t
+            else:
+                i, path = sw.gh_api_word(t, i, path)
             i += 1
-        path = re.sub(r"^/+", "", re.sub(r"^https?://[^/]+/", "", path, count=1), count=1)
+        path = sw.gh_api_path(path)
         if re.fullmatch(r"repos/[^/]+/[^/]+/issues/?", path) and (method == "POST" or (method == "" and fields)):
             self._emit(rep, "create")
         if path == "graphql":

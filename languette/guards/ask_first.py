@@ -143,26 +143,33 @@ def _hit(entry, name, rest):
     return ok
 
 
+def segments(doc, prose=sw.PROSE):
+    """([(scan, a, b, nested)] for each non-empty segment of every text the
+    command runs, whether any text holds a LOOP word): what a guard that spends
+    one yes per run walks."""
+    out, loop = [], False
+    for t, nested in doc.texts(prose):
+        s = doc.scan(t)
+        loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
+        out += [(s, a, b, nested) for a, b in s.segments() if a <= b]
+    return out, loop
+
+
 def _matches(doc, entry):
     """(how many times the command runs entry, whether any of it sits in a loop)."""
     names = {entry["cmd"]} | LAUNCH | (PM if entry["cmd"] in PM else set())
     rx = re.compile(r"(?:^|/)(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\Z")
-    n, loop = 0, False
-    for t, nested in doc.texts(PROSE):
-        s = doc.scan(t)
-        loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
-        for a, b in s.segments():
-            if a > b:
-                continue
-            g = sw.cmd_index(s, a, b, rx, nested, prose=PROSE)
-            # cmd_index stops at the first launcher; a later word may be the command.
-            while g is not None:
-                if _hit(entry, _base(s.w[g]), s.w[g + 1:b + 1]):
-                    n += 1
-                    break
-                if nested:
-                    break
-                g = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and rx.search(s.w[i])), None)
+    n, (segs, loop) = 0, segments(doc, PROSE)
+    for s, a, b, nested in segs:
+        g = sw.cmd_index(s, a, b, rx, nested, prose=PROSE)
+        # cmd_index stops at the first launcher; a later word may be the command.
+        while g is not None:
+            if _hit(entry, _base(s.w[g]), s.w[g + 1:b + 1]):
+                n += 1
+                break
+            if nested:
+                break
+            g = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and rx.search(s.w[i])), None)
     return n, loop
 
 

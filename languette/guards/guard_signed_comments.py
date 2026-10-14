@@ -53,7 +53,6 @@ _MUTATION = re.compile(r"\b(?:addComment|addPullRequestReviewComment|addPullRequ
                        r"updatePullRequestReviewComment|updatePullRequestReview|addDiscussionComment|"
                        r"updateDiscussionComment)\b")
 _COMMENTS = re.compile(r"(?:^|/)(?:comments|reviews)(?:/|\Z)")
-_SKIP_VALUE = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 _FROM_DOC = re.compile(r"\$\(\s*cat\s+(?:-\s+)?HEREDOC(\d+)\s*\)")
 _VAR = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
 _HOME = re.compile(r"(?:~|\$HOME|\$\{HOME\})(?=/|\Z)")
@@ -106,9 +105,6 @@ class _Read:
                 if a <= b:
                     self.segment(a, b, nested)
 
-    def wv(self, i):
-        return self.s.q[i] if self.s.k[i] == "q" else self.s.w[i]
-
     def doc(self, k):
         return ("doc", k) if self.docs is not None else ("opaque", "a heredoc this hook could not pair with its use")
 
@@ -154,28 +150,28 @@ class _Read:
             self.api(g, hi)
             return
         v = g + 2                          # -R/--repo may come before the verb
-        while v <= hi and (self.wv(v) in ("-R", "--repo") or re.match(r"--repo=|-R.", self.wv(v))):
-            v += 2 if self.wv(v) in ("-R", "--repo") else 1
-        verb = _VERBS.get((s.w[g + 1], self.wv(v))) if v <= hi else None
+        while v <= hi and (r := sw.gh_repo_flag(s, v, hi)):
+            v = r[1] + 1
+        verb = _VERBS.get((s.w[g + 1], sw.word(self.s, v))) if v <= hi else None
         if verb is None:
             return
         bodies, i = [], v + 1
         while i <= hi:
-            t, live = self.wv(i), s.live[i]
+            t, live = sw.word(self.s, i), s.live[i]
             if verb == "c":                 # close / reopen: only --comment/-c posts text
                 if t in ("--comment", "-c") and i < hi:
                     i += 1
-                    bodies.append(self.val(self.wv(i), s.live[i]))
+                    bodies.append(self.val(sw.word(self.s, i), s.live[i]))
                 elif t.startswith("--comment="):
                     bodies.append(self.val(t[10:], live))
                 elif re.match(r"-c.", t):
                     bodies.append(self.val(t[2:], live))
             elif t in ("--body", "-b") and i < hi:
                 i += 1
-                bodies.append(self.val(self.wv(i), s.live[i]))
+                bodies.append(self.val(sw.word(self.s, i), s.live[i]))
             elif t in ("--body-file", "-F") and i < hi:
                 i += 1
-                bodies.append(self.file(self.wv(i), lo, hi))
+                bodies.append(self.file(sw.word(self.s, i), lo, hi))
             elif t.startswith("--body="):
                 bodies.append(self.val(t[7:], live))
             elif t.startswith("--body-file="):
@@ -194,32 +190,25 @@ class _Read:
         s = self.s
         path, method, fields, inp, i = "", "", [], None, g + 2
         while i <= hi:
-            t = self.wv(i)
-            if t in ("-X", "--method") and i < hi:
-                i += 1
-                method = s.w[i].upper()
-            elif t.startswith("--method="):
-                method = t[9:].upper()
-            elif re.match(r"-X.", t):
-                method = t[2:].upper()
+            t = sw.word(self.s, i)
+            if m := sw.gh_method_flag(s, i, hi, method):
+                method, i = m
             elif t in ("-f", "-F", "--field", "--raw-field") and i < hi:
                 i += 1
-                fields.append(self.field(self.wv(i), s.live[i], t in ("-F", "--field"), g, hi))
+                fields.append(self.field(sw.word(self.s, i), s.live[i], t in ("-F", "--field"), g, hi))
             elif re.match(r"-[fF].", t):
                 fields.append(self.field(t[2:], s.live[i], t[1] == "F", g, hi))
             elif re.match(r"--(?:field|raw-field)=", t):
                 fields.append(self.field(t.split("=", 1)[1], s.live[i], t.startswith("--field="), g, hi))
             elif t == "--input" and i < hi:
                 i += 1
-                inp = self.file(self.wv(i), g, hi)
+                inp = self.file(sw.word(self.s, i), g, hi)
             elif t.startswith("--input="):
                 inp = self.file(t[8:], g, hi)
-            elif t in _SKIP_VALUE:
-                i += 1
-            elif not t.startswith("-") and path == "":
-                path = t
+            else:
+                i, path = sw.gh_api_word(t, i, path)
             i += 1
-        p = re.sub(r"^/+", "", re.sub(r"^https?://[^/]+/", "", path, count=1), count=1)
+        p = sw.gh_api_path(path)
         p = re.split(r"[?#]", p, maxsplit=1)[0]
         if p == "graphql":
             query = next((src for key, src in fields if key == "query"), None)

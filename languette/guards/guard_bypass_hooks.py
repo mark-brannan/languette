@@ -23,7 +23,7 @@ outright.
 import re
 
 from languette import scan as sw
-from languette.guards.ask_first import LOOP, claim
+from languette.guards.ask_first import claim, segments
 from languette.verdict import deny
 
 NAME = "guard-bypass-hooks"
@@ -80,26 +80,21 @@ def _skips(sub, args):
 
 def _runs(doc):
     """(how many times the command skips the hooks, whether any of it is in a loop)."""
-    n, loop = 0, False
-    for t, nested in doc.texts():
-        s = doc.scan(t)
-        loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
-        for a, b in s.segments():
-            if a > b:
-                continue
-            g = sw.cmd_index(s, a, b, sw.GIT, nested)
-            if g is None:
-                continue
-            i, hooks_path = sw.git_subcommand(s, g, b), False
-            for j in sw.git_options(s, g, i):
-                w = s.w[j]
-                v = w[len("--config-env="):] if w.startswith("--config-env=") else (
-                    s.w[j + 1] if w in ("-c", "--config-env") and j < b and s.k[j + 1] == "w" else "")
-                hooks_path = hooks_path or v.split("=", 1)[0].lower() == "core.hookspath"
-            if hooks_path:
-                n += 1
-            elif i <= b and s.k[i] == "w" and s.w[i] in VALUE and _skips(s.w[i], s.w[i + 1:b + 1]):
-                n += 1
+    n, (segs, loop) = 0, segments(doc)
+    for s, a, b, nested in segs:
+        g = sw.cmd_index(s, a, b, sw.GIT, nested)
+        if g is None:
+            continue
+        i, hooks_path = sw.git_subcommand(s, g, b), False
+        for j in sw.git_options(s, g, i):
+            w = s.w[j]
+            v = w[len("--config-env="):] if w.startswith("--config-env=") else (
+                s.w[j + 1] if w in ("-c", "--config-env") and j < b and s.k[j + 1] == "w" else "")
+            hooks_path = hooks_path or v.split("=", 1)[0].lower() == "core.hookspath"
+        if hooks_path:
+            n += 1
+        elif i <= b and s.k[i] == "w" and s.w[i] in VALUE and _skips(s.w[i], s.w[i + 1:b + 1]):
+            n += 1
     return n, loop
 
 

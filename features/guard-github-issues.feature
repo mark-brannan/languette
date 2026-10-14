@@ -335,6 +335,24 @@ Feature: guard-github-issues
       When the agent runs `gh issue delete 7 -R o/b --yes`
       Then the guard denies, naming "Delete issue o/b#7"
 
+    Scenario Outline: the repo of a delete is its -R in any spelling, the last one as gh reads it
+      Given a project directory
+      And the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Delete issue 7 in o/a?", "header": "Issue", "multiSelect": false, "options": [{"label": "Delete issue o/a#7", "description": ""}, {"label": "Don't", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Delete issue 7 in o/a?\"=\"Delete issue o/a#7\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `<command>`
+      Then the guard <verdict>
+
+      Examples:
+        | command                                | verdict                              |
+        | gh issue delete 7 -Ro/b --yes          | denies, naming "Delete issue o/b#7"  |
+        | gh issue delete 7 --repo=o/b --yes     | denies, naming "Delete issue o/b#7"  |
+        | gh issue delete 7 -R o/a -R o/b --yes  | denies, naming "Delete issue o/b#7"  |
+        | gh issue delete 7 -Ro/a --yes          | is silent                            |
+        | gh issue delete 7 -R o/b -R o/a --yes  | is silent                            |
+
     Scenario: a yes to delete issue o/a#7 opens its delete in o/a
       Given a project directory
       And the transcript holds:

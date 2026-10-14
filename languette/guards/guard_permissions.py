@@ -14,7 +14,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Refuse, context, deny, planned
+from languette.verdict import Refuse, deny
 
 NAME = "guard-permissions"
 
@@ -163,38 +163,15 @@ class _Judge:
         paths.judge_segments(self, scans)
 
 
-def parse(doc):
-    return paths.parse_targets(doc, NAME, _Judge, "LANGUETTE_PERM_ALLOW")
+_MALFORMED = ("LANGUETTE_PERM_ALLOW is malformed ({}). Recursive chown, chgrp and chmod, and "
+              "chmod 777, are blocked until it is fixed or unset; other commands run. It must be a "
+              "colon-separated list of absolute paths (/srv/scratch), using only letters, digits and "
+              ". _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.")
 
 
-def plan(parsed):
-    return paths.plan_targets(parsed, _parse_allow)
-
-
-def judge(parsed, answers):
-    if parsed["found"] or parsed["home"] is None:
-        return parsed["found"]
-    home, physical = parsed["home"], paths.physical_of(answers)
-    extra_roots, allow_err = [], None
-    if parsed["allow"]:
-        extra_roots, allow_err = _parse_allow(parsed["allow"], home, physical(home), physical)
-    allow_msg = None
-    if allow_err:
-        allow_msg = (f"LANGUETTE_PERM_ALLOW is malformed ({allow_err}). Recursive chown, chgrp and chmod, and "
-                     "chmod 777, are blocked until it is fixed or unset; other commands run. It must be a "
-                     "colon-separated list of absolute paths (/srv/scratch), using only letters, digits and "
-                     ". _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.")
-
-    refused = parsed["refused"]
-    if refused is None and not parsed["targets"]:
-        return context("guard-permissions: " + allow_msg) if allow_msg else None
-    if allow_msg:
-        return deny("guard-permissions: " + allow_msg)
-    if refused is not None:
-        return deny(refused)
-
+def _verdict(targets, home, physical, extra_roots=()):
     roots = paths.own_roots(home, physical, extra_roots)
-    for abs_, what, raw in parsed["targets"]:
+    for abs_, what, raw in targets:
         if not paths.under(abs_, roots):
             return deny(f"`{what} {raw}` is blocked: only the scratchpad, /tmp, agent worktrees and paths named "
                         f"in LANGUETTE_PERM_ALLOW may be swept, and {abs_} is none of those. {_WAY_OUT}")
@@ -206,4 +183,5 @@ def judge(parsed, answers):
 
 
 def check(doc):
-    return (yield from planned(doc, parse, plan, judge))
+    return (yield from paths.check_targets(doc, NAME, _Judge, "LANGUETTE_PERM_ALLOW", _parse_allow, _MALFORMED,
+                                           _verdict))

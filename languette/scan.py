@@ -893,6 +893,63 @@ def word(s, i):
     return s.q[i] if s.k[i] == "q" else s.w[i]
 
 
+# gh command words, as the guards that read a gh command share them: the repo
+# a -R/--repo flag names, and `gh api`'s method, valued flags and endpoint.
+# Each reads one word at a time, so a guard's own walk keeps its own flags.
+
+# The flag that names the repo; its value is the next word unless glued on.
+GH_REPO_FLAGS = ("-R", "--repo")
+
+# `gh api` flags whose value no guard reads.
+GH_API_VALUED = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
+
+
+def _gh_valued(s, i, hi, spaced, long_eq, short, default):
+    """(value, index of the flag's last word) when word i is the flag: `spaced`
+    then its value (`default` when that would pass hi), `long_eq`value, or
+    `short`value glued on. Else None."""
+    t = word(s, i)
+    if t in spaced:
+        return (word(s, i + 1), i + 1) if i < hi else (default, i)
+    if t.startswith(long_eq):
+        return t[len(long_eq):], i
+    if t.startswith(short) and len(t) > len(short):
+        return t[len(short):], i
+    return None
+
+
+def gh_repo_flag(s, i, hi, default=None):
+    """(repo, index of its last word) when word i is -R/--repo in any spelling
+    (-R x, -Rx, --repo x, --repo=x); repo is `default` when its value would
+    pass hi. Else None."""
+    return _gh_valued(s, i, hi, GH_REPO_FLAGS, "--repo=", "-R", default)
+
+
+def gh_method_flag(s, i, hi, default=""):
+    """(method upper-cased, index of its last word) when word i of `gh api` sets
+    the HTTP method (-X M, -XM, --method M, --method=M); method is `default`
+    when its value would pass hi. Else None."""
+    got = _gh_valued(s, i, hi, ("-X", "--method"), "--method=", "-X", None)
+    return got and (default if got[0] is None else got[0].upper(), got[1])
+
+
+def gh_api_word(t, i, path):
+    """(i, path) past `gh api` word t at i, when no guard flag claims it: a flag
+    in GH_API_VALUED takes the next word with it, and the first word that is not a
+    flag is the endpoint path."""
+    if t in GH_API_VALUED:
+        return i + 1, path
+    if not t.startswith("-") and path == "":
+        return i, t
+    return i, path
+
+
+def gh_api_path(path):
+    """The endpoint a `gh api` path argument names: any https://host/ prefix and
+    leading slashes dropped (repos/o/r/issues)."""
+    return re.sub(r"^/+", "", re.sub(r"^https?://[^/]+/", "", path, count=1), count=1)
+
+
 def texts_of(text, prose=PROSE, read=None):
     """[(text, nested)]: the text itself plus, recursively, every quoted string
     in it that holds whitespace and may run. A segment's quoted strings are

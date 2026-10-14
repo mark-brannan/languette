@@ -79,6 +79,15 @@ class Act(Need):
     __slots__ = ()
 
 
+def judged(doc, name, judge):
+    """A check for a guard whose judge(doc) gives a deny reason or None: no
+    command is no finding, and a reason is a deny under the guard's name."""
+    if doc.text is None:
+        return None
+    why = judge(doc)
+    return deny(f"{name}: {why}") if why else None
+
+
 def planned(doc, parse, plan, judge):
     """A check for a guard that parses once: parse(doc) reads the command, plan
     lists every Need, and judge(parsed, answers) gets the answers keyed by
