@@ -201,6 +201,7 @@ class Ctx:
         self.project_env = True
         self.stubs = False
         self.hook = None                       # a hooks.json command, for wiring
+        self.wired = None                      # the guard a wiring row is about: the one command runs them all
         self.arg = None                        # the hook event, as Claude Code names it, for the guard to read
         self.session = "s1"                    # session_id in the payload, for guard-github-issues; None leaves it out
         self.agent = None                      # agent_id in the payload: a subagent's call, for guard-worktrees
@@ -472,6 +473,13 @@ def _setenv(ctx, var, value):
     ctx.env[var] = value
 
 
+@given("every guard's option is off")
+def _all_off(ctx):
+    # An ordinary guard's option exactly "false"; an opt-in guard's unset, its default.
+    for g in {g for _, _, gs in run.GUARDS for g in gs}:
+        ctx.env[run.option(g)] = None if hasattr(g, "OPT_IN") else "false"
+
+
 @given("no engine is configured")
 def _no_engine(ctx):
     ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = None
@@ -639,7 +647,7 @@ def _bare_path(ctx, tools, gh):
 
 @given(parsers.parse('the hook is the hooks.json command for "{guard}"'))
 def _hooks_json(ctx, guard):
-    ctx.hook = hooks_json_commands()[guard]
+    ctx.hook, ctx.wired = hooks_json_commands()[guard], guard
 
 
 @given(parsers.parse('the hook is the hooks.json {event} command for "{guard}"'))
@@ -1006,9 +1014,29 @@ def scanned(ctx, mode):
 
 # --- Then ----------------------------------------------------------------
 
+def _from_the_wired_guard(ctx):
+    """A wiring row's verdict is its own guard's, or the hook's fail-closed deny: the one
+    hooks.json command runs every guard, so another's finding could stand in for a guard
+    that never ran. The same call through the command narrowed to that guard must agree."""
+    if not ctx.wired or "fails closed" in (ctx.verdict.reason or ""):
+        return
+    run_py = 'python3 -I "${CLAUDE_PLUGIN_ROOT}/languette/run.py"'
+    assert ctx.hook.count(run_py) == 1, ctx.hook
+    hook, whole = ctx.hook, ctx.verdict
+    ctx.hook = hook.replace(run_py, f"{run_py} --guard {ctx.wired}")
+    try:
+        ctx.run(ctx.stdin)
+        alone = ctx.verdict
+    finally:
+        ctx.hook, ctx.verdict = hook, whole
+    assert (alone.decision, alone.reason) == (whole.decision, whole.reason), \
+        f"want {ctx.wired}'s own verdict ({alone.decision}: {alone.reason}), got {whole.decision}: {whole.reason}"
+
+
 @then("the guard denies")
 def _denies(ctx):
     assert_that(ctx.verdict, denies())
+    _from_the_wired_guard(ctx)
 
 
 @then(parsers.re(r'the guard denies, naming "(?P<text>.*)"'))
@@ -1030,6 +1058,7 @@ def _asks_naming(ctx, text):
 @then("the guard asks")
 def _asks(ctx):
     assert_that(ctx.verdict, asks())
+    _from_the_wired_guard(ctx)
 
 
 @then("the guard is silent")

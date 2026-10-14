@@ -43,13 +43,13 @@ Feature: wiring
       | guard-scheduled-jobs | crontab -r | denies |
       | guard-git-stacked-base | git push origin --delete "$b" | asks      |
       | ask-first              | npm run walk                  | denies    |
-      | guard-bypass-hooks | git push --no-verify | denies |
+      | guard-bypass-hooks | git merge --no-verify topic | denies |
       | guard-secrets | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 | denies |
       | guard-infra         | terraform destroy             | denies    |
       | guard-github-issues             | gh issue create -t t -b b     | denies    |
       | prose-budget-commit    | git commit -m x               | warns about "CI fails on this" |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-duplicate-prs | gh pr create -t t -b "$B" | denies |
+      | guard-duplicate-prs | gh pr create -t t -b "Closes #1" | asks |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
       | guard-bypass-ruleset      | git push origin HEAD:$b       | asks      |
 
@@ -85,17 +85,18 @@ Feature: wiring
       | guard-scheduled-jobs | crontab -r |
       | guard-git-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
-      | guard-bypass-hooks | git push --no-verify |
+      | guard-bypass-hooks | git merge --no-verify topic |
       | guard-infra         | terraform destroy             |
       | guard-github-issues             | gh issue create -t t -b b     |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-duplicate-prs | gh pr create -t t -b "$B" |
+      | guard-duplicate-prs | gh pr create -t t -b "Closes #1" |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
   # One command runs every guard, so with python3 absent it denies every call
-  # and says why instead of blaming the plugin directory. It cannot read the
-  # guards' options without python3, so turning a guard off does not lift it.
+  # and says why instead of blaming the plugin directory. Without python3 it
+  # reads no one guard's option, so turning one guard off does not lift it;
+  # with every guard off it stays silent, as an install with no guard on would.
   Scenario: with python3 absent from PATH, the hooks.json command denies and says python3 is required
     Given the hook is the hooks.json command for "guard-recursive-delete"
     And PATH holds only "sh cat printf dirname"
@@ -109,6 +110,33 @@ Feature: wiring
     And CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE is "false"
     When the agent runs `rm -rf build`
     Then the guard denies, naming "python3 is required for the languette guards"
+
+  Scenario Outline: with every guard off, the hooks.json command is silent though it cannot run
+    Given the hook is the hooks.json command for "guard-recursive-delete"
+    And every guard's option is off
+    And <setup>
+    When the agent runs `rm -rf build`
+    Then the guard is silent
+
+    Examples:
+      | setup                                   |
+      | PATH holds only "sh cat printf dirname" |
+      | CLAUDE_PLUGIN_ROOT is "/nonexistent"    |
+
+  Scenario Outline: with every guard off but one, the hooks.json command still fails closed
+    Given the hook is the hooks.json command for "guard-recursive-delete"
+    And every guard's option is off
+    And <option> is "<value>"
+    And <setup>
+    When the agent runs `rm -rf build`
+    Then the guard denies, naming "<text>"
+
+    Examples:
+      | option                                    | value | setup                                   | text                                          |
+      | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE | true  | PATH holds only "sh cat printf dirname" | python3 is required for the languette guards |
+      | CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES      | true  | PATH holds only "sh cat printf dirname" | python3 is required for the languette guards |
+      | CLAUDE_PLUGIN_OPTION_ASK_FIRST            | no    | CLAUDE_PLUGIN_ROOT is "/nonexistent"    | languette/run.py is missing                   |
+      | CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS | true  | CLAUDE_PLUGIN_ROOT is "/nonexistent"    | languette/run.py is missing                   |
 
   Scenario Outline: a script that crashes is a deny
     Given the hook is the hooks.json command for "<guard>"
@@ -128,11 +156,11 @@ Feature: wiring
       | guard-scheduled-jobs | crontab -r |
       | guard-git-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
-      | guard-bypass-hooks | git push --no-verify |
+      | guard-bypass-hooks | git merge --no-verify topic |
       | guard-infra         | terraform destroy             |
       | guard-github-issues             | gh issue create -t t -b b     |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-duplicate-prs | gh pr create -t t -b "$B" |
+      | guard-duplicate-prs | gh pr create -t t -b "Closes #1" |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
@@ -154,11 +182,11 @@ Feature: wiring
       | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | crontab -r |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | git push origin --delete "$b" |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | npm run walk                  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | git push --no-verify |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | git merge --no-verify topic |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | terraform destroy             |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | gh issue create -t t -b b     |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | gh pr create -t t -b "$B" |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | gh pr create -t t -b "Closes #1" |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | git commit -m x               |
 
@@ -227,17 +255,17 @@ Feature: wiring
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | true  | git push origin --delete "$b" | asks    |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | 1     | git push origin --delete "$b" | asks    |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              |       | npm run walk                  | denies  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS |  | git push --no-verify | denies |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS |  | git merge --no-verify topic | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | 0     | npm run walk                  | denies  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | 0 | git push --no-verify | denies |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | 0 | git merge --no-verify topic | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | False | npm run walk                  | denies  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | False | git push --no-verify | denies |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | False | git merge --no-verify topic | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | no    | npm run walk                  | denies  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | no | git push --no-verify | denies |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | no | git merge --no-verify topic | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | true  | npm run walk                  | denies  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | true | git push --no-verify | denies |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | true | git merge --no-verify topic | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | 1     | npm run walk                  | denies  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | 1 | git push --no-verify | denies |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | 1 | git merge --no-verify topic | denies |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         |       | terraform destroy             | denies  |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | 0     | terraform destroy             | denies  |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | False | terraform destroy             | denies  |
@@ -251,16 +279,16 @@ Feature: wiring
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | true  | gh issue create -t t -b b     | denies  |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | 1     | gh issue create -t t -b b     | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     |       | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS |  | gh pr create -t t -b "$B" | denies |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS |  | gh pr create -t t -b "Closes #1" | asks |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 0     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 0 | gh pr create -t t -b "$B" | denies |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 0 | gh pr create -t t -b "Closes #1" | asks |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | False | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | False | gh pr create -t t -b "$B" | denies |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | False | gh pr create -t t -b "Closes #1" | asks |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | no | gh pr create -t t -b "$B" | denies |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | no | gh pr create -t t -b "Closes #1" | asks |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | true | gh pr create -t t -b "$B" | denies |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 1 | gh pr create -t t -b "$B" | denies |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | true | gh pr create -t t -b "Closes #1" | asks |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 1 | gh pr create -t t -b "Closes #1" | asks |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | warns about "CI fails on this" |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | warns about "CI fails on this" |

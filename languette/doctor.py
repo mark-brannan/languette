@@ -192,10 +192,14 @@ def probe(command, env, cwd, limit, sent):
         decision, reason = out.get("permissionDecision"), out.get("permissionDecisionReason")
     except (ValueError, KeyError, TypeError, AttributeError):
         return False, f"the hook printed something that is not a decision (exit {r.returncode})", ms
-    if decision == "deny" and isinstance(reason, str) and FALLBACK.search(reason):
+    # The one hooks.json command runs every guard and joins their denies, so another guard's
+    # own fail-closed deny can sit beside the probed guard's: only a deny that is all
+    # fallback means no guard judged the probe.
+    judged = [p for p in reason.split("\n\n") if not FALLBACK.search(p)] if isinstance(reason, str) else []
+    if decision == "deny" and isinstance(reason, str) and not judged:
         return False, f"only the fallback denied it, so the guard never judged it: {reason.split('. ')[0]}", ms
     if decision == "deny":
-        return True, (one_line(reason) if isinstance(reason, str) else "") or "no reason given", ms
+        return True, (one_line(judged[0]) if judged else "") or "no reason given", ms
     return False, f"the hook {'let it through silently' if decision is None else 'answered ' + str(decision)}" \
                   f" (exit {r.returncode})", ms
 
