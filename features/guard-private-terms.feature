@@ -999,6 +999,7 @@ Feature: guard-private-terms
       When the agent runs `<command>`
       Then the guard denies
 
+      @also_guard-duplicate-prs
       Examples:
         | command                                                                       |
         | SP={PROJ}/sp gh pr create -R o/r -t x --body-file "$SP/clean.md"              |
@@ -1007,8 +1008,12 @@ Feature: guard-private-terms
         | X="~/d"; gh pr create -R o/r -t x --body-file "$X/../b.md"                    |
         | SP=$(mktemp -d); gh pr create -R o/r -t x --body-file "$SP/clean.md"          |
         | SP={PROJ}/sp; sh -c 'gh pr create -R o/r -t x --body-file $SP/clean.md'       |
+
+      Examples:
+        | command                                                                       |
         | sh -c 'gh pr create -R o/r -t x --body-file ~/b.md'                           |
 
+    @also_guard-duplicate-prs
     Scenario: a quoted word leading a line is not an assignment list, so the real path is the one read
       Given the file "decoy/notes.md" holds:
         """
