@@ -223,6 +223,15 @@ def _fetch(p):
         return Refuse(str(e))
 
 
+def _abs(p, cwd, cd, env):
+    """The absolute, collapsed path `p` names, or None when this command's own cd hides where it stands."""
+    if p == "~" or p.startswith("~/"):
+        p = (env.get("HOME") or "") + p[1:] if env.get("HOME") else None
+    elif not os.path.isabs(p):
+        p = os.path.join(cwd, p) if cwd and not cd else None
+    return os.path.normpath(p) if p else p
+
+
 def _body(post, cwd, cd, docs, fed, env):
     """The text of the body `post` sends, or the deny that says why it cannot be read."""
     text = ""
@@ -239,14 +248,10 @@ def _body(post, cwd, cd, docs, fed, env):
                              "it cannot be checked. Put the text in a heredoc in the same command, or in a file and "
                              "pass --body-file <path>.")
             text += "".join(body + "\n" for body, _ in docs)
-        elif v in fed:                         # this command writes it from a heredoc: that text, not the file's
+        elif v in fed or _abs(v, cwd, cd, env) in fed:     # this command writes it from a heredoc: that text, not the file's
             text += "".join(body + "\n" for body, _ in docs)
         else:
-            p = v
-            if p == "~" or p.startswith("~/"):
-                p = (env.get("HOME") or "") + p[1:] if env.get("HOME") else None
-            elif not os.path.isabs(p):
-                p = os.path.join(cwd, p) if cwd and not cd else None
+            p = _abs(v, cwd, cd, env)
             got = Refuse("is a relative path after a cd, and the guard cannot tell where the command stands") \
                 if p is None else (yield from _fetch(p))
             if isinstance(got, Refuse):
@@ -360,7 +365,7 @@ def check(doc):
     for post in found:
         if not post.parts:
             continue
-        text = yield from _body(post, cwd, cd, docs, fed, env)
+        text = yield from _body(post, cwd, cd, docs, fed | {_abs(w, cwd, cd, env) for w in fed} - {None}, env)
         if isinstance(text, dict):
             return text
         if not CLOSES.search(text):

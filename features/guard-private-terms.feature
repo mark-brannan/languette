@@ -950,10 +950,14 @@ Feature: guard-private-terms
       When the agent runs `<command>`
       Then the guard <verdict>
 
+      @also_guard-duplicate-prs
       Examples:
         | command                                                                        | verdict                     |
         | SP={PROJ}/sp; gh pr create -R o/r -t x --body-file "$SP/clean.md"              | is silent                   |
         | SP={PROJ}/sp; gh pr create -R o/r -t x --body-file "$SP/body.md"               | denies, naming "Wanderlust" |
+
+      Examples:
+        | command                                                                        | verdict                     |
         | sh -c 'gh pr create -R o/r -t x --body-file {PROJ}/sp/clean.md'                | is silent                   |
 
       @also_guard-github-issues
@@ -968,6 +972,7 @@ Feature: guard-private-terms
         | SP=/nowhere; SP={PROJ}/sp; gh pr comment 3 -R o/r -F $SP/clean.md              | is silent                   |
         | SP=~; gh pr comment 3 -R o/r -F $SP/pt-clean.md                                | is silent                   |
 
+    @also_guard-duplicate-prs
     Scenario: a variable assigned in the command and a file the same command writes under it
       Given the working directory is "{PROJ}"
       When the agent runs:
@@ -980,6 +985,7 @@ Feature: guard-private-terms
         """
       Then the guard is silent
 
+    @also_guard-duplicate-prs
     Scenario: a variable no command assigned is denied, and the deny says earlier commands are invisible
       Given the working directory is "{PROJ}"
       When the agent runs `gh pr create -R o/r -t x --body-file "$SP/clean.md"`
