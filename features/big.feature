@@ -14,7 +14,7 @@ Feature: big
     When the agent runs:
       """
       timeout 40 ssh -o BatchMode=yes pi@host 'sudo sh -c "
-      v_stash=\$(git -c safe.directory=\"*\" --git-dir=/home/pi/.local/share/yadm/repo.git --work-tree=/home/pi stash list 2>/dev/null | wc -l)
+      v_stash=\$(git -c safe.directory=\"*\" --git-dir=/srv/dots.git --work-tree=/srv/home stash list 2>/dev/null | wc -l)
       echo \"stash count: \$v_stash\"
       "' 2>&1
       echo "=== what the body will read ==="
@@ -29,8 +29,8 @@ Feature: big
        if [ \"\$_n\" = 0 ]; then printf current; else printf \"%s behind\" \"\$_n\"; fi
        [ -n \"\$_age\" ] && printf \", fetched %sm ago\" \"\$_age\"
       }
-      d=\$(repo_state /home/pi/.local/share/yadm/repo.git origin/main /home/pi/.local/share/yadm/repo.git/FETCH_HEAD)
-      s=\$(git -c safe.directory=\"*\" --git-dir=/home/pi/.local/share/yadm/repo.git --work-tree=/home/pi stash list 2>/dev/null | wc -l)
+      d=\$(repo_state /srv/dots.git origin/main /srv/dots.git/FETCH_HEAD)
+      s=\$(git -c safe.directory=\"*\" --git-dir=/srv/dots.git --work-tree=/srv/home stash list 2>/dev/null | wc -l)
       [ \"\$s\" = 0 ] || d=\"\$d, \${s} stashed\"
       echo \"app: \$(repo_state /home/pi/app/.git origin/main /home/pi/app/.git/FETCH_HEAD)\"
       echo \"dotfiles: \$d\"
@@ -49,10 +49,10 @@ Feature: big
       echo "Commands run read-only on this machine so a reviewer without a shell could cite them. Each block is the command then its output, cut at the line count shown by head. Nothing here is an opinion."
       run "gh api repos/example/tools/rules/branches/main --jq '.[] | {type, parameters}'"
       for r in api web cli core docs plugin app notes site lib; do run "gh api repos/example/$r/rules/branches/main --jq '[.[].type] | sort | join(\", \")'" 5; done
-      run "for r in tools api web cli core app docs plugin; do echo \"\$r: \$(ls /home/user/\$r/.git/hooks/mergify-hooks 2>/dev/null | tr '\\n' ' ')\"; done"
+      run "for r in tools api web cli core app docs plugin; do echo \"\$r: \$(ls /home/user/\$r/.git/hooks/extra 2>/dev/null | tr '\\n' ' ')\"; done"
       run "ls /home/user/api/.git/hooks/; head -20 /home/user/api/.git/hooks/pre-push"
-      run "cat /home/user/api/.git/hooks/mergify-hooks/pre-push" 80
-      run "for r in api web cli app; do echo \"\$r: \$(git -C /home/user/\$r log -30 --format=%B main 2>/dev/null | grep -c '^Change-Id:') Change-Id trailers in last 30 main commits\"; done"
+      run "cat /home/user/api/.git/hooks/extra/pre-push" 80
+      run "for r in api web cli app; do echo \"\$r: \$(git -C /home/user/\$r log -30 --format=%B main 2>/dev/null | grep -c '^Signed-off-by:') Signed-off-by trailers in last 30 main commits\"; done"
       run "git -C /home/user/api log -12 --format='%h %s' main"
       run "git -C /home/user/web log -12 --format='%h %s' main"
       run "git -C /home/user/cli log -12 --format='%h %s' main"
@@ -60,15 +60,15 @@ Feature: big
       run "git -C /home/user/notes log -8 --format='%h %G? %s' main"
       run "git -C /home/user/notes log --merges --oneline main | wc -l; git -C /home/user/notes log --oneline main | wc -l"
       run "git config --global --get commit.gpgsign; git config --global --get gpg.format; git config --global --get user.signingkey | cut -c1-30"
-      run "for r in cli core docs plugin lib; do echo \"== \$r\"; cat /home/user/\$r/release-please-config.json 2>/dev/null; cat /home/user/\$r/.release-please-manifest.json 2>/dev/null; done" 120
+      run "for r in cli core docs plugin lib; do echo \"== \$r\"; cat /home/user/\$r/release-config.json 2>/dev/null; cat /home/user/\$r/.release-manifest.json 2>/dev/null; done" 120
       run "for r in cli core docs plugin lib api web tools app; do echo \"\$r: \$(ls /home/user/\$r/.github/workflows 2>/dev/null | tr '\\n' ' ')\"; done"
-      run "for r in cli core docs plugin lib api web tools app notes site; do echo \"== \$r\"; cat /home/user/\$r/.mergify.yml 2>/dev/null | head -30; done" 200
-      run "gh api repos/example/.github/contents/.mergify.yml --jq .content | base64 -d" 120
-      run "grep -rn -i 'linear' /home/user/tools/RUNBOOK.md | head -20"
-      run "grep -rn -i 'unset-upstream\\|set-upstream\\|--no-verify' /home/user/tools/docs/rules.md /home/user/tools/README.md 2>/dev/null | head -20"
-      run "ls /home/user/tools/docs/ /home/user/tools/hooks/ 2>/dev/null; find /home/user/tools -name 'rebase-branch.sh' -o -name 'check-push*' 2>/dev/null | grep -v node_modules" 30
-      run "f=\$(find /home/user/tools -name 'check-push*' -not -path '*/node_modules/*' | head -1); echo \$f; head -30 \"\$f\""
-      run "find /home/user/.claude/plugins -path '*mergify*' -name 'SKILL.md' | head; f=\$(find /home/user/.claude/plugins -path '*mergify*stack*' -name 'SKILL.md' | head -1); head -40 \"\$f\""
+      run "for r in cli core docs plugin lib api web tools app notes site; do echo \"== \$r\"; cat /home/user/\$r/.merge-queue.yml 2>/dev/null | head -30; done" 200
+      run "gh api repos/example/.github/contents/.merge-queue.yml --jq .content | base64 -d" 120
+      run "grep -rn -i 'linear' /home/user/tools/NOTES.md | head -20"
+      run "grep -rn -i '--force\\|--no-verify' /home/user/tools/docs/style.md /home/user/tools/README.md 2>/dev/null | head -20"
+      run "ls /home/user/tools/docs/ /home/user/tools/hooks/ 2>/dev/null; find /home/user/tools -name 'rebase.sh' -o -name 'pre-push*' 2>/dev/null | grep -v node_modules" 30
+      run "f=\$(find /home/user/tools -name 'pre-push*' -not -path '*/node_modules/*' | head -1); echo \$f; head -30 \"\$f\""
+      run "find /home/user/.local/share/plugins -path '*queue*' -name 'README.md' | head; f=\$(find /home/user/.local/share/plugins -path '*queue*' -name 'README.md' | head -1); head -40 \"\$f\""
       run "gh pr list -R example/tools --state open --json number,title --jq '.[] | \"\\(.number) \\(.title)\"'" 20
       run "gh pr list -R example/api --state open --json number,title --jq '.[] | \"\\(.number) \\(.title)\"'" 20
       run "gh pr list -R example/api --state merged --limit 20 --json number,title,commits --jq '.[] | \"\\(.number) commits=\\(.commits|length) \\(.title)\"'" 25
@@ -79,7 +79,7 @@ Feature: big
       run "gh api repos/example/notes --jq '{visibility, allow_squash_merge, allow_merge_commit, allow_rebase_merge}'"
       run "git -C /home/user/site log --oneline main | wc -l; git -C /home/user/site remote -v; ls /home/user/site | head -20"
       run "cat /home/user/notes/log/2026-09-01.md" 60
-      run "sed -n '480,520p' /home/user/tools/RUNBOOK.md"
+      run "sed -n '480,520p' /home/user/tools/NOTES.md"
       } > $E
       wc -l $E; grep -c '^### ' $E
       """
@@ -102,15 +102,15 @@ Feature: big
       echo "## heartbeat"; ls -l /etc/site-heartbeat.json 2>&1; journalctl -t site-heartbeat -n 2 --no-pager -o cat 2>&1; journalctl -t site-hourly-sync -n 2 --no-pager -o cat 2>&1
       echo "## autostart"; ls ~/.config/autostart-disabled/ ~/.config/autostart/ 2>&1
       echo "## gpu"; journalctl -b -k 2>/dev/null | grep -c "Resetting GPU for hang"
-      echo "## webapp launcher"; cat ~/.webapp/webapp-server 2>&1 | head -3; npm config get prefix; ls -d ~/.npm-global/lib/node_modules/webapp-server 2>&1
-      echo "## pkg"; grep -o '"[^"]*": *"file:[^"]*"' ~/.webapp/package.json; node -e 'console.log(require("/home/pi/.webapp/package.json").dependencies["sensors-plugin"])' 2>&1; ls -ld ~/.webapp/node_modules/sensors-plugin ~/sensors-plugin 2>&1; grep -c getBluetoothSession /home/pi/sensors-plugin/index.js 2>&1
-      echo "## can"; ip -br link show can0 2>&1; curl -s localhost:3000/api/v1/status | head -c 300; echo; grep -o '"uniqueNumber":[^,}]*' ~/.webapp/settings.json 2>/dev/null | head -2
-      echo "## plugin configs"; ls ~/.webapp/plugin-config-data/ | grep -E 'influx|sensors|ntfy'
-      echo "## udp inputs"; python3 -c 'import json;s=json.load(open("/home/pi/.webapp/settings.json"));[print(p.get("id"),p.get("type"),p.get("subOptions",{}).get("type"),p.get("subOptions",{}).get("port"),p.get("subOptions",{}).get("uniqueNumber")) for p in s.get("pipedProviders",[])]' 2>&1
+      echo "## webapp launcher"; cat ~/.app/webapp-server 2>&1 | head -3; npm config get prefix; ls -d ~/.npm-global/lib/node_modules/webapp-server 2>&1
+      echo "## pkg"; grep -o '"[^"]*": *"file:[^"]*"' ~/.app/package.json; node -e 'console.log(require("/home/pi/.app/package.json").dependencies["plugin-a"])' 2>&1; ls -ld ~/.app/node_modules/plugin-a ~/plugin-a 2>&1; grep -c openSession /home/pi/plugin-a/index.js 2>&1
+      echo "## can"; ip -br link show eth1 2>&1; curl -s localhost:3000/api/v1/status | head -c 300; echo; grep -o '"unit":[^,}]*' ~/.app/settings.json 2>/dev/null | head -2
+      echo "## plugin configs"; ls ~/.app/plugin-config-data/ | grep -E 'influx|sensors|ntfy'
+      echo "## udp inputs"; python3 -c 'import json;s=json.load(open("/home/pi/.app/settings.json"));[print(p.get("id"),p.get("type"),p.get("subOptions",{}).get("type"),p.get("subOptions",{}).get("port"),p.get("subOptions",{}).get("unit")) for p in s.get("inputs",[])]' 2>&1
       echo "## dbus"; ls /etc/dbus-1/ 2>&1 | head; grep -rl auth_timeout /etc/dbus-1/ 2>/dev/null
-      echo "## router+dns"; ssh -o BatchMode=yes -o ConnectTimeout=5 root@192.168.8.1 "uci get dhcp.@dnsmasq[0].address" 2>&1 | head -2; ip -br -4 addr | grep -E 'eth0|wlan0'
+      echo "## router+dns"; ssh -o BatchMode=yes -o ConnectTimeout=5 root@198.51.100.1 "uci get dhcp.@dnsmasq[0].address" 2>&1 | head -2; ip -br -4 addr | grep -E 'eth0|wlan0'
       echo "## backups"; ls ~/app-backups/ 2>&1 | head -3; ls -d ~/influx-export 2>&1
-      echo "## influx"; ls /etc/telegraf/ 2>&1 | head -3; grep -l "webapp-to-influxdb" ~/.webapp/plugin-config-data/*.json 2>/dev/null | head -2
+      echo "## influx"; ls /etc/telegraf/ 2>&1 | head -3; grep -l "webapp-to-influxdb" ~/.app/plugin-config-data/*.json 2>/dev/null | head -2
       echo "## mem"; free -m | head -2
       echo "## sysctl"; cat /proc/sys/vm/max_map_count; ls /etc/sysctl.d/ | grep questdb
       echo "## worker data"; ls ~/app/worker/data 2>&1 | head -3; ls -d ~/.worker 2>&1
@@ -411,10 +411,10 @@ Feature: big
       echo "Commands run read-only on this machine so a reviewer without a shell could cite them. Each block is the command then its output, cut at the line count shown by head. Nothing here is an opinion."
       run "gh api repos/example/tools/rules/branches/main --jq '.[] | {type, parameters}'"
       for r in api web cli core docs plugin app notes site lib; do run "gh api repos/example/$r/rules/branches/main --jq '[.[].type] | sort | join(\", \")'" 5; done
-      run "for r in tools api web cli core app docs plugin; do echo \"\$r: \$(ls /home/user/\$r/.git/hooks/mergify-hooks 2>/dev/null | tr '\\n' ' ')\"; done"
+      run "for r in tools api web cli core app docs plugin; do echo \"\$r: \$(ls /home/user/\$r/.git/hooks/extra 2>/dev/null | tr '\\n' ' ')\"; done"
       run "ls /home/user/api/.git/hooks/; head -20 /home/user/api/.git/hooks/pre-push"
-      run "cat /home/user/api/.git/hooks/mergify-hooks/pre-push" 80
-      run "for r in api web cli app; do echo \"\$r: \$(git -C /home/user/\$r log -30 --format=%B main 2>/dev/null | grep -c '^Change-Id:') Change-Id trailers in last 30 main commits\"; done"
+      run "cat /home/user/api/.git/hooks/extra/pre-push" 80
+      run "for r in api web cli app; do echo \"\$r: \$(git -C /home/user/\$r log -30 --format=%B main 2>/dev/null | grep -c '^Signed-off-by:') Signed-off-by trailers in last 30 main commits\"; done"
       run "git -C /home/user/api log -12 --format='%h %s' main"
       run "git -C /home/user/web log -12 --format='%h %s' main"
       run "git -C /home/user/cli log -12 --format='%h %s' main"
@@ -422,15 +422,15 @@ Feature: big
       run "git -C /home/user/notes log -8 --format='%h %G? %s' main"
       run "git -C /home/user/notes log --merges --oneline main | wc -l; git -C /home/user/notes log --oneline main | wc -l"
       run "git config --global --get commit.gpgsign; git config --global --get gpg.format; git config --global --get user.signingkey | cut -c1-30"
-      run "for r in cli core docs plugin lib; do echo \"== \$r\"; cat /home/user/\$r/release-please-config.json 2>/dev/null; cat /home/user/\$r/.release-please-manifest.json 2>/dev/null; done" 120
+      run "for r in cli core docs plugin lib; do echo \"== \$r\"; cat /home/user/\$r/release-config.json 2>/dev/null; cat /home/user/\$r/.release-manifest.json 2>/dev/null; done" 120
       run "for r in cli core docs plugin lib api web tools app; do echo \"\$r: \$(ls /home/user/\$r/.github/workflows 2>/dev/null | tr '\\n' ' ')\"; done"
-      run "for r in cli core docs plugin lib api web tools app notes site; do echo \"== \$r\"; cat /home/user/\$r/.mergify.yml 2>/dev/null | head -30; done" 200
-      run "gh api repos/example/.github/contents/.mergify.yml --jq .content | base64 -d" 120
-      run "grep -rn -i 'linear' /home/user/tools/RUNBOOK.md | head -20"
-      run "grep -rn -i 'unset-upstream\\|set-upstream\\|--no-verify' /home/user/tools/docs/rules.md /home/user/tools/README.md 2>/dev/null | head -20"
-      run "ls /home/user/tools/docs/ /home/user/tools/hooks/ 2>/dev/null; find /home/user/tools -name 'rebase-branch.sh' -o -name 'check-push*' 2>/dev/null | grep -v node_modules" 30
-      run "f=\$(find /home/user/tools -name 'check-push*' -not -path '*/node_modules/*' | head -1); echo \$f; head -30 \"\$f\""
-      run "find /home/user/.claude/plugins -path '*mergify*' -name 'SKILL.md' | head; f=\$(find /home/user/.claude/plugins -path '*mergify*stack*' -name 'SKILL.md' | head -1); head -40 \"\$f\""
+      run "for r in cli core docs plugin lib api web tools app notes site; do echo \"== \$r\"; cat /home/user/\$r/.merge-queue.yml 2>/dev/null | head -30; done" 200
+      run "gh api repos/example/.github/contents/.merge-queue.yml --jq .content | base64 -d" 120
+      run "grep -rn -i 'linear' /home/user/tools/NOTES.md | head -20"
+      run "grep -rn -i '--force\\|--no-verify' /home/user/tools/docs/style.md /home/user/tools/README.md 2>/dev/null | head -20"
+      run "ls /home/user/tools/docs/ /home/user/tools/hooks/ 2>/dev/null; find /home/user/tools -name 'rebase.sh' -o -name 'pre-push*' 2>/dev/null | grep -v node_modules" 30
+      run "f=\$(find /home/user/tools -name 'pre-push*' -not -path '*/node_modules/*' | head -1); echo \$f; head -30 \"\$f\""
+      run "find /home/user/.local/share/plugins -path '*queue*' -name 'README.md' | head; f=\$(find /home/user/.local/share/plugins -path '*queue*' -name 'README.md' | head -1); head -40 \"\$f\""
       run "gh pr list -R example/tools --state open --json number,title --jq '.[] | \"\\(.number) \\(.title)\"'" 20
       run "gh pr list -R example/api --state open --json number,title --jq '.[] | \"\\(.number) \\(.title)\"'" 20
       run "gh pr list -R example/api --state merged --limit 20 --json number,title,commits --jq '.[] | \"\\(.number) commits=\\(.commits|length) \\(.title)\"'" 25
@@ -441,7 +441,7 @@ Feature: big
       run "gh api repos/example/notes --jq '{visibility, allow_squash_merge, allow_merge_commit, allow_rebase_merge}'"
       run "git -C /home/user/site log --oneline main | wc -l; git -C /home/user/site remote -v; ls /home/user/site | head -20"
       run "cat /home/user/notes/log/2026-09-01.md" 60
-      run "sed -n '480,520p' /home/user/tools/RUNBOOK.md"
+      run "sed -n '480,520p' /home/user/tools/NOTES.md"
       } > $E
       wc -l $E; grep -c '^### ' $E
       """
@@ -451,7 +451,7 @@ Feature: big
     When the agent runs:
       """
       timeout 40 ssh -o BatchMode=yes pi@host 'sudo sh -c "
-      v_stash=\$(git -c safe.directory=\"*\" --git-dir=/home/pi/.local/share/yadm/repo.git --work-tree=/home/pi stash list 2>/dev/null | wc -l)
+      v_stash=\$(git -c safe.directory=\"*\" --git-dir=/srv/dots.git --work-tree=/srv/home stash list 2>/dev/null | wc -l)
       echo \"stash count: \$v_stash\"
       "' 2>&1
       echo "=== what the body will read ==="
@@ -466,8 +466,8 @@ Feature: big
        if [ \"\$_n\" = 0 ]; then printf current; else printf \"%s behind\" \"\$_n\"; fi
        [ -n \"\$_age\" ] && printf \", fetched %sm ago\" \"\$_age\"
       }
-      d=\$(repo_state /home/pi/.local/share/yadm/repo.git origin/main /home/pi/.local/share/yadm/repo.git/FETCH_HEAD)
-      s=\$(git -c safe.directory=\"*\" --git-dir=/home/pi/.local/share/yadm/repo.git --work-tree=/home/pi stash list 2>/dev/null | wc -l)
+      d=\$(repo_state /srv/dots.git origin/main /srv/dots.git/FETCH_HEAD)
+      s=\$(git -c safe.directory=\"*\" --git-dir=/srv/dots.git --work-tree=/srv/home stash list 2>/dev/null | wc -l)
       [ \"\$s\" = 0 ] || d=\"\$d, \${s} stashed\"
       for n in 1 2; do bash -c \"dd if=/dev/zero of=/dev/sda bs=1M count=\$n\"; done
       echo \"app: \$(repo_state /home/pi/app/.git origin/main /home/pi/app/.git/FETCH_HEAD)\"
@@ -497,15 +497,15 @@ Feature: big
       echo "## heartbeat"; ls -l /etc/site-heartbeat.json 2>&1; journalctl -t site-heartbeat -n 2 --no-pager -o cat 2>&1; journalctl -t site-hourly-sync -n 2 --no-pager -o cat 2>&1
       echo "## autostart"; ls ~/.config/autostart-disabled/ ~/.config/autostart/ 2>&1
       echo "## gpu"; journalctl -b -k 2>/dev/null | grep -c "Resetting GPU for hang"
-      echo "## webapp launcher"; cat ~/.webapp/webapp-server 2>&1 | head -3; npm config get prefix; ls -d ~/.npm-global/lib/node_modules/webapp-server 2>&1
-      echo "## pkg"; grep -o '"[^"]*": *"file:[^"]*"' ~/.webapp/package.json; node -e 'console.log(require("/home/pi/.webapp/package.json").dependencies["sensors-plugin"])' 2>&1; ls -ld ~/.webapp/node_modules/sensors-plugin ~/sensors-plugin 2>&1; grep -c getBluetoothSession /home/pi/sensors-plugin/index.js 2>&1
-      echo "## can"; ip -br link show can0 2>&1; curl -s localhost:3000/api/v1/status | head -c 300; echo; grep -o '"uniqueNumber":[^,}]*' ~/.webapp/settings.json 2>/dev/null | head -2
-      echo "## plugin configs"; ls ~/.webapp/plugin-config-data/ | grep -E 'influx|sensors|ntfy'
-      echo "## udp inputs"; python3 -c 'import json;s=json.load(open("/home/pi/.webapp/settings.json"));[print(p.get("id"),p.get("type"),p.get("subOptions",{}).get("type"),p.get("subOptions",{}).get("port"),p.get("subOptions",{}).get("uniqueNumber")) for p in s.get("pipedProviders",[])]' 2>&1
+      echo "## webapp launcher"; cat ~/.app/webapp-server 2>&1 | head -3; npm config get prefix; ls -d ~/.npm-global/lib/node_modules/webapp-server 2>&1
+      echo "## pkg"; grep -o '"[^"]*": *"file:[^"]*"' ~/.app/package.json; node -e 'console.log(require("/home/pi/.app/package.json").dependencies["plugin-a"])' 2>&1; ls -ld ~/.app/node_modules/plugin-a ~/plugin-a 2>&1; grep -c openSession /home/pi/plugin-a/index.js 2>&1
+      echo "## can"; ip -br link show eth1 2>&1; curl -s localhost:3000/api/v1/status | head -c 300; echo; grep -o '"unit":[^,}]*' ~/.app/settings.json 2>/dev/null | head -2
+      echo "## plugin configs"; ls ~/.app/plugin-config-data/ | grep -E 'influx|sensors|ntfy'
+      echo "## udp inputs"; python3 -c 'import json;s=json.load(open("/home/pi/.app/settings.json"));[print(p.get("id"),p.get("type"),p.get("subOptions",{}).get("type"),p.get("subOptions",{}).get("port"),p.get("subOptions",{}).get("unit")) for p in s.get("inputs",[])]' 2>&1
       echo "## dbus"; ls /etc/dbus-1/ 2>&1 | head; grep -rl auth_timeout /etc/dbus-1/ 2>/dev/null
-      echo "## router+dns"; ssh -o BatchMode=yes -o ConnectTimeout=5 root@192.168.8.1 "uci get dhcp.@dnsmasq[0].address" 2>&1 | head -2; ip -br -4 addr | grep -E 'eth0|wlan0'
+      echo "## router+dns"; ssh -o BatchMode=yes -o ConnectTimeout=5 root@198.51.100.1 "uci get dhcp.@dnsmasq[0].address" 2>&1 | head -2; ip -br -4 addr | grep -E 'eth0|wlan0'
       echo "## backups"; ls ~/app-backups/ 2>&1 | head -3; ls -d ~/influx-export 2>&1
-      echo "## influx"; ls /etc/telegraf/ 2>&1 | head -3; grep -l "webapp-to-influxdb" ~/.webapp/plugin-config-data/*.json 2>/dev/null | head -2
+      echo "## influx"; ls /etc/telegraf/ 2>&1 | head -3; grep -l "webapp-to-influxdb" ~/.app/plugin-config-data/*.json 2>/dev/null | head -2
       echo "## mem"; free -m | head -2
       echo "## sysctl"; cat /proc/sys/vm/max_map_count; ls /etc/sysctl.d/ | grep questdb
       echo "## worker data"; ls ~/app/worker/data 2>&1 | head -3; ls -d ~/.worker 2>&1
