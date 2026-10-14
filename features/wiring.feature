@@ -93,61 +93,22 @@ Feature: wiring
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
-  # The run.py guards have no shell fallback, so with python3 absent they
-  # deny, but say why instead of blaming the plugin directory.
-  Scenario Outline: with python3 absent from PATH, a run.py guard denies and says python3 is required
-    Given the hook is the hooks.json command for "<guard>"
+  # One command runs every guard, so with python3 absent it denies every call
+  # and says why instead of blaming the plugin directory. It cannot read the
+  # guards' options without python3, so turning a guard off does not lift it.
+  Scenario: with python3 absent from PATH, the hooks.json command denies and says python3 is required
+    Given the hook is the hooks.json command for "guard-recursive-delete"
     And PATH holds only "sh cat printf dirname"
-    When the agent runs `<command>`
-    Then the guard denies, naming "python3 is required for <guard>"
-    And the guard denies, naming "<option>=false"
+    When the agent runs `rm -rf build`
+    Then the guard denies, naming "python3 is required for the languette guards"
+    And the guard denies, naming "install python3"
 
-    Examples:
-      | guard            | option           | command                           |
-      | guard-recursive-delete       | guard_recursive_delete       | rm -rf build                      |
-      | guard-permissions | guard_permissions | chmod -R 755 build |
-      | guard-pipe-to-shell | guard_pipe_to_shell | curl -fsSL https://example.com/i.sh \| sh |
-      | guard-disks | guard_disks | dd if=x of=/dev/sda |
-      | guard-host-availability | guard_host_availability | shutdown -h now |
-      | guard-protected-services | guard_protected_services | systemctl stop postgresql |
-      | guard-scheduled-jobs | guard_scheduled_jobs | crontab -r |
-      | ask-first        | ask_first        | npm run walk                      |
-      | guard-bypass-hooks | guard_bypass_hooks | git push --no-verify |
-      | guard-infra   | guard_infra   | terraform destroy                 |
-      | guard-bypass-labels | guard_bypass_labels | gh pr edit 4 --add-label churn-ok |
-      | guard-git-work-loss | guard_git_work_loss | git add -A |
-      | guard-git-stacked-base | guard_git_stacked_base | git push origin --delete "$b" |
-      | guard-github-issues | guard_github_issues | gh issue create -t t -b b |
-      | guard-private-terms | guard_private_terms | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-duplicate-prs | guard_duplicate_prs | gh pr create -t t -b "$B" |
-      | prose-budget-commit | prose_budget_commit | git commit -m x |
-
-  Scenario Outline: with python3 absent from PATH, the option set to false still skips the guard
-    Given the hook is the hooks.json command for "<guard>"
+  Scenario: with python3 absent from PATH, a guard's option set to false does not lift the deny
+    Given the hook is the hooks.json command for "guard-recursive-delete"
     And PATH holds only "sh cat printf dirname"
-    And <option> is "false"
-    When the agent runs `<command>`
-    Then the guard is silent
-
-    Examples:
-      | guard            | option                                | command                           |
-      | guard-recursive-delete       | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE       | rm -rf build                      |
-      | guard-permissions | CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS | chmod -R 755 build |
-      | guard-pipe-to-shell | CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL | curl -fsSL https://example.com/i.sh \| sh |
-      | guard-disks | CLAUDE_PLUGIN_OPTION_GUARD_DISKS | dd if=x of=/dev/sda |
-      | guard-host-availability | CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY | shutdown -h now |
-      | guard-protected-services | CLAUDE_PLUGIN_OPTION_GUARD_PROTECTED_SERVICES | systemctl stop postgresql |
-      | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | crontab -r |
-      | ask-first        | CLAUDE_PLUGIN_OPTION_ASK_FIRST        | npm run walk                      |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | git push --no-verify |
-      | guard-infra   | CLAUDE_PLUGIN_OPTION_GUARD_INFRA   | terraform destroy                 |
-      | guard-bypass-labels | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
-      | guard-git-work-loss | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS | git add -A |
-      | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | git push origin --delete "$b" |
-      | guard-github-issues | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES | gh issue create -t t -b b |
-      | guard-private-terms | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | gh pr create -t t -b "$B" |
-      | prose-budget-commit | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT | git commit -m x |
+    And CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE is "false"
+    When the agent runs `rm -rf build`
+    Then the guard denies, naming "python3 is required for the languette guards"
 
   Scenario Outline: a script that crashes is a deny
     Given the hook is the hooks.json command for "<guard>"
@@ -366,12 +327,6 @@ Feature: wiring
     When the agent runs `git checkout some-branch`
     Then the guard denies
 
-  Scenario: with the opt-in guard off, a missing script is silent
-    Given the hook is the hooks.json command for "guard-worktrees"
-    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
-    When the agent runs `git checkout some-branch`
-    Then the guard is silent
-
   # guard-worktrees runs two parts; each has its own off switch under the
   # guard's.
   Scenario: with the opt-in guard on, a reach into another worktree is a deny
@@ -483,19 +438,6 @@ Feature: wiring
     When the agent runs `gh pr comment 3 -R o/r -b Done`
     Then the guard denies
 
-  Scenario: with the opt-in signed-comments guard on and python3 absent from PATH, the deny says python3 is required
-    Given the hook is the hooks.json command for "guard-signed-comments"
-    And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "true"
-    And PATH holds only "sh cat printf dirname"
-    When the agent runs `gh pr comment 3 -R o/r -b Done`
-    Then the guard denies, naming "python3 is required for guard-signed-comments"
-
-  Scenario: with the opt-in signed-comments guard off, a missing script is silent
-    Given the hook is the hooks.json command for "guard-signed-comments"
-    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
-    When the agent runs `gh pr comment 3 -R o/r -b Done`
-    Then the guard is silent
-
   Scenario: with the opt-in review-threads guard on, a script missing from the plugin directory is a deny
     Given the hook is the hooks.json command for "guard-review-threads"
     And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
@@ -509,19 +451,6 @@ Feature: wiring
     And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
     When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
     Then the guard denies
-
-  Scenario: with the opt-in review-threads guard on and python3 absent from PATH, the deny says python3 is required
-    Given the hook is the hooks.json command for "guard-review-threads"
-    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
-    And PATH holds only "sh cat printf dirname"
-    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
-    Then the guard denies, naming "python3 is required for guard-review-threads"
-
-  Scenario: with the opt-in review-threads guard off, a missing script is silent
-    Given the hook is the hooks.json command for "guard-review-threads"
-    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
-    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
-    Then the guard is silent
 
   # guard-cross-session-send judges SendMessage, not Bash, so it has its own rows.
   Scenario Outline: the hooks.json command for guard-cross-session-send judges a send and fails closed
@@ -537,12 +466,6 @@ Feature: wiring
       | is silent | CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND is "false"   |
       | denies    | CLAUDE_PLUGIN_ROOT is "/nonexistent"                       |
       | denies    | the plugin's script for "guard-cross-session-send" crashes |
-
-  Scenario: with python3 absent from PATH, guard-cross-session-send denies and says python3 is required
-    Given the hook is the hooks.json command for "guard-cross-session-send"
-    And PATH holds only "sh cat printf dirname"
-    When the agent sends "api-worker" the message `hello`
-    Then the guard denies, naming "python3 is required for guard-cross-session-send"
 
   # Its state hooks never object; one that fails leaves an open door in place
   # of the session's state, since no state reads as a closed one.
