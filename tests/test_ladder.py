@@ -325,6 +325,7 @@ def feature_commands(files=None):
     return sorted(c for c in out if not re.search(r"<[a-z]+>", c))   # Outline placeholders
 
 
+@pytest.mark.full
 @needs_shfmt
 def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens_and_operators(monkeypatch):
     refused, differ = [], []

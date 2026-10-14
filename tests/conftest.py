@@ -17,6 +17,10 @@ block), which must fire too. @family marks a feature named for a family of
 guards, not one guard, and @planned one whose verdicts no guard gives yet: no
 guard is named, so the silence check is off. @planned on one scenario marks it
 expected to fail (xfail, not strict).
+
+Each push runs a tier of that: the shfmt engine only on @big and @shfmt_only
+scenarios, and no @planned or @full row. `pytest --full` runs everything,
+nightly and on dispatch (.github/workflows/full-sweep.yml).
 """
 
 import builtins
@@ -39,6 +43,7 @@ from pytest_bdd import given, parsers, then, when
 from matchers import Verdict, asks, denies, is_silent, warns_about
 from doctor_steps import *  # noqa: F401,F403  (features/doctor.feature)
 from pipeline_checks import *  # noqa: F401,F403  (the guard pipeline's promises, on every scenario)
+import pipeline_checks
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -93,7 +98,7 @@ def pytest_cmdline_main(config):
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config):
-    refuse_update_under_xdist(config)
+    refuse_partial_update(config)
     for g in GUARD_NAMES:
         config.addinivalue_line("markers", f"also_{g}: the row rightly trips {g} too")
     # A throwaway $HOME for the whole run, so no verdict depends on, and no
@@ -388,10 +393,28 @@ def ctx(engine, request):
     c.cleanup()
 
 
-def pytest_collection_modifyitems(items):
+def pytest_addoption(parser):
+    parser.addoption("--full", action="store_true",
+                     help="the full sweep: the shfmt engine on every row, @planned and @full rows")
+
+
+def _full_sweep_only(item):
+    if item.get_closest_marker("planned") or item.get_closest_marker("full"):
+        return True
+    on_shfmt = getattr(item, "callspec", None) and item.callspec.params.get("engine") == "shfmt"
+    return bool(on_shfmt) and not (item.get_closest_marker("big") or item.get_closest_marker("shfmt_only"))
+
+
+def pytest_collection_modifyitems(config, items):
+    if not config.getoption("full"):
+        dropped = [i for i in items if _full_sweep_only(i)]
+        if dropped:
+            items[:] = [i for i in items if not _full_sweep_only(i)]
+            config.hook.pytest_deselected(items=dropped)
     for item in items:
         if item.get_closest_marker("planned"):
             item.add_marker(pytest.mark.xfail(reason="planned: no guard gives this verdict yet", strict=False))
+    pipeline_checks.pytest_collection_modifyitems(items)     # this hook shadows its star-imported one
 
 
 def pytest_bdd_before_scenario(request, feature, scenario):

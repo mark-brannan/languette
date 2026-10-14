@@ -118,12 +118,15 @@ def pipeline(engine, request, monkeypatch):
                          "tests/test_features.py")
 
 
-def refuse_update_under_xdist(config):
-    """Called from conftest.pytest_configure: each xdist worker would write the
-    file with only its share of the scenarios."""
+def refuse_partial_update(config):
+    """Called from conftest.pytest_configure: an update needs every scenario on
+    every engine in one process."""
     if _UPDATE and (os.environ.get("PYTEST_XDIST_WORKER") or getattr(config.option, "numprocesses", 0)):
         raise pytest.UsageError("LANGUETTE_PIN_IO=update rewrites tests/io_counts.json from one whole run; "
                                 "under pytest-xdist each worker would write a partial file. Run with -n 0.")
+    if _UPDATE and not config.getoption("full"):
+        raise pytest.UsageError("LANGUETTE_PIN_IO=update rewrites tests/io_counts.json from one whole run; "
+                                "without --full the shfmt engine skips most rows. Run with --full -n 0.")
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -153,4 +156,4 @@ def pytest_sessionfinish(session):
     PINS.write_text("{\n" + ",\n".join(f" {json.dumps(k)}: {json.dumps(v)}" for k, v in sorted(pins.items())) + "\n}\n")
 
 
-__all__ = ["pipeline", "refuse_update_under_xdist", "pytest_runtest_makereport", "pytest_collection_modifyitems", "pytest_sessionfinish"]
+__all__ = ["pipeline", "refuse_partial_update", "pytest_runtest_makereport", "pytest_collection_modifyitems", "pytest_sessionfinish"]
