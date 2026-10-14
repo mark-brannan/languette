@@ -808,6 +808,18 @@ def _still_holds(ctx, target, content):
     assert Path(ctx.expand(target)).read_text() == content
 
 
+@then("the decision record is empty")
+def _no_record(ctx):
+    assert not (Path(ctx.expand("{TMP}")) / "state/languette/decisions.jsonl").exists()
+
+
+@then(parsers.re(r"the decision record holds the command `(?P<command>.*)`"))
+def _recorded_command(ctx, command):
+    lines = (Path(ctx.expand("{TMP}")) / "state/languette/decisions.jsonl").read_text().splitlines()
+    assert len(lines) == 1, lines
+    assert json.loads(lines[0])["command"] == json.loads(command)
+
+
 @when(parsers.re(r"the agent starts `(?P<command>.*)`", flags=re.S))
 def _starts(ctx, command):
     # PreToolUse ran and the call is still running: no result, no PostToolUse.
