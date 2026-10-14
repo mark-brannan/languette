@@ -14,10 +14,11 @@ with no step of its own. Each run.respond call the scenario makes is watched:
 
 After a change that means to add or drop such a call, regenerate the pins:
 
-    LANGUETTE_PIN_IO=update python -m pytest -n 0 tests/test_features.py
+    LANGUETTE_PIN_IO=update python -m pytest --full -n 0 tests/test_features.py
 
 (-n 0: the suite runs under pytest-xdist by default, and each worker would
-write a partial file, so update refuses to run under it.)
+write a partial file; --full: a push skips the shfmt engine on most rows. An
+update refuses to run without both.)
 
 A scenario's pin is the same on every engine (the key drops the engine), and
 one with no such Need has no entry. The @hook engine runs languette in a
@@ -115,7 +116,7 @@ def pipeline(engine, request, monkeypatch):
     want = want.get(engine, {}) if set(want) & {"python", "shfmt"} else want
     assert got == want, (f"{key}: programs and GitHub calls {got}, pinned {want} in {PINS.name}. One more git or "
                          "network call per guard shows here; if it is meant, LANGUETTE_PIN_IO=update pytest "
-                         "tests/test_features.py")
+                         "--full -n 0 tests/test_features.py")
 
 
 def refuse_partial_update(config):
