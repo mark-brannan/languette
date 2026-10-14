@@ -31,9 +31,10 @@ jobs:
     with:
       conventional: true
 
-  # Every scenario in features/, under the Python engine on its awk rung and
-  # on its shfmt rung, plus the hooks.json commands run as Claude Code runs
-  # them. The same run checks the hooks.json shape (`claude plugin validate
+  # Every scenario in features/ under the Python engine on its awk rung,
+  # features/big.feature's on its shfmt rung too (the rest of the shfmt rung
+  # runs in full-sweep.yml), plus the hooks.json commands run as Claude Code
+  # runs them. The same run checks the hooks.json shape (`claude plugin validate
   # --strict` passes a garbage one), the stdlib-only rule for languette/ and
   # the README table.
   tests:

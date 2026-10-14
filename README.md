@@ -346,7 +346,7 @@ git clone https://github.com/mark-brannan/languette && cd languette
 sudo apt install shfmt shellcheck
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
-python3 -m pytest                       # every scenario
+python3 -m pytest                       # as each push runs it; --full runs every row
 python3 tests/readme_table.py           # regenerate the table
 shellcheck --severity=warning tests/stubs/* tests/*.test.sh   # as CI runs it
 ```
