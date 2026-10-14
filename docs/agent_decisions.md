@@ -368,3 +368,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261013t203618z
 - A feature row the awk and shfmt engines make different I/O on is pinned per engine in tests/io_counts.json, not refused Undo: restore the split refusal in tests/pipeline_checks.py and fix #203 first ([#190](https://github.com/mark-brannan/languette/pull/190))
+
+### 20261014t052140z
+- Per push, @shfmt_only rows still run on the shfmt rung; only the shfmt engine's copy of the other rows moves to the full sweep Undo: add shfmt_only to _full_sweep_only's drop list in tests/conftest.py ([#206](https://github.com/mark-brannan/languette/issues/206)) (no PR, branch claude/languette-shfmt-orchestration-74a331)
