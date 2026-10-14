@@ -238,7 +238,10 @@ def _respond(stdin_text, env, only):
 def _state_failed(payload, env):
     """A state-keeping hook (PostToolUse and the rest) that crashed or objected leaves
     guard-cross-session-send's file saying the session has read something unknown, so
-    its door stays shut rather than open on a stale record."""
+    its door stays shut rather than open on a stale record. With that guard's option
+    off, nothing reads the file, so none is written (hooks.json's sh fallback agrees)."""
+    if env.get("CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND") == "false":
+        return
     sid = payload.get("session_id") if isinstance(payload, dict) else None
     if not isinstance(sid, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", sid):
         return

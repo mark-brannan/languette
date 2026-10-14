@@ -522,3 +522,19 @@ Feature: wiring
       | PostToolUse   | the plugin's script for "guard-cross-session-send" prints a deny |
       | SessionStart  | the plugin's script for "guard-cross-session-send" crashes       |
       | SubagentStart | PATH holds only "sh cat printf dirname sed head rm"              |
+
+  # The Python failure path and the sh fallback agree: with the option off, no file is written.
+  Scenario: a guard-cross-session-send state hook that fails inside run.py leaves the door open
+    Given the hook is the hooks.json PostToolUse command for "guard-cross-session-send"
+    And the plugin's script for "guard-cross-session-send" fails after reading its payload
+    When Claude Code fires PostToolUse for tool "WebFetch"
+    Then the guard is silent
+    And the cross-session state file names "an unknown tool (a state hook failed)"
+
+  Scenario: a guard-cross-session-send state hook that fails inside run.py writes no file when the option is false
+    Given the hook is the hooks.json PostToolUse command for "guard-cross-session-send"
+    And the plugin's script for "guard-cross-session-send" fails after reading its payload
+    And CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND is "false"
+    When Claude Code fires PostToolUse for tool "WebFetch"
+    Then the guard is silent
+    And the cross-session state file is gone

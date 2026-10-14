@@ -692,6 +692,18 @@ def _load_deny(ctx, guard):
     ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
 
 
+@given(parsers.parse('the plugin\'s script for "{guard}" fails after reading its payload'))
+def _fails_mid_run(ctx, guard):
+    """The real run.py, whose verdict step raises: a state event then reaches its own
+    failure path (_state_failed), not the hooks.json sh fallback."""
+    root = Path(ctx.mkdtemp())
+    assert "languette/run.py" in hooks_json_commands()[guard]
+    shutil.copytree(ROOT / "languette", root / "languette", ignore=shutil.ignore_patterns("__pycache__"))
+    with open(root / "languette/verdict.py", "a") as f:
+        f.write("\n\ndef verdict(event, findings):\n    raise RuntimeError('boom')\n")
+    ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
+
+
 def hooks_json_commands():
     """guard name -> the PreToolUse command in hooks/hooks.json that judges it: the one
     command, which names no guard and runs every guard wired for the call."""
