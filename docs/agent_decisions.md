@@ -374,3 +374,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261014t054735z
 - tests: @shfmt_only rows still run per push, not only in the full sweep Undo: drop them in _full_sweep_only in tests/conftest.py ([#213](https://github.com/mark-brannan/languette/pull/213))
+
+### 20261014t054748z
+- full sweep: a red nightly run is seen through GitHub's failure email only, no issue is opened Undo: an issue-on-failure step in .github/workflows/full-sweep.yml ([#213](https://github.com/mark-brannan/languette/pull/213))
