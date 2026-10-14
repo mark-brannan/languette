@@ -66,6 +66,7 @@ Feature: guard-disks
       | cd /tmp && dd if=a of=out.bin           | is silent                                   |                                        |
       | cd sub && echo x \| tee out.txt         | is silent                                   |                                        |
       | cd && echo x > notes.txt                | is silent                                   | cd with no operand is $HOME            |
+      | abcd /dev && cat x > sda                | is silent                                   | a command whose name ends in cd is not cd |
 
   Scenario Outline: mkfs, wipefs and shred are denied on anything but the agent's own area
     When the agent runs `<command>`

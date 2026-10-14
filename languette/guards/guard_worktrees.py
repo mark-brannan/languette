@@ -44,7 +44,6 @@ from languette.verdict import Act, Need, Refuse, deny
 
 NAME = "guard-worktrees"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES"
-CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 MAX_CANDIDATES = 48
 _HOMEISH = re.compile(r"(?:/|~\Z|~/|\$HOME\Z|\$HOME/|\$\{HOME\}\Z|\$\{HOME\}/)")
 _KEYWORD = frozenset("builtin command if then else elif while until do !".split())
@@ -84,7 +83,7 @@ def _home_events(doc):
         for a, b in s.segments():
             if a > b:
                 continue
-            c = sw.cmd_index(s, a, b, CD, nested)
+            c = sw.cmd_index(s, a, b, sw.CD, nested)
             if c is not None:
                 v = next((s.w[i] for i in range(c + 1, b + 1)
                           if s.k[i] == "w" and (not s.w[i].startswith("-") or s.w[i] == "-")), "")

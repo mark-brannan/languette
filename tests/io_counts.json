@@ -720,6 +720,7 @@
  "tests/test_features.py::test_a_recursive_sweep_of_anything_but_the_agents_own_area_is_denied_however_the_flag_is_spelled[timeout 5 chmod -R 755 src-is none of those-]": {"git": 1},
  "tests/test_features.py::test_a_recursive_sweep_of_anything_but_the_agents_own_area_is_denied_however_the_flag_is_spelled[xargs chmod -R 755-no target is visible-xargs hides the target]": {"git": 1},
  "tests/test_features.py::test_a_relative_engine_command_still_resolves_after_the_hook_changes_directory": {"git": 3, "run": 1},
+ "tests/test_features.py::test_a_relative_path_after_a_cd_that_may_land_in_dev_cannot_be_followed_so_it_is_denied[abcd /dev && cat x > sda-is silent-a command whose name ends in cd is not cd]": {"git": 2},
  "tests/test_features.py::test_a_relative_path_after_a_cd_that_may_land_in_dev_cannot_be_followed_so_it_is_denied[cd \"$D\" && cat x > sda-denies, naming \"`cd` earlier\"-a cd the hook cannot resolve]": {"git": 2},
  "tests/test_features.py::test_a_relative_path_after_a_cd_that_may_land_in_dev_cannot_be_followed_so_it_is_denied[cd && echo x > notes.txt-is silent-cd with no operand is $HOME]": {"git": 3},
  "tests/test_features.py::test_a_relative_path_after_a_cd_that_may_land_in_dev_cannot_be_followed_so_it_is_denied[cd - && cat x > sda-denies, naming \"`cd` earlier\"-]": {"git": 3},

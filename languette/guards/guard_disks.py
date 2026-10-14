@@ -26,7 +26,6 @@ _VALUE_OPTS = {
     "mkfs": ("-t", "-L", "-U", "-b", "-i", "-I", "-N", "-m", "-E", "-O", "-d", "-r", "-T", "-C", "-g", "-G", "--type"),
     "wipe": ("-t", "-o", "-n", "-s", "--types", "--offset", "--iterations", "--size", "--random-source"),
 }
-_CD = re.compile(r"(?:cd|pushd|popd)\Z")
 _CD_FLAGS = ("-P", "-L", "-e", "-@", "--")
 
 _WAY_OUT = ("Work on an image file in /tmp or the scratchpad instead; a real disk is the user's to write, so "
@@ -94,7 +93,7 @@ class _Judge:
     def lands_in_dev(self, s, a, b):
         """A cd (or `env -C`, `sudo -D`) in a..b that may leave the working directory under /dev, or
         whose target the hook cannot resolve."""
-        g = sw.cmd_index(s, a, b, _CD, True)
+        g = sw.cmd_index(s, a, b, sw.CD, True)
         if g is not None:
             ops = [i for i in range(g + 1, b + 1) if not (s.k[i] == "w" and s.w[i] in _CD_FLAGS)]
             if not ops:

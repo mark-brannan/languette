@@ -61,9 +61,9 @@ def _label(verb, number, repo=None):
 def _repo_flag(s, lo, hi):
     """The repo a -R/--repo flag names between lo and hi, or None."""
     for i in range(lo, hi + 1):
-        t = _wv(s, i)
+        t = sw.word(s, i)
         if t in ("-R", "--repo") and i < hi:
-            return _wv(s, i + 1)
+            return sw.word(s, i + 1)
         if t.startswith("--repo="):
             return t[7:]
     return None
@@ -79,15 +79,11 @@ def _deny(why):
     return deny(f"{NAME}: {why}")
 
 
-def _wv(s, i):
-    return s.q[i] if s.k[i] == "q" else s.w[i]
-
-
 def _skip_r(s, lo, hi):
     """The first word at or after lo that is not a flag, -R/--repo taking its value; or None."""
     i = lo
     while i <= hi:
-        t = _wv(s, i)
+        t = sw.word(s, i)
         if t in ("-R", "--repo"):
             i += 2
             continue
@@ -145,7 +141,7 @@ class _Writes:
                 self._emit(rep, "create")
             elif sub2 is not None and s.w[sub2] in ("transfer", "delete"):
                 arg = _skip_r(s, sub2 + 1, hi)
-                hit = _NUMBER.fullmatch(_wv(s, arg)) if arg is not None else None
+                hit = _NUMBER.fullmatch(sw.word(s, arg)) if arg is not None else None
                 number = hit and (hit[1] or hit[3])
                 repo = number and ((hit[2] if hit else None) or _repo_flag(s, g + 1, hi))
                 self._emit(rep, s.w[sub2], number, repo)
@@ -155,7 +151,7 @@ class _Writes:
         path, method, fields, m = "", "", False, []
         i = sub1 + 1
         while i <= hi:
-            t = _wv(s, i)
+            t = sw.word(s, i)
             m += _MUTATION.findall(t)
             if t in ("-X", "--method"):
                 if i < hi:
@@ -169,7 +165,7 @@ class _Writes:
                 fields = True
                 if i < hi:
                     i += 1
-                    m += _MUTATION.findall(_wv(s, i))
+                    m += _MUTATION.findall(sw.word(s, i))
             elif re.match(r"-[fF].|--(?:field|raw-field|input)=", t):
                 fields = True
             elif t in _SKIP_VALUE:

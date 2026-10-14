@@ -60,10 +60,6 @@ def _maybe_graphql(word):
     return ends and starts
 
 
-def _wv(s, i):
-    return s.q[i] if s.k[i] == "q" else s.w[i]
-
-
 def _decoded(body):
     """A text, and, when it is JSON, its decoded text too: a \\u escape can
     spell the mutation's name."""
@@ -81,9 +77,9 @@ def _args(s, g, b):
     j = 0
     while j < len(idx):
         i = idx[j]
-        t = _wv(s, i)
+        t = sw.word(s, i)
         words.append(t)
-        nxt = (_wv(s, idx[j + 1]), s.live[idx[j + 1]]) if j + 1 < len(idx) else ("", False)
+        nxt = (sw.word(s, idx[j + 1]), s.live[idx[j + 1]]) if j + 1 < len(idx) else ("", False)
         kv = None
         if t in FLAGS:
             (kv, live), typed = nxt, FLAGS[t]
@@ -127,7 +123,7 @@ def _calls(doc, command, cwd, home):
             if "api" not in words and first not in live_at:
                 continue
             if not any(GRAPHQL.fullmatch(w) for w in words):
-                if any(_maybe_graphql(_wv(s, i)) for i in live_at):
+                if any(_maybe_graphql(sw.word(s, i)) for i in live_at):
                     out.append({"why": "the endpoint is built at run time"})
                 continue
             rec = {"text": "\n".join(words), "qfiles": [], "files": [], "stdin": False, "live": bool(live_at),
