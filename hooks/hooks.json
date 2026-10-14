@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" >/dev/null 2>&1; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" 2>/dev/null) && [ -z \"$o\" ]; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
             "statusMessage": "Keeping languette's per-session state"
           }
         ]
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" >/dev/null 2>&1; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" 2>/dev/null) && [ -z \"$o\" ]; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
             "statusMessage": "Keeping languette's per-session state"
           }
         ]
@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" >/dev/null 2>&1; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" 2>/dev/null) && [ -z \"$o\" ]; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
             "statusMessage": "Opening the issue door for this turn"
           }
         ]
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" >/dev/null 2>&1; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" 2>/dev/null) && [ -z \"$o\" ]; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
             "statusMessage": "Keeping languette's per-session state"
           }
         ]
@@ -63,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" >/dev/null 2>&1; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" 2>/dev/null) && [ -z \"$o\" ]; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
             "statusMessage": "Closing the cross-session door for a new session"
           }
         ]

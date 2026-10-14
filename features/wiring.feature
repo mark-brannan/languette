@@ -189,6 +189,9 @@ Feature: wiring
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | gh pr create -t t -b "Closes #1" |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | git commit -m x               |
+      | require-well-formed | CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED | echo "unterminated |
+      | guard-secrets | CLAUDE_PLUGIN_OPTION_GUARD_SECRETS | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 |
+      | guard-bypass-ruleset | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_RULESET | git push origin HEAD:$b |
 
   # Only the exact word false skips: unset, empty or anything else runs the
   # guard, so a misconfiguration cannot open the gate.
@@ -513,8 +516,9 @@ Feature: wiring
     And the cross-session state file names "an unknown tool (a state hook failed)"
 
     Examples:
-      | event            | setup                                                      |
-      | PostToolUse      | the plugin's script for "guard-cross-session-send" crashes |
-      | PostToolUse      | CLAUDE_PLUGIN_ROOT is "/nonexistent"                       |
-      | SessionStart     | the plugin's script for "guard-cross-session-send" crashes |
-      | SubagentStart    | PATH holds only "sh cat printf dirname sed head rm"        |
+      | event         | setup                                                            |
+      | PostToolUse   | the plugin's script for "guard-cross-session-send" crashes       |
+      | PostToolUse   | CLAUDE_PLUGIN_ROOT is "/nonexistent"                             |
+      | PostToolUse   | the plugin's script for "guard-cross-session-send" prints a deny |
+      | SessionStart  | the plugin's script for "guard-cross-session-send" crashes       |
+      | SubagentStart | PATH holds only "sh cat printf dirname sed head rm"              |

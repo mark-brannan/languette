@@ -680,6 +680,18 @@ def _crash(ctx, guard):
     ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
 
 
+@given(parsers.parse('the plugin\'s script for "{guard}" prints a deny'))
+def _load_deny(ctx, guard):
+    """run.py's own answer when a guard will not import: a deny, exit 0, before it
+    knows the event, so a state hook must read any output as a failure."""
+    root = Path(ctx.mkdtemp())
+    assert "languette/run.py" in hooks_json_commands()[guard]
+    (root / "languette").mkdir()
+    (root / "languette/run.py").write_text(
+        "print('{\"hookSpecificOutput\": {\"permissionDecision\": \"deny\"}}')\n")
+    ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
+
+
 def hooks_json_commands():
     """guard name -> the PreToolUse command in hooks/hooks.json that judges it: the one
     command, which names no guard and runs every guard wired for the call."""
