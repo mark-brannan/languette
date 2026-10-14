@@ -6,7 +6,7 @@ Feature: smoke
   signed in, and that the installed hook denies the canary under that PATH.
 
   Each machine is a PATH holding python3 and exactly the tools named, nothing
-  else, plus a HOME where Claude Code lists languette as installed, or not. The hook is require-well-formed's own command string from
+  else, plus a HOME where Claude Code lists languette as installed, or not. The hook is the one PreToolUse command string from
   hooks/hooks.json, run under /bin/sh as Claude Code runs it. A pip parser
   comes from a venv named by an environment variable, which CI's smoke job
   builds; unset, its rows skip locally and fail under CI. A pip parser never

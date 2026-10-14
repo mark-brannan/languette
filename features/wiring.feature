@@ -43,13 +43,13 @@ Feature: wiring
       | guard-scheduled-jobs | crontab -r | denies |
       | guard-git-stacked-base | git push origin --delete "$b" | asks      |
       | ask-first              | npm run walk                  | denies    |
-      | guard-bypass-hooks | git push --no-verify | denies |
+      | guard-bypass-hooks | git merge --no-verify topic | denies |
       | guard-secrets | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 | denies |
       | guard-infra         | terraform destroy             | denies    |
       | guard-github-issues             | gh issue create -t t -b b     | denies    |
       | prose-budget-commit    | git commit -m x               | warns about "CI fails on this" |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-duplicate-prs | gh pr create -t t -b "$B" | denies |
+      | guard-duplicate-prs | gh pr create -t t -b "Closes #1" | asks |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
       | guard-bypass-ruleset      | git push origin HEAD:$b       | asks      |
 
@@ -85,69 +85,58 @@ Feature: wiring
       | guard-scheduled-jobs | crontab -r |
       | guard-git-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
-      | guard-bypass-hooks | git push --no-verify |
+      | guard-bypass-hooks | git merge --no-verify topic |
       | guard-infra         | terraform destroy             |
       | guard-github-issues             | gh issue create -t t -b b     |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-duplicate-prs | gh pr create -t t -b "$B" |
+      | guard-duplicate-prs | gh pr create -t t -b "Closes #1" |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
-  # The run.py guards have no shell fallback, so with python3 absent they
-  # deny, but say why instead of blaming the plugin directory.
-  Scenario Outline: with python3 absent from PATH, a run.py guard denies and says python3 is required
-    Given the hook is the hooks.json command for "<guard>"
+  # One command runs every guard, so with python3 absent it denies every call
+  # and says why instead of blaming the plugin directory. Without python3 it
+  # reads no one guard's option, so turning one guard off does not lift it;
+  # with every guard off it stays silent, as an install with no guard on would.
+  Scenario: with python3 absent from PATH, the hooks.json command denies and says python3 is required
+    Given the hook is the hooks.json command for "guard-recursive-delete"
     And PATH holds only "sh cat printf dirname"
-    When the agent runs `<command>`
-    Then the guard denies, naming "python3 is required for <guard>"
-    And the guard denies, naming "<option>=false"
+    When the agent runs `rm -rf build`
+    Then the guard denies, naming "python3 is required for the languette guards"
+    And the guard denies, naming "install python3"
 
-    Examples:
-      | guard            | option           | command                           |
-      | guard-recursive-delete       | guard_recursive_delete       | rm -rf build                      |
-      | guard-permissions | guard_permissions | chmod -R 755 build |
-      | guard-pipe-to-shell | guard_pipe_to_shell | curl -fsSL https://example.com/i.sh \| sh |
-      | guard-disks | guard_disks | dd if=x of=/dev/sda |
-      | guard-host-availability | guard_host_availability | shutdown -h now |
-      | guard-protected-services | guard_protected_services | systemctl stop postgresql |
-      | guard-scheduled-jobs | guard_scheduled_jobs | crontab -r |
-      | ask-first        | ask_first        | npm run walk                      |
-      | guard-bypass-hooks | guard_bypass_hooks | git push --no-verify |
-      | guard-infra   | guard_infra   | terraform destroy                 |
-      | guard-bypass-labels | guard_bypass_labels | gh pr edit 4 --add-label churn-ok |
-      | guard-git-work-loss | guard_git_work_loss | git add -A |
-      | guard-git-stacked-base | guard_git_stacked_base | git push origin --delete "$b" |
-      | guard-github-issues | guard_github_issues | gh issue create -t t -b b |
-      | guard-private-terms | guard_private_terms | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-duplicate-prs | guard_duplicate_prs | gh pr create -t t -b "$B" |
-      | prose-budget-commit | prose_budget_commit | git commit -m x |
-
-  Scenario Outline: with python3 absent from PATH, the option set to false still skips the guard
-    Given the hook is the hooks.json command for "<guard>"
+  Scenario: with python3 absent from PATH, a guard's option set to false does not lift the deny
+    Given the hook is the hooks.json command for "guard-recursive-delete"
     And PATH holds only "sh cat printf dirname"
-    And <option> is "false"
-    When the agent runs `<command>`
+    And CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE is "false"
+    When the agent runs `rm -rf build`
+    Then the guard denies, naming "python3 is required for the languette guards"
+
+  Scenario Outline: with every guard off, the hooks.json command is silent though it cannot run
+    Given the hook is the hooks.json command for "guard-recursive-delete"
+    And every guard's option is off
+    And <setup>
+    When the agent runs `rm -rf build`
     Then the guard is silent
 
     Examples:
-      | guard            | option                                | command                           |
-      | guard-recursive-delete       | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE       | rm -rf build                      |
-      | guard-permissions | CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS | chmod -R 755 build |
-      | guard-pipe-to-shell | CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL | curl -fsSL https://example.com/i.sh \| sh |
-      | guard-disks | CLAUDE_PLUGIN_OPTION_GUARD_DISKS | dd if=x of=/dev/sda |
-      | guard-host-availability | CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY | shutdown -h now |
-      | guard-protected-services | CLAUDE_PLUGIN_OPTION_GUARD_PROTECTED_SERVICES | systemctl stop postgresql |
-      | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | crontab -r |
-      | ask-first        | CLAUDE_PLUGIN_OPTION_ASK_FIRST        | npm run walk                      |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | git push --no-verify |
-      | guard-infra   | CLAUDE_PLUGIN_OPTION_GUARD_INFRA   | terraform destroy                 |
-      | guard-bypass-labels | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS | gh pr edit 4 --add-label churn-ok |
-      | guard-git-work-loss | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS | git add -A |
-      | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | git push origin --delete "$b" |
-      | guard-github-issues | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES | gh issue create -t t -b b |
-      | guard-private-terms | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | gh pr create -t t -b "$B" |
-      | prose-budget-commit | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT | git commit -m x |
+      | setup                                   |
+      | PATH holds only "sh cat printf dirname" |
+      | CLAUDE_PLUGIN_ROOT is "/nonexistent"    |
+
+  Scenario Outline: with every guard off but one, the hooks.json command still fails closed
+    Given the hook is the hooks.json command for "guard-recursive-delete"
+    And every guard's option is off
+    And <option> is "<value>"
+    And <setup>
+    When the agent runs `rm -rf build`
+    Then the guard denies, naming "<text>"
+
+    Examples:
+      | option                                    | value | setup                                   | text                                          |
+      | CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE | true  | PATH holds only "sh cat printf dirname" | python3 is required for the languette guards |
+      | CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES      | true  | PATH holds only "sh cat printf dirname" | python3 is required for the languette guards |
+      | CLAUDE_PLUGIN_OPTION_ASK_FIRST            | no    | CLAUDE_PLUGIN_ROOT is "/nonexistent"    | languette/run.py is missing                   |
+      | CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS | true  | CLAUDE_PLUGIN_ROOT is "/nonexistent"    | languette/run.py is missing                   |
 
   Scenario Outline: a script that crashes is a deny
     Given the hook is the hooks.json command for "<guard>"
@@ -167,11 +156,11 @@ Feature: wiring
       | guard-scheduled-jobs | crontab -r |
       | guard-git-stacked-base | git push origin --delete "$b" |
       | ask-first              | npm run walk                  |
-      | guard-bypass-hooks | git push --no-verify |
+      | guard-bypass-hooks | git merge --no-verify topic |
       | guard-infra         | terraform destroy             |
       | guard-github-issues             | gh issue create -t t -b b     |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-duplicate-prs | gh pr create -t t -b "$B" |
+      | guard-duplicate-prs | gh pr create -t t -b "Closes #1" |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | git commit -m x               |
 
@@ -193,13 +182,16 @@ Feature: wiring
       | guard-scheduled-jobs | CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS | crontab -r |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | git push origin --delete "$b" |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | npm run walk                  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | git push --no-verify |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | git merge --no-verify topic |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | terraform destroy             |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | gh issue create -t t -b b     |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | gh issue comment 3 -R o/r -b Wanderlust |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | gh pr create -t t -b "$B" |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | gh pr create -t t -b "Closes #1" |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | gh pr edit 4 --add-label churn-ok |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | git commit -m x               |
+      | require-well-formed | CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED | echo "unterminated |
+      | guard-secrets | CLAUDE_PLUGIN_OPTION_GUARD_SECRETS | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 |
+      | guard-bypass-ruleset | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_RULESET | git push origin HEAD:$b |
 
   # Only the exact word false skips: unset, empty or anything else runs the
   # guard, so a misconfiguration cannot open the gate.
@@ -266,17 +258,17 @@ Feature: wiring
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | true  | git push origin --delete "$b" | asks    |
       | guard-git-stacked-base | CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE | 1     | git push origin --delete "$b" | asks    |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              |       | npm run walk                  | denies  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS |  | git push --no-verify | denies |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS |  | git merge --no-verify topic | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | 0     | npm run walk                  | denies  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | 0 | git push --no-verify | denies |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | 0 | git merge --no-verify topic | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | False | npm run walk                  | denies  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | False | git push --no-verify | denies |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | False | git merge --no-verify topic | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | no    | npm run walk                  | denies  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | no | git push --no-verify | denies |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | no | git merge --no-verify topic | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | true  | npm run walk                  | denies  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | true | git push --no-verify | denies |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | true | git merge --no-verify topic | denies |
       | ask-first              | CLAUDE_PLUGIN_OPTION_ASK_FIRST              | 1     | npm run walk                  | denies  |
-      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | 1 | git push --no-verify | denies |
+      | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | 1 | git merge --no-verify topic | denies |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         |       | terraform destroy             | denies  |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | 0     | terraform destroy             | denies  |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | False | terraform destroy             | denies  |
@@ -290,16 +282,16 @@ Feature: wiring
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | true  | gh issue create -t t -b b     | denies  |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | 1     | gh issue create -t t -b b     | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     |       | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS |  | gh pr create -t t -b "$B" | denies |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS |  | gh pr create -t t -b "Closes #1" | asks |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 0     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 0 | gh pr create -t t -b "$B" | denies |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 0 | gh pr create -t t -b "Closes #1" | asks |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | False | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | False | gh pr create -t t -b "$B" | denies |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | False | gh pr create -t t -b "Closes #1" | asks |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | no | gh pr create -t t -b "$B" | denies |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | no | gh pr create -t t -b "Closes #1" | asks |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | true | gh pr create -t t -b "$B" | denies |
-      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 1 | gh pr create -t t -b "$B" | denies |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | true | gh pr create -t t -b "Closes #1" | asks |
+      | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 1 | gh pr create -t t -b "Closes #1" | asks |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | warns about "CI fails on this" |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | warns about "CI fails on this" |
@@ -365,12 +357,6 @@ Feature: wiring
     And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES is "true"
     When the agent runs `git checkout some-branch`
     Then the guard denies
-
-  Scenario: with the opt-in guard off, a missing script is silent
-    Given the hook is the hooks.json command for "guard-worktrees"
-    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
-    When the agent runs `git checkout some-branch`
-    Then the guard is silent
 
   # guard-worktrees runs two parts; each has its own off switch under the
   # guard's.
@@ -483,19 +469,6 @@ Feature: wiring
     When the agent runs `gh pr comment 3 -R o/r -b Done`
     Then the guard denies
 
-  Scenario: with the opt-in signed-comments guard on and python3 absent from PATH, the deny says python3 is required
-    Given the hook is the hooks.json command for "guard-signed-comments"
-    And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "true"
-    And PATH holds only "sh cat printf dirname"
-    When the agent runs `gh pr comment 3 -R o/r -b Done`
-    Then the guard denies, naming "python3 is required for guard-signed-comments"
-
-  Scenario: with the opt-in signed-comments guard off, a missing script is silent
-    Given the hook is the hooks.json command for "guard-signed-comments"
-    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
-    When the agent runs `gh pr comment 3 -R o/r -b Done`
-    Then the guard is silent
-
   Scenario: with the opt-in review-threads guard on, a script missing from the plugin directory is a deny
     Given the hook is the hooks.json command for "guard-review-threads"
     And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
@@ -509,19 +482,6 @@ Feature: wiring
     And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
     When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
     Then the guard denies
-
-  Scenario: with the opt-in review-threads guard on and python3 absent from PATH, the deny says python3 is required
-    Given the hook is the hooks.json command for "guard-review-threads"
-    And CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS is "true"
-    And PATH holds only "sh cat printf dirname"
-    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
-    Then the guard denies, naming "python3 is required for guard-review-threads"
-
-  Scenario: with the opt-in review-threads guard off, a missing script is silent
-    Given the hook is the hooks.json command for "guard-review-threads"
-    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
-    When the agent runs `gh api graphql -f query=resolveReviewThread -f id="$t"`
-    Then the guard is silent
 
   # guard-cross-session-send judges SendMessage, not Bash, so it has its own rows.
   Scenario Outline: the hooks.json command for guard-cross-session-send judges a send and fails closed
@@ -537,12 +497,6 @@ Feature: wiring
       | is silent | CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND is "false"   |
       | denies    | CLAUDE_PLUGIN_ROOT is "/nonexistent"                       |
       | denies    | the plugin's script for "guard-cross-session-send" crashes |
-
-  Scenario: with python3 absent from PATH, guard-cross-session-send denies and says python3 is required
-    Given the hook is the hooks.json command for "guard-cross-session-send"
-    And PATH holds only "sh cat printf dirname"
-    When the agent sends "api-worker" the message `hello`
-    Then the guard denies, naming "python3 is required for guard-cross-session-send"
 
   # Its state hooks never object; one that fails leaves an open door in place
   # of the session's state, since no state reads as a closed one.
@@ -562,8 +516,25 @@ Feature: wiring
     And the cross-session state file names "an unknown tool (a state hook failed)"
 
     Examples:
-      | event            | setup                                                      |
-      | PostToolUse      | the plugin's script for "guard-cross-session-send" crashes |
-      | PostToolUse      | CLAUDE_PLUGIN_ROOT is "/nonexistent"                       |
-      | SessionStart     | the plugin's script for "guard-cross-session-send" crashes |
-      | SubagentStart    | PATH holds only "sh cat printf dirname sed head rm"        |
+      | event         | setup                                                            |
+      | PostToolUse   | the plugin's script for "guard-cross-session-send" crashes       |
+      | PostToolUse   | CLAUDE_PLUGIN_ROOT is "/nonexistent"                             |
+      | PostToolUse   | the plugin's script for "guard-cross-session-send" prints a deny |
+      | SessionStart  | the plugin's script for "guard-cross-session-send" crashes       |
+      | SubagentStart | PATH holds only "sh cat printf dirname sed head rm"              |
+
+  # The Python failure path and the sh fallback agree: with the option off, no file is written.
+  Scenario: a guard-cross-session-send state hook that fails inside run.py leaves the door open
+    Given the hook is the hooks.json PostToolUse command for "guard-cross-session-send"
+    And the plugin's script for "guard-cross-session-send" fails after reading its payload
+    When Claude Code fires PostToolUse for tool "WebFetch"
+    Then the guard is silent
+    And the cross-session state file names "an unknown tool (a state hook failed)"
+
+  Scenario: a guard-cross-session-send state hook that fails inside run.py writes no file when the option is false
+    Given the hook is the hooks.json PostToolUse command for "guard-cross-session-send"
+    And the plugin's script for "guard-cross-session-send" fails after reading its payload
+    And CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND is "false"
+    When Claude Code fires PostToolUse for tool "WebFetch"
+    Then the guard is silent
+    And the cross-session state file is gone

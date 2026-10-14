@@ -146,14 +146,24 @@ def _installed_open(doctor, version, guard):
     copy = doctor.aside / "plugin"
     (copy / "hooks").mkdir(parents=True)
     # Both probed guards get a hook: the named one lets everything through, the other is the real one.
-    real = json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]["PreToolUse"]
-    hooks = [h for e in real for h in e["hooks"]
-             if any(f"--guard {g}" in h["command"] for g in ("guard-recursive-delete", "require-well-formed"))
-             and f"--guard {guard}" not in h["command"]]
-    hooks.append({"type": "command", "command": f"cat >/dev/null # --guard {guard}"})
+    hooks = [_real_hook_for(_other_probed(guard)),
+             {"type": "command", "command": f'cat >/dev/null # languette/run.py" --guard {guard}'}]
     (copy / "languette").symlink_to(ROOT / "languette")      # the real guard behind the real hook
     (copy / "hooks/hooks.json").write_text(json.dumps({"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": hooks}]}}))
     _install(doctor, version, "user", root=copy)
+
+
+def _other_probed(guard):
+    [other] = {"guard-recursive-delete", "require-well-formed"} - {guard}
+    return other
+
+
+def _real_hook_for(guard):
+    """The plugin's one PreToolUse hook, narrowed to `guard` alone: a copy wired per guard."""
+    [h] = [h for e in json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]["PreToolUse"] for h in e["hooks"]]
+    run_py = 'python3 -I "${CLAUDE_PLUGIN_ROOT}/languette/run.py"'
+    assert h["command"].count(run_py) == 1
+    return {**h, "command": h["command"].replace(run_py, f"{run_py} --guard {guard}")}
 
 
 @given(parsers.re(r'languette "(?P<version>\w+)" is installed at user scope from a copy without a '
@@ -161,8 +171,7 @@ def _installed_open(doctor, version, guard):
 def _installed_without(doctor, version, guard):
     copy = doctor.aside / "plugin"
     (copy / "hooks").mkdir(parents=True)
-    real = json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]["PreToolUse"]
-    hooks = [h for e in real for h in e["hooks"] if f"--guard {guard}" not in h["command"]]
+    hooks = [_real_hook_for(_other_probed(guard))]
     (copy / "languette").symlink_to(ROOT / "languette")
     (copy / "hooks/hooks.json").write_text(json.dumps({"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": hooks}]}}))
     _install(doctor, version, "user", root=copy)

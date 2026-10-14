@@ -201,6 +201,7 @@ class Ctx:
         self.project_env = True
         self.stubs = False
         self.hook = None                       # a hooks.json command, for wiring
+        self.wired = None                      # the guard a wiring row is about: the one command runs them all
         self.arg = None                        # the hook event, as Claude Code names it, for the guard to read
         self.session = "s1"                    # session_id in the payload, for guard-github-issues; None leaves it out
         self.agent = None                      # agent_id in the payload: a subagent's call, for guard-worktrees
@@ -472,6 +473,13 @@ def _setenv(ctx, var, value):
     ctx.env[var] = value
 
 
+@given("every guard's option is off")
+def _all_off(ctx):
+    # An ordinary guard's option exactly "false"; an opt-in guard's unset, its default.
+    for g in {g for _, _, gs in run.GUARDS for g in gs}:
+        ctx.env[run.option(g)] = None if hasattr(g, "OPT_IN") else "false"
+
+
 @given("no engine is configured")
 def _no_engine(ctx):
     ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = None
@@ -639,13 +647,12 @@ def _bare_path(ctx, tools, gh):
 
 @given(parsers.parse('the hook is the hooks.json command for "{guard}"'))
 def _hooks_json(ctx, guard):
-    ctx.hook = hooks_json_commands()[guard]
+    ctx.hook, ctx.wired = hooks_json_commands()[guard], guard
 
 
 @given(parsers.parse('the hook is the hooks.json {event} command for "{guard}"'))
 def _hooks_json_event(ctx, event, guard):
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [ctx.hook] = [h["command"] for e in hj["hooks"][event] for h in e["hooks"] if f"--guard {guard}" in h["command"]]
+    ctx.hook = hooks_json_event_command(event)
 
 
 @when(parsers.parse('Claude Code fires {event} for tool "{tool}"'))
@@ -673,22 +680,48 @@ def _crash(ctx, guard):
     ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
 
 
+@given(parsers.parse('the plugin\'s script for "{guard}" prints a deny'))
+def _load_deny(ctx, guard):
+    """run.py's own answer when a guard will not import: a deny, exit 0, before it
+    knows the event, so a state hook must read any output as a failure."""
+    root = Path(ctx.mkdtemp())
+    assert "languette/run.py" in hooks_json_commands()[guard]
+    (root / "languette").mkdir()
+    (root / "languette/run.py").write_text(
+        "print('{\"hookSpecificOutput\": {\"permissionDecision\": \"deny\"}}')\n")
+    ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
+
+
+@given(parsers.parse('the plugin\'s script for "{guard}" fails after reading its payload'))
+def _fails_mid_run(ctx, guard):
+    """The real run.py, whose verdict step raises: a state event then reaches its own
+    failure path (_state_failed), not the hooks.json sh fallback."""
+    root = Path(ctx.mkdtemp())
+    assert "languette/run.py" in hooks_json_commands()[guard]
+    shutil.copytree(ROOT / "languette", root / "languette", ignore=shutil.ignore_patterns("__pycache__"))
+    with open(root / "languette/verdict.py", "a") as f:
+        f.write("\n\ndef verdict(event, findings):\n    raise RuntimeError('boom')\n")
+    ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
+
+
 def hooks_json_commands():
-    """guard name -> its command in hooks/hooks.json."""
+    """guard name -> the PreToolUse command in hooks/hooks.json that judges it: the one
+    command, which names no guard and runs every guard wired for the call."""
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    out = {}
-    for entry in hj["hooks"]["PreToolUse"]:
-        for h in entry["hooks"]:
-            m = re.search(r'languette/run\.py" --guard ([a-z-]+)', h["command"])
-            out[m.group(1)] = h["command"]
-    return out
+    [command] = [h["command"] for e in hj["hooks"]["PreToolUse"] for h in e["hooks"]]
+    return {g.NAME: command for ev, _, gs in run.GUARDS for g in gs if ev == "PreToolUse"}
+
+
+def hooks_json_event_command(event):
+    """The one command hooks/hooks.json runs for `event`."""
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
+    [command] = [h["command"] for e in hj["hooks"][event] for h in e["hooks"]]
+    return command
 
 
 def hooks_json_prompt_command():
     """The UserPromptSubmit command in hooks/hooks.json that opens the guard-github-issues door."""
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [h] = [h for e in hj["hooks"]["UserPromptSubmit"] for h in e["hooks"] if "--guard guard-github-issues" in h["command"]]
-    return h["command"]
+    return hooks_json_event_command("UserPromptSubmit")
 
 
 # --- When ----------------------------------------------------------------
@@ -1005,9 +1038,29 @@ def scanned(ctx, mode):
 
 # --- Then ----------------------------------------------------------------
 
+def _from_the_wired_guard(ctx):
+    """A wiring row's verdict is its own guard's, or the hook's fail-closed deny: the one
+    hooks.json command runs every guard, so another's finding could stand in for a guard
+    that never ran. The same call through the command narrowed to that guard must agree."""
+    if not ctx.wired or "fails closed" in (ctx.verdict.reason or ""):
+        return
+    run_py = 'python3 -I "${CLAUDE_PLUGIN_ROOT}/languette/run.py"'
+    assert ctx.hook.count(run_py) == 1, ctx.hook
+    hook, whole = ctx.hook, ctx.verdict
+    ctx.hook = hook.replace(run_py, f"{run_py} --guard {ctx.wired}")
+    try:
+        ctx.run(ctx.stdin)
+        alone = ctx.verdict
+    finally:
+        ctx.hook, ctx.verdict = hook, whole
+    assert (alone.decision, alone.reason) == (whole.decision, whole.reason), \
+        f"want {ctx.wired}'s own verdict ({alone.decision}: {alone.reason}), got {whole.decision}: {whole.reason}"
+
+
 @then("the guard denies")
 def _denies(ctx):
     assert_that(ctx.verdict, denies())
+    _from_the_wired_guard(ctx)
 
 
 @then(parsers.re(r'the guard denies, naming "(?P<text>.*)"'))
@@ -1029,6 +1082,7 @@ def _asks_naming(ctx, text):
 @then("the guard asks")
 def _asks(ctx):
     assert_that(ctx.verdict, asks())
+    _from_the_wired_guard(ctx)
 
 
 @then("the guard is silent")

@@ -110,7 +110,7 @@ Feature: doctor
   Scenario: a deny from the hook's fallback, with run.py missing, fails
     Given languette "cd31356ad5db" is installed at user scope from a copy without run.py
     When the doctor runs
-    Then the "fail-closed" row is ✗ matching "was not denied through the hook command as installed: only the fallback denied it, so the guard never judged it: languette/run.py \(guard-recursive-delete\) is missing"
+    Then the "fail-closed" row is ✗ matching "was not denied through the hook command as installed: only the fallback denied it, so the guard never judged it: languette/run.py is missing from the plugin directory or crashed"
     And the "parse check" row is ✗ matching "only the fallback denied it"
     And the doctor exits 1
 

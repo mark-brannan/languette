@@ -2,206 +2,36 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree|SendMessage|mcp__.*",
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard require-well-formed; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for require-well-formed and was not found on PATH. This is a gate and fails closed: install python3, or set require_well_formed=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (require-well-formed) is missing from the plugin directory or crashed, so a command that does not parse could not be caught. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking that the command parses"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-git-work-loss; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-git-work-loss and was not found on PATH. This is a gate and fails closed: install python3, or set guard_git_work_loss=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-git-work-loss) is missing from the plugin directory or crashed, so the git work-loss moves could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for git work loss"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-recursive-delete; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-recursive-delete and was not found on PATH. This is a gate and fails closed: install python3, or set guard_recursive_delete=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-recursive-delete) is missing from the plugin directory or crashed, so recursive rm could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a recursive rm"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-permissions; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-permissions and was not found on PATH. This is a gate and fails closed: install python3, or set guard_permissions=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-permissions) is missing from the plugin directory or crashed, so a recursive chmod, chown or chgrp could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a recursive permission change"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-pipe-to-shell; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-pipe-to-shell and was not found on PATH. This is a gate and fails closed: install python3, or set guard_pipe_to_shell=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-pipe-to-shell) is missing from the plugin directory or crashed, so a download piped into a shell could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a download piped into a shell"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_DISKS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-disks; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-disks and was not found on PATH. This is a gate and fails closed: install python3, or set guard_disks=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-disks) is missing from the plugin directory or crashed, so a disk wipe could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a disk wipe"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-host-availability; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-host-availability and was not found on PATH. This is a gate and fails closed: install python3, or set guard_host_availability=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-host-availability) is missing from the plugin directory or crashed, so a shutdown or a fork bomb could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a shutdown or a fork bomb"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_PROTECTED_SERVICES-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-protected-services; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-protected-services and was not found on PATH. This is a gate and fails closed: install python3, or set guard_protected_services=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-protected-services) is missing from the plugin directory or crashed, so a stop of a protected service could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a stop of a protected service"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-scheduled-jobs; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-scheduled-jobs and was not found on PATH. This is a gate and fails closed: install python3, or set guard_scheduled_jobs=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-scheduled-jobs) is missing from the plugin directory or crashed, so a crontab deletion could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a crontab deletion"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-git-stacked-base; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-git-stacked-base and was not found on PATH. This is a gate and fails closed: install python3, or set guard_git_stacked_base=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-git-stacked-base) is missing from the plugin directory or crashed, so a remote-branch deletion could not be checked for open PRs stacked on it. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for open PRs stacked on the branch being deleted"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS-}\" != true ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-review-threads; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-review-threads and was not found on PATH. This is a gate and fails closed: install python3, or set guard_review_threads=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-review-threads) is missing from the plugin directory or crashed, so resolving a review thread could not be checked for a reply. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking that a resolved review thread was answered"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_ASK_FIRST-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard ask-first; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for ask-first and was not found on PATH. This is a gate and fails closed: install python3, or set ask_first=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (ask-first) is missing from the plugin directory or crashed, so commands the repo marks ask-first could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking whether this command needs the user's approval first"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-bypass-hooks; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-bypass-hooks and was not found on PATH. This is a gate and fails closed: install python3, or set guard_bypass_hooks=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-bypass-hooks) is missing from the plugin directory or crashed, so a skipped hook could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a skipped hook"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_SECRETS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-secrets; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-secrets and was not found on PATH. This is a gate and fails closed: install python3, or set guard_secrets=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-secrets) is missing from the plugin directory or crashed, so a credential pasted into the command could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a credential pasted into the command"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_INFRA-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-infra; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-infra and was not found on PATH. This is a gate and fails closed: install python3, or set guard_infra=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-infra) is missing from the plugin directory or crashed, so destructive infrastructure commands could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a command that destroys infrastructure"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_RULESET-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-bypass-ruleset; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-bypass-ruleset and was not found on PATH. This is a gate and fails closed: install python3, or set guard_bypass_ruleset=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-bypass-ruleset) is missing from the plugin directory or crashed, so a push or merge around a pull-request rule could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a push or merge around a branch's pull-request rule"
-          },
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard prose-budget-commit; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for prose-budget-commit and was not found on PATH. This is a gate and fails closed: install python3, or set prose_budget_commit=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (prose-budget-commit) is missing from the plugin directory or crashed, so staged prose could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking staged prose against the repo's budgets"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|mcp__.*__(create_issue|issue_write|transfer_issue|delete_issue)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-github-issues; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-github-issues and was not found on PATH. This is a gate and fails closed: install python3, or set guard_github_issues=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-github-issues) is missing from the plugin directory or crashed, so this issue create, transfer or delete could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for an issue create, transfer or delete"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|mcp__.*__(create_issue|update_issue|issue_write|add_issue_comment|create_pull_request|update_pull_request|add_pull_request_review_comment|create_pull_request_review|pull_request_review_write|add_comment_to_pending_review|create_and_submit_pull_request_review|submit_pending_pull_request_review|add_reply_to_pull_request_comment|update_issue_comment)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-private-terms; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-private-terms and was not found on PATH. This is a gate and fails closed: install python3, or set guard_private_terms=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-private-terms) is missing from the plugin directory or crashed, so text bound for a public GitHub repo could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking issue/PR text against the private-terms list"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|mcp__.*__(create_pull_request)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-duplicate-prs; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-duplicate-prs and was not found on PATH. This is a gate and fails closed: install python3, or set guard_duplicate_prs=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-duplicate-prs) is missing from the plugin directory or crashed, so a second PR on an issue an open PR already references could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for an open PR already on the issue this PR closes"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|mcp__.*__(add_issue_comment|add_reply_to_pull_request_comment|add_comment_to_pending_review|pull_request_review_write|update_issue_comment|add_pull_request_review_comment|create_pull_request_review|create_and_submit_pull_request_review|submit_pending_pull_request_review)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS-}\" != true ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-signed-comments; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-signed-comments and was not found on PATH. This is a gate and fails closed: install python3, or set guard_signed_comments=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-signed-comments) is missing from the plugin directory or crashed, so a GitHub comment could not be checked for its agent signature. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking that a GitHub comment is signed as an agent's"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|mcp__.*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-bypass-labels; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-bypass-labels and was not found on PATH. This is a gate and fails closed: install python3, or set guard_bypass_labels=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-bypass-labels) is missing from the plugin directory or crashed, so a label that waives a CI gate could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a label that waives a CI gate"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES-}\" != true ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-worktrees; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-worktrees and was not found on PATH. This is a gate and fails closed: install python3, or set guard_worktrees=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-worktrees) is missing from the plugin directory or crashed, so a branch switch in $HOME or a reach into a worktree of another session could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking for a branch switch in $HOME or a reach into another session's worktree"
-          }
-        ]
-      },
-      {
-        "matcher": "SendMessage",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for guard-cross-session-send and was not found on PATH. This is a gate and fails closed: install python3, or set guard_cross_session_send=false to turn this guard off.\"}}'; fi; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-cross-session-send) is missing from the plugin directory or crashed, so a message to another session could not be checked. This is a gate and fails closed: reinstall the plugin and retry.\"}}'",
-            "statusMessage": "Checking a message to another session"
+            "command": "{ [ \"${CLAUDE_PLUGIN_OPTION_ASK_FIRST-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_RULESET-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_DISKS-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GIT_STACKED_BASE-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_HOST_AVAILABILITY-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_INFRA-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_PERMISSIONS-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_PIPE_TO_SHELL-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_PROTECTED_SERVICES-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_RECURSIVE_DELETE-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS-}\" != true ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_SCHEDULED_JOBS-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_SECRETS-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS-}\" != true ] && [ \"${CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES-}\" != true ] && [ \"${CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT-}\" = false ] && [ \"${CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED-}\" = false ]; } || { if command -v python3 >/dev/null 2>&1; then [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\"; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"python3 is required for the languette guards and was not found on PATH. This is a gate and fails closed: install python3.\"}}'; fi || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py is missing from the plugin directory or crashed, so none of the languette guards could check this call. This is a gate and fails closed: reinstall the plugin and retry.\"}}'; }",
+            "statusMessage": "Checking the call against languette's guards"
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash|mcp__.*__(create_issue|issue_write|transfer_issue|delete_issue)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-github-issues >/dev/null 2>&1; }; true",
-            "statusMessage": "Spending the issue door for this turn"
-          }
-        ]
-      },
-      {
         "matcher": "WebFetch|WebSearch|Bash|Agent|mcp__.*",
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { p=$(cat); o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send 2>/dev/null) && [ -z \"$o\" ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
-            "statusMessage": "Noting a network read or a subagent for the cross-session guard"
+            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" 2>/dev/null) && [ -z \"$o\" ]; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "statusMessage": "Keeping languette's per-session state"
           }
         ]
       }
     ],
     "PostToolUseFailure": [
       {
-        "matcher": "Bash|mcp__.*__(create_issue|issue_write|transfer_issue|delete_issue)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-github-issues >/dev/null 2>&1; }; true",
-            "statusMessage": "Spending the issue door for this turn"
-          }
-        ]
-      },
-      {
         "matcher": "WebFetch|WebSearch|Bash|Agent|mcp__.*",
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { p=$(cat); o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send 2>/dev/null) && [ -z \"$o\" ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
-            "statusMessage": "Noting a network read or a subagent for the cross-session guard"
+            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" 2>/dev/null) && [ -z \"$o\" ]; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "statusMessage": "Keeping languette's per-session state"
           }
         ]
       }
@@ -211,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES-}\" = false ] || { [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-github-issues >/dev/null 2>&1; }; true",
+            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" 2>/dev/null) && [ -z \"$o\" ]; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
             "statusMessage": "Opening the issue door for this turn"
           }
         ]
@@ -222,8 +52,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { p=$(cat); o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send 2>/dev/null) && [ -z \"$o\" ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
-            "statusMessage": "Noting this session's subagent for the cross-session guard"
+            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" 2>/dev/null) && [ -z \"$o\" ]; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "statusMessage": "Keeping languette's per-session state"
           }
         ]
       }
@@ -233,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { p=$(cat); o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" --guard guard-cross-session-send 2>/dev/null) && [ -z \"$o\" ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
+            "command": "{ p=$(cat); { command -v python3 >/dev/null 2>&1 && [ -f \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" ] && o=$(printf '%s' \"$p\" | python3 -I \"${CLAUDE_PLUGIN_ROOT}/languette/run.py\" 2>/dev/null) && [ -z \"$o\" ]; } || [ \"${CLAUDE_PLUGIN_OPTION_GUARD_CROSS_SESSION_SEND-}\" = false ] || { s=$(printf '%s' \"$p\" | sed -n 's/.*\"session_id\" *: *\"\\([A-Za-z0-9_-]*\\)\".*/\\1/p' | head -n 1); f=\"${TMPDIR:-/tmp}/languette-guard-cross-session-send.$s\"; [ -n \"$s\" ] && rm -f \"$f\" && (set -C; printf '%s\\n' '{\"subagents\": [], \"read\": \"an unknown tool (a state hook failed)\"}' > \"$f\"); }; } 2>/dev/null; true",
             "statusMessage": "Closing the cross-session door for a new session"
           }
         ]
