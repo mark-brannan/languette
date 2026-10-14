@@ -23,7 +23,7 @@ packages = ["languette", "languette.guards"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--strict-markers"
+addopts = "--strict-markers -n auto"
 bdd_features_base_dir = "features"
 markers = [
   "python: run the scenario against languette/ in-process",
