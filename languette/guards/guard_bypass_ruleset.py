@@ -298,7 +298,7 @@ def _admin_merge(s, a, b, nested):
                 if dyn[k]:                     # a run-time -R value may split into `pr merge`
                     first.append(k)
             elif x.startswith("-"):
-                skip = x in ("-R", "--repo") or _opt(x, "--repo") and "=" not in x
+                skip = x in sw.GH_REPO_FLAGS or _opt(x, "--repo") and "=" not in x
             elif len(first) < 2:
                 first.append(k)
         # Only a run-time group, or a run-time verb under a literal `pr`, could spell `pr merge`.

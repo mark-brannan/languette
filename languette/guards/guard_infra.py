@@ -45,7 +45,7 @@ helmfile, docker, ansible or a database's DROP.
 import re
 
 from languette import scan as sw
-from languette.guards.ask_first import LAUNCH, LOOP, PROSE, claim
+from languette.guards.ask_first import LAUNCH, PROSE, claim, segments
 from languette.verdict import deny
 
 NAME = "guard-infra"
@@ -288,21 +288,16 @@ def _candidates(s, g, b, nested):
 def _runs(doc):
     """({rule: [tool name per run]}, whether the command has a loop word). A
     segment is one run of at most one rule."""
-    found, loop = {}, False
-    for t, nested in doc.texts(PROSE):
-        s = doc.scan(t)
-        loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
-        for a, b in s.segments():
-            if a > b:
-                continue
-            g = sw.cmd_index(s, a, b, _ANY, nested, prose=PROSE)
-            if g is None:
-                continue
-            for i in _candidates(s, g, b, nested):
-                rule = _judge(s.w[i], s.w[i + 1:b + 1])
-                if rule:
-                    found.setdefault(rule, []).append(_name(s.w[i]))
-                    break
+    found, (segs, loop) = {}, segments(doc, PROSE)
+    for s, a, b, nested in segs:
+        g = sw.cmd_index(s, a, b, _ANY, nested, prose=PROSE)
+        if g is None:
+            continue
+        for i in _candidates(s, g, b, nested):
+            rule = _judge(s.w[i], s.w[i + 1:b + 1])
+            if rule:
+                found.setdefault(rule, []).append(_name(s.w[i]))
+                break
     return found, loop
 
 

@@ -14,7 +14,7 @@ import os
 import re
 
 from languette import scan as sw
-from languette.verdict import WAY_USER, deny
+from languette.verdict import WAY_USER, judged
 
 NAME = "guard-host-availability"
 
@@ -151,7 +151,4 @@ def judge(doc):
 
 
 def check(doc):
-    if doc.text is None:
-        return None
-    why = judge(doc)
-    return deny(f"{NAME}: {why}") if why else None
+    return judged(doc, NAME, judge)

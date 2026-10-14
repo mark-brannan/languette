@@ -46,7 +46,6 @@ GH = re.compile(r"(?:^|/)gh\Z")
 TO_PRIVATE = "target a repo listed in the private_repos option"
 _UNSEEN = re.compile(r"--[A-Za-z-]*(?:body|comment|message)[A-Za-z-]*")
 _ACTS = frozenset("create comment edit review close reopen merge".split())
-_SKIP_VALUE = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 _GRAPHQL = re.compile(r"addComment|createIssue|updateIssue|createPullRequest|updatePullRequest|"
                       r"addPullRequestReview|submitPullRequestReview|addDiscussionComment")
 _BACKSTOP = re.compile(r"(?:^|[^A-Za-z0-9_./-])gh\s+(?:issue|pr)\s+(?:create|comment|edit|review|close|reopen|merge)(?:\s|$)",
@@ -145,9 +144,6 @@ class _Meta:
     def add(self, kind, value=""):
         self.out.append((kind, value))
 
-    def wv(self, i):
-        return self.s.q[i] if self.s.k[i] == "q" else self.s.w[i]
-
     def file(self, p):
         if p == "-":
             self.add("STDIN")
@@ -213,10 +209,10 @@ class _Meta:
             for i in range(c + 1, hi + 1):
                 if s.w[i] == "--":
                     if i < hi:
-                        t = self.wv(i + 1)
+                        t = sw.word(self.s, i + 1)
                     break
                 if not re.match(r"[-+].", s.w[i]):
-                    t = self.wv(i)
+                    t = sw.word(self.s, i)
                     break
         self.add("CDTO", _flat(t))
 
@@ -253,20 +249,14 @@ class _Meta:
             return
         i = g + 3
         while i <= hi:
-            t = self.wv(i)                       # a glued flag+quoted-value token may not be kind "w"
+            t = sw.word(self.s, i)                       # a glued flag+quoted-value token may not be kind "w"
             live = s.live[i]
-            if t in ("--repo", "-R"):
-                if i < hi:
-                    i += 1
-                    repo = self.wv(i)
-            elif t.startswith("--repo="):
-                repo = t[7:]
-            elif t.startswith("-R") and len(t) > 2:
-                repo = t[2:]
+            if r := sw.gh_repo_flag(s, i, hi, repo):
+                repo, i = r
             elif t in ("--body-file", "--comment-file", "-F"):
                 if i < hi:
                     i += 1
-                    self.file(self.wv(i))
+                    self.file(sw.word(self.s, i))
             elif t.startswith("--body-file="):
                 self.file(t[12:])
             elif t.startswith("--comment-file="):
@@ -276,7 +266,7 @@ class _Meta:
             elif t in ("--body", "--title", "--comment", "--subject", "-b", "-t", "-c"):
                 if i < hi:
                     i += 1
-                    self.val(self.wv(i), s.live[i])
+                    self.val(sw.word(self.s, i), s.live[i])
             elif re.match(r"--(?:body|title|comment|subject)=", t):
                 self.val(t.split("=", 1)[1], live)
             elif re.match(r"-[btc].", t):
@@ -284,7 +274,7 @@ class _Meta:
             elif t in ("--label", "--add-label", "-l"):
                 if i < hi:
                     i += 1
-                    self.lab(self.wv(i))
+                    self.lab(sw.word(self.s, i))
             elif re.match(r"--(?:add-)?label=", t):
                 self.lab(t.split("=", 1)[1])
             elif t.startswith("-l") and len(t) > 2:
@@ -308,20 +298,14 @@ class _Meta:
         path, method, fields = "", "", False
         i = g + 2
         while i <= hi:
-            t = self.wv(i)
-            if t in ("-X", "--method"):
-                if i < hi:
-                    i += 1
-                    method = s.w[i].upper()
-            elif t.startswith("--method="):
-                method = t[9:].upper()
-            elif t.startswith("-X") and len(t) > 2:
-                method = t[2:].upper()
+            t = sw.word(self.s, i)
+            if m := sw.gh_method_flag(s, i, hi, method):
+                method, i = m
             elif t in ("-f", "-F", "--field", "--raw-field"):
                 fields = True
                 if i < hi:
                     i += 1
-                    self.field(self.wv(i), s.live[i])
+                    self.field(sw.word(self.s, i), s.live[i])
             elif re.match(r"-[fF].", t):
                 fields = True
                 self.field(t[2:], s.live[i])
@@ -332,11 +316,11 @@ class _Meta:
                 fields = True
                 if i < hi:
                     i += 1
-                    self.file(self.wv(i))
+                    self.file(sw.word(self.s, i))
             elif t.startswith("--input="):
                 fields = True
                 self.file(t[8:])
-            elif t in _SKIP_VALUE:
+            elif t in sw.GH_API_VALUED:
                 i += 1
             elif _UNSEEN.match(t):
                 self.add("UNSEEN", _flat(t))
@@ -345,14 +329,14 @@ class _Meta:
             elif path == "":
                 path = t
             i += 1
-        p = re.sub(r"^/+", "", re.sub(r"^https?://[^/]+/", "", path, count=1), count=1)
+        p = sw.gh_api_path(path)
         if re.match(r"repos/[^/]+/[^/]+/(?:issues|pulls)(?:/|\Z)", p):
             if method in ("GET", "HEAD") or (method == "" and not fields):
                 return
             parts = p.split("/")
             self.add("R", parts[1] + "/" + parts[2])
         elif p == "graphql":
-            if any(_GRAPHQL.search(self.wv(i)) for i in range(g, hi + 1)):
+            if any(_GRAPHQL.search(sw.word(self.s, i)) for i in range(g, hi + 1)):
                 self.add("R", "?")          # the target is a node id in the query, never the cwd's origin
 
 

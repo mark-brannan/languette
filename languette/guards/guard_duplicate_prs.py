@@ -45,7 +45,6 @@ _CREATE = frozenset("create new".split())
 # gh pr create's flags that take a value, so the value is never read as a flag.
 _VALUED = frozenset("-a --assignee -B --base -H --head -l --label -m --milestone -p --project -r --reviewer "
                     "-T --template -t --title --recover".split())
-_API_VALUED = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 _NAME = r"[A-Za-z0-9_.-]+"
 _REF = (rf"(?:(?P<repo>{_NAME}/{_NAME})?#(?P<num>[0-9]+)"
         rf"|https?://github\.com/(?P<urepo>{_NAME}/{_NAME})/issues/(?P<unum>[0-9]+))(?![A-Za-z0-9_/])")
@@ -106,14 +105,8 @@ def _pr_create(s, g, hi, repo):
     i = g + 3
     while i <= hi:
         t, live = sw.word(s, i), s.live[i]
-        if t in ("-R", "--repo"):
-            if i < hi:
-                i += 1
-                post.repo = sw.word(s, i)
-        elif t.startswith("--repo="):
-            post.repo = t[7:]
-        elif t.startswith("-R") and len(t) > 2:
-            post.repo = t[2:]
+        if r := sw.gh_repo_flag(s, i, hi, post.repo):
+            post.repo, i = r
         elif t in ("-b", "--body"):
             if i < hi:
                 i += 1
@@ -142,14 +135,8 @@ def _api(s, g, hi):
     i = g + 2
     while i <= hi:
         t, live = sw.word(s, i), s.live[i]
-        if t in ("-X", "--method"):
-            if i < hi:
-                i += 1
-                method = sw.word(s, i).upper()
-        elif t.startswith("--method="):
-            method = t[9:].upper()
-        elif t.startswith("-X") and len(t) > 2:
-            method = t[2:].upper()
+        if m := sw.gh_method_flag(s, i, hi, method):
+            method, i = m
         elif t in ("-f", "-F", "--field", "--raw-field") or re.match(r"-[fF].|--(?:field|raw-field)=", t):
             fields = True
             if t in ("-f", "-F", "--field", "--raw-field"):
@@ -169,12 +156,10 @@ def _api(s, g, hi):
             fields = True
             if t == "--input":
                 i += 1
-        elif t in _API_VALUED:
-            i += 1
-        elif not t.startswith("-") and path == "":
-            path = t
+        else:
+            i, path = sw.gh_api_word(t, i, path)
         i += 1
-    p = re.sub(r"^/+", "", re.sub(r"^https?://[^/]+/", "", path, count=1), count=1)
+    p = sw.gh_api_path(path)
     m = re.fullmatch(rf"repos/({_NAME}|\{{owner\}})/({_NAME}|\{{repo\}})/pulls/?", p)
     if not m or method in ("GET", "HEAD") or (method == "" and not fields):
         return None

@@ -7,7 +7,7 @@ position, behind a wrapper, and with r in a short-option cluster (`-ir`).
 import re
 
 from languette import scan as sw
-from languette.verdict import WAY_USER, deny
+from languette.verdict import WAY_USER, judged
 
 NAME = "guard-scheduled-jobs"
 
@@ -27,7 +27,4 @@ def judge(doc):
 
 
 def check(doc):
-    if doc.text is None:
-        return None
-    why = judge(doc)
-    return deny(f"{NAME}: {why}") if why else None
+    return judged(doc, NAME, judge)

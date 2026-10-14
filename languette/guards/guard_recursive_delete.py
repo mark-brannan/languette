@@ -12,7 +12,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Refuse, context, deny, planned
+from languette.verdict import Refuse, deny
 
 NAME = "guard-recursive-delete"
 
@@ -152,36 +152,13 @@ class _Judge:
         paths.judge_segments(self, scans)
 
 
-def parse(doc):
-    return paths.parse_targets(doc, NAME, _Judge, "LANGUETTE_RM_ALLOW")
+_MALFORMED = ("LANGUETTE_RM_ALLOW is malformed ({}). Recursive rm and find -delete are "
+              "blocked until it is fixed or unset; other commands run. It must be a colon-separated "
+              "list of directory names (dist) or absolute paths (/srv/scratch), using only letters, "
+              "digits and . _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.")
 
 
-def plan(parsed):
-    return paths.plan_targets(parsed, _parse_allow)
-
-
-def judge(parsed, answers):
-    if parsed["found"] or parsed["home"] is None:
-        return parsed["found"]
-    home, physical = parsed["home"], paths.physical_of(answers)
-    extra_roots, extra_names, allow_err = [], [], None
-    if parsed["allow"]:
-        extra_roots, extra_names, allow_err = _parse_allow(parsed["allow"], home, physical(home), physical)
-    allow_msg = None
-    if allow_err:
-        allow_msg = (f"LANGUETTE_RM_ALLOW is malformed ({allow_err}). Recursive rm and find -delete are "
-                     "blocked until it is fixed or unset; other commands run. It must be a colon-separated "
-                     "list of directory names (dist) or absolute paths (/srv/scratch), using only letters, "
-                     "digits and . _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.")
-
-    refused = parsed["refused"]
-    if refused is None and not parsed["targets"]:
-        return context("guard-recursive-delete: " + allow_msg) if allow_msg else None
-    if allow_msg:
-        return deny("guard-recursive-delete: " + allow_msg)
-    if refused is not None:
-        return deny(refused)
-
+def _verdict(targets, home, physical, extra_roots=(), extra_names=()):
     names = GENERATED_NAMES + tuple(extra_names)
     roots = paths.own_roots(home, physical, extra_roots)
 
@@ -196,7 +173,7 @@ def judge(parsed, answers):
     def allowed(p):
         return any(p == r or p.startswith(r + "/") for r in roots) or is_generated(p)
 
-    for abs_, kind, raw in parsed["targets"]:
+    for abs_, kind, raw in targets:
         what = f"find {raw} -delete" if kind == "find" else f"rm -r {raw}"
         if not allowed(abs_):
             return deny(
@@ -215,4 +192,5 @@ def judge(parsed, answers):
 
 
 def check(doc):
-    return (yield from planned(doc, parse, plan, judge))
+    return (yield from paths.check_targets(doc, NAME, _Judge, "LANGUETTE_RM_ALLOW", _parse_allow, _MALFORMED,
+                                           _verdict))

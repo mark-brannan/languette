@@ -8,7 +8,7 @@ import os
 import re
 
 from languette import scan as sw
-from languette.verdict import Need, Refuse, deny
+from languette.verdict import Need, Refuse, context, deny, planned
 
 
 class Unresolved(Exception):
@@ -185,6 +185,38 @@ def plan_targets(parsed, parse_allow):
     if parsed["refused"] is None and parsed["targets"]:
         want += own_bases(home) + [t for t, _, _ in parsed["targets"]]
     return [Need("physical", p) for p in dict.fromkeys(want)]
+
+
+def judge_targets(parsed, answers, name, parse_allow, malformed, verdict):
+    """The judge of a guard that judges target paths, up to the targets
+    themselves: a malformed allow var (`malformed`, a template its error fills)
+    is context when there is nothing to judge and a deny otherwise; a refused
+    parse is a deny. Past that, `verdict(targets, home, physical, *extras)`
+    judges the targets, extras being what parse_allow found besides its error
+    (none when the allow var is unset)."""
+    if parsed["found"] or parsed["home"] is None:
+        return parsed["found"]
+    home, physical = parsed["home"], physical_of(answers)
+    extras, allow_err = [], None
+    if parsed["allow"]:
+        *extras, allow_err = parse_allow(parsed["allow"], home, physical(home), physical)
+    allow_msg = malformed.format(allow_err) if allow_err else None
+    refused = parsed["refused"]
+    if refused is None and not parsed["targets"]:
+        return context(f"{name}: " + allow_msg) if allow_msg else None
+    if allow_msg:
+        return deny(f"{name}: " + allow_msg)
+    if refused is not None:
+        return deny(refused)
+    return verdict(parsed["targets"], home, physical, *extras)
+
+
+def check_targets(doc, name, judge, allow_var, parse_allow, malformed, verdict):
+    """The whole check of a guard that judges target paths: parse_targets,
+    plan_targets and judge_targets, in planned's order."""
+    return (yield from planned(doc, lambda d: parse_targets(d, name, judge, allow_var),
+                               lambda p: plan_targets(p, parse_allow),
+                               lambda p, a: judge_targets(p, a, name, parse_allow, malformed, verdict)))
 
 
 def project_config(payload, env, name):
