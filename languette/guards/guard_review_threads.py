@@ -26,6 +26,7 @@ from languette.guards.guard_bypass_labels import MAX_READ, _alone
 from languette.verdict import Need, ask, deny
 
 NAME = "guard-review-threads"
+OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS"
 GH = re.compile(r"(?:^|/)gh\Z")
 RESOLVE = re.compile(r"(?<![A-Za-z0-9_])resolveReviewThread(?![A-Za-z0-9_])")
 THREAD = re.compile(r"PRRT_[A-Za-z0-9_-]+")

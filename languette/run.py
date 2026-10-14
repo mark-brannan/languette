@@ -3,8 +3,9 @@ registered for its hook event and tool, print one decision.
 
     python3 -I languette/run.py [--guard NAME]
 
---guard restricts the run to one guard (the hooks.json wiring runs each
-Python guard alone this way). Fails closed: an unreadable payload is a deny,
+--guard restricts the run to one guard whatever its option says (hooks/hooks.json
+names none: one run judges every guard wired for the event and tool whose option
+allows it). Fails closed: an unreadable payload is a deny,
 a Bash command the parser refuses is a deny (require-well-formed; the other guards
 skip it), and a guard that raises is a deny naming the guard. No guard
 matched, or none objected, is exit 0 with no output; a deny outranks an ask.
@@ -60,6 +61,7 @@ except Exception as e:  # noqa: BLE001
 # (hook event, tool name pattern or None for an event with no tool, guards in
 # the order they judge). guard-cross-session-send judges SendMessage; on the
 # other events it only keeps its per-session state, and never objects.
+STATE_EVENTS = frozenset({"PostToolUse", "PostToolUseFailure", "SubagentStart", "SessionStart", "UserPromptSubmit"})
 _SEND_STATE_TOOLS = re.compile(r"(?:WebFetch|WebSearch|Bash|Agent|mcp__.+)\Z")
 GUARDS = (
     ("PreToolUse", re.compile(r"Bash\Z"), (require_well_formed, guard_git_work_loss, guard_recursive_delete, ask_first,
@@ -86,9 +88,23 @@ GUARDS = (
 )
 
 
+def option(g):
+    """The environment variable holding guard g's on/off option."""
+    return getattr(g, "OPT_IN", None) or "CLAUDE_PLUGIN_OPTION_" + g.NAME.upper().replace("-", "_")
+
+
 def _on(g, env):
-    opt = getattr(g, "OPT_IN", None)
-    return not opt or env.get(opt) == "true"
+    """Whether g runs when no guard is named: an opt-in guard (OPT_IN) only when its
+    option is exactly "true", any other guard unless its option is exactly "false"."""
+    if hasattr(g, "OPT_IN"):
+        return env.get(g.OPT_IN) == "true"
+    return env.get(option(g)) != "false"
+
+
+def gates():
+    """Option name -> its gate, `=` (on unless false) or `!=` (on only if true), for every guard."""
+    return {option(g)[len("CLAUDE_PLUGIN_OPTION_"):].lower(): "!=" if hasattr(g, "OPT_IN") else "="
+            for _, _, gs in GUARDS for g in gs}
 
 
 def wired(event, tool):
@@ -192,8 +208,8 @@ def _respond(stdin_text, env, only):
         return _out("PreToolUse", deny(f"languette: no guard is named {only}, so this hook checks nothing. "
                                        "This is a gate and fails closed: reinstall the plugin, or copy the "
                                        "entry again from hooks/hooks.json")), (World(env, payload), payload, [], [])
-    # An opt-in guard (OPT_IN names its option) runs alone by name, or with the
-    # rest only when its option is exactly "true", as hooks.json runs it.
+    # A guard runs alone by name whatever its option says, or with the rest when
+    # its option allows it (_on): the one hooks.json command names no guard.
     guards = [g for g in wired(event, tool) if only == g.NAME or (only is None and _on(g, env))]
     doc = Document(payload, env)
     if (guards and event == "PreToolUse" and doc.command is not None
@@ -219,12 +235,46 @@ def _respond(stdin_text, env, only):
     return (_out(event, fields) if fields else ""), judged
 
 
+def _state_failed(payload, env):
+    """A state-keeping hook (PostToolUse and the rest) that crashed or objected leaves
+    guard-cross-session-send's file saying the session has read something unknown, so
+    its door stays shut rather than open on a stale record."""
+    sid = payload.get("session_id") if isinstance(payload, dict) else None
+    if not isinstance(sid, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", sid):
+        return
+    path = os.path.join(env.get("TMPDIR") or "/tmp", f"languette-guard-cross-session-send.{sid}")
+    try:
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(json.dumps({"subagents": [], "read": "an unknown tool (a state hook failed)"}) + "\n")
+    except OSError:
+        pass
+
+
 def main(argv):
     only = argv[argv.index("--guard") + 1] if "--guard" in argv[:-1] else None
     try:
         stdin_text = sys.stdin.buffer.read()
     except OSError:
         stdin_text = b""                       # judged as an unreadable payload
+    try:
+        payload = json.loads(stdin_text)
+    except ValueError:
+        payload = None
+    event = payload.get("hook_event_name") if isinstance(payload, dict) else None
+    if event in STATE_EVENTS:
+        # These events carry no decision: whatever the guards say is kept off stdout.
+        try:
+            out = respond(stdin_text, os.environ, only)
+        except Exception:  # noqa: BLE001
+            out = "crashed"
+        if out:
+            _state_failed(payload, os.environ)
+        return 0
     sys.stdout.write(respond(stdin_text, os.environ, only))
     return 0
 

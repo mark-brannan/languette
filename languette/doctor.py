@@ -33,9 +33,6 @@ PROBES = (PARSE, CANARY)
 REASON_MAX = 100                   # characters of a deny reason the parse check row shows
 HOOK_TIMEOUT = 600                 # seconds: Claude Code's default for a command hook
 WAIT_MAX = 60                      # seconds the doctor waits on a probe, whatever the hook's limit
-# The gate each hooks.json command opens with: `= false` runs the guard unless
-# its option is exactly false, `!= true` (an opt-in guard) only when exactly true.
-GATE = re.compile(r'^\[ "\$\{CLAUDE_PLUGIN_OPTION_(\w+)-\}" (=|!=) (true|false) \]')
 BY_HAND = re.compile(r"languette/run\.py")
 SHA = re.compile(r"[0-9a-f]{7,40}")
 # A deny that came from the wrapper, the loader or a crash, not the guard: run.py is
@@ -227,18 +224,23 @@ def _env_value(v):
 
 
 def gates(hooks):
-    """Option name -> its gate, `=` (on unless false) or `!=` (on only if true),
-    and the first hook of each probed guard, from a hooks.json object."""
-    found, probed = {}, {}
+    """Option name -> its gate, `=` (on unless false) or `!=` (on only if true), as run.py
+    reads them, and the first hook of each probed guard, from a hooks.json object. A
+    command that names no guard (the plugin's) runs every guard, so it takes every probe."""
     pre = hooks.get("hooks") if isinstance(hooks, dict) else None
     if not isinstance(pre, dict):
         raise Unreadable("hooks.json has a shape the doctor does not know")
+    try:
+        from languette import run
+        found = run.gates()
+    except BaseException as e:  # noqa: BLE001 -- run.py exits when a guard will not import
+        raise Unreadable(f"the guards did not load ({type(e).__name__}: {e})")
+    probed = {}
     for h in _commands(hooks):
-        m = GATE.match(h["command"])
-        if m:
-            found[m[1].lower()] = m[2]
+        if "languette/run.py" not in h["command"]:
+            continue
         for _, guard, _ in PROBES:
-            if f"--guard {guard}" in h["command"]:
+            if f"--guard {guard}" in h["command"] or "--guard" not in h["command"]:
                 probed.setdefault(guard, h)
     return found, probed
 

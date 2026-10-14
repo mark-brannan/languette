@@ -644,8 +644,7 @@ def _hooks_json(ctx, guard):
 
 @given(parsers.parse('the hook is the hooks.json {event} command for "{guard}"'))
 def _hooks_json_event(ctx, event, guard):
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [ctx.hook] = [h["command"] for e in hj["hooks"][event] for h in e["hooks"] if f"--guard {guard}" in h["command"]]
+    ctx.hook = hooks_json_event_command(event)
 
 
 @when(parsers.parse('Claude Code fires {event} for tool "{tool}"'))
@@ -674,21 +673,23 @@ def _crash(ctx, guard):
 
 
 def hooks_json_commands():
-    """guard name -> its command in hooks/hooks.json."""
+    """guard name -> the PreToolUse command in hooks/hooks.json that judges it: the one
+    command, which names no guard and runs every guard wired for the call."""
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    out = {}
-    for entry in hj["hooks"]["PreToolUse"]:
-        for h in entry["hooks"]:
-            m = re.search(r'languette/run\.py" --guard ([a-z-]+)', h["command"])
-            out[m.group(1)] = h["command"]
-    return out
+    [command] = [h["command"] for e in hj["hooks"]["PreToolUse"] for h in e["hooks"]]
+    return {g.NAME: command for ev, _, gs in run.GUARDS for g in gs if ev == "PreToolUse"}
+
+
+def hooks_json_event_command(event):
+    """The one command hooks/hooks.json runs for `event`."""
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
+    [command] = [h["command"] for e in hj["hooks"][event] for h in e["hooks"]]
+    return command
 
 
 def hooks_json_prompt_command():
     """The UserPromptSubmit command in hooks/hooks.json that opens the guard-github-issues door."""
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [h] = [h for e in hj["hooks"]["UserPromptSubmit"] for h in e["hooks"] if "--guard guard-github-issues" in h["command"]]
-    return h["command"]
+    return hooks_json_event_command("UserPromptSubmit")
 
 
 # --- When ----------------------------------------------------------------
