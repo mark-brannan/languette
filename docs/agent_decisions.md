@@ -371,3 +371,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261014t052140z
 - Per push, @shfmt_only rows still run on the shfmt rung; only the shfmt engine's copy of the other rows moves to the full sweep Undo: add shfmt_only to _full_sweep_only's drop list in tests/conftest.py ([#206](https://github.com/mark-brannan/languette/issues/206)) (no PR, branch claude/languette-shfmt-orchestration-74a331)
+
+### 20261014t054735z
+- tests: @shfmt_only rows still run per push, not only in the full sweep Undo: drop them in _full_sweep_only in tests/conftest.py ([#213](https://github.com/mark-brannan/languette/pull/213))
