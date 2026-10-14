@@ -353,10 +353,7 @@ shellcheck --severity=warning tests/stubs/* tests/*.test.sh   # as CI runs it
 
 Running the tests needs pytest, pytest-bdd, pytest-xdist and PyHamcrest; the hooks do not.
 
-The suite runs on at most 4 cores (pytest-xdist; about a minute), never all of
-them, because many sessions share a machine. `LANGUETTE_TEST_WORKERS=N` sets
-the default and the ceiling, which an explicit `-n` cannot pass; `-n 0` runs
-serially (needed for `LANGUETTE_PIN_IO=update`).
+The suite runs on at most 4 workers; `LANGUETTE_TEST_WORKERS=N` sets the cap, `-n 0` runs serially.
 
 The same run checks the shape of `hooks/hooks.json`, because
 `claude plugin validate --strict` passes a malformed one. The headless smoke

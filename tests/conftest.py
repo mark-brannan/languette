@@ -81,13 +81,19 @@ def pytest_xdist_auto_num_workers(config):
 
 
 @pytest.hookimpl(tryfirst=True)
-def pytest_configure(config):
-    refuse_update_under_xdist(config)
+def pytest_cmdline_main(config):
+    # Before xdist's own pytest_cmdline_main turns numprocesses into the list
+    # of workers to start (config.option.tx); clamping later changes nothing.
     n = getattr(config.option, "numprocesses", None)
     if isinstance(n, int) and n > _worker_ceiling():
         config.option.numprocesses = _worker_ceiling()
         sys.stderr.write(f"languette: -n {n} clamped to {_worker_ceiling()} workers "
                          "(raise the ceiling with LANGUETTE_TEST_WORKERS)\n")
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_configure(config):
+    refuse_update_under_xdist(config)
     for g in GUARD_NAMES:
         config.addinivalue_line("markers", f"also_{g}: the row rightly trips {g} too")
     # A throwaway $HOME for the whole run, so no verdict depends on, and no
