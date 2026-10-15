@@ -12,6 +12,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Refuse, deny
 
 NAME = "guard-recursive-delete"
@@ -72,12 +73,7 @@ class _Judge:
         return "rm -r" + ("" if raw == "" else " " + raw)
 
     def blocked(self, raw, why):
-        raise Refuse(
-            f"`{self.lab(raw)}` is blocked: {why}. Resolve the target yourself and spell it out: `rm -rf` on "
-            "the absolute path of a generated directory (node_modules, dist, coverage, .pio ...), the "
-            "scratchpad, /tmp or an agent worktree. Anything else in a repo or under $HOME is the user's -- "
-            "`git status --short` / `git clean -n` show what is there; `git rm` tracked files by path and "
-            "hand the rest to the user.")
+        raise Refuse(say("recursive_delete", label=self.lab(raw), why=why))
 
     def target(self, s, idx):
         raw = t = s.w[idx]
