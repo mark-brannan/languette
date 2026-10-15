@@ -10,6 +10,8 @@ Refuse is how a guard's internals say "deny, for this reason" from deep inside
 a walk; check catches it and returns deny. Standard library only.
 """
 
+from languette.messages import say
+
 WAY_USER = "That is the user's to run, not an agent's: say what you need and hand them the exact command."
 
 
@@ -85,7 +87,7 @@ def judged(doc, name, judge):
     if doc.text is None:
         return None
     why = judge(doc)
-    return deny(f"{name}: {why}") if why else None
+    return deny(say("judged", guard=name, why=why)) if why else None
 
 
 def planned(doc, parse, plan, judge):
