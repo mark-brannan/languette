@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4](https://github.com/mark-brannan/languette/compare/v0.0.3...v0.0.4) (2026-10-15)
+
+
+### Bug Fixes
+
+* decode ANSI-C quoting in the scanner ([#212](https://github.com/mark-brannan/languette/issues/212)) ([#221](https://github.com/mark-brannan/languette/issues/221)) ([1a7e5e1](https://github.com/mark-brannan/languette/commit/1a7e5e1cde38a07c2bc3266c137a3e9bc3b23c47))
+* **scan:** a heredoc fed to a shell is queued as executed text ([#220](https://github.com/mark-brannan/languette/issues/220)) ([4826c35](https://github.com/mark-brannan/languette/commit/4826c355c74feb5b3f84e13d83201d33743270ae))
+
 ## [0.0.3](https://github.com/mark-brannan/languette/compare/v0.0.2...v0.0.3) (2026-10-14)
 
 
