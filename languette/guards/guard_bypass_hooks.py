@@ -24,6 +24,7 @@ import re
 
 from languette import scan as sw
 from languette.guards.ask_first import claim, segments
+from languette.messages import say
 from languette.verdict import deny
 
 NAME = "guard-bypass-hooks"
@@ -107,15 +108,12 @@ def check(doc):
     if not runs:
         return None
     if looped:
-        return deny(f"{NAME}: skipping the hooks inside a loop, xargs, parallel or watch skips the hooks an "
-                    "unknown number of times, and each run needs its own approval. Fix what the blocking "
-                    "hook reported, or run it once, on its own, after asking.")
+        return deny(say("loop_hooks", guard=NAME))
     try:
         approved, spent = yield from claim({APPROVE_LABEL: runs})
     except (OSError, ValueError) as e:
-        return deny(f"{NAME}: cannot read the session transcript to look for the user's approval, or "
-                    f"record it as spent ({e}), so `{cmd.strip()}` is denied. Fix what the blocking "
-                    "hook reported, or ask the user to run it themselves.")
+        return deny(say("transcript_unreadable", guard=NAME, err=e, cmd=cmd.strip(),
+                        then="Fix what the blocking hook reported, or ask the user to run it themselves."))
     if spent:
         return None
     have = len(approved[APPROVE_LABEL])

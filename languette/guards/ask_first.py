@@ -38,6 +38,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Need, Refuse, deny
 
 NAME = "ask-first"
@@ -215,15 +216,14 @@ def check(doc):
     if not hits:
         return None
     if looped:
-        return deny("ask-first: " + ", ".join(f"`{c['id']}`" for c in looped) + " inside a loop, xargs, "
-                     "parallel or watch runs an unknown number of times, and each run needs its own "
-                     "approval. Run it once, on its own.")
+        return deny(say("loop", guard="ask-first", what=", ".join(f"`{c['id']}`" for c in looped),
+                        then="Run it once, on its own."))
 
     try:
         approved, spent = yield from claim({c["approve_label"]: runs[c["id"]] for c in hits})
     except (OSError, ValueError) as e:
-        return deny(f"ask-first: cannot read the session transcript to look for the user's approval, or "
-                     f"record it as spent ({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
+        return deny(say("transcript_unreadable", guard="ask-first", err=e, cmd=cmd.strip(),
+                        then="Ask the user to run it themselves."))
     if spent:
         return None
     parts = []

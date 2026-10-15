@@ -51,6 +51,7 @@ try:
                                   prose_budget_commit)
     from languette import record
     from languette.document import Document
+    from languette.messages import say
     from languette.verdict import Act, deny, verdict
     from languette.world import ACTS, World
 except Exception as e:  # noqa: BLE001
@@ -143,7 +144,7 @@ def _finding(g, doc, world, acts):
     try:
         return _drive(g.check(doc), world, acts), False
     except Exception as e:  # noqa: BLE001
-        return deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
+        return deny(say("guard_crashed", guard=g.NAME, kind=type(e).__name__, err=e)), True
 
 
 def respond(stdin_text, env, only=None):
@@ -189,7 +190,7 @@ def _respond(stdin_text, env, only):
         if not isinstance(payload, dict):
             raise ValueError("payload is not an object")
     except Exception as e:  # noqa: BLE001 -- a gate fails closed on anything
-        return _out("PreToolUse", deny(f"languette: unreadable hook payload ({e})")), (World(env, {}), {}, [], [])
+        return _out("PreToolUse", deny(say("payload_unreadable", err=e))), (World(env, {}), {}, [], [])
     # The shell guards never read the event; a payload without one is judged
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
@@ -198,16 +199,12 @@ def _respond(stdin_text, env, only):
     # state-keeping events read no cwd, and skipping them would fail open.
     cwd = payload.get("cwd")
     if event == "PreToolUse" and (not isinstance(cwd, str) or not cwd.startswith("/")):
-        return _out(event, deny(
-            "languette: the hook payload has no working directory, or only a relative one, so no path in "
-            "the call can be resolved. This is a gate and fails closed.")), (World(env, payload), payload, [], [])
+        return _out(event, deny(say("no_cwd"))), (World(env, payload), payload, [], [])
     tool = payload.get("tool_name")
     # A hook entry that names no guard here, say one renamed since it was
     # copied, would otherwise judge nothing and pass every command.
     if only is not None and only not in {g.NAME for _, _, gs in GUARDS for g in gs}:
-        return _out("PreToolUse", deny(f"languette: no guard is named {only}, so this hook checks nothing. "
-                                       "This is a gate and fails closed: reinstall the plugin, or copy the "
-                                       "entry again from hooks/hooks.json")), (World(env, payload), payload, [], [])
+        return _out("PreToolUse", deny(say("unknown_guard", name=only))), (World(env, payload), payload, [], [])
     # A guard runs alone by name whatever its option says, or with the rest when
     # its option allows it (_on): the one hooks.json command names no guard.
     guards = [g for g in wired(event, tool) if only == g.NAME or (only is None and _on(g, env))]
