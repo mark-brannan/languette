@@ -87,6 +87,91 @@ MESSAGES = {
         "`git status --short` / `git clean -n` show what is there; `git rm` tracked files by path and "
         "hand the rest to the user."
     ),
+    "cross_session_ask": (
+        "{guard}: a message to {target}, which may be another of the user's sessions, "
+        "leaves this one: {first_line}"
+    ),
+    "rd_quoted_space": "a quoted string with whitespace in it is not one path this hook can resolve",
+    "rd_glob": "a glob or brace expansion could name anything",
+    "rd_substitution": "a variable or command substitution could expand to anything",
+    "rd_tab_newline": "it contains a tab or newline",
+    "rd_dotdot": "a `..` segment steps out of the directory the name suggests",
+    "rd_tilde": "only a leading `~/` is understood",
+    "rd_cd_moved": (
+        "a `cd` earlier in this command moves the working directory and the hook "
+        "cannot follow it; use an absolute path"
+    ),
+    "rd_root": "that is the root of the filesystem",
+    "rd_home": "that is $HOME itself",
+    "rd_find_no_start": "with no start path find deletes under the working directory",
+    "rd_no_target": (
+        "no target is visible to this hook -- find -exec, xargs, brace expansion and "
+        "quoted lists all look like this. Run rm on the resolved paths directly"
+    ),
+    "pipe_into": "a download piped into `{name}`",
+    "pipe_substituted": "`{name}` run on a download substituted into its command line",
+    "pipe_substituted_c": "`{name} -c` run on a download substituted into its command line",
+    "pipe_eval": "`eval` of a download",
+    "pipe_source": "`{name}` of a download",
+    # A git checkout or a worktree the session does not own.
+    "wt_checkout_home": (
+        "{guard}: `checkout`/`switch` in $HOME switches the branch every shell and session on "
+        "this machine sees until someone checks the old branch back out. Use a worktree "
+        "instead:\n  {prog} worktree add -b <branch> <path> main\nthen cd into it and work there."
+    ),
+    "wt_git_missing_checkout": (
+        "{guard}: git is missing, so a checkout/switch can't be checked against $HOME. This is a "
+        "gate and fails closed."
+    ),
+    "wt_home_unresolved_checkout": (
+        "{guard}: $HOME does not resolve, so a git checkout/switch can't be checked against it."
+    ),
+    "wt_repo_unclear": (
+        "{guard}: can't tell which repository or work tree this git checkout/switch runs against "
+        "(a --git-dir or --work-tree that doesn't resolve), so it can't be checked against "
+        "$HOME. Use an absolute path."
+    ),
+    "wt_dir_unclear": (
+        "{guard}: can't tell which directory this git checkout/switch runs in (a cd, -C or "
+        "session cwd that doesn't resolve), so it can't be checked against $HOME. Use an "
+        "absolute path with git -C."
+    ),
+    "wt_foreign": (
+        "{guard}: `{word}` is inside {ft}, a git worktree this session does not own. A hand-off "
+        "carries a branch, an issue and a PR -- never a directory; another session may still be "
+        "running in there, and it may be archived out from under you mid-turn (an agent once "
+        "lost a worktree that way).\nTo read that branch, stay here: `git log/diff/show "
+        "<branch>`, `git show <branch>:<path>` -- worktrees of a repo share objects and refs.\nTo "
+        "work on it, take your own worktree, one command, from anywhere: `{recipe}`, then `git "
+        "merge --ff-only {branch}` inside it. If --ff-only fails, the histories have diverged: "
+        "report that and stop.\nIf you made this worktree yourself in an earlier call, that is "
+        "why: a worktree is yours only when the command that creates it also `cd`s into it, or "
+        "it lives under your scratchpad. The recipe above does both.\nWorktree hygiene is the "
+        "user's call, not a session's."
+    ),
+    "wt_dotdot_missing": (
+        "{guard}: `{raw}` has a `..` after a directory that does not exist, so where it lands "
+        "cannot be resolved. Spell the path without `..`."
+    ),
+    "wt_git_missing_owner": (
+        "{guard}: git is missing, so worktree ownership cannot be checked. This is a gate and "
+        "fails closed."
+    ),
+    "wt_home_unresolved_owner": (
+        "{guard}: $HOME does not resolve, so worktree ownership cannot be checked. This is a "
+        "gate and fails closed."
+    ),
+    "wt_enter_existing": (
+        "{guard}: EnterWorktree(path=...) enters a worktree that already exists, with no check "
+        "on whose it is -- the tool only requires that the path appear in `git worktree list`. "
+        "That is how an agent once lost a worktree mid-turn: the session that owned it was "
+        "archived and the directory went away underneath the session that had attached to "
+        "it.\nTake your own instead, one command, from anywhere: `{recipe}`, then `git merge "
+        "--ff-only <branch>` inside it to bring the branch you are resuming into your own "
+        "directory. If --ff-only fails, the histories have diverged: report that and "
+        "stop.\nNothing needs the other directory -- worktrees of a repo share objects and refs, "
+        "so `git log/diff/show <branch>` and `git show <branch>:<path>` read it from here."
+    ),
     # A label that waives a CI gate.
     "bypass_label": (
         "{guard}: the label `{label}` is a human's to apply, not a session's: it waives a CI gate, "

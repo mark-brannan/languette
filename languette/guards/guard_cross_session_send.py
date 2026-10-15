@@ -34,6 +34,7 @@ import os
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Act, Need, ask, deny
 
 NAME = "guard-cross-session-send"
@@ -270,5 +271,4 @@ def check(doc):
 
 
 def _ask_reason(target, ti):
-    return (f"{NAME}: a message to {target}, which may be another of the user's sessions, "
-            f"leaves this one: {_first_line(ti.get('message'))}")
+    return say("cross_session_ask", guard=NAME, target=target, first_line=_first_line(ti.get("message")))
