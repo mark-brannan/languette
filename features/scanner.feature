@@ -35,7 +35,7 @@ Feature: scanner
       | x=$(git add -A)                   | ["w:x=$", ";", "w:git", "w:add", "w:-A", ";"]                               | parentheses are separators, so a command substitution is scanned as commands     |
       | x=`git push -f origin foo`        | ["w:x=", ";", "w:git", "w:push", "w:-f", "w:origin", "w:foo", ";"]          | backticks are separators                                                         |
       | git push origin --delete "$b"     | ["w:git", "w:push", "w:origin", "w:--delete", "w:$b"]                       | a variable ref stays an unresolvable word                                        |
-      | echo $'\ud800'                    | ["w:echo", "w:\\ud800"]                                                     | a lone surrogate stays as written, so no later encode can raise                  |
+      | echo $'\ud800'                    | ["w:echo", "w:\\\\ud800"]                                                   | a lone surrogate stays as written, so no later encode can raise                  |
 
   Scenario: a line continuation is nothing
     When the scanner reads:
