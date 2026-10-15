@@ -92,6 +92,6 @@ class Document:
         return [body for body, _ in self._heredocs(text)[1]]
 
     def texts(self, prose=sw.PROSE, text=None):
-        """scan.texts_of `text`, the command when None, heredocs stripped: [(text, nested)]."""
-        stripped = self.stripped(text)
-        return self._kept(("texts", stripped, prose), lambda: tuple(sw.texts_of(stripped, prose, read=self.scan)))
+        """scan.texts_of_command `text`, the command when None: [(text, nested)]."""
+        src = _source(self._text if text is None else text)
+        return self._kept(("texts", src, prose), lambda: tuple(sw.texts_of_command(src, prose, read=self.scan)))

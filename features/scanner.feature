@@ -89,6 +89,15 @@ Feature: scanner
       """
     Then its texts are ["0:cat  HEREDOC \n"]
 
+  Scenario: a heredoc fed to a shell is executed text, queued after the command
+    When the scanner reads:
+      """
+      ssh host 'bash -s' <<'EOF'
+      rm -rf x
+      EOF
+      """
+    Then its texts are ["0:ssh host 'bash -s'  HEREDOC \n", "1:bash -s", "1:rm -rf x"]
+
   Scenario: an unquoted heredoc keeps its command substitutions, one per line
     When the scanner reads:
       """

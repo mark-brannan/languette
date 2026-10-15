@@ -1098,7 +1098,7 @@ def scanned(ctx, mode):
         s = scan.Scan(ctx.scanned)
         assert s.rung == IN_PROCESS[ctx.engine][0], f"the {s.rung} rung read it"
         return s.tokens()
-    return [("1:" if nested else "0:") + t for t, nested in scan.texts_of(scan.strip_heredocs(ctx.scanned + "\n"))]
+    return [("1:" if nested else "0:") + t for t, nested in scan.texts_of_command(ctx.scanned + "\n")]
 
 
 # --- Then ----------------------------------------------------------------
