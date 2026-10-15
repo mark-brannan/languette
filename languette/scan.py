@@ -984,6 +984,44 @@ def texts_of(text, prose=PROSE, read=None):
     return out
 
 
+def _is_shell(word):
+    return word.rsplit("/", 1)[-1] in SHELL
+
+
+def shell_heredocs(text, scan=None):
+    """[body] of the heredocs in `text` that a shell reads: the HEREDOC marker's
+    segment, or one piped on from it, holds a shell word (sh, bash -s), or is
+    an ssh whose quoted remote command holds one ('sudo bash -s'). Heredocs
+    fed to anything else are data and stay dropped."""
+    docs = _heredocs(text)[1]
+    # a literal word HEREDOC in the command must not pass for a marker
+    s = (scan or Scan)(_heredocs(re.sub(r"\bHEREDOC\b", "HEREDOC_", text))[0])
+    out, k = [], 0
+    for a, b in s.segments():
+        e = b
+        while e + 1 in s.pipes:
+            e = next(y for x, y in s.segments() if x == e + 2)
+        ssh = any(s.k[i] == "w" and s.w[i] == "ssh" for i in range(a, e + 1))
+        shell = any((s.k[i] == "w" and _is_shell(s.w[i])) or (ssh and s.k[i] == "q" and any(map(_is_shell, re.split(r"[\s;&|()]+", s.q[i]))))
+                    for i in range(a, e + 1))
+        for j in range(a, b + 1):
+            if s.k[j] == "w" and s.w[j] == "HEREDOC":
+                if shell and k < len(docs):
+                    out.append(docs[k][0])
+                k += 1
+    return out
+
+
+def texts_of_command(text, prose=PROSE, read=None):
+    """texts_of `text` with its heredocs stripped, then each heredoc body a
+    shell reads queued as nested text, by the same rule (a heredoc inside it
+    that a shell reads is queued too)."""
+    out = texts_of(strip_heredocs(text), prose, read)
+    for body in shell_heredocs(text, read):
+        out += [(t, True) for t, _ in texts_of_command(body, prose, read)]
+    return out
+
+
 def cmd_index(s, a, b, cmd, nested, parents=None, prose=PROSE):
     """Index in a..b of the word that is the command `cmd` (a compiled regex)
     describes, or None. Top level: any word counts unless the word before it
