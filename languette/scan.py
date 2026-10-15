@@ -66,7 +66,8 @@ def ansi_c(body):
             return chr(ord(ctl) & 0x1f)
         n = int(octal, 8) & 0xff if octal else int(hexa or u4 or u8, 16)
         try:
-            return chr(n)
+            # A lone surrogate is not text: bash emits bytes no encoder takes.
+            return chr(n) if not 0xd800 <= n <= 0xdfff else m.group(0)
         except (ValueError, OverflowError):
             return m.group(0)
     return _ANSI_C.sub(one, body).split("\0", 1)[0]
