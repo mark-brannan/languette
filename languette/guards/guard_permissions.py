@@ -14,6 +14,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Refuse, deny
 
 NAME = "guard-permissions"
@@ -177,8 +178,7 @@ def _verdict(targets, home, physical, extra_roots=()):
                         f"in LANGUETTE_PERM_ALLOW may be swept, and {abs_} is none of those. {_WAY_OUT}")
         phys = physical(abs_)
         if phys != abs_ and not paths.under(phys, roots):
-            return deny(f"`{what} {raw}` is blocked: {abs_} resolves through a symlink to {phys}, which is not "
-                        f"the scratchpad, /tmp or an agent worktree. {_WAY_OUT}")
+            return deny(say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys, way_out=_WAY_OUT))
     return None
 
 

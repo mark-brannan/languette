@@ -46,6 +46,7 @@ import re
 
 from languette import scan as sw
 from languette.guards.ask_first import LAUNCH, PROSE, claim, segments
+from languette.messages import say
 from languette.verdict import deny
 
 NAME = "guard-infra"
@@ -310,14 +311,13 @@ def check(doc):
     if not found:
         return None
     if loop:
-        return deny("guard-infra: " + ", ".join(f"`{r}`" for r in found) + " inside a loop, xargs, "
-                    "parallel or watch runs an unknown number of times, and each run needs its own "
-                    "approval. Run it once, on its own, after looking at what it would remove.")
+        return deny(say("loop", guard="guard-infra", what=", ".join(f"`{r}`" for r in found),
+                        then="Run it once, on its own, after looking at what it would remove."))
     try:
         approved, spent = yield from claim({RULES[r][0]: len(found[r]) for r in found})
     except (OSError, ValueError) as e:
-        return deny(f"guard-infra: cannot read the session transcript to look for the user's approval, or "
-                    f"record it as spent ({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
+        return deny(say("transcript_unreadable", guard="guard-infra", err=e, cmd=cmd.strip(),
+                        then="Ask the user to run it themselves."))
     if spent:
         return None
     parts = []

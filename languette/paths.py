@@ -8,6 +8,7 @@ import os
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Need, Refuse, context, deny, planned
 
 
@@ -161,7 +162,7 @@ def parse_targets(doc, name, judge, allow_var):
     cwd = payload["cwd"]
     home = env.get("HOME", "")
     if not home.startswith("/"):
-        out["found"] = deny(f"{name}: $HOME is not an absolute path, cannot resolve targets")
+        out["found"] = deny(say("home_not_absolute", guard=name))
         return out
     walker = judge(cwd, home)
     try:

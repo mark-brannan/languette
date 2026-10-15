@@ -12,6 +12,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Need, Refuse, deny, planned
 
 NAME = "guard-disks"
@@ -199,7 +200,7 @@ def parse(doc):
     cwd = payload["cwd"]
     home = env.get("HOME", "")
     if not home.startswith("/"):
-        return deny("guard-disks: $HOME is not an absolute path, cannot resolve targets"), None, []
+        return deny(say("home_not_absolute", guard="guard-disks")), None, []
 
     judge = _Judge(cwd, home)
     try:
@@ -228,8 +229,8 @@ def judge(parsed, answers):
             return deny(f"guard-disks: `{what} {raw}` is blocked: {abs_} is {kind}. {_WAY_OUT}")
         phys = physical(abs_)
         if phys != abs_ and not paths.under(phys, roots):
-            return deny(f"guard-disks: `{what} {raw}` is blocked: {abs_} resolves through a symlink to {phys}, "
-                        f"which is not the scratchpad, /tmp or an agent worktree. {_WAY_OUT}")
+            return deny("guard-disks: " + say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys,
+                                              way_out=_WAY_OUT))
     return None
 
 
