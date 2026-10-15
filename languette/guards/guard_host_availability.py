@@ -14,6 +14,7 @@ import os
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import WAY_USER, judged
 
 NAME = "guard-host-availability"
@@ -130,23 +131,20 @@ def judge(doc):
         for a, b in segs:
             what = _power(s, a, b)
             if what:
-                return f"`{what}` is blocked: it takes the machine down, with the user's session on it. {WAY_USER}"
+                return say("host_power", what=what, way_user=WAY_USER)
         for a, b in segs:
             verb = service_stop(s, a, b, _core_unit)
             if verb:
-                return (f"`systemctl {verb}` is blocked: it takes down the host or a service the "
-                        f"user's session runs on. {WAY_USER}")
+                return say("host_ctl", verb=verb, way_user=WAY_USER)
         for a, b in segs:
             verb = sysv_stop(s, a, b)
             if verb:
-                return (f"`{verb}` is blocked: it takes down a service the "
-                        f"user's session runs on. {WAY_USER}")
+                return say("host_sysv", verb=verb, way_user=WAY_USER)
         # The fork bomb is raw text, so a commit message that quotes it must not trip it:
         # only a text with a segment that is not led by a prose consumer is read.
         if any(sw.seg_cmd(s, a, b) is None or s.w[sw.seg_cmd(s, a, b)] not in sw.PROSE or s.shellseg
                for a, b in segs) and _FORK.search(t):
-            return ("`:(){ :|:& };:` is blocked: that is the fork-bomb shape, a function that pipes itself into "
-                    f"itself in the background, and it freezes the machine. {WAY_USER}")
+            return say("host_fork_bomb", way_user=WAY_USER)
     return None
 
 

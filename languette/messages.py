@@ -216,6 +216,23 @@ MESSAGES = {
         "{guard}: this posts a GitHub comment under the user's login, so it must be signed as an agent's, "
         "or a reader takes it for the user's own words. Here {problems}. {shape}"
     ),
+    # A command the user runs, not an agent: the host, the crontab, a protected service.
+    "judged": "{guard}: {why}",
+    "cron_remove": "`crontab -r` is blocked: it deletes the whole crontab with no undo. {way_user}",
+    "host_power": "`{what}` is blocked: it takes the machine down, with the user's session on it. {way_user}",
+    "host_ctl": (
+        "`systemctl {verb}` is blocked: it takes down the host or a service the "
+        "user's session runs on. {way_user}"
+    ),
+    "host_sysv": "`{verb}` is blocked: it takes down a service the user's session runs on. {way_user}",
+    "host_fork_bomb": (
+        "`:(){{ :|:& }};:` is blocked: that is the fork-bomb shape, a function that pipes itself into "
+        "itself in the background, and it freezes the machine. {way_user}"
+    ),
+    "protected_stop": (
+        "`systemctl {verb}` is blocked: it stops a protected service, one the user's machine "
+        "depends on (the protected_services setting). {way_user}"
+    ),
 }
 
 
