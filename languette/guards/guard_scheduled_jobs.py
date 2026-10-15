@@ -7,6 +7,7 @@ position, behind a wrapper, and with r in a short-option cluster (`-ir`).
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import WAY_USER, judged
 
 NAME = "guard-scheduled-jobs"
@@ -22,7 +23,7 @@ def judge(doc):
             g = sw.cmd_index(s, a, b, _CRON, nested) if a <= b else None
             if g is not None and any(s.k[i] == "w" and re.fullmatch(r"-[A-Za-z]*r[A-Za-z]*", s.w[i])
                                      for i in range(g + 1, b + 1)):
-                return f"`crontab -r` is blocked: it deletes the whole crontab with no undo. {WAY_USER}"
+                return say("cron_remove", way_user=WAY_USER)
     return None
 
 
