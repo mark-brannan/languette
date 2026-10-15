@@ -476,9 +476,6 @@ Feature: big
       """
     Then the guard denies, naming "dd of=/dev/sda"
 
-  # A heredoc body fed to a shell (`bash -s`, `bash <<EOF`) is read only by
-  # guard-bypass-labels today; guard-pipe-to-shell never sees it (#214).
-  @planned
   Scenario: a real ssh health check, with a download piped to sh added to its bash -s heredoc, is denied
     When the agent runs:
       """

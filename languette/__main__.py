@@ -28,7 +28,7 @@ def scan_doc(text, command=None):
     from languette import scan
     rx = re.compile(command) if isinstance(command, str) else command
     segments = []
-    for t, nested in scan.texts_of(scan.strip_heredocs(text + "\n")):
+    for t, nested in scan.texts_of_command(text + "\n"):
         s = scan.Scan(t)
         for a, b in s.segments():
             if a > b:
