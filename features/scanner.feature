@@ -98,6 +98,26 @@ Feature: scanner
       """
     Then its texts are ["0:ssh host 'bash -s'  HEREDOC \n", "1:bash -s", "1:rm -rf x"]
 
+  Scenario: a heredoc inside a shell-fed heredoc is read by the same rule
+    When the scanner reads:
+      """
+      ssh host 'bash -s' <<'EOF'
+      bash <<'IN'
+      rm -rf x
+      IN
+      EOF
+      """
+    Then its texts are ["0:ssh host 'bash -s'  HEREDOC \n", "1:bash -s", "1:bash  HEREDOC \n", "1:rm -rf x"]
+
+  Scenario: an ssh remote command that holds a shell after another word still feeds it
+    When the scanner reads:
+      """
+      ssh host 'cd /srv && sudo bash -s' <<'EOF'
+      rm -rf x
+      EOF
+      """
+    Then its texts are ["0:ssh host 'cd /srv && sudo bash -s'  HEREDOC \n", "1:cd /srv && sudo bash -s", "1:rm -rf x"]
+
   Scenario: an unquoted heredoc keeps its command substitutions, one per line
     When the scanner reads:
       """
@@ -171,3 +191,21 @@ Feature: scanner
   Scenario: a \r is a byte in a word, not a line end, in both engines
     When the scanner reads the JSON string "echo a\r\nb"
     Then its tokens are ["w:echo", "w:a\r", ";", "w:b"]
+
+  Scenario: a literal word HEREDOC before a shell heredoc does not shift its body away
+    When the scanner reads:
+      """
+      echo HEREDOC; bash <<'EOF'
+      rm -rf x
+      EOF
+      """
+    Then its texts are ["0:echo HEREDOC; bash  HEREDOC \n", "1:rm -rf x"]
+
+  Scenario: a shell named by its path feeds its heredoc
+    When the scanner reads:
+      """
+      ssh host '/bin/bash -s' <<'EOF'
+      rm -rf x
+      EOF
+      """
+    Then its texts are ["0:ssh host '/bin/bash -s'  HEREDOC \n", "1:/bin/bash -s", "1:rm -rf x"]
