@@ -78,30 +78,29 @@ class _Judge:
     def target(self, s, idx):
         raw = t = s.w[idx]
         if s.k[idx] == "q":
-            self.blocked(raw, "a quoted string with whitespace in it is not one path this hook can resolve")
+            self.blocked(raw, say("rd_quoted_space"))
         if re.search(r"[*?\[{}]", t):
-            self.blocked(t, "a glob or brace expansion could name anything")
+            self.blocked(t, say("rd_glob"))
         if re.search(r"[$`]", t):
-            self.blocked(t, "a variable or command substitution could expand to anything")
+            self.blocked(t, say("rd_substitution"))
         if re.search(r"[\t\n\r]", t):
-            self.blocked(t, "it contains a tab or newline")
+            self.blocked(t, say("rd_tab_newline"))
         if t == ".." or re.search(r"(?:^|/)\.\.(?:/|\Z)", t):
-            self.blocked(t, "a `..` segment steps out of the directory the name suggests")
+            self.blocked(t, say("rd_dotdot"))
         if "~" in t:
             if t == "~":
                 t = self.home
             elif t.startswith("~/"):
                 t = self.home + t[1:]
             else:
-                self.blocked(t, "only a leading `~/` is understood")
+                self.blocked(t, say("rd_tilde"))
         if not t.startswith("/"):
             if self.moved:
-                self.blocked(t, "a `cd` earlier in this command moves the working directory and the hook "
-                                "cannot follow it; use an absolute path")
+                self.blocked(t, say("rd_cd_moved"))
             t = self.cwd + "/" + t
         t = paths.normalize(t)
         if t in ("/", self.homeN):
-            self.blocked(raw, "that is " + ("the root of the filesystem" if t == "/" else "$HOME itself"))
+            self.blocked(raw, (say("rd_root") if t == "/" else say("rd_home")))
         self.targets.append((t, self.trig, raw))
 
     def segment(self, s, a, b, nested):
@@ -109,7 +108,7 @@ class _Judge:
         if g is not None and "-delete" in s.w[g + 1:b + 1]:
             self.trig, starts = "find", paths.find_starts(s, g, b)
             if not starts:
-                self.blocked("", "with no start path find deletes under the working directory")
+                self.blocked("", say("rd_find_no_start"))
             for i in starts:
                 self.target(s, i)
             self.trig = "rm"
@@ -135,8 +134,7 @@ class _Judge:
         if not recursive:
             return
         if not tgt:
-            self.blocked("", "no target is visible to this hook -- find -exec, xargs, brace expansion and "
-                             "quoted lists all look like this. Run rm on the resolved paths directly")
+            self.blocked("", say("rd_no_target"))
         for i in tgt:
             self.target(s, i)
 

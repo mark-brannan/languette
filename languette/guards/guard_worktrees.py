@@ -40,6 +40,7 @@ import os
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Act, Need, Refuse, deny
 
 NAME = "guard-worktrees"
@@ -172,9 +173,7 @@ def _resolve_all(raw, bases, home):
 
 
 def _generic(prog):
-    return Refuse(f"{NAME}: `checkout`/`switch` in $HOME switches the branch every shell and session on this "
-                  f"machine sees until someone checks the old branch back out. Use a worktree instead:\n"
-                  f"  {prog} worktree add -b <branch> <path> main\nthen cd into it and work there.")
+    return Refuse(say("wt_checkout_home", guard=NAME, prog=prog))
 
 
 def _checkout_home(doc):
@@ -186,8 +185,7 @@ def _checkout_home(doc):
     if not events:
         return
     if not (yield Need("which", "git")):
-        raise Refuse(f"{NAME}: git is missing, so a checkout/switch can't be checked against $HOME. This is a gate "
-                     "and fails closed.")
+        raise Refuse(say("wt_git_missing_checkout", guard=NAME))
     home = (yield from _canon(env.get("HOME") or "")) or ""
     pcwd = payload.get("cwd")
     cwd = (yield from _canon(pcwd)) if isinstance(pcwd, str) and pcwd else None
@@ -228,7 +226,7 @@ def _checkout_home(doc):
                     lost = True
         else:
             if not home:
-                raise Refuse(f"{NAME}: $HOME does not resolve, so a git checkout/switch can't be checked against it.")
+                raise Refuse(say("wt_home_unresolved_checkout", guard=NAME))
             bases, blind, pinned, unpinned = cands, lost, False, False
             for tk, tv in env_targets + ev[1]:
                 if tk == "C":
@@ -244,16 +242,12 @@ def _checkout_home(doc):
                     if (tk == "GITDIR" and (yield from gitdir_is_home(r))) or (tk == "WORKTREE" and r == home):
                         raise _generic("git")
             if unpinned:
-                raise Refuse(f"{NAME}: can't tell which repository or work tree this git checkout/switch runs "
-                             "against (a --git-dir or --work-tree that doesn't resolve), so it can't be checked "
-                             "against $HOME. Use an absolute path.")
+                raise Refuse(say("wt_repo_unclear", guard=NAME))
             # -C, --git-dir or --work-tree pin where the command resolves.
             if pinned:
                 continue
             if blind:
-                raise Refuse(f"{NAME}: can't tell which directory this git checkout/switch runs in (a cd, -C or "
-                             "session cwd that doesn't resolve), so it can't be checked against $HOME. Use an "
-                             "absolute path with git -C.")
+                raise Refuse(say("wt_dir_unclear", guard=NAME))
             for d in bases:
                 if (yield from targets_home(d)):
                     raise _generic("git")
@@ -363,18 +357,8 @@ def _recipe(sess, d):
 
 def _deny_path(sess, env, word, ft):
     branch = yield from _git("/", "-C", ft, "symbolic-ref", "-q", "--short", "HEAD")
-    head = f"{NAME}: `{word}` is inside {ft}, a git worktree this session does not own."
     recipe = yield from _recipe(sess, ft)
-    raise Refuse(f"{head} A hand-off carries a branch, an issue and a PR -- never a directory; another session may "
-                 "still be running in there, and it may be archived out from under you mid-turn (an agent once lost "
-                 "a worktree that way).\nTo read that branch, stay here: `git log/diff/show <branch>`, "
-                 "`git show <branch>:<path>` -- worktrees of a repo share objects and refs.\n"
-                 f"To work on it, take your own worktree, one command, from anywhere: `{recipe}`, then "
-                 f"`git merge --ff-only {branch or '<branch>'}` inside it. If --ff-only fails, the histories have "
-                 "diverged: report that and stop.\nIf you made this worktree yourself in an earlier call, that is "
-                 "why: a worktree is yours only when the command that creates it also `cd`s into it, or it lives "
-                 "under your scratchpad. The recipe above does both.\nWorktree hygiene is the user's call, not a "
-                 "session's.")
+    raise Refuse(say("wt_foreign", guard=NAME, word=word, ft=ft, recipe=recipe, branch=branch or "<branch>"))
 
 
 def _resolve_dir(raw, base, home):
@@ -402,8 +386,7 @@ def _resolve_dir(raw, base, home):
     if not (yield Need("path", "isdir", r)):
         return "", ""
     if "/../" in f"/{rest}/":
-        raise Refuse(f"{NAME}: `{raw}` has a `..` after a directory that does not exist, so where it lands cannot "
-                     "be resolved. Spell the path without `..`.")
+        raise Refuse(say("wt_dotdot_missing", guard=NAME, raw=raw))
     return (yield Need("path", "realpath", r)), rest
 
 
@@ -412,14 +395,12 @@ def _foreign(doc):
     # git is what every foreignness answer is asked of: without it, every path
     # would read as nobody's worktree.
     if not (yield Need("which", "git")):
-        raise Refuse(f"{NAME}: git is missing, so worktree ownership cannot be checked. This is a gate and fails "
-                     "closed.")
+        raise Refuse(say("wt_git_missing_owner", guard=NAME))
     tool = payload.get("tool_name")
     pcwd = payload["cwd"]
     home = yield from _canon(env.get("HOME") or "")
     if not home:
-        raise Refuse(f"{NAME}: $HOME does not resolve, so worktree ownership cannot be checked. This is a gate "
-                     "and fails closed.")
+        raise Refuse(say("wt_home_unresolved_owner", guard=NAME))
     own_top = (yield from _git("/", "-C", pcwd, "rev-parse", "--show-toplevel")) or ""
     sess = _Session(payload, env, own_top, home)
     yield from sess.arrive(bool(own_top) and (yield Need("path", "isfile", os.path.join(own_top, ".git"))))
@@ -431,14 +412,7 @@ def _foreign(doc):
             yield from sess.leave("enter")
             return
         recipe = yield from _recipe(sess, p)
-        raise Refuse(f"{NAME}: EnterWorktree(path=...) enters a worktree that already exists, with no check on whose "
-                     "it is -- the tool only requires that the path appear in `git worktree list`. That is how an "
-                     "agent once lost a worktree mid-turn: the session that owned it was archived and the directory "
-                     "went away underneath the session that had attached to it.\nTake your own instead, one command, "
-                     f"from anywhere: `{recipe}`, then `git merge --ff-only <branch>` inside it to bring the branch "
-                     "you are resuming into your own directory. If --ff-only fails, the histories have diverged: "
-                     "report that and stop.\nNothing needs the other directory -- worktrees of a repo share objects "
-                     "and refs, so `git log/diff/show <branch>` and `git show <branch>:<path>` read it from here.")
+        raise Refuse(say("wt_enter_existing", guard=NAME, recipe=recipe))
 
     def foreign_top(d):
         t = yield from _git("/", "-C", d, "rev-parse", "--show-toplevel")
