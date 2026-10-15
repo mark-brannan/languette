@@ -36,15 +36,14 @@ except ImportError:                          # pragma: no cover -- 3.10 and befo
     import sre_parse as _sre
 
 from languette import paths, secrets
+from languette.messages import say
 from languette.verdict import Refuse, ask, deny
 
 NAME = "guard-secrets"
 CONFIG = ".languette/secrets.json"
 MAX_REGEX = 512
 
-_WAY_OUT = ("Keep the value out of the command: read it from the environment (`\"$TOKEN\"`), a file "
-            "(`--password-file`, `gh auth login --with-token < file`) or the tool's own credential store, so the "
-            "secret is not in the transcript or in what the command writes.")
+_WAY_OUT = say("secrets_way_out")
 
 
 def _nested_repeat(pattern):
@@ -141,8 +140,7 @@ def check(doc):
     try:
         extra = yield from project_rules(payload, env)
     except Refuse as e:
-        return deny(f"guard-secrets: {CONFIG} is {e}, so the project's secret patterns cannot be read. "
-                    f"Fix the file; until then every Bash command is denied.")
+        return deny(say("secrets_config", config=CONFIG, err=e))
     desc = {r.id: r.description for r in tuple(secrets.secret_rules.RULES) + tuple(extra)}
     shapes, contexts = [], []
     for s in _scans(doc):
@@ -150,10 +148,8 @@ def check(doc):
             item = f"`{secrets.shown(s, f)}` ({desc.get(f.rule, f.rule.replace('context:', 'named by '))})"
             (shapes if f.how == "shape" else contexts).append(item)
     if shapes:
-        return deny(f"guard-secrets: the command holds what looks like a credential: {', '.join(shapes)}. "
-                    f"A secret pasted into a command is in the transcript and in anything it writes or posts. {_WAY_OUT}")
+        return deny(say("secrets_shape", found=", ".join(shapes), way_out=_WAY_OUT))
     if contexts:
-        return ask(f"guard-secrets: a value here is named as a credential: {', '.join(contexts)}. "
-                   f"If it is a real secret, say no and keep it out of the command. {_WAY_OUT}")
+        return ask(say("secrets_context", found=", ".join(contexts), way_out=_WAY_OUT))
     return None
 

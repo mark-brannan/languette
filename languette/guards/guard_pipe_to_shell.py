@@ -12,6 +12,7 @@ import os
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import deny
 
 NAME = "guard-pipe-to-shell"
@@ -26,9 +27,7 @@ _NODE_SCRIPT = ("-e", "--eval", "-p", "--print", "-pe", "-ep", "-c", "--check")
 _VALUE_OPTS = {"sh": ("-o", "-O", "+o", "+O", "--rcfile", "--init-file"), "python": ("-W", "-X"),
                "perl": ("-I",), "ruby": ("-I", "-r"), "node": ("-r", "--require", "--import", "--loader")}
 
-_WAY_OUT = ("Download it to a file, read it, then run the file: `curl -fsSLo install.sh <url>`, read "
-            "install.sh, `sh install.sh`. The same install, one more command, and the script has been "
-            "seen before it ran.")
+_WAY_OUT = say("pipe_to_shell_way_out")
 
 
 def _family(path):
@@ -121,5 +120,5 @@ def check(doc):
     for text, nested in doc.texts():
         why = _judge(doc, doc.scan(text), nested)
         if why:
-            return deny(f"guard-pipe-to-shell: {why} runs whatever the server sends, unread. {_WAY_OUT}")
+            return deny(say("pipe_to_shell", why=why, way_out=_WAY_OUT))
     return None

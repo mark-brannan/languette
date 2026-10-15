@@ -32,6 +32,7 @@ import re
 from languette import scan as sw
 from languette.guards.guard_bypass_labels import MAX_READ
 from languette.guards.guard_private_terms import writes
+from languette.messages import say
 from languette.verdict import Need, deny
 
 NAME = "guard-signed-comments"
@@ -278,8 +279,7 @@ def check(doc):
         sig = re.compile(pattern.replace("{session}", hexid or _ANY_HEX))
         loose = re.compile(pattern.replace("{session}", _ANY_HEX))
     except re.error as e:
-        return deny(f"{NAME}: the signed_comments_signature setting `{pattern}` is not a regular expression "
-                    f"({e}), so no comment's signature can be checked. Fix the setting, or empty it for the default.")
+        return deny(say("signature_not_regex", guard=NAME, pattern=pattern, err=e))
     if first == FIRST and pattern == SIGNED:
         example = _EXAMPLE.format(hex=hexid or "<first 8 hex of the session id>")
         signed = f"A signed body:\n\n{example}"
@@ -311,8 +311,7 @@ def check(doc):
         if kind == "doc":
             return r.docs[src[1]]
         if kind == "opaque":
-            raise _Unread(f"{src[1]}, so its signature cannot be checked before it is posted. Write it literally, "
-                          "in a heredoc in the same command, or in a file and pass --body-file <path>.")
+            raise _Unread(say("signature_opaque_body", what=src[1]))
         if kind == "json":
             return (yield from text(src[1]))
         p = src[1]
@@ -334,9 +333,7 @@ def check(doc):
             if files[f] is None:
                 why = f"{p} cannot be read"
         if why:
-            raise _Unread(f"the body file {why}, so its signature cannot be checked before it is posted. Spell "
-                          "out the path, or write the file from a heredoc in this same command (cat > PATH <<'EOF' "
-                          "... EOF), or put the body in a heredoc and pass --body-file -.")
+            raise _Unread(say("signature_body_file", why=why))
         return files[f]
 
     def bodies(src):
@@ -346,8 +343,7 @@ def check(doc):
             try:
                 return _json_bodies(json.loads(raw))
             except ValueError:
-                raise _Unread("the --input payload is not JSON this hook can read, so its signature cannot be "
-                              "checked. Write the JSON literally in a heredoc fed to --input -.") from None
+                raise _Unread(say("signature_input_not_json")) from None
         if src[0] != "graphql":
             return [(yield from text(src))]
         _, qsrc, fields, inp = src
@@ -359,8 +355,7 @@ def check(doc):
             except ValueError:
                 obj = None
             if not isinstance(obj, dict):
-                raise _Unread("the --input payload is not JSON this hook can read, so its signature cannot be "
-                              "checked. Write the JSON literally in a heredoc fed to --input -.")
+                raise _Unread(say("signature_input_not_json"))
             query = obj.get("query") if qsrc is None else None
             variables = obj.get("variables") if isinstance(obj.get("variables"), dict) else {}
         if qsrc is not None:
@@ -381,8 +376,7 @@ def check(doc):
             if not rest.startswith("$"):
                 s = _graphql_string(rest)
                 if s is None:
-                    raise _Unread("the graphql body is not a string literal this hook can read, so its signature "
-                                  "cannot be checked. Pass it as a variable (-f body=..., or from a heredoc).")
+                    raise _Unread(say("signature_graphql_not_literal"))
                 out.append(s)
                 continue
             name = re.match(r"\$([A-Za-z_][A-Za-z0-9_]*)", rest)
@@ -393,9 +387,7 @@ def check(doc):
             elif name in fields and m.group(1) == "body":
                 out.append((yield from text(fields[name])))
             else:
-                raise _Unread(f"the graphql {m.group(1)} comes from ${name}, which this hook cannot read, so its "
-                              "signature cannot be checked. Pass the body as its own variable, -f body=... or "
-                              "from a heredoc in the same command.")
+                raise _Unread(say("signature_graphql_variable", field=m.group(1), name=name))
         return out
 
     problems = []
@@ -404,7 +396,7 @@ def check(doc):
             try:
                 got = yield from bodies(src)
             except _Unread as e:
-                return deny(f"{NAME}: {e}\n\n{signed}")
+                return deny(say("signature_unread", guard=NAME, why=e, signed=signed))
             for body in got:
                 if not body.strip():
                     continue           # nothing posted as text: gh refuses it, or a review posts no comment
@@ -420,5 +412,4 @@ def check(doc):
                     problems.append(f"the last line is not the signature: `{_short(last)}`")
     if not problems:
         return None
-    return deny(f"{NAME}: this posts a GitHub comment under the user's login, so it must be signed as an agent's, "
-                f"or a reader takes it for the user's own words. Here {'; '.join(problems)}. {shape}")
+    return deny(say("signature_wrong", guard=NAME, problems="; ".join(problems), shape=shape))

@@ -39,6 +39,7 @@ import os
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Need, Refuse, deny, planned
 
 NAME = "guard-bypass-labels"
@@ -466,14 +467,9 @@ def judge(parsed, answers):
     bad = bypass_labels(env)
     hit = next((x.casefold() for x in f.labels if x.casefold() in bad), None)
     if hit:
-        return deny(f"{NAME}: the label `{hit}` is a human's to apply, not a session's: it waives a CI gate, "
-                    "and a gate whose bypass the gated party can apply is not a gate. Split the change "
-                    "instead, or say in the PR body why it needs the waiver and leave the label for the "
-                    "user to add by hand.")
+        return deny(say("bypass_label", guard=NAME, label=hit))
     if f.unseen:
-        return deny(f"{NAME}: {f.unseen[0]}, so the guard cannot tell whether it applies a bypass label "
-                    f"({', '.join(bad)}). Write the label literally in the command, or leave it for the "
-                    "user to add.")
+        return deny(say("bypass_label_unseen", guard=NAME, unseen=f.unseen[0], labels=", ".join(bad)))
     return None
 
 
