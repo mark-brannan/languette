@@ -515,8 +515,6 @@ Feature: big
       """
     Then the guard denies, naming "a download piped into `sh`"
 
-  # The scanner reads $'git ...' as the word $git (#212).
-  @planned
   Scenario: a push skipping its hooks, written in $'..' quoting inside sh -c in a pipeline, is denied
     When the agent runs:
       """

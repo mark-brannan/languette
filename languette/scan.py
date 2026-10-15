@@ -49,6 +49,29 @@ NESTED_CAP = 64
 _CASE = re.compile(r"(?<![A-Za-z0-9_])case(?![A-Za-z0-9_])")
 
 
+_ANSI_C = re.compile(r"\\(?:([abeEfnrtv\\'\"?])|([0-7]{1,3})|x([0-9A-Fa-f]{1,2})|u([0-9A-Fa-f]{1,4})"
+                     r"|U([0-9A-Fa-f]{1,8})|c(.))", re.S)
+_ANSI_C_CHARS = {"a": "\a", "b": "\b", "e": "\x1b", "E": "\x1b", "f": "\f", "n": "\n", "r": "\r",
+                 "t": "\t", "v": "\v"}
+
+
+def ansi_c(body):
+    r"""The text of $'body': the escapes bash decodes (\n, \', octal, \xHH, \u,
+    \cX ...); an unknown one stays as written. Bash stops at a NUL."""
+    def one(m):
+        simple, octal, hexa, u4, u8, ctl = m.groups()
+        if simple:
+            return _ANSI_C_CHARS.get(simple, simple)
+        if ctl:
+            return chr(ord(ctl) & 0x1f)
+        n = int(octal, 8) & 0xff if octal else int(hexa or u4 or u8, 16)
+        try:
+            return chr(n)
+        except (ValueError, OverflowError):
+            return m.group(0)
+    return _ANSI_C.sub(one, body).split("\0", 1)[0]
+
+
 def _sub_end(s, j):
     """Index just past the `)` closing a `$(` whose text starts at j, or len(s)
     when none does or the walk cannot be sure: a quote, backtick, backslash,
@@ -682,7 +705,13 @@ class Scan:
             if t == "Lit":
                 self._lex(dec(s, e))
             elif t in ("SglQuoted", "DblQuoted"):
-                if p.get("Dollar"):                # $'...' and $"..."
+                dollar = p.get("Dollar")
+                if dollar and t == "SglQuoted":    # $'...': ANSI-C quoting, decoded
+                    self._quoted = self._have = True
+                    self._cur += ansi_c(dec(s + 2, e - 1))
+                    at = e
+                    continue
+                if dollar:                         # $"..."
                     self._cur += "$"; self._livecur = True; s += 1
                 self._quoted = self._have = True
                 if t == "SglQuoted":
@@ -814,6 +843,14 @@ class Scan:
                     self._cur += b[i + 1:]
                     break
                 self._cur += b[i + 1:e]
+                i = e + 1
+                continue
+            if c == "$" and at(i + 1) == "'":      # $'...': ANSI-C quoting, to the next unescaped '
+                self._quoted = self._have = True
+                e = i + 2
+                while e < L and b[e] != "'":
+                    e += 2 if b[e] == "\\" else 1
+                self._cur += ansi_c(b[i + 2:e])
                 i = e + 1
                 continue
             if c == '"':                           # to the next unescaped "

@@ -113,7 +113,7 @@ Feature: guard-bypass-ruleset
       | B=claude/x git push origin HEAD:$B                       | asks                                      | a prefix set, read before it applies  |
       | B=claude/x; eval "$c"; git push origin HEAD:$B           | asks                                      | eval may set it again                 |
       | B=claude/x; git push origin HEAD:$B$C                    | asks                                      | a second run-time part                |
-      | B=claude/x; git push origin HEAD:$'B'                    | asks                                      | ANSI quoting, not a variable          |
+      | B=claude/x; git push origin HEAD:$'B'                    | is silent                                 | ANSI quoting: the literal B, not a variable |
       | B=--all; git push origin $B                              | asks                                      | an option, not a refspec              |
       | B=--mirror && git push origin $B                         | asks                                      | the same, --mirror                    |
       | B=claude/x:main; git push origin $B                      | denies, naming "requires a pull request"  | a whole refspec, landing on main      |
