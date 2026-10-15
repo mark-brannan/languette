@@ -98,17 +98,17 @@ def _judge(doc, s, nested):
         if g is not None:
             name = os.path.basename(s.w[g])
             if carried and _reads_stdin(s, g, b):
-                return f"a download piped into `{name}`"
+                return say("pipe_into", name=name)
             given, ops = _program(s, g, b)
             if fed and (given or not ops):
-                return f"`{name}` run on a download substituted into its command line"
+                return say("pipe_substituted", name=name)
             if given and any(s.k[i] == "q" and _text_downloads(doc, s.q[i]) for i in range(g + 1, b + 1)):
-                return f"`{name} -c` run on a download substituted into its command line"
+                return say("pipe_substituted_c", name=name)
         if c is not None and s.w[c] == "eval":
             if fed or any(s.k[i] == "q" and _text_downloads(doc, s.q[i]) for i in range(c + 1, b + 1)):
-                return "`eval` of a download"
+                return say("pipe_eval")
         if c is not None and s.w[c] in ("source", ".") and fed and len(s.w[c + 1:b + 1]) == 0:
-            return f"`{s.w[c]}` of a download"
+            return say("pipe_source", name=s.w[c])
         if _has_dl(s, a, b, nested):
             carried = True
     return None
