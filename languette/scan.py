@@ -1241,6 +1241,8 @@ def service_stop(s, a, b, hit, host_verbs=_CTL_HOST):
 # byte to stdout that could become labels, so a redirect on one only
 # truncates the file (pushd and popd print the directory stack).
 INERT = frozenset("cd true :".split())
+
+
 def alone(scans, cmd):
     """One segment is the command `cmd`, and every other is a shell running
     quoted text the scan already holds (not built at run time) or a command
