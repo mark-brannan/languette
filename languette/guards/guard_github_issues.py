@@ -16,7 +16,7 @@ when the call names one, with its repo when the call does too ("File this
 issue", "Delete issue o/r#7", "Delete issue 7"). A yes
 to file opens no delete, and a yes to delete issue 7 opens no other. Each yes
 allows one write and is spent the way ask-first spends one
-(languette.guards.ask_first.claim), so several in a row take one question
+(languette.verdict.claim), so several in a row take one question
 each.
 
 Counts as an identifier write: `gh issue create|new|transfer|delete`; `gh api`
@@ -30,8 +30,7 @@ so the two never spend each other's (languette.world.DOOR).
 import re
 
 from languette import scan as sw
-from languette.guards.ask_first import claim
-from languette.verdict import Act, Need, deny
+from languette.verdict import Act, Need, claim, deny
 
 NAME = "guard-github-issues"
 # The tools hooks.json wires this guard to; the MCP ones by their name's tail.
