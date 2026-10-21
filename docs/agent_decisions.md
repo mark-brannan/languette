@@ -377,3 +377,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261014t054748z
 - full sweep: a red nightly run is seen through GitHub's failure email only, no issue is opened Undo: an issue-on-failure step in .github/workflows/full-sweep.yml ([#213](https://github.com/mark-brannan/languette/pull/213))
+
+### 20261021t095434z
+- scan names ask-first's widened prose set PROSE_PROCESS Undo: rename the constant in scan.py and its three users ([#226](https://github.com/mark-brannan/languette/issues/226)) (no PR, branch refactor/ask-first-scan-bits)
