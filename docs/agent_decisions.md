@@ -380,3 +380,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261021t095434z
 - scan names ask-first's widened prose set PROSE_PROCESS Undo: rename the constant in scan.py and its three users ([#226](https://github.com/mark-brannan/languette/issues/226)) (no PR, branch refactor/ask-first-scan-bits)
+
+### 20261021t103546z
+- guard-scheduled-jobs' shipped rule file holds an empty rule list, so an install decides as it did before the file existed Undo: add a rule to languette/rules/guard-scheduled-jobs.json ([#233](https://github.com/mark-brannan/languette/pull/233))
