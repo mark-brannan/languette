@@ -45,7 +45,7 @@ helmfile, docker, ansible or a database's DROP.
 import re
 
 from languette import scan as sw
-from languette.guards.ask_first import LAUNCH, PROSE, claim, segments
+from languette.guards.ask_first import claim
 from languette.messages import say
 from languette.verdict import deny
 
@@ -114,8 +114,8 @@ RULES = {
 
 TOOLS = frozenset("terraform tofu terragrunt pulumi cdk aws-cdk aws gcloud az kubectl helm".split())
 _TOOL = re.compile(r"(?:^|/)(?:" + "|".join(sorted(TOOLS)) + r")(?:@[^/]*)?\Z")
-_ANY = re.compile(r"(?:^|/)(?:" + "|".join(sorted(TOOLS | LAUNCH)) + r")(?:@[^/]*)?\Z")
-_LAUNCHER = re.compile(r"(?:^|/)(?:" + "|".join(sorted(LAUNCH)) + r")\Z")
+_ANY = re.compile(r"(?:^|/)(?:" + "|".join(sorted(TOOLS | sw.LAUNCH)) + r")(?:@[^/]*)?\Z")
+_LAUNCHER = re.compile(r"(?:^|/)(?:" + "|".join(sorted(sw.LAUNCH)) + r")\Z")
 HELP = frozenset("-h -help --help".split())
 
 # Options that take the next word as their value, and so must not be
@@ -289,9 +289,9 @@ def _candidates(s, g, b, nested):
 def _runs(doc):
     """({rule: [tool name per run]}, whether the command has a loop word). A
     segment is one run of at most one rule."""
-    found, (segs, loop) = {}, segments(doc, PROSE)
+    found, (segs, loop) = {}, sw.segments(doc, sw.PROSE_PROCESS)
     for s, a, b, nested in segs:
-        g = sw.cmd_index(s, a, b, _ANY, nested, prose=PROSE)
+        g = sw.cmd_index(s, a, b, _ANY, nested, prose=sw.PROSE_PROCESS)
         if g is None:
             continue
         for i in _candidates(s, g, b, nested):

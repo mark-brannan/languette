@@ -45,14 +45,8 @@ NAME = "ask-first"
 CONFIG = ".languette/ask-first.json"
 
 PM = frozenset("npm pnpm yarn bun".split())
-LAUNCH = frozenset("npx bunx pnpm yarn bun".split())
-LAUNCH_SUB = frozenset("exec dlx x".split())
-# Process tools name a script to find it, not to run it.
-PROSE = sw.PROSE | frozenset("pkill pgrep killall ps lsof fuser which type".split())
 # npm's aliases for `run`.
 RUN = frozenset("run run-script rum urn".split())
-# Words that run what follows an unknown number of times.
-LOOP = frozenset("for while until select xargs parallel watch -exec -execdir -ok -okdir".split())
 
 
 def _config(payload, env):
@@ -124,8 +118,8 @@ def _hit(entry, name, rest):
     if name in PM:
         words = ["run" if w in RUN else w for w in words]
     if name != cmd and not (cmd in PM and name in PM):
-        if name in LAUNCH:
-            if words and words[0] in LAUNCH_SUB:
+        if name in sw.LAUNCH:
+            if words and words[0] in sw.LAUNCH_SUB:
                 words = words[1:]
             # The first word naming cmd: an option's value (npx -p x cmd) may come first.
             w = next((w for w in words if _base(w) == cmd), None)
@@ -144,25 +138,13 @@ def _hit(entry, name, rest):
     return ok
 
 
-def segments(doc, prose=sw.PROSE):
-    """([(scan, a, b, nested)] for each non-empty segment of every text the
-    command runs, whether any text holds a LOOP word): what a guard that spends
-    one yes per run walks."""
-    out, loop = [], False
-    for t, nested in doc.texts(prose):
-        s = doc.scan(t)
-        loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
-        out += [(s, a, b, nested) for a, b in s.segments() if a <= b]
-    return out, loop
-
-
 def _matches(doc, entry):
     """(how many times the command runs entry, whether any of it sits in a loop)."""
-    names = {entry["cmd"]} | LAUNCH | (PM if entry["cmd"] in PM else set())
+    names = {entry["cmd"]} | sw.LAUNCH | (PM if entry["cmd"] in PM else set())
     rx = re.compile(r"(?:^|/)(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\Z")
-    n, (segs, loop) = 0, segments(doc, PROSE)
+    n, (segs, loop) = 0, sw.segments(doc, sw.PROSE_PROCESS)
     for s, a, b, nested in segs:
-        g = sw.cmd_index(s, a, b, rx, nested, prose=PROSE)
+        g = sw.cmd_index(s, a, b, rx, nested, prose=sw.PROSE_PROCESS)
         # cmd_index stops at the first launcher; a later word may be the command.
         while g is not None:
             if _hit(entry, _base(s.w[g]), s.w[g + 1:b + 1]):
