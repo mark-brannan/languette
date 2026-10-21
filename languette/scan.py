@@ -1125,3 +1125,62 @@ def segments(doc, prose=PROSE):
         loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
         out += [(s, a, b, nested) for a, b in s.segments() if a <= b]
     return out, loop
+
+
+_CTL = re.compile(r"(?:^|/)systemctl\Z")
+_CTL_OTHER = {"--user", "-H", "--host", "-M", "--machine"}
+_CTL_HOST = {"isolate", "rescue", "emergency", "halt", "poweroff", "reboot", "kexec", "soft-reboot"}
+_CTL_STOP = {"stop", "restart", "try-restart", "reload-or-restart", "try-reload-or-restart", "kill"}
+# Options that take a separate value; the value is not the verb. A missing one only fails closed.
+_CTL_ARG = {"-t", "--type", "-p", "--property", "-s", "--signal", "-n", "--lines", "-o", "--output",
+            "--root", "--state", "--job-mode", "--kill-whom", "--kill-who", "--preset-mode", "--timestamp"}
+# Options that take no value. Any option in neither set, before the verb, means the verb cannot be
+# known, so a read verb after it does not clear the segment.
+_CTL_FLAG = {"-a", "--all", "-l", "--full", "-q", "--quiet", "-r", "--recursive", "-f", "--force", "-i",
+             "-T", "--show-transaction", "--now", "--no-pager", "--no-legend", "--no-block", "--no-wall",
+             "--no-ask-password", "--failed", "--system", "--reverse", "--after", "--before", "--plain",
+             "--value", "--dry-run", "--wait", "--global", "--runtime"}
+# Verbs whose own arguments may be any word, so a later `reboot` is a unit or pattern, not a verb.
+_CTL_READ = {"status", "show", "cat", "help", "list-units", "list-unit-files", "list-sockets", "list-timers",
+             "list-jobs", "list-dependencies", "list-automounts", "list-paths", "list-machines",
+             "is-active", "is-enabled", "is-failed", "is-system-running", "show-environment", "get-default",
+             "start", "reload", "enable", "reenable", "daemon-reload"}
+
+
+def unit_names(u):
+    """The names `u` answers to: as written, without its unit-type suffix, and without its `@instance`."""
+    bare = re.sub(r"\.(?:service|socket|target|scope|slice)\Z", "", u)
+    return {u, bare, bare.split("@")[0]}
+
+
+def service_stop(s, a, b, hit, host_verbs=_CTL_HOST):
+    """`<verb>` or `<verb> <unit>` when the segment's host `systemctl` runs one of `host_verbs`,
+    or stops a unit `hit` accepts; else None."""
+    g = cmd_index(s, a, b, _CTL, True)
+    if g is None:
+        return None
+    words = [s.w[i] for i in range(g + 1, b + 1) if s.k[i] == "w"]
+    pos, skip, known = [], False, True
+    for w in words:
+        if skip:
+            skip = False
+        elif w in _CTL_OTHER or w.startswith(("--host=", "--machine=")):
+            return None                        # tested here, so an option's value (`--root -M`) is not it
+        elif w in _CTL_ARG:
+            skip = True
+        elif w.startswith("-"):
+            known = known and (w in _CTL_FLAG or ("=" in w and w.startswith("--")) or bool(pos))
+        else:
+            pos.append(w)
+    if known and pos and pos[0] in _CTL_READ:
+        return None
+    # The verb is the first word past the options, but an option's value looks like a word too
+    # (`--root /x reboot`), so any down verb in the segment counts unless a read verb leads.
+    for i, w in enumerate(pos):
+        if w in host_verbs:
+            return w
+        if w in _CTL_STOP or (w in ("disable", "mask") and "--now" in words):
+            unit = next((u for u in pos[i + 1:] if hit(u)), None)
+            if unit:
+                return f"{w} {unit}"
+    return None

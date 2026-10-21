@@ -11,7 +11,7 @@ services a session runs on (ssh, the network) are guard-host-availability's.
 import fnmatch
 import re
 
-from languette.guards.guard_host_availability import service_stop, unit_names
+from languette import scan as sw
 from languette.messages import say
 from languette.verdict import WAY_USER, judged
 
@@ -32,12 +32,12 @@ def judge(doc):
         return None
 
     def hit(u):
-        return any(c in u for c in "*?[") or any(fnmatch.fnmatchcase(n, p) for n in unit_names(u) for p in pats)
+        return any(c in u for c in "*?[") or any(fnmatch.fnmatchcase(n, p) for n in sw.unit_names(u) for p in pats)
 
     for t, _ in doc.texts():
         s = doc.scan(t)
         for a, b in s.segments():
-            verb = a <= b and service_stop(s, a, b, hit, host_verbs=())
+            verb = a <= b and sw.service_stop(s, a, b, hit, host_verbs=())
             if verb:
                 return say("protected_stop", verb=verb, way_user=WAY_USER)
     return None
