@@ -61,49 +61,6 @@ def _flat(t):
     return t.replace("\n", " ")
 
 
-def _unq(t):
-    return t.replace('"', "").replace("'", "")
-
-
-def writes(b, heredoc_only):
-    """The file paths `b` writes with a redirection or `tee`, heredoc bodies
-    skipped; with heredoc_only, only those on a line that opens a heredoc --
-    the paths whose content is the heredoc body. Quotes are stripped; a path
-    built from $VAR comes back unresolved."""
-    out, delim = [], ""
-    for line in b.split("\n"):
-        if delim:
-            if re.fullmatch(r"[ \t]*" + re.escape(delim) + r"[ \t]*", line):
-                delim = ""
-            continue
-        m = re.search(r"""<<-?[ \t]*["']?[A-Za-z_][A-Za-z0-9_]*["']?""", line)
-        if m:
-            delim = _unq(re.sub(r"^<<-?[ \t]*", "", m.group()))
-            pre = line[:m.start()]
-        else:
-            pre = line
-        if heredoc_only and not m:
-            continue
-        pre = re.sub(r"[;|&]", " ; ", pre)
-        pre = re.sub(r">>?", " @redir@ ", pre)
-        t = [x for x in re.split(r"[ \t]+", pre) if x != ""]
-        teeing = False
-        for x, tok in enumerate(t):
-            if tok == ";":
-                teeing = False
-                continue
-            if tok == "@redir@":
-                if x + 1 < len(t) and t[x + 1] not in (";", "@redir@"):
-                    out.append(_unq(t[x + 1]))
-                continue
-            if _unq(tok) == "tee":
-                teeing = True
-                continue
-            if teeing and not tok.startswith("-"):
-                out.append(_unq(tok))
-    return out
-
-
 class _Meta:
     """The command's records, in command order, as (kind, value):
     R repo (- = the cwd's, ? = unknown) | T posted text | HDTXT heredoc text |
@@ -114,9 +71,9 @@ class _Meta:
         self.out = []
         buf = self.orig = command + "\n"
         counts = {}
-        for p in writes(buf, False):
+        for p in sw.writes(buf, False):
             counts[p] = counts.get(p, 0) + 1
-        for p in writes(buf, True):
+        for p in sw.writes(buf, True):
             if counts.get(p) == 1:
                 self.add("HFED", p)
         if doc.heredocs():
@@ -340,19 +297,11 @@ class _Meta:
                 self.add("R", "?")          # the target is a node id in the query, never the cwd's origin
 
 
-def norm_repo(r):
-    """owner/name in lower case from any of the spellings gh and git accept."""
-    r = r.lower()
-    for pat in (r"^[a-z]*://[^/]*/", r"^[^@/]*@[^:]*:", r"^github\.com/", r"\.git$", r"/*$"):
-        r = re.sub(pat, "", r, count=1)
-    return r
-
-
 def _is_private(repo, env):
     if not repo:
         return False
     listed = env.get("CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS") or ""
-    return any(r.strip() and norm_repo(r.strip()) == repo for r in listed.split(","))
+    return any(r.strip() and sw.norm_repo(r.strip()) == repo for r in listed.split(","))
 
 
 def normpath(p):
@@ -438,7 +387,7 @@ def check(doc):
             repo = ""
         elif repo == "-":
             repo = "" if cd else ((yield Need("git", "git", cwd, "remote", "get-url", "origin")) or "")
-        if not _is_private(norm_repo(repo), env):
+        if not _is_private(sw.norm_repo(repo), env):
             all_private = False
     if all_private:
         return None
