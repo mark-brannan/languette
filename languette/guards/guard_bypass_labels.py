@@ -38,6 +38,7 @@ import json
 import os
 import re
 
+from languette import paths
 from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Need, Refuse, deny, planned
@@ -61,11 +62,6 @@ READS = frozenset("list get search read".split())
 WRITE_WORDS = frozenset("add set create update edit write apply put post patch assign rename replace "
                         "upsert merge modify change toggle attach tag mark link insert append save store "
                         "mutate sync push commit delete remove clear reset move copy and or then".split())
-# Commands that may share the call with a gh that reads a file. None writes a
-# byte to stdout that could become labels, so a redirect on one only
-# truncates the file (pushd and popd print the directory stack).
-INERT = frozenset("cd true :".split())
-MAX_READ = 1 << 20
 WORDS = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")
 
 
@@ -326,59 +322,12 @@ def _alias(f, s, g, b, act):
         f.unseen.append(f"the alias file `{src}` may define an alias that applies a label")
 
 
-def _alone(scans):
-    """One segment is the gh, and every other is a shell running quoted text
-    the scan already holds (not built at run time) or a command that writes
-    no file."""
-    ghs = 0
-    for s, nested in scans:
-        for a, b in s.segments():
-            if a > b:
-                continue
-            if sw.cmd_index(s, a, b, GH, nested) is not None:
-                ghs += 1                       # a second gh can download into the file
-                if ghs > 1:
-                    return False
-                continue
-            c = sw.seg_cmd(s, a, b)
-            w = s.w[c].rsplit("/", 1)[-1] if c is not None else None
-            if w not in INERT and not (w in sw.SHELL and _runs_quoted(s, c, b, w)):
-                return False
-    return True
-
-
-def _runs_quoted(s, c, b, w):
-    """The shell at c runs only quoted text the scan holds: `eval` whose every
-    operand is quoted, or `sh … -c SCRIPT` whose operand to -c is quoted and
-    no other word before it is an operand (a script file the scan never
-    reads). `source` and `.` always run a file."""
-    fixed = lambda j: s.k[j] == "q" and not s.live[j]
-    if w == "eval":
-        return c < b and all(fixed(j) for j in range(c + 1, b + 1))
-    if w in ("source", "."):
-        return False
-    j = c + 1
-    while j <= b:
-        t = s.w[j] if s.k[j] == "w" else ""
-        if t in ("-o", "+o", "-O", "+O"):
-            j += 2
-        elif t.startswith("--"):
-            j += 1
-        elif t[:1] in "-+" and len(t) > 1:
-            if "c" in t:
-                return j < b and fixed(j + 1)
-            j += 1
-        else:
-            return False                       # an operand before -c: a script file
-    return False
-
-
 def _bash(f, doc, cmd, cwd, env, depth=0, alone=True):
     scans = [(doc.scan(t), nested) for t, nested in doc.texts(text=cmd)]
     bodies = doc.heredocs(cmd)
     ctx = {"cwd": cwd, "env": env, "bodies": bodies, "files": f.files, "wanted": f.wanted,
            "moved": any(k == "w" and w in ("cd", "pushd", "popd") for s, _ in scans for k, w in zip(s.k, s.w)),
-           "alone": alone and _alone(scans)}
+           "alone": alone and sw.alone(scans, GH)}
     for s, nested in scans:
         for a, b in s.segments():
             if a > b:
@@ -453,7 +402,7 @@ def plan(parsed):
     """The files the walk could not read."""
     if parsed is None:
         return []
-    return [Need("read", p, MAX_READ) for p in dict.fromkeys(parsed[0].wanted)]
+    return [Need("read", p, paths.MAX_READ) for p in dict.fromkeys(parsed[0].wanted)]
 
 
 def judge(parsed, answers):
@@ -462,7 +411,7 @@ def judge(parsed, answers):
     f, rewalk, env = parsed
     if f.wanted:
         # No file's contents lead to another read: one more walk, with every file, is the last.
-        f = _Found({p: _text(answers[Need("read", p, MAX_READ)]) for p in f.wanted})
+        f = _Found({p: _text(answers[Need("read", p, paths.MAX_READ)]) for p in f.wanted})
         _bash(f, *rewalk, env)
     bad = bypass_labels(env)
     hit = next((x.casefold() for x in f.labels if x.casefold() in bad), None)

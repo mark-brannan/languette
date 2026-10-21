@@ -11,6 +11,8 @@ from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Need, Refuse, context, deny, planned
 
+MAX_READ = 1 << 20                             # bytes a read Need may return
+
 
 class Unresolved(Exception):
     """A word that cannot be resolved to one path; str() says what the guard saw."""
