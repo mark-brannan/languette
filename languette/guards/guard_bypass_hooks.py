@@ -23,7 +23,7 @@ outright.
 import re
 
 from languette import scan as sw
-from languette.guards.ask_first import claim, segments
+from languette.guards.ask_first import claim
 from languette.messages import say
 from languette.verdict import deny
 
@@ -81,7 +81,7 @@ def _skips(sub, args):
 
 def _runs(doc):
     """(how many times the command skips the hooks, whether any of it is in a loop)."""
-    n, (segs, loop) = 0, segments(doc)
+    n, (segs, loop) = 0, sw.segments(doc)
     for s, a, b, nested in segs:
         g = sw.cmd_index(s, a, b, sw.GIT, nested)
         if g is None:

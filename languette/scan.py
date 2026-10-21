@@ -38,6 +38,12 @@ CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 GIT_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
 PROSE = frozenset("grep egrep fgrep rg ag ack echo printf git yadm gh glab sed awk jq yq "
                   "cat tee test [ diff sort head tail wc tr cut less more".split())
+# Process tools name a script to find it, not to run it.
+PROSE_PROCESS = PROSE | frozenset("pkill pgrep killall ps lsof fuser which type".split())
+LAUNCH = frozenset("npx bunx pnpm yarn bun".split())
+LAUNCH_SUB = frozenset("exec dlx x".split())
+# Words that run what follows an unknown number of times.
+LOOP = frozenset("for while until select xargs parallel watch -exec -execdir -ok -okdir".split())
 EXEC = frozenset("sh bash zsh dash ksh ash busybox eval exec xargs su ssh sudo doas env nohup "
                  "timeout nice time watch parallel script chroot docker podman kubectl".split())
 _FIND_EXECS = frozenset("-exec -execdir -ok -okdir".split())
@@ -1107,3 +1113,15 @@ def git_options(s, g, sub):
     while i < sub:
         yield i
         i += 1 + (s.w[i] in GIT_VALUE)
+
+
+def segments(doc, prose=PROSE):
+    """([(scan, a, b, nested)] for each non-empty segment of every text the
+    command runs, whether any text holds a LOOP word): what a guard that spends
+    one yes per run walks."""
+    out, loop = [], False
+    for t, nested in doc.texts(prose):
+        s = doc.scan(t)
+        loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
+        out += [(s, a, b, nested) for a, b in s.segments() if a <= b]
+    return out, loop
