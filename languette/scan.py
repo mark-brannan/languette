@@ -1235,3 +1235,54 @@ def service_stop(s, a, b, hit, host_verbs=_CTL_HOST):
             if unit:
                 return f"{w} {unit}"
     return None
+
+
+# Commands that may share the call with a gh that reads a file. None writes a
+# byte to stdout that could become labels, so a redirect on one only
+# truncates the file (pushd and popd print the directory stack).
+INERT = frozenset("cd true :".split())
+def alone(scans, cmd):
+    """One segment is the command `cmd`, and every other is a shell running
+    quoted text the scan already holds (not built at run time) or a command
+    that writes no file."""
+    ghs = 0
+    for s, nested in scans:
+        for a, b in s.segments():
+            if a > b:
+                continue
+            if cmd_index(s, a, b, cmd, nested) is not None:
+                ghs += 1                       # a second gh can download into the file
+                if ghs > 1:
+                    return False
+                continue
+            c = seg_cmd(s, a, b)
+            w = s.w[c].rsplit("/", 1)[-1] if c is not None else None
+            if w not in INERT and not (w in SHELL and runs_quoted(s, c, b, w)):
+                return False
+    return True
+
+
+def runs_quoted(s, c, b, w):
+    """The shell at c runs only quoted text the scan holds: `eval` whose every
+    operand is quoted, or `sh … -c SCRIPT` whose operand to -c is quoted and
+    no other word before it is an operand (a script file the scan never
+    reads). `source` and `.` always run a file."""
+    fixed = lambda j: s.k[j] == "q" and not s.live[j]
+    if w == "eval":
+        return c < b and all(fixed(j) for j in range(c + 1, b + 1))
+    if w in ("source", "."):
+        return False
+    j = c + 1
+    while j <= b:
+        t = s.w[j] if s.k[j] == "w" else ""
+        if t in ("-o", "+o", "-O", "+O"):
+            j += 2
+        elif t.startswith("--"):
+            j += 1
+        elif t[:1] in "-+" and len(t) > 1:
+            if "c" in t:
+                return j < b and fixed(j + 1)
+            j += 1
+        else:
+            return False                       # an operand before -c: a script file
+    return False

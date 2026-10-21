@@ -29,8 +29,8 @@ import json
 import os
 import re
 
+from languette import paths
 from languette import scan as sw
-from languette.guards.guard_bypass_labels import MAX_READ
 from languette.messages import say
 from languette.verdict import Need, deny
 
@@ -326,7 +326,7 @@ def check(doc):
         else:
             if f not in files:
                 try:
-                    files[f] = yield Need("read", f, MAX_READ)
+                    files[f] = yield Need("read", f, paths.MAX_READ)
                 except Exception:  # noqa: BLE001
                     files[f] = None
             if files[f] is None:

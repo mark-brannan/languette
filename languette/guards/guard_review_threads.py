@@ -22,7 +22,6 @@ import re
 
 from languette import paths
 from languette import scan as sw
-from languette.guards.guard_bypass_labels import MAX_READ, _alone
 from languette.verdict import Need, ask, deny
 
 NAME = "guard-review-threads"
@@ -111,7 +110,7 @@ def _calls(doc, command, cwd, home):
     buf = command.replace("HEREDOC", "HEREDOC_") + "\n"      # a typed HEREDOC must not pass for scan's mark
     hd = "\n".join(_decoded(b) for b in doc.heredoc_bodies(buf))
     scans = [(doc.scan(t), nested) for t, nested in doc.texts(text=buf)]
-    alone, moved = _alone(scans), paths.moves_directory(scans)
+    alone, moved = sw.alone(scans, GH), paths.moves_directory(scans)
     out = []
     for s, nested in scans:
         for a, b in s.segments():
@@ -170,7 +169,7 @@ def _read(p):
     if p is None or not (yield Need("path", "isfile", p)):
         return None
     try:
-        return _decoded((yield Need("read", p, MAX_READ)))
+        return _decoded((yield Need("read", p, paths.MAX_READ)))
     except Exception:  # noqa: BLE001 -- unreadable or not text: the caller denies
         return None
 
