@@ -21,6 +21,10 @@ languette = "languette.__main__:main"
 [tool.setuptools]
 packages = ["languette", "languette.guards"]
 
+[tool.setuptools.package-data]
+# Each guard's shipped rule file (docs/design/guard-rules.md).
+languette = ["rules/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-markers -n auto"
