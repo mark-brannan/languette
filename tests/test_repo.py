@@ -2,7 +2,9 @@
 plugin's options, the stdlib-only rule for languette/, the README table."""
 
 import ast
+import importlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -343,3 +345,27 @@ def test_the_guard_signed_comments_matcher_covers_the_tool(tool):
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__create_issue"])
 def test_the_guard_signed_comments_matcher_leaves_other_tools_alone(tool):
     assert_that(_reaches(guard_signed_comments, tool), is_(False))
+
+
+def _gathered(gen):
+    """Drive a guard's gather generator against the real disk, the way world answers
+    the path and read Needs it yields."""
+    answer = None
+    while True:
+        try:
+            need = gen.send(answer)
+        except StopIteration as stop:
+            return stop.value
+        op, path = need.args[0], need.args[-1]
+        answer = Path(path).read_text() if need.kind == "read" else getattr(os.path, op)(path)
+
+
+@pytest.mark.parametrize("rule_file", sorted((ROOT / "languette" / "rules").glob("*.json")), ids=lambda p: p.name)
+def test_every_shipped_rule_file_loads_and_is_packaged(rule_file):
+    # docs/design/guard-rules.md, "Rule sets that do not load": the deny a bad file
+    # gives never greets an install.
+    guard = importlib.import_module(f"languette.guards.{rule_file.stem.replace('-', '_')}")
+    assert_that(Path(guard.RULE_FILE), equal_to(rule_file))
+    got = _gathered(guard.rules(str(rule_file)))
+    assert_that(got[:len(guard.RULES)], equal_to(guard.RULES))
+    assert_that((ROOT / "pyproject.toml").read_text(), contains_string('languette = ["rules/*.json"]'))

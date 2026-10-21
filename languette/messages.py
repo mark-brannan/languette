@@ -219,6 +219,11 @@ MESSAGES = {
     # A command the user runs, not an agent: the host, the crontab, a protected service.
     "judged": "{guard}: {why}",
     "cron_remove": "`crontab -r` is blocked: it deletes the whole crontab with no undo. {way_user}",
+    "rule_deny": "`{cmd}` is blocked by rule `{id}` in {file}: {why}. {way_user}",
+    "rules_bad": (
+        "{file} is invalid: {err}. Every Bash command is denied until it is fixed, because the guard "
+        "cannot tell what it was meant to cover. Fix the file, or tell the user."
+    ),
     "host_power": "`{what}` is blocked: it takes the machine down, with the user's session on it. {way_user}",
     "host_ctl": (
         "`systemctl {verb}` is blocked: it takes down the host or a service the "

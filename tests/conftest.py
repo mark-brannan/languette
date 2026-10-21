@@ -545,6 +545,22 @@ def _unsetenv(ctx, var):
         ctx.project_env = False
 
 
+def _guard_module(guard):
+    return __import__(f"languette.guards.{guard.replace('-', '_')}", fromlist=["RULE_FILE"])
+
+
+@given(parsers.parse('the rule file of "{guard}" is absent'))
+def _rule_file_absent(ctx, guard, monkeypatch):
+    monkeypatch.setattr(_guard_module(guard), "RULE_FILE", str(Path(ctx.mkdtemp()) / f"{guard}.json"))
+
+
+@given(parsers.parse('the rule file of "{guard}" holds:'))
+def _rule_file(ctx, guard, monkeypatch, docstring):
+    f = Path(ctx.mkdtemp()) / f"{guard}.json"
+    f.write_text(docstring + "\n")
+    monkeypatch.setattr(_guard_module(guard), "RULE_FILE", str(f))
+
+
 @given(parsers.parse('the directory "{path}"'))
 def _mkdir(ctx, path):
     Path(ctx.expand(path)).mkdir(parents=True, exist_ok=True)
