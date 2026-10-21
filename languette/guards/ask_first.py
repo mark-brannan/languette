@@ -44,11 +44,6 @@ from languette.verdict import Refuse, claim, deny
 NAME = "ask-first"
 CONFIG = ".languette/ask-first.json"
 
-PM = frozenset("npm pnpm yarn bun".split())
-# npm's aliases for `run`.
-RUN = frozenset("run run-script rum urn".split())
-
-
 def _config(payload, env):
     """The governing config path, or None when no project has one
     (paths.project_config). Raises Refuse when cwd is unusable and the project
@@ -102,60 +97,6 @@ def _load(path):
     return cfg["commands"]
 
 
-def _base(w):
-    return w.rsplit("/", 1)[-1]
-
-
-def _run_of(words, a):
-    """Is `a` a contiguous run inside `words`?"""
-    return any(words[i:i + len(a)] == a for i in range(len(words) - len(a) + 1))
-
-
-def _hit(entry, name, rest):
-    """Does entry match command word `name` followed by words `rest`?"""
-    words = [w for w in rest if not w.startswith("-")]
-    cmd = entry["cmd"]
-    if name in PM:
-        words = ["run" if w in RUN else w for w in words]
-    if name != cmd and not (cmd in PM and name in PM):
-        if name in sw.LAUNCH:
-            if words and words[0] in sw.LAUNCH_SUB:
-                words = words[1:]
-            # The first word naming cmd: an option's value (npx -p x cmd) may come first.
-            w = next((w for w in words if _base(w) == cmd), None)
-            if w is not None:
-                return _hit(entry, cmd, rest[rest.index(w) + 1:])
-        return False
-    ok = True
-    if "args" in entry:
-        a = entry["args"]
-        ok = _run_of(words, a) or (name in PM - {"npm"} and a[0] == "run" and len(a) > 1 and _run_of(words, a[1:]))
-    if ok and "script" in entry:
-        sc = entry["script"]
-        while sc.startswith("./"):
-            sc = sc[2:]
-        ok = any(w == sc or w.endswith("/" + sc) for w in rest)
-    return ok
-
-
-def _matches(doc, entry):
-    """(how many times the command runs entry, whether any of it sits in a loop)."""
-    names = {entry["cmd"]} | sw.LAUNCH | (PM if entry["cmd"] in PM else set())
-    rx = re.compile(r"(?:^|/)(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\Z")
-    n, (segs, loop) = 0, sw.segments(doc, sw.PROSE_PROCESS)
-    for s, a, b, nested in segs:
-        g = sw.cmd_index(s, a, b, rx, nested, prose=sw.PROSE_PROCESS)
-        # cmd_index stops at the first launcher; a later word may be the command.
-        while g is not None:
-            if _hit(entry, _base(s.w[g]), s.w[g + 1:b + 1]):
-                n += 1
-                break
-            if nested:
-                break
-            g = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and rx.search(s.w[i])), None)
-    return n, loop
-
-
 def check(doc):
     payload, env = doc.payload, doc.env
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
@@ -175,7 +116,7 @@ def check(doc):
                      "the Edit tool, or tell the user.")
     runs, looped = {}, []
     for c in commands:
-        m = [_matches(doc, e) for e in c["match"]]
+        m = [sw.matches(doc, e) for e in c["match"]]
         # Entries may describe the same run two ways (npm run x, tsx x.ts); count the widest.
         n = max(k for k, _ in m)
         if n:
