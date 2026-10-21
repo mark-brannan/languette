@@ -42,6 +42,9 @@ PROSE = frozenset("grep egrep fgrep rg ag ack echo printf git yadm gh glab sed a
 PROSE_PROCESS = PROSE | frozenset("pkill pgrep killall ps lsof fuser which type".split())
 LAUNCH = frozenset("npx bunx pnpm yarn bun".split())
 LAUNCH_SUB = frozenset("exec dlx x".split())
+# Package managers that stand in for each other in a command rule, and npm's aliases for `run`.
+PM = frozenset("npm pnpm yarn bun".split())
+RUN = frozenset("run run-script rum urn".split())
 # Words that run what follows an unknown number of times.
 LOOP = frozenset("for while until select xargs parallel watch -exec -execdir -ok -okdir".split())
 EXEC = frozenset("sh bash zsh dash ksh ash busybox eval exec xargs su ssh sudo doas env nohup "
@@ -1176,6 +1179,72 @@ def segments(doc, prose=PROSE):
         loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
         out += [(s, a, b, nested) for a, b in s.segments() if a <= b]
     return out, loop
+
+
+# Command rules: docs/design/guard-rules.md, "Command rules". A rule's match is
+# a command word (`cmd`, by basename) and any of: `args`, a run of its
+# non-option words; `script`, a later word that is it or ends in `/script`;
+# `flags`, short option letters each present in a short-option cluster.
+_CLUSTER = re.compile(r"-[A-Za-z]+")
+
+
+def _base(w):
+    return w.rsplit("/", 1)[-1]
+
+
+def _run_of(words, a):
+    """Is `a` a contiguous run inside `words`?"""
+    return any(words[i:i + len(a)] == a for i in range(len(words) - len(a) + 1))
+
+
+def _hit(match, name, rest):
+    """Does match fit command word `name` followed by words `rest`?"""
+    words = [w for w in rest if not w.startswith("-")]
+    cmd = match["cmd"]
+    if name in PM:
+        words = ["run" if w in RUN else w for w in words]
+    if name != cmd and not (cmd in PM and name in PM):
+        if name in LAUNCH:
+            if words and words[0] in LAUNCH_SUB:
+                words = words[1:]
+            # The first word naming cmd: an option's value (npx -p x cmd) may come first.
+            w = next((w for w in words if _base(w) == cmd), None)
+            if w is not None:
+                return _hit(match, cmd, rest[rest.index(w) + 1:])
+        return False
+    ok = True
+    if "args" in match:
+        a = match["args"]
+        ok = _run_of(words, a) or (name in PM - {"npm"} and a[0] == "run" and len(a) > 1 and _run_of(words, a[1:]))
+    if ok and "script" in match:
+        sc = match["script"]
+        while sc.startswith("./"):
+            sc = sc[2:]
+        ok = any(w == sc or w.endswith("/" + sc) for w in rest)
+    if ok and "flags" in match:
+        held = {c for w in rest if _CLUSTER.fullmatch(w) for c in w[1:]}
+        ok = all(f in held for f in match["flags"])
+    return ok
+
+
+def matches(doc, match, prose=PROSE_PROCESS, launchers=True):
+    """(how many times the command runs `match`, whether any text holds a LOOP
+    word). `prose` names the commands whose words are not commands; launchers
+    (npx, `pnpm exec`) run `cmd` unless `launchers` is False."""
+    names = {match["cmd"]} | (LAUNCH if launchers else set()) | (PM if match["cmd"] in PM else set())
+    rx = re.compile(r"(?:^|/)(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\Z")
+    n, (segs, loop) = 0, segments(doc, prose)
+    for s, a, b, nested in segs:
+        g = cmd_index(s, a, b, rx, nested, prose=prose)
+        # cmd_index stops at the first launcher; a later word may be the command.
+        while g is not None:
+            if _hit(match, _base(s.w[g]), s.w[g + 1:b + 1]):
+                n += 1
+                break
+            if nested:
+                break
+            g = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and rx.search(s.w[i])), None)
+    return n, loop
 
 
 _CTL = re.compile(r"(?:^|/)systemctl\Z")
