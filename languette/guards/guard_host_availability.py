@@ -20,31 +20,13 @@ from languette.verdict import WAY_USER, judged
 NAME = "guard-host-availability"
 
 _POWER = re.compile(r"(?:^|/)(?:shutdown|reboot|halt|poweroff)\Z")
-_CTL = re.compile(r"(?:^|/)systemctl\Z")
 _SYSV = re.compile(r"(?:^|/)(?:service|invoke-rc\.d|rc-service)\Z")
 _INITD = re.compile(r"(?:^|/)etc/(?:rc\.d/)?init\.d/[^/]+\Z")
 _SERVICE_STOP = {"stop", "restart", "force-reload", "try-restart", "--full-restart"}
-_CTL_OTHER = {"--user", "-H", "--host", "-M", "--machine"}
-_CTL_HOST = {"isolate", "rescue", "emergency", "halt", "poweroff", "reboot", "kexec", "soft-reboot"}
-_CTL_STOP = {"stop", "restart", "try-restart", "reload-or-restart", "try-reload-or-restart", "kill"}
 # The services a session runs on: stopping one cuts the user off the machine.
 _CORE = {"ssh", "sshd", "systemd-logind", "dbus", "dbus-broker", "NetworkManager", "systemd-networkd", "networking",
          "display-manager", "gdm", "gdm3", "sddm", "lightdm", "getty", "user",
          "multi-user", "graphical", "default", "network", "network-online", "basic", "sysinit"}
-# Options that take a separate value; the value is not the verb. A missing one only fails closed.
-_CTL_ARG = {"-t", "--type", "-p", "--property", "-s", "--signal", "-n", "--lines", "-o", "--output",
-            "--root", "--state", "--job-mode", "--kill-whom", "--kill-who", "--preset-mode", "--timestamp"}
-# Options that take no value. Any option in neither set, before the verb, means the verb cannot be
-# known, so a read verb after it does not clear the segment.
-_CTL_FLAG = {"-a", "--all", "-l", "--full", "-q", "--quiet", "-r", "--recursive", "-f", "--force", "-i",
-             "-T", "--show-transaction", "--now", "--no-pager", "--no-legend", "--no-block", "--no-wall",
-             "--no-ask-password", "--failed", "--system", "--reverse", "--after", "--before", "--plain",
-             "--value", "--dry-run", "--wait", "--global", "--runtime"}
-# Verbs whose own arguments may be any word, so a later `reboot` is a unit or pattern, not a verb.
-_CTL_READ = {"status", "show", "cat", "help", "list-units", "list-unit-files", "list-sockets", "list-timers",
-             "list-jobs", "list-dependencies", "list-automounts", "list-paths", "list-machines",
-             "is-active", "is-enabled", "is-failed", "is-system-running", "show-environment", "get-default",
-             "start", "reload", "enable", "reenable", "daemon-reload"}
 _FORK = re.compile(r"([A-Za-z_:][A-Za-z0-9_:]*)\s*\(\s*\)\s*\{\s*\1\s*\|\s*\1\s*&")
 
 
@@ -56,50 +38,11 @@ def _power(s, a, b):
     return None if g is None else os.path.basename(s.w[g])
 
 
-def unit_names(u):
-    """The names `u` answers to: as written, without its unit-type suffix, and without its `@instance`."""
-    bare = re.sub(r"\.(?:service|socket|target|scope|slice)\Z", "", u)
-    return {u, bare, bare.split("@")[0]}
-
-
 def _core_unit(u):
     """True when the unit is, or may match, one the session runs on. A glob fails closed."""
     if any(c in u for c in "*?["):
         return True
-    return any(n in _CORE or n.startswith("session-") for n in unit_names(u))
-
-
-def service_stop(s, a, b, hit, host_verbs=_CTL_HOST):
-    """`<verb>` or `<verb> <unit>` when the segment's host `systemctl` runs one of `host_verbs`,
-    or stops a unit `hit` accepts; else None."""
-    g = sw.cmd_index(s, a, b, _CTL, True)
-    if g is None:
-        return None
-    words = [s.w[i] for i in range(g + 1, b + 1) if s.k[i] == "w"]
-    pos, skip, known = [], False, True
-    for w in words:
-        if skip:
-            skip = False
-        elif w in _CTL_OTHER or w.startswith(("--host=", "--machine=")):
-            return None                        # tested here, so an option's value (`--root -M`) is not it
-        elif w in _CTL_ARG:
-            skip = True
-        elif w.startswith("-"):
-            known = known and (w in _CTL_FLAG or ("=" in w and w.startswith("--")) or bool(pos))
-        else:
-            pos.append(w)
-    if known and pos and pos[0] in _CTL_READ:
-        return None
-    # The verb is the first word past the options, but an option's value looks like a word too
-    # (`--root /x reboot`), so any down verb in the segment counts unless a read verb leads.
-    for i, w in enumerate(pos):
-        if w in host_verbs:
-            return w
-        if w in _CTL_STOP or (w in ("disable", "mask") and "--now" in words):
-            unit = next((u for u in pos[i + 1:] if hit(u)), None)
-            if unit:
-                return f"{w} {unit}"
-    return None
+    return any(n in _CORE or n.startswith("session-") for n in sw.unit_names(u))
 
 
 def sysv_stop(s, a, b):
@@ -133,7 +76,7 @@ def judge(doc):
             if what:
                 return say("host_power", what=what, way_user=WAY_USER)
         for a, b in segs:
-            verb = service_stop(s, a, b, _core_unit)
+            verb = sw.service_stop(s, a, b, _core_unit)
             if verb:
                 return say("host_ctl", verb=verb, way_user=WAY_USER)
         for a, b in segs:
