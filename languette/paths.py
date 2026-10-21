@@ -248,5 +248,7 @@ def read_json(path):
         return json.loads((yield Need("read", path)))
     except ValueError as e:
         raise Refuse(f"not JSON ({e})")
+    except RecursionError:
+        raise Refuse("not JSON (nested too deep to parse)")
     except OSError as e:
         raise Refuse(f"unreadable ({e.strerror})")

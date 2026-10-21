@@ -561,6 +561,13 @@ def _rule_file(ctx, guard, monkeypatch, docstring):
     monkeypatch.setattr(_guard_module(guard), "RULE_FILE", str(f))
 
 
+@given(parsers.parse('the rule file of "{guard}" nests {depth:d} brackets deep'))
+def _rule_file_deep(ctx, guard, depth, monkeypatch):
+    f = Path(ctx.mkdtemp()) / f"{guard}.json"
+    f.write_text("[" * depth)
+    monkeypatch.setattr(_guard_module(guard), "RULE_FILE", str(f))
+
+
 @given(parsers.parse('the directory "{path}"'))
 def _mkdir(ctx, path):
     Path(ctx.expand(path)).mkdir(parents=True, exist_ok=True)

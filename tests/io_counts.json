@@ -779,6 +779,7 @@
  "tests/test_features.py::test_a_rrepo_flag_before_the_subcommand_is_still_seen[gh -R o/r issue create -t t -b b]": {"git": 2},
  "tests/test_features.py::test_a_rrepo_flag_before_the_subcommand_is_still_seen[gh issue --repo o/r delete 5]": {"git": 2},
  "tests/test_features.py::test_a_rrepo_flag_before_the_subcommand_is_still_seen[gh issue -R o/r create -t t -b b]": {"git": 2},
+ "tests/test_features.py::test_a_rule_file_nested_too_deep_to_parse_is_invalid_not_a_crash": {"git": 1},
  "tests/test_features.py::test_a_rule_file_that_does_not_load_denies_every_command_naming_the_file_and_the_fault[{\"commands\": []}-the top level must be]": {"git": 1},
  "tests/test_features.py::test_a_rule_file_that_does_not_load_denies_every_command_naming_the_file_and_the_fault[{\"rules\": [-guard-scheduled-jobs.json is invalid: not JSON]": {"git": 1},
  "tests/test_features.py::test_a_rule_file_that_does_not_load_denies_every_command_naming_the_file_and_the_fault[{\"rules\": [{\"id\": \"crontab-wipe\", \"match\": {\"cmd\": \"crontab\", \"flags\": [\"l\"]}, \"action\": \"deny\"}]}-it never replaces one]": {"git": 1},

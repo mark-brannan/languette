@@ -70,3 +70,8 @@ Feature: guard-scheduled-jobs
       | {"rules": [{"id": "crontab-wipe", "match": {"cmd": "crontab", "flags": ["l"]}, "action": "deny"}]} | it never replaces one     |
       | {"rules": [{"id": "x", "match": {"cmd": "atrm", "args": ["all"]}, "action": "allow"}]} | action must be "deny"                  |
       | {"rules": [{"id": "x", "match": {"cmd": "atrm"}, "action": "deny"}]}                   | would match every atrm                 |
+
+  Scenario: a rule file nested too deep to parse is invalid, not a crash
+    Given the rule file of "guard-scheduled-jobs" nests 200000 brackets deep
+    When the agent runs `ls`
+    Then the guard denies, naming "is invalid: not JSON (nested too deep to parse)"

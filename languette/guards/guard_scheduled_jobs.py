@@ -97,6 +97,6 @@ def check(doc):
             why = say("cron_remove", way_user=WAY_USER)
         else:
             why = say("rule_deny", cmd=rule["match"]["cmd"], id=rule["id"], file=RULE_FILE,
-                      why=rule.get("why") or "the rule file lists it", way_user=WAY_USER)
+                      why=(rule.get("why") or "the rule file lists it").rstrip("."), way_user=WAY_USER)
         return deny(say("judged", guard=NAME, why=why))
     return None
