@@ -386,3 +386,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261021t103548z
 - a rule-file rule whose id is a Python default's is a load fault, as guard-secrets treats a shipped rule's id; a file adds, never replaces Undo: let a same-id rule stand beside the default in _load ([#233](https://github.com/mark-brannan/languette/pull/233))
+
+### 20261021t103551z
+- feature rows point guard-scheduled-jobs at a test rule file by patching its RULE_FILE in-process; no env var or setting names the file Undo: add a setting naming the rule file ([#233](https://github.com/mark-brannan/languette/pull/233))
