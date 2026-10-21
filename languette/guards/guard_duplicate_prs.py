@@ -31,7 +31,6 @@ import os
 import re
 
 from languette import scan as sw
-from languette.guards.guard_private_terms import norm_repo, writes
 from languette.verdict import Need, Refuse, ask, deny
 
 NAME = "guard-duplicate-prs"
@@ -65,7 +64,7 @@ def refs(rx, text, repo):
     out = []
     for m in rx.finditer(text):
         r = m.group("repo") or m.group("urepo")
-        r = norm_repo(r) if r else repo
+        r = sw.norm_repo(r) if r else repo
         n = int(m.group("num") or m.group("unum"))
         if (r, n) not in out:
             out.append((r, n))
@@ -247,13 +246,13 @@ def _body(post, cwd, cd, docs, fed, env):
 def _slug(repo, cd, cwd):
     """owner/name of the repo a bare #N is on, or None."""
     if repo:
-        r = norm_repo(repo)
+        r = sw.norm_repo(repo)
         return r if re.fullmatch(rf"{_NAME}/{_NAME}", r) else None
     if cd or not cwd:
         return None
     url = yield Need("git", "git", cwd, "remote", "get-url", "origin")
     m = _GITHUB.search(url or "")
-    return norm_repo(f"{m.group(1)}/{m.group(2)}") if m else None
+    return sw.norm_repo(f"{m.group(1)}/{m.group(2)}") if m else None
 
 
 def _open_prs(slug, n):
@@ -275,7 +274,7 @@ def _open_prs(slug, n):
         if not isinstance(r, str):
             m = _HTML.search(str(iss.get("html_url") or ""))
             r = m.group(1) if m else slug
-        pr = (norm_repo(r), iss["number"], str(iss.get("title") or ""))
+        pr = (sw.norm_repo(r), iss["number"], str(iss.get("title") or ""))
         if pr[:2] not in [p[:2] for p in out]:
             out.append(pr)
     return out if out or len(body) < PAGE else None
@@ -328,7 +327,7 @@ def check(doc):
         if not isinstance(cmd, str) or ("gh" not in cmd):
             return None
         found, cd, docs = posts(doc)
-        fed = set(writes(cmd + "\n", True))
+        fed = set(sw.writes(cmd + "\n", True))
     elif _MCP.match(tool):
         body, owner, repo = ti.get("body"), ti.get("owner"), ti.get("repo")
         post = _Post(f"{owner}/{repo}" if isinstance(owner, str) and owner and isinstance(repo, str) and repo

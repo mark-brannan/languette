@@ -31,7 +31,6 @@ import re
 
 from languette import scan as sw
 from languette.guards.guard_bypass_labels import MAX_READ
-from languette.guards.guard_private_terms import writes
 from languette.messages import say
 from languette.verdict import Need, deny
 
@@ -93,7 +92,7 @@ class _Read:
         self.fed, self.written = {}, {}
         for line in stripped.split("\n"):
             ks = re.findall(r"\bHEREDOC(\d+)\b", line)
-            for p in writes(line, False):
+            for p in sw.writes(line, False):
                 self.written[p] = self.written.get(p, 0) + 1
                 if len(ks) == 1:
                     self.fed[p] = int(ks[0])

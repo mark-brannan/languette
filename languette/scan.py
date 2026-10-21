@@ -994,6 +994,57 @@ def gh_api_path(path):
     return re.sub(r"^/+", "", re.sub(r"^https?://[^/]+/", "", path, count=1), count=1)
 
 
+def _unq(t):
+    return t.replace('"', "").replace("'", "")
+
+
+def writes(b, heredoc_only):
+    """The file paths `b` writes with a redirection or `tee`, heredoc bodies
+    skipped; with heredoc_only, only those on a line that opens a heredoc --
+    the paths whose content is the heredoc body. Quotes are stripped; a path
+    built from $VAR comes back unresolved."""
+    out, delim = [], ""
+    for line in b.split("\n"):
+        if delim:
+            if re.fullmatch(r"[ \t]*" + re.escape(delim) + r"[ \t]*", line):
+                delim = ""
+            continue
+        m = re.search(r"""<<-?[ \t]*["']?[A-Za-z_][A-Za-z0-9_]*["']?""", line)
+        if m:
+            delim = _unq(re.sub(r"^<<-?[ \t]*", "", m.group()))
+            pre = line[:m.start()]
+        else:
+            pre = line
+        if heredoc_only and not m:
+            continue
+        pre = re.sub(r"[;|&]", " ; ", pre)
+        pre = re.sub(r">>?", " @redir@ ", pre)
+        t = [x for x in re.split(r"[ \t]+", pre) if x != ""]
+        teeing = False
+        for x, tok in enumerate(t):
+            if tok == ";":
+                teeing = False
+                continue
+            if tok == "@redir@":
+                if x + 1 < len(t) and t[x + 1] not in (";", "@redir@"):
+                    out.append(_unq(t[x + 1]))
+                continue
+            if _unq(tok) == "tee":
+                teeing = True
+                continue
+            if teeing and not tok.startswith("-"):
+                out.append(_unq(tok))
+    return out
+
+
+def norm_repo(r):
+    """owner/name in lower case from any of the spellings gh and git accept."""
+    r = r.lower()
+    for pat in (r"^[a-z]*://[^/]*/", r"^[^@/]*@[^:]*:", r"^github\.com/", r"\.git$", r"/*$"):
+        r = re.sub(pat, "", r, count=1)
+    return r
+
+
 def texts_of(text, prose=PROSE, read=None):
     """[(text, nested)]: the text itself plus, recursively, every quoted string
     in it that holds whitespace and may run. A segment's quoted strings are
