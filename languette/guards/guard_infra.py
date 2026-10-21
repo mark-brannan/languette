@@ -45,9 +45,8 @@ helmfile, docker, ansible or a database's DROP.
 import re
 
 from languette import scan as sw
-from languette.guards.ask_first import claim
 from languette.messages import say
-from languette.verdict import deny
+from languette.verdict import claim, deny
 
 NAME = "guard-infra"
 

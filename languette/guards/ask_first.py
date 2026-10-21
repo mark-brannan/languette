@@ -39,7 +39,7 @@ import re
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Need, Refuse, deny
+from languette.verdict import Refuse, claim, deny
 
 NAME = "ask-first"
 CONFIG = ".languette/ask-first.json"
@@ -154,18 +154,6 @@ def _matches(doc, entry):
                 break
             g = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and rx.search(s.w[i])), None)
     return n, loop
-
-
-def claim(wants):
-    """Spend one of the user's approvals per run; `wants` is {approve_label: runs}.
-    Use as `approved, spent = yield from claim({c["approve_label"]: runs[c["id"]] for c in hits})`: approved is {label:
-    tool_use ids}, spent is whether every label had its runs' worth, now recorded
-    against this tool call. A click comes back when the transcript shows the call
-    never ran (languette.world). The world's OSError or ValueError, for a payload
-    with no transcript or a transcript that can't be read, is raised from here.
-    Shared with guard-infra and guard-bypass-hooks: one click is one run,
-    whichever guard asked."""
-    return (yield Need("claim", dict(wants)))
 
 
 def check(doc):

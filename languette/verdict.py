@@ -65,6 +65,18 @@ class Need:
         return f"{type(self).__name__}({self.kind!r}{''.join(', ' + repr(a) for a in self.args)})"
 
 
+def claim(wants):
+    """Spend one of the user's approvals per run; `wants` is {approve_label: runs}.
+    Use as `approved, spent = yield from claim({c["approve_label"]: runs[c["id"]] for c in hits})`: approved is {label:
+    tool_use ids}, spent is whether every label had its runs' worth, now recorded
+    against this tool call. A click comes back when the transcript shows the call
+    never ran (languette.world). The world's OSError or ValueError, for a payload
+    with no transcript or a transcript that can't be read, is raised from here.
+    Shared with guard-infra and guard-bypass-hooks: one click is one run,
+    whichever guard asked."""
+    return (yield Need("claim", dict(wants)))
+
+
 class Act(Need):
     """A write a guard asks for. The runner sends None back at once and does
     every Act through languette.world after the verdict, whatever the verdict;
