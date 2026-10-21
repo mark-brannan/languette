@@ -383,3 +383,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261021t103546z
 - guard-scheduled-jobs' shipped rule file holds an empty rule list, so an install decides as it did before the file existed Undo: add a rule to languette/rules/guard-scheduled-jobs.json ([#233](https://github.com/mark-brannan/languette/pull/233))
+
+### 20261021t103548z
+- a rule-file rule whose id is a Python default's is a load fault, as guard-secrets treats a shipped rule's id; a file adds, never replaces Undo: let a same-id rule stand beside the default in _load ([#233](https://github.com/mark-brannan/languette/pull/233))
