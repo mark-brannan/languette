@@ -282,7 +282,7 @@ def _admin_merge(s, a, b, nested):
     w = s.w[g + 1:b + 1]
     admin = any(x == "--admin" or x.startswith("--admin=") for x in w)
     dyn = [s.live[g + 1 + k] or bool(_UNREADABLE.search(x)) for k, x in enumerate(w)]
-    first, skip = [], False                    # the group and its verb; a literal -R value is neither
+    first, skip, odd = [], False, False        # the group and its verb; a literal -R value is neither
     for k, x in enumerate(w):
         if skip:
             skip = False
@@ -290,9 +290,12 @@ def _admin_merge(s, a, b, nested):
                 first.append(k)
         elif x.startswith("-"):
             skip = x in sw.GH_REPO_FLAGS or _opt(x, "--repo") and "=" not in x
+            odd = odd or len(first) < 2 and not (skip or _opt(x, "--repo"))
         elif len(first) < 2:
             first.append(k)
-    if len(first) >= 2 and not dyn[first[0]] and not dyn[first[1]] and (w[first[0]], w[first[1]]) != ("pr", "merge"):
+    # Certain only when no flag ahead of the verb but the repo flag could hide a value.
+    if (len(first) >= 2 and not odd and not dyn[first[0]] and not dyn[first[1]]
+            and (w[first[0]], w[first[1]]) != ("pr", "merge")):
         return False                           # a literal other verb: `merge` is a flag's value, as in `--add-label merge`
     if "pr" in w and "merge" in w:
         if admin:

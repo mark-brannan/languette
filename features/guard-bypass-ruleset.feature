@@ -159,6 +159,10 @@ Feature: guard-bypass-ruleset
       | command                      |
       | p=pr; gh $p merge 5 --admin  |
 
+  Scenario: an admin merge behind an unknown flag and its value is denied
+    When the agent runs `gh -X foo pr merge 5 --admin`
+    Then the guard denies, naming "--admin"
+
   Scenario: an admin merge with a split flag is denied
     When the agent runs `gh pr merge 5 --adm''in`
     Then the guard denies, naming "--admin"
@@ -203,6 +207,7 @@ Feature: guard-bypass-ruleset
       | git -c url.https://github.com/o/r.insteadOf=foo push foo main | a URL rewrite |
       | gh pr merge 5 "$flags"            | a flag built at run time              |
       | gh pr $v 5                        | a pr subcommand built at run time     |
+      | gh -X foo pr merge 5 "$flags"    | an unknown flag's value ahead of the verb |
       | gh -R o/r $p merge 5              | a run-time group behind a repo flag   |
       | gh --repo o/r pr $v 5             | a run-time verb behind a repo flag    |
       | export GIT_DIR=/x; git push origin main | another repository, exported       |
