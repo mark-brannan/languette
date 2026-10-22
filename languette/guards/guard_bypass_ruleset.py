@@ -282,6 +282,21 @@ def _admin_merge(s, a, b, nested):
     w = s.w[g + 1:b + 1]
     admin = any(x == "--admin" or x.startswith("--admin=") for x in w)
     dyn = [s.live[g + 1 + k] or bool(_UNREADABLE.search(x)) for k, x in enumerate(w)]
+    first, skip, odd = [], False, False        # the group and its verb; a literal -R value is neither
+    for k, x in enumerate(w):
+        if skip:
+            skip = False
+            if dyn[k]:                         # a run-time -R value may split into `pr merge`
+                first.append(k)
+        elif x.startswith("-"):
+            skip = x in sw.GH_REPO_FLAGS or _opt(x, "--repo") and "=" not in x
+            odd = odd or len(first) < 2 and not (skip or _opt(x, "--repo"))
+        elif len(first) < 2:
+            first.append(k)
+    # Certain only when no flag ahead of the verb but the repo flag could hide a value.
+    if (len(first) >= 2 and not odd and not dyn[first[0]] and not dyn[first[1]]
+            and (w[first[0]], w[first[1]]) != ("pr", "merge")):
+        return False                           # a literal other verb: `merge` is a flag's value, as in `--add-label merge`
     if "pr" in w and "merge" in w:
         if admin:
             return True
@@ -291,16 +306,6 @@ def _admin_merge(s, a, b, nested):
     if any(dyn):
         if admin:
             return True                        # a live subcommand beside a literal --admin
-        first, skip = [], False                # the group and its verb; a literal -R value is neither
-        for k, x in enumerate(w):
-            if skip:
-                skip = False
-                if dyn[k]:                     # a run-time -R value may split into `pr merge`
-                    first.append(k)
-            elif x.startswith("-"):
-                skip = x in sw.GH_REPO_FLAGS or _opt(x, "--repo") and "=" not in x
-            elif len(first) < 2:
-                first.append(k)
         # Only a run-time group, or a run-time verb under a literal `pr`, could spell `pr merge`.
         if first and (dyn[first[0]] or (w[first[0]] == "pr" and len(first) > 1 and dyn[first[1]])):
             raise Refuse("the `gh` subcommand is built at run time and could be `pr merge --admin`")
