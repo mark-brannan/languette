@@ -2316,6 +2316,7 @@
  "tests/test_features.py::test_what_lands_elsewhere_or_not_at_all_is_not_this_guards[gh api repos/$R/pulls/5-a run-time path under a literal api]": {"git": 1},
  "tests/test_features.py::test_what_lands_elsewhere_or_not_at_all_is_not_this_guards[gh issue $verb 5-a run-time word under issue, not pr]": {"git": 1},
  "tests/test_features.py::test_what_lands_elsewhere_or_not_at_all_is_not_this_guards[gh pr checks 5 -R $R-a run-time repo beside a literal pr]": {"git": 1},
+ "tests/test_features.py::test_what_lands_elsewhere_or_not_at_all_is_not_this_guards[gh pr edit 5 --repo $R --add-label merge-`merge` is a label's value, under a run-time repo]": {"git": 1},
  "tests/test_features.py::test_what_lands_elsewhere_or_not_at_all_is_not_this_guards[gh pr merge 5 --squash --auto-a merge that waits for the rules]": {"git": 1},
  "tests/test_features.py::test_what_lands_elsewhere_or_not_at_all_is_not_this_guards[git push --dry-run origin main-a dry run pushes nothing]": {"git": 1},
  "tests/test_features.py::test_what_lands_elsewhere_or_not_at_all_is_not_this_guards[git push --tags origin-tags only]": {"git": 1},

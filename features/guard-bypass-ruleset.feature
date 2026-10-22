@@ -90,6 +90,7 @@ Feature: guard-bypass-ruleset
       | gh pr checks 5 -R $R                      | a run-time repo beside a literal pr       |
       | gh issue $verb 5                          | a run-time word under issue, not pr       |
       | gh -R o/r api repos/$R/pulls/5            | a literal repo before a literal api       |
+      | gh pr edit 5 --repo $R --add-label merge  | `merge` is a label's value, under a run-time repo |
 
     @also_guard-github-issues
     Examples:
