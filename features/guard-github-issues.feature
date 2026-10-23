@@ -44,6 +44,9 @@ Feature: guard-github-issues
   This is a gate, so it fails closed: a call that mentions an issue and
   cannot be read is denied.
 
+  Background:
+    Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "churn-ok,mixed-loops-ok"
+
   Scenario Outline: never an identifier write, door shut or not
     When the agent runs `<command>`
     Then the guard is silent

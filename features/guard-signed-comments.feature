@@ -27,6 +27,9 @@ Feature: guard-signed-comments
   guard-private-terms denies it, with the fix in the reason: write it
   literally, in a heredoc or a --body-file.
 
+  Background:
+    Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "churn-ok,mixed-loops-ok"
+
   Rule: a signed comment posts
 
     Scenario: a signed comment, quoted on the command line

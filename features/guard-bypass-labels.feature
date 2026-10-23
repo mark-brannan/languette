@@ -2,15 +2,19 @@
 Feature: guard-bypass-labels
   A label that waives a CI gate is a human's to apply, never a session's: a
   gate whose bypass the gated party can apply to its own PR is not a gate.
-  The labels are the bypass_labels option, comma-separated, by default
-  churn-ok (the churn gate) and mixed-loops-ok (the mixed-loops gate). They
-  are matched case-insensitively, as GitHub matches label names, and denied
-  in every repo, public or private. Three routes reach a label: gh's flags
+  The labels are the bypass_labels option, comma-separated; by default there
+  are none, and every label is a session's to apply. A repo owner lists the
+  labels to keep for humans, such as churn-ok (the churn gate) and
+  mixed-loops-ok (the mixed-loops gate). They are matched case-insensitively,
+  as GitHub matches label names, and denied in every repo, public or private. Three routes reach a label: gh's flags
   (also stored by gh alias), gh api, and an MCP tool's labels field. The gh
   is found through wrappers, sh -c, eval, a pipe into a shell and a heredoc
   fed to a shell, which is code; a heredoc fed to anything else is text. A
   label named in text is not a label applied. The option is a list of names,
   matched literally, never a pattern.
+
+  Background:
+    Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "churn-ok,mixed-loops-ok"
 
   Rule: a bypass label applied through gh's flags is denied
 
@@ -471,9 +475,9 @@ Feature: guard-bypass-labels
       When the agent calls tool "Write" with input `{"file_path":"/tmp/x.md","content":"gh pr edit 1 --add-label churn-ok"}`
       Then the guard is silent
 
-  Rule: the labels are a setting, matched literally, and an empty one is the default
+  Rule: the labels are a setting, matched literally, and an empty one keeps none
 
-    Scenario: bypass_labels replaces the default list
+    Scenario: bypass_labels replaces the list
       Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "skip-e2e, Churn-OK"
       When the agent runs `gh pr edit 12 --add-label SKIP-E2E`
       Then the guard denies, naming "skip-e2e"
@@ -482,10 +486,12 @@ Feature: guard-bypass-labels
       When the agent runs `gh pr edit 12 --add-label mixed-loops-ok`
       Then the guard is silent
 
-    Scenario Outline: an empty or blank bypass_labels is the default, never no labels at all
+    Scenario Outline: an empty or blank bypass_labels keeps no label for humans
       Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "<value>"
       When the agent runs `gh pr edit 12 --add-label mixed-loops-ok`
-      Then the guard denies, naming "mixed-loops-ok"
+      Then the guard is silent
+      When the agent runs `gh pr edit 12 --add-label churn-ok`
+      Then the guard is silent
 
       Examples:
         | value |
@@ -493,10 +499,24 @@ Feature: guard-bypass-labels
         | ,     |
         |  , ,  |
 
-    Scenario: an unset bypass_labels is the default
+    Scenario: an unset bypass_labels keeps no label for humans
       Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is unset
       When the agent runs `gh pr edit 12 --add-label churn-ok`
+      Then the guard is silent
+      When the agent runs `gh pr edit 12 --add-label mixed-loops-ok`
+      Then the guard is silent
+
+    Scenario: with no label kept, a label the guard cannot read is allowed too
+      Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is unset
+      When the agent runs `gh pr edit 12 --add-label "$LABEL"`
+      Then the guard is silent
+
+    Scenario: a setting that lists churn-ok still denies it
+      Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "churn-ok"
+      When the agent runs `gh pr edit 12 --add-label churn-ok`
       Then the guard denies, naming "churn-ok"
+      When the agent runs `gh pr edit 12 --add-label mixed-loops-ok`
+      Then the guard is silent
 
     Scenario Outline: the option is names, never a pattern or code
       Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "<value>"

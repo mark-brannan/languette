@@ -9,6 +9,7 @@ Feature: wiring
 
   Background:
     Given a project directory
+    And CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "churn-ok,mixed-loops-ok"
     And the file ".languette/ask-first.json" holds:
       """
       {"commands": [{"id": "walk", "match": [{"cmd": "npm", "args": ["run", "walk"]}],

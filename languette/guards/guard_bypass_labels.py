@@ -1,11 +1,11 @@
-"""guard-bypass-labels: a label that waives a CI gate is a human's to apply.
+"""guard-bypass-labels: a label that waives a CI gate can be kept for humans.
 
-`churn-ok` waives the churn gate and `mixed-loops-ok` the mixed-loops gate.
 A gate whose bypass the gated party can apply to its own PR is not a gate, so
-a session may not apply either label, in any repo, public or private. The
-list is the bypass_labels option (CLAUDE_PLUGIN_OPTION_BYPASS_LABELS),
-comma-separated; unset, empty or blank is the default list, so a
-misconfiguration cannot open the gate. Names are compared case-folded, as
+a repo owner who wants a label (`churn-ok`, `mixed-loops-ok`) kept for humans
+lists it in the bypass_labels option (CLAUDE_PLUGIN_OPTION_BYPASS_LABELS),
+comma-separated; a session may not apply a listed label, in any repo, public
+or private. Unset, empty or blank lists none: the guard then allows every
+label, and each is a session's to apply. Names are compared case-folded, as
 GitHub compares label names.
 
 Three routes reach a label, and each is read:
@@ -45,7 +45,7 @@ from languette.verdict import Need, Refuse, deny, planned
 
 NAME = "guard-bypass-labels"
 OPTION = "CLAUDE_PLUGIN_OPTION_BYPASS_LABELS"
-DEFAULT = ("churn-ok", "mixed-loops-ok")
+DEFAULT = ()
 
 GH = re.compile(r"(?:^|/)gh\Z")
 WRITES = frozenset("create new edit".split())
@@ -414,6 +414,8 @@ def judge(parsed, answers):
         f = _Found({p: _text(answers[Need("read", p, paths.MAX_READ)]) for p in f.wanted})
         _bash(f, *rewalk, env)
     bad = bypass_labels(env)
+    if not bad:
+        return None
     hit = next((x.casefold() for x in f.labels if x.casefold() in bad), None)
     if hit:
         return deny(say("bypass_label", guard=NAME, label=hit))

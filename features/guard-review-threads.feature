@@ -35,6 +35,7 @@ Feature: guard-review-threads
   Background:
     Given the stub "gh" is first on PATH, for a Python guard
     And GH_LOGIN is "me"
+    And CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "churn-ok,mixed-loops-ok"
 
   Scenario Outline: a reply naming the fix or the record lets the thread close
     Given review thread "PRRT_t1" holds:

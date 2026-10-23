@@ -214,8 +214,8 @@
     "bypass_labels": {
       "type": "string",
       "title": "Bypass labels",
-      "description": "Labels that waive a CI gate, so only a human may apply them: comma-separated, matched case-insensitively. Empty means the default, churn-ok,mixed-loops-ok.",
-      "default": "churn-ok,mixed-loops-ok",
+      "description": "Labels that waive a CI gate and are kept for humans, so a session may not apply them: comma-separated, matched case-insensitively. Empty means none: every label is the session's to apply.",
+      "default": "",
       "required": false
     },
     "prose_budget_commit": {
