@@ -73,8 +73,7 @@ CALLS = {"open", "io.open", "io.FileIO", "builtins.open", "codecs.open", "input"
 NEED = ("Need", "verdict.Need")
 # Door claim takes the door when it stands, a rename and a write (world._take).
 WRITES = {"claim", "ruleset-keep", "send-keep", ("door", "open"), ("door", "spend"), ("door", "claim"),
-          ("door", "take"), ("worktree", "arrive"), ("worktree", "keep"), ("worktree", "add"),
-          ("worktree", "leave")}
+          ("door", "take"), ("worktree", "arrive"), ("worktree", "keep"), ("worktree", "leave")}
 BUILTINS = {"open", "input", "breakpoint"}
 # Methods that do I/O on whatever they are called on: Path's, a file's.
 METHODS = {"read_text", "read_bytes", "write_text", "write_bytes", "iterdir", "rglob", "touch", "unlink", "rmdir",

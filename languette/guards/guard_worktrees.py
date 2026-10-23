@@ -30,9 +30,10 @@ component equal to the payload's session_id (its scratchpad); and toplevels
 recorded in ${TMPDIR:-/tmp}/languette-guard-worktrees.<session>[.<agent>]
 when reached by a route this guard vouches for (the session's first call, the
 call after EnterWorktree(name=...), a cd into a path that did not exist yet),
-or named as the path of a `git worktree add` this guard allowed while nothing
-that is a worktree stood there. Each record line carries the inode of the
-worktree's `.git`, bound the first time an added path is reached; a record not
+or, at the session's next call, the path of an unconditional `git worktree
+add` this guard allowed while nothing stood there, when a `.git` file made
+since stands there. Each record line carries the inode of the worktree's
+`.git`; a record not
 owned by this user, or a symlink, is ignored. EnterWorktree(path=...) is
 denied outright. Redirection targets are not seen. The deny names a
 one-command recipe for the session's own worktree.
@@ -49,6 +50,7 @@ NAME = "guard-worktrees"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES"
 MAX_CANDIDATES = 48
 _HOMEISH = re.compile(r"(?:/|~\Z|~/|\$HOME\Z|\$HOME/|\$\{HOME\}\Z|\$\{HOME\}/)")
+_CTRL = re.compile(r"[\x00-\x1f\x7f]")
 _KEYWORD = frozenset("builtin command if then else elif while until do !".split())
 
 
@@ -265,32 +267,48 @@ def _pathish(t):
     return t if "/" in t else ""
 
 
-def _worktree_add(s, a, b, nested):
-    """(path, [-C values]) for a `git worktree add <path>` in segment a..b, or None."""
-    g = sw.cmd_index(s, a, b, sw.GIT, nested)
-    if g is None:
+# `git worktree add` options: flags, and those that take the next word.
+_ADD_FLAGS = frozenset("-f --force -d --detach --checkout --no-checkout --lock -q --quiet --track --no-track "
+                       "--guess-remote --no-guess-remote --orphan --relative-paths --no-relative-paths".split())
+_ADD_VALUE = frozenset("-b -B --reason".split())
+# Words that make what follows run only on a condition, or more than once.
+_CONTROL = frozenset("if then else elif fi while until do done for case select function !".split())
+
+
+def _worktree_add(s, a, b):
+    """(path, [-C values]) for a `git worktree add <path>` in segment a..b, or
+    None. Any option it does not know, a word it can't read, or more than a
+    path and a commit-ish is None: what it can't parse it never records."""
+    g = sw.cmd_index(s, a, b, sw.GIT, False)
+    if g is None or not re.search(r"(?:^|/)git\Z", s.w[g]):
         return None
     sub = sw.git_subcommand(s, g, b)
     if sub + 1 > b or s.w[sub] != "worktree" or s.w[sub + 1] != "add":
         return None
     cs = [s.w[i + 1] for i in sw.git_options(s, g, sub) if s.w[i] == "-C"]
-    i = sub + 2
+    pos, i, opts = [], sub + 2, True
     while i <= b:
         if s.k[i] != "w":
             return None
         w = s.w[i]
-        if w == "--":
+        i += 1
+        if not opts or not w.startswith("-") or w == "-":
+            pos.append(w)
+        elif w == "--":
+            opts = False
+        elif w in _ADD_FLAGS or w.startswith("--reason="):
+            pass
+        elif w in _ADD_VALUE:
             i += 1
-            break
-        if w in ("-b", "-B", "--reason"):
-            i += 2
-        elif w.startswith("-"):
-            i += 1
+        elif re.fullmatch(r"-[fdq]*[bB].*|-[fdq]+", w):
+            # a bundle: -fq, -fb <branch>, -fbname
+            if re.fullmatch(r"-[fdq]*[bB]", w):
+                i += 1
         else:
-            break
-    if i > b or s.k[i] != "w":
+            return None
+    if i > b + 1 or not 1 <= len(pos) <= 2:
         return None
-    return s.w[i], cs
+    return pos[0], cs
 
 
 def _foreign_words(doc):
@@ -302,7 +320,7 @@ def _foreign_words(doc):
     for x, (text, nested) in enumerate(doc.texts()):
         s = doc.scan(text)
         out.append(("T",))
-        ncd, seen = 0, set()
+        ncd, seen, cond = 0, set(), False
         for a, b in s.segments():
             c = a
             while c <= b and s.k[c] == "w" and (sw._ASSIGN.match(s.w[c]) or s.w[c] in _KEYWORD):
@@ -330,7 +348,12 @@ def _foreign_words(doc):
                     continue
                 seen.add((ncd, t))
                 out.append(("W", t))
-            add = _worktree_add(s, a, b, nested)
+            # An add that runs only on a condition (behind &&, ||, a pipe, a
+            # keyword, or in a nested text) may never run: it records nothing.
+            if a > 0 and any(o in s.op[a - 1] for o in ("&&", "||", "|")):
+                cond = True
+            cond = cond or nested or any(s.k[j] == "w" and s.w[j] in _CONTROL for j in range(a, b + 1))
+            add = None if cond else _worktree_add(s, a, b)
             if add:
                 out.append(("A", *add))
     return out
@@ -346,7 +369,7 @@ class _Session:
         self.env, self.own_top, self.home = env, own_top, home
         sid, aid = payload.get("session_id"), payload.get("agent_id")
         self.sid = sid if isinstance(sid, str) else ""
-        self.rec, self.bound = None, set()
+        self.rec = None
         if self.sid:
             tag = re.sub(r"[^A-Za-z0-9_-]", "_", self.sid)
             if isinstance(aid, str) and aid:
@@ -357,24 +380,13 @@ class _Session:
         return bool(self.sid) and f"/{self.sid}/" in f"/{d}/"
 
     def recorded(self, top):
-        """Whether `top` is in the record; an added path found there is bound
-        to its `.git` inode now, so a later stranger at that path is not."""
         if not self.rec:
             return False
-        r = yield Need("worktree", "recorded", self.rec, top)
-        if r == "added" and top not in self.bound:
-            self.bound.add(top)
-            yield Act("worktree-keep", self.rec, top)
-        return bool(r)
-
-    def added(self, paths):
-        """Record the paths of the `git worktree add`s this allowed call runs."""
-        if self.rec:
-            for p in paths:
-                yield Act("worktree-add", self.rec, p)
+        return (yield Need("worktree", "recorded", self.rec, top))
 
     def leave(self, text):
-        """What the next call may adopt as its own: `enter`, or the arrivals."""
+        """What the next call may adopt as its own: `enter`, the arrivals, or
+        `add<TAB><path>` for a worktree this call's `git worktree add` makes."""
         if self.rec:
             yield Act("worktree-leave", self.rec, text)
 
@@ -503,7 +515,7 @@ def _foreign(doc):
         if not d:
             return None
         p = d.rstrip("/") + "/" + os.path.normpath(rest) if rest else d
-        if (yield Need("path", "lexists", p + "/.git")) or (rest and (yield Need("path", "lexists", p))):
+        if _CTRL.search(p) or (yield Need("path", "lexists", p + "/.git")) or (rest and (yield Need("path", "lexists", p))):
             return None
         return None if sess.under_scratch(p) else p
 
@@ -537,9 +549,8 @@ def _foreign(doc):
         else:
             vcwd = cd_dir
     # Allowed. Leave this command's arrivals for the next call to consume.
-    if arrivals:
-        yield from sess.leave("\n".join(arrivals))
-    yield from sess.added(adds)
+    if arrivals or adds:
+        yield from sess.leave("\n".join(arrivals + ["add\t" + p for p in adds]))
 
 
 CONTROLS = (("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME", _checkout_home),
