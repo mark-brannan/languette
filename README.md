@@ -253,7 +253,7 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 Without a terms file the guard is off.
 
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
-comma-separated; empty means none, so every label is the session's to apply.
+comma-separated; empty means none, so every label may be applied.
 List the labels to keep for humans, such as `churn-ok,mixed-loops-ok`.
 
 `record_decisions`, off by default, keeps every verdict, with its command and
