@@ -107,7 +107,7 @@ Each guard checks for one kind of hazard:
 - [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
-  applying a label that waives a CI gate, such as `churn-ok`
+  applying a label the `bypass_labels` setting names (none by default)
 - [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push direct to
   main where pull requests are normally required (agents could potentially bypass using your credentials)
 - [`guard-cross-session-send`](features/guard-cross-session-send.feature): prevents
@@ -253,7 +253,9 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 Without a terms file the guard is off.
 
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
-comma-separated; empty means `churn-ok,mixed-loops-ok`.
+comma-separated; empty, the default, guards no label. A label that waives a CI
+gate is the driver's to apply unless this setting names it, for example
+`churn-ok,mixed-loops-ok`.
 
 `record_decisions`, off by default, keeps every verdict, with its command and
 secrets masked, in `$XDG_STATE_HOME/languette/decisions.jsonl`, readable only by you.

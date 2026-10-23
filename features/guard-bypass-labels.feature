@@ -1,16 +1,20 @@
 @python
 Feature: guard-bypass-labels
-  A label that waives a CI gate is a human's to apply, never a session's: a
-  gate whose bypass the gated party can apply to its own PR is not a gate.
-  The labels are the bypass_labels option, comma-separated, by default
-  churn-ok (the churn gate) and mixed-loops-ok (the mixed-loops gate). They
-  are matched case-insensitively, as GitHub matches label names, and denied
-  in every repo, public or private. Three routes reach a label: gh's flags
-  (also stored by gh alias), gh api, and an MCP tool's labels field. The gh
-  is found through wrappers, sh -c, eval, a pipe into a shell and a heredoc
+  A label that waives a CI gate is the driver's to apply unless the
+  bypass_labels option names it. The option is comma-separated and empty by
+  default, so by default the guard allows every command; the scenarios
+  below, unless one says otherwise, run with it set to churn-ok (the churn
+  gate) and mixed-loops-ok (the mixed-loops gate). A named label is matched
+  case-insensitively, as GitHub matches label names, and denied in every
+  repo, public or private. Three routes reach a label: gh's flags (also
+  stored by gh alias), gh api, and an MCP tool's labels field. The gh is
+  found through wrappers, sh -c, eval, a pipe into a shell and a heredoc
   fed to a shell, which is code; a heredoc fed to anything else is text. A
   label named in text is not a label applied. The option is a list of names,
   matched literally, never a pattern.
+
+  Background:
+    Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "churn-ok,mixed-loops-ok"
 
   Rule: a bypass label applied through gh's flags is denied
 
@@ -471,9 +475,9 @@ Feature: guard-bypass-labels
       When the agent calls tool "Write" with input `{"file_path":"/tmp/x.md","content":"gh pr edit 1 --add-label churn-ok"}`
       Then the guard is silent
 
-  Rule: the labels are a setting, matched literally, and an empty one is the default
+  Rule: the labels are a setting, matched literally, and an empty one guards none
 
-    Scenario: bypass_labels replaces the default list
+    Scenario: bypass_labels names the guarded labels
       Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "skip-e2e, Churn-OK"
       When the agent runs `gh pr edit 12 --add-label SKIP-E2E`
       Then the guard denies, naming "skip-e2e"
@@ -482,10 +486,10 @@ Feature: guard-bypass-labels
       When the agent runs `gh pr edit 12 --add-label mixed-loops-ok`
       Then the guard is silent
 
-    Scenario Outline: an empty or blank bypass_labels is the default, never no labels at all
+    Scenario Outline: an empty or blank bypass_labels guards no label
       Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "<value>"
       When the agent runs `gh pr edit 12 --add-label mixed-loops-ok`
-      Then the guard denies, naming "mixed-loops-ok"
+      Then the guard is silent
 
       Examples:
         | value |
@@ -493,10 +497,23 @@ Feature: guard-bypass-labels
         | ,     |
         |  , ,  |
 
-    Scenario: an unset bypass_labels is the default
+    Scenario: an unset bypass_labels guards no label
       Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is unset
       When the agent runs `gh pr edit 12 --add-label churn-ok`
-      Then the guard denies, naming "churn-ok"
+      Then the guard is silent
+
+    Scenario Outline: an empty bypass_labels allows every route
+      Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is ""
+      When the agent runs `<command>`
+      Then the guard is silent
+
+      Examples:
+        | command                                                                  |
+        | gh pr create -t t -b b --label churn-ok                                  |
+        | gh api -X POST repos/o/r/issues/12/labels -f labels[]=churn-ok           |
+        | gh api repos/o/r/issues/12/labels --input /nonexistent/payload.json      |
+        | gh api graphql -f query='mutation { addLabelsToLabelable(input:{}) { clientMutationId } }' |
+        | gh pr edit 12 --add-label "$L"                                           |
 
     Scenario Outline: the option is names, never a pattern or code
       Given CLAUDE_PLUGIN_OPTION_BYPASS_LABELS is "<value>"
