@@ -1,9 +1,10 @@
 # Decisions
 
-Rulings that settle languette's public interface. The README says what the
-interface is; this file says who decided it and why, one line each.
+Decisions that settle languette's public interface. The README says what the
+interface is; this file says what was decided and why, one line each. Every
+line is the maintainer's (@mark-brannan) unless it says otherwise.
 
-## ask-first config: Solace, 2026-10-02 and 2026-10-03
+## ask-first config: 2026-10-02 and 2026-10-03
 
 - The config lives at `.languette/ask-first.json`, replacing
   `.claude/languette-ask.json`. The folder names who made it and the file
@@ -24,27 +25,27 @@ interface is; this file says who decided it and why, one line each.
   pattern times the hook out, and a timed-out hook does not block.
 - Examples and fixtures use generic commands, not one project's.
 
-## Parser ladder: Solace, 2026-10-06
+## Parser ladder: 2026-10-06
 
 - The shell parser's cascade (#4), in order: a user-installed `shfmt`
   first, then a pip-installed parser, and awk only when none of those is
   available.
 - Which pip parser, or both in turn (tree-sitter-bash, bashlex), is open (#4).
 
-## Parser ladder refusals: Solace, 2026-10-07
+## Parser ladder refusals: 2026-10-07
 
 - `bash -n` is a rung; a rung reads, refuses (a deny naming it) or passes down.
 - tree-sitter-bash refuses on an ERROR node; bashlex on an unclosed quote,
   bracket or unexpected end; the built-in lexer on an unclosed quote.
 
-## Parse check: Solace, 2026-10-07
+## Parse check: 2026-10-07
 
 - shfmt is the critical path; below it, `bash -n` decides the parse check; a
   pip parser, if installed, only adds the column.
-- This replaces the pip parsers' refusals in the ruling above: tree-sitter-bash
+- This replaces the pip parsers' refusals in the decision above: tree-sitter-bash
   and bashlex no longer refuse.
 
-## Runtime dependencies: Solace, 2026-10-06
+## Runtime dependencies: 2026-10-06
 
 - Languette runs on python3 and its standard library plus the parser ladder
   above, takes no other dependency, and depends on nothing in
@@ -54,7 +55,7 @@ interface is; this file says who decided it and why, one line each.
   without needing that tool installed. `gh` is optional, for
   `no-delete-stacked-base` only.
 
-## Guard names: Solace, 2026-10-07
+## Guard names: 2026-10-07
 
 - Every guard is named `guard-<concept>`, the asset or scenario it guards
   against; no `no-` prefix, no "footguns". One guard per concept, a setting
@@ -64,14 +65,14 @@ interface is; this file says who decided it and why, one line each.
   `guard-private-terms`; config keys follow, with underscores. The rest are
   renamed as reached.
 
-## Three concerns: Solace, 2026-10-07
+## Three concerns: 2026-10-07
 
 - Parse reads the command into parts. Guards are pure functions reporting
   findings. Verdict turns findings and configuration into an action.
-- Guards needing enriched data: how is unruled; first try is
+- Guards needing enriched data: how is open; first try is
   request-and-answer (#79).
 
-## The guard pipeline: Solace, 2026-10-07
+## The guard pipeline: 2026-10-07
 
 - Six steps: parse, plan, gather, guard, verdict, act. Plan, guard and
   verdict are pure; gather reads, act writes.
@@ -79,31 +80,31 @@ interface is; this file says who decided it and why, one line each.
   the parse.
 - Design: [docs/design/guard-pipeline.md](design/guard-pipeline.md).
 
-## Gather reads only: Solace, 2026-10-09
+## Gather reads only: 2026-10-09
 
 - No Need writes or runs a host-named program. Scar: #107.
 - The readable set is the read kinds in `KINDS` in `languette/world.py`.
 - Whether `prose-budget-commit` keeps running the engine `prose_budget_bin`
-  names is unruled.
+  names is open.
 
-## New guards: Solace, 2026-10-09
+## New guards: 2026-10-09
 
 - A guard enters languette through an issue, never straight from a miss.
   Issue fields: incident, root cause, hazard, concept, name. Scar: #125.
 - Hazard: why it could ruin a day, as the README's lede puts it; a waste
   of an hour is not one. Concept: a setting of an existing guard, or a new
-  one. Name: under the naming ruling above.
+  one. Name: under the naming decision above.
 - Root cause first, guard second. A miss is often a workflow gap, and a
   guard at most a backstop for it.
 - No prototypes here, not even as drafts; a closed PR is residue. A quick
   fix lands in the author's own hook layer, or an unstable sibling repo, and
-  comes here once Solace puts the GitHub label `ready` on its issue.
+  comes here once the maintainer puts the GitHub label `ready` on its issue.
 - If prototyping outside is hard because the parser and engine live here,
   the fix is to expose those interfaces, not to admit the prototype.
 - Whether guards that watch an agent's conduct on GitHub (#118, #119, #125)
-  are one concept or several is unruled.
+  are one concept or several is open.
 - Prose now; a check with teeth once the gate's shape is settled.
-- Ruled 2026-10-13: a new guard is written against the shared layer
+- 2026-10-13: a new guard is written against the shared layer
   first: Document for the call, scan for the words, verdict for the
   answer. A primitive the guard needs that two or more guards would share
   (a program pattern, an option walk, a sentence) goes into scan or
@@ -113,7 +114,7 @@ interface is; this file says who decided it and why, one line each.
 - Current thinking, not settled: guards trend toward a rules engine with a
   few deep special cases.
 
-## Base-case guard names: Solace, 2026-10-09
+## Base-case guard names: 2026-10-09
 
 - `require-well-formed` replaces `guard-unparsable`. Well-formed means
   parsed whole, within the size and depth bounds.
@@ -122,12 +123,12 @@ interface is; this file says who decided it and why, one line each.
 - These name what happens, outside the `guard-<concept>` scheme. The
   suffix `-first` is not reserved.
 
-## License and versions: Solace, 2026-10-08 and 2026-10-09
+## License and versions: 2026-10-08 and 2026-10-09
 
 - Code is AGPL-3.0-or-later and prose is CC BY-SA 4.0 ("AGPL + CC SA for
   writing").
 - The first release is 0.0.1, carrying `languette doctor`.
-- Every release bumps the patch number only, until Solace says otherwise. No
+- Every release bumps the patch number only, until the maintainer says otherwise. No
   semver; a review that asks for a minor or major bump is out of scope.
 
 ## Releases and titles: 2026-10-10
@@ -139,7 +140,7 @@ interface is; this file says who decided it and why, one line each.
 - Docs changes count toward a release, so a README fix can open the
   release pull request. Opening it obliges nothing.
 
-## Trust and licence riders: Solace, 2026-10-09
+## Trust and licence riders: 2026-10-09
 
 - No licence rider against AI companies: AGPL answers hosting, and no licence
   answers training. The README states the distrust as a position, not a condition.
