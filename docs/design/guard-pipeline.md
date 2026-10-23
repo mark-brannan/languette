@@ -1,7 +1,7 @@
 # The guard pipeline
 
 The design behind epic #76. Present tense is the aim, not today's code;
-the ruling is in [decisions.md](../decisions.md).
+the decisions are in [decisions.md](../decisions.md).
 
 ## Purpose
 
@@ -57,6 +57,6 @@ false. Cost: one file, a few milliseconds per run (estimate).
 ## Cross-cutting: metrics
 
 Metrics are expected to be simple and recorded in act, alongside the other
-writes (Solace, 2026-10-07: "most likely we will do simple metrics that are at
+writes (the maintainer, 2026-10-07: "most likely we will do simple metrics that are at
 the write stage also"). A richer metric that needs timing inside steps 1 to 5
 would be the first wrinkle in this shape.
