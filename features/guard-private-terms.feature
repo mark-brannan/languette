@@ -3,13 +3,12 @@ Feature: guard-private-terms
   Text bound for a public GitHub repo is checked against the user's private
   terms file, wherever the text travels: a flag value, a heredoc, a file, an
   MCP field. The file is the private_terms_file option. Without one the guard
-  is inert; with one that cannot be read it is closed. The standalone suite,
-  tests/guard-private-terms.test.sh, walks the long tail of shell shapes.
+  is inert; with one that cannot be read it is closed.
 
-  Why. A private repo or notes directory holds details (boat names,
-  hostnames, service URLs, account identifiers) that must not reach the
-  public code repos, and a rule kept as prose in CLAUDE.md has already failed
-  at that. Once a term is in a public issue or PR comment it is in GitHub's
+  Why. A private repo or notes directory holds details (hostnames,
+  service URLs, account identifiers, project code names) that must not reach the
+  public code repos, and a rule kept as prose in an instructions file is not
+  enough. Once a term is in a public issue or PR comment it is in GitHub's
   history and every mirror of it; the undo is a support ticket, not an edit.
   So the check moves from the model's memory to the moment the text leaves
   the machine.
@@ -590,8 +589,8 @@ Feature: guard-private-terms
       Then the guard denies, naming "{HOME}"
 
     # A longer path that merely starts with $HOME is not $HOME: a plain replace
-    # would corrupt it (~2 is a different user). Scars from PR review on
-    # dotfiles#184, rounds 1 and 2.
+    # would corrupt it (~2 is a different user). Scar from an earlier
+    # review.
     Scenario Outline: a path that only starts with the home directory is not rewritten
       Given the private terms file holds:
         """

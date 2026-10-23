@@ -348,7 +348,7 @@ python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 python3 -m pytest                       # as each push runs it; --full runs every row
 python3 tests/readme_table.py           # regenerate the table
-shellcheck --severity=warning tests/stubs/* tests/*.test.sh   # as CI runs it
+shellcheck --severity=warning tests/stubs/*   # as CI runs it
 ```
 
 Running the tests needs pytest, pytest-bdd, pytest-xdist and PyHamcrest; the hooks do not.

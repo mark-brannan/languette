@@ -20,7 +20,7 @@ Feature: guard-review-threads
   over 30 days, 21 were resolved with no reply at all and 5 dismissed on
   the agent's own word with nothing behind them; the 29 sound dismissals
   each pointed at a record. So the reply carries the fix commit, or a link
-  to the ruling, decision record or issue the dismissal rests on. With
+  to the decision, design note or issue the dismissal rests on. With
   nothing behind it, the thread stays open for a person.
 
   gh is a stub throughout: it answers as GH_LOGIN, and each thread a

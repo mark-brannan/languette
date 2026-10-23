@@ -11,7 +11,7 @@ Feature: guard-signed-comments
       🤖 claude-opus-5-5 · high · 5a74df74
 
   Why. An agent posts under the user's own GitHub login, so a review bot and
-  the next agent read an agent's reply as the user's ruling. Scar: #116,
+  the next agent read an agent's reply as the user's own words. Scar: #116,
   where an agent's reply on a review thread was taken as the user's, and a
   reversal of the user's instruction was merged into the PR.
 
