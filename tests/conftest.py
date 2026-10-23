@@ -231,7 +231,9 @@ class Ctx:
         # to each other and to $HOME, so a guard that assumes otherwise fails.
         self.cwd = self.default_cwd = scattered(seed, "cwd")
         self.process_dir = scattered(seed, "process")
-        self.env = {}                          # name -> value, or None for unset
+        # name -> value, or None for unset. The guard's own default guards no label, so
+        # scenarios that expect guard-bypass-labels to fire start from a configured list.
+        self.env = {"CLAUDE_PLUGIN_OPTION_BYPASS_LABELS": "churn-ok,mixed-loops-ok"}
         self.proj = self.tmp = self.stub_log = self.bare = self.cache = None
         self.project_env = True
         self.stubs = False

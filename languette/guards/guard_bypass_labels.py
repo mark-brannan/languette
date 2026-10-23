@@ -1,11 +1,15 @@
-"""guard-bypass-labels: a label that waives a CI gate is a human's to apply.
+"""guard-bypass-labels: a label named in the bypass_labels option is a human's
+to apply.
 
-`churn-ok` waives the churn gate and `mixed-loops-ok` the mixed-loops gate.
-A gate whose bypass the gated party can apply to its own PR is not a gate, so
-a session may not apply either label, in any repo, public or private. The
-list is the bypass_labels option (CLAUDE_PLUGIN_OPTION_BYPASS_LABELS),
-comma-separated; unset, empty or blank is the default list, so a
-misconfiguration cannot open the gate. Names are compared case-folded, as
+A label that waives a CI gate is the driver's to apply unless the option names
+it. The list is the bypass_labels option (CLAUDE_PLUGIN_OPTION_BYPASS_LABELS),
+comma-separated, and it is empty by default: unset, empty or blank guards no
+label and the guard allows every command. (Until 2026-10-23 the default list
+was churn-ok and mixed-loops-ok, and an empty option meant that list, so a
+misconfiguration could not open the gate; that is reversed.) A deployment that
+wants the gate back names its labels; a gate whose bypass the gated party can
+apply to its own PR is not a gate, so a session may then not apply a named
+label, in any repo, public or private. Names are compared case-folded, as
 GitHub compares label names.
 
 Three routes reach a label, and each is read:
@@ -45,7 +49,7 @@ from languette.verdict import Need, Refuse, deny, planned
 
 NAME = "guard-bypass-labels"
 OPTION = "CLAUDE_PLUGIN_OPTION_BYPASS_LABELS"
-DEFAULT = ("churn-ok", "mixed-loops-ok")
+DEFAULT = ()                                   # no label is guarded until the option names one
 
 GH = re.compile(r"(?:^|/)gh\Z")
 WRITES = frozenset("create new edit".split())
@@ -400,8 +404,8 @@ def parse(doc):
 
 def plan(parsed):
     """The files the walk could not read."""
-    if parsed is None:
-        return []
+    if parsed is None or not bypass_labels(parsed[2]):
+        return []                              # nothing is guarded: no file is worth reading
     return [Need("read", p, paths.MAX_READ) for p in dict.fromkeys(parsed[0].wanted)]
 
 
@@ -409,11 +413,13 @@ def judge(parsed, answers):
     if parsed is None:
         return None
     f, rewalk, env = parsed
+    bad = bypass_labels(env)
+    if not bad:
+        return None
     if f.wanted:
         # No file's contents lead to another read: one more walk, with every file, is the last.
         f = _Found({p: _text(answers[Need("read", p, paths.MAX_READ)]) for p in f.wanted})
         _bash(f, *rewalk, env)
-    bad = bypass_labels(env)
     hit = next((x.casefold() for x in f.labels if x.casefold() in bad), None)
     if hit:
         return deny(say("bypass_label", guard=NAME, label=hit))

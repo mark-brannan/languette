@@ -208,14 +208,14 @@
     "guard_bypass_labels": {
       "type": "boolean",
       "title": "Keep CI-gate bypass labels for humans",
-      "description": "Deny a session applying a label that waives a CI gate (bypass_labels) to an issue or PR, through gh, gh api or an MCP tool, in any repo. Leave on unless you want sessions to waive their own gates.",
+      "description": "Deny a session applying a label named in bypass_labels (none by default) to an issue or PR, through gh, gh api or an MCP tool, in any repo. With bypass_labels empty the guard allows every command.",
       "default": true
     },
     "bypass_labels": {
       "type": "string",
       "title": "Bypass labels",
-      "description": "Labels that waive a CI gate, so only a human may apply them: comma-separated, matched case-insensitively. Empty means the default, churn-ok,mixed-loops-ok.",
-      "default": "churn-ok,mixed-loops-ok",
+      "description": "Labels a session may not apply: comma-separated, matched case-insensitively. Empty, the default, guards no label: a label that waives a CI gate is the driver's to apply unless this names it.",
+      "default": "",
       "required": false
     },
     "prose_budget_commit": {
