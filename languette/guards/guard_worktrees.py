@@ -20,7 +20,7 @@ $HOME's worktree (`rev-parse --show-toplevel`), following a cd/pushd, chained
 A directory that cannot be resolved (a variable, `cd -`, a stale cwd) is a
 deny. `(cd x); git checkout y` is judged from x: a known false allow.
 
-foreign. A hand-off carries a branch, an issue and a PR, never a directory:
+foreign. Another session's worktree is never a place to work:
 the session that owns a worktree may archive it mid-turn under anyone who
 reached in. Any path-shaped word (or the word after -C, or a cd target) that
 git resolves to a toplevel that is not this session's own and whose `.git` is

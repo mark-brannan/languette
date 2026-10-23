@@ -23,8 +23,8 @@ Counts as an identifier write: `gh issue create|new|transfer|delete`; `gh api`
 POST to repos/o/r/issues; a graphql createIssue, transferIssue or deleteIssue;
 the MCP create_issue, transfer_issue, delete_issue, and issue_write with
 method create. `sh -c`, `eval` and `xargs` bodies are read; a script file is
-not. The door is named apart from the claude plugin's own copy of this guard,
-so the two never spend each other's (languette.world.DOOR).
+not. The door file carries a languette- prefix (languette.world.DOOR), so
+another plugin's copy of this guard never spends it.
 """
 
 import re

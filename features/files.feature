@@ -7,7 +7,7 @@ Feature: files
 
   Scenarios tagged @planned are verdicts no guard gives yet: they are
   expected to fail, so they never fail CI, and a row that starts passing
-  shows as XPASS. The verdicts there are proposals, not rulings. Every other
+  shows as XPASS. The verdicts there are proposals, not decisions. Every other
   scenario is allowed by design and fails CI when a guard stops allowing it.
 
   Scenario Outline: a file named by a variable, or an inline script that only prints, is stored work as usual
