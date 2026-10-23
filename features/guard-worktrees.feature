@@ -104,8 +104,14 @@ Feature: guard-worktrees
   deny the session's new worktree. Own is the cwd's toplevel now plus every
   recorded one. A toplevel is recorded only when reached by a route the guard
   vouches for: the first call of the session; the call after
-  EnterWorktree(name=...); or a `cd` the guard allowed into a path that did
-  not exist yet when checked (`git worktree add X && cd X`). A cwd reached
+  EnterWorktree(name=...); a `cd` the guard allowed into a path that did
+  not exist yet when checked (`git worktree add X && cd X`); or, at the
+  session's next call, the path of a `git worktree add` the guard allowed,
+  when nothing stood there at the add and a `.git` file made since the add
+  stands there now. Only an add that runs unconditionally counts: not one
+  behind `&&`, `||`, a pipe or a keyword, not one in a nested string, not one
+  with an option or a word the guard cannot read, and never a path holding a
+  control character; any of those records nothing. A cwd reached
   any other way (`cd "$VAR"`) is own while the shell stands in it and is
   never recorded, so an unchecked route cannot be laundered into a lasting
   allow. Each record line carries the inode of the worktree's `.git` file, so
@@ -770,6 +776,113 @@ Feature: guard-worktrees
       Then the guard is silent
       When the agent runs `git -C {TMP}/repo/.claude/worktrees/mine status`
       Then the guard is silent
+
+    Scenario Outline: a worktree the session added is its own in a later call
+      Given the session is "s7"
+      When the agent runs `git status`
+      And the working directory is "<from>"
+      And the agent runs `<add>`
+      Then the guard is silent
+      Given a linked worktree "{TMP}/repo/.claude/worktrees/added7" of the repository at "{TMP}/repo"
+      When the working directory is "{TMP}/repo/.claude/worktrees/mine"
+      And the agent runs `cd ../added7 && git status`
+      Then the guard is silent
+      When the working directory is "{TMP}/other-clone"
+      And the agent runs `git -C {TMP}/repo/.claude/worktrees/added7 status`
+      Then the guard is silent
+      When the agent calls tool "Edit" with input `{"file_path": "{TMP}/repo/.claude/worktrees/added7/f.txt"}`
+      Then the guard is silent
+      When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
+      Then the guard denies
+
+      Examples:
+        | from                              | add                                                       |
+        | {TMP}/repo/.claude/worktrees/mine | git worktree add ../added7 -b added7                      |
+        | {TMP}/other-clone                 | git -C {TMP}/repo worktree add -b added7 .claude/worktrees/added7 |
+        | {TMP}/repo/.claude/worktrees/mine | cd ..; git worktree add --detach added7 HEAD              |
+        | {TMP}/repo/.claude/worktrees/mine | git worktree add -fb added7 ../added7                     |
+
+    Scenario: a worktree another session added is still foreign
+      Given the session is "s8a"
+      When the agent runs `git status`
+      And the agent runs `git worktree add ../added8 -b added8`
+      Then the guard is silent
+      Given a linked worktree "{TMP}/repo/.claude/worktrees/added8" of the repository at "{TMP}/repo"
+      And the session is "s8b"
+      When the agent runs `git status`
+      And the agent runs `cd ../added8`
+      Then the guard denies
+
+    Scenario: with no record to write, an added worktree stays foreign
+      Given the session is "s9"
+      And TMPDIR is "{TMP}/no-such-dir"
+      When the agent runs `git status`
+      And the agent runs `git worktree add ../added9 -b added9`
+      Then the guard is silent
+      Given a linked worktree "{TMP}/repo/.claude/worktrees/added9" of the repository at "{TMP}/repo"
+      When the agent runs `cd ../added9`
+      Then the guard denies
+
+    Scenario: an add naming a worktree that already stood there records nothing
+      Given the session is "s10"
+      When the agent runs `git status`
+      And the working directory is "{TMP}/repo/.claude/worktrees"
+      And the agent runs `git worktree add -f theirs`
+      Then the guard is silent
+      When the working directory is "{TMP}/repo/.claude/worktrees/mine"
+      And the agent runs `cd ../theirs`
+      Then the guard denies
+
+    Scenario: an add that made nothing by the next call records nothing
+      Given the session is "s11"
+      When the agent runs `git status`
+      And the agent runs `git worktree add ../added11 -b added11`
+      Then the guard is silent
+      When the agent runs `git status`
+      Given a linked worktree "{TMP}/repo/.claude/worktrees/added11" of the repository at "{TMP}/repo"
+      When the agent runs `cd ../added11`
+      Then the guard denies
+
+    Scenario Outline: an add that may not run records nothing
+      Given the session is "s12"
+      When the agent runs `git status`
+      And the agent runs `<add>`
+      Then the guard <verdict>
+      Given a linked worktree "{TMP}/repo/.claude/worktrees/added12" of the repository at "{TMP}/repo"
+      When the agent runs `cd ../added12`
+      Then the guard denies
+
+      Examples:
+        | add                                                                  | verdict   |
+        | git -C ../theirs status && git worktree add ../added12 -b added12    | denies    |
+        | git status && git worktree add ../added12 -b added12                 | is silent |
+        | false \|\| git worktree add ../added12 -b added12                    | is silent |
+        | if true; then git worktree add ../added12 -b added12; fi             | is silent |
+        | sh -c "git worktree add ../added12 -b added12"                       | is silent |
+
+    Scenario Outline: an add the guard cannot parse records nothing
+      Given the session is "s13"
+      When the agent runs `git status`
+      And the agent runs `<add>`
+      Then the guard is silent
+      Given a linked worktree "{TMP}/repo/.claude/worktrees/added13" of the repository at "{TMP}/repo"
+      When the agent runs `cd ../added13`
+      Then the guard denies
+
+      Examples:
+        | add                                                  |
+        | git worktree add --frobnicate ../added13             |
+        | git worktree add -fx ../added13                      |
+        | git worktree add -b added13 ../added13 HEAD extra    |
+
+    Scenario: an add whose path holds a newline records nothing, not even the part before it
+      Given the session is "s14"
+      When the agent runs `git status`
+      And the agent runs `git worktree add $'../added14\nx' -b added14`
+      Then the guard is silent
+      Given a linked worktree "{TMP}/repo/.claude/worktrees/added14" of the repository at "{TMP}/repo"
+      When the agent runs `cd ../added14`
+      Then the guard denies
 
     Scenario: a cd that names a sibling which already existed is not recorded
       Given the session is "s3b"
