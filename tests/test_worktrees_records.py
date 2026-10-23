@@ -71,6 +71,31 @@ def test_a_record_whose_inode_is_stale_is_not_own(fx):
     assert _hook(_bash(f"git -C {new3} status", fx["clone"], s), env) == "deny"
 
 
+def test_an_added_worktree_is_recorded_at_the_next_call_by_its_inode(fx):
+    """The add leaves its path for the next call, which records it only when a
+    gitfile made since stands there, bound to that gitfile's inode."""
+    s, new4 = "11111111-0000-4000-8000-000000000004", fx["wts"] / "new4"
+    env = _env(fx)
+    rec = fx["records"] / f"languette-guard-worktrees.{s}"
+    assert _hook(_bash("git status", fx["mine"], s), env) == "allow"
+    assert _hook(_bash("git worktree add ../new4 -b new4", fx["mine"], s), env) == "allow"
+    assert f"add\t{new4}" in Path(f"{rec}.arrive").read_text().splitlines()
+    subprocess.run(["git", "-C", str(fx["repo"]), "worktree", "add", "-q", "-b", "new4", str(new4)], check=True)
+    assert _hook(_bash("cd ../new4", fx["mine"], s), env) == "allow"
+    assert f"{new4}\t{(new4 / '.git').stat().st_ino}" in rec.read_text().splitlines()
+
+
+def test_an_add_line_for_a_worktree_older_than_it_records_nothing(fx):
+    """A gitfile that stood before the add was left is someone else's."""
+    s = "11111111-0000-4000-8000-000000000005"
+    env = _env(fx)
+    rec = fx["records"] / f"languette-guard-worktrees.{s}"
+    assert _hook(_bash("git status", fx["mine"], s), env) == "allow"
+    Path(f"{rec}.arrive").write_text(f"add\t{fx['theirs']}\n")
+    assert _hook(_bash("cd ../theirs", fx["mine"], s), env) == "deny"
+    assert str(fx["theirs"]) not in rec.read_text()
+
+
 def test_a_symlinked_record_grants_nothing(fx):
     """A shared /tmp could plant one."""
     s = "11111111-0000-4000-8000-000000000007"

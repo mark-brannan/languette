@@ -37,7 +37,7 @@
     "guard_git_work_loss_force_push": {
       "type": "boolean",
       "title": "Block force pushes",
-      "description": "Deny bare force pushes, and force pushes or deletes of main. Leave on unless you want this git command through unchecked. Has no effect while guard_git_work_loss is false.",
+      "description": "Deny bare force pushes, and force pushes or deletes of main or master. Leave on unless you want this git command through unchecked. Has no effect while guard_git_work_loss is false.",
       "default": true
     },
     "guard_git_work_loss_discard": {
@@ -182,7 +182,7 @@
     "guard_signed_comments": {
       "type": "boolean",
       "title": "Experimental, opt-in: sign an agent's GitHub comments as an agent's",
-      "description": "Experimental and off by default: the signature is one workflow's convention, and the general shape is open (mark-brannan/languette#194). Deny a PR or issue comment, review or review-thread reply posted through gh, gh api or a GitHub MCP tool unless its body's first line starts with signed_comments_opening and its last line matches signed_comments_signature. The agent posts under your login; the signature keeps its words from being read as yours. Turn on if your agents sign their comments that way.",
+      "description": "Experimental and off by default: the signature is one workflow's convention. Deny a PR or issue comment, review or review-thread reply posted through gh, gh api or a GitHub MCP tool unless its body's first line starts with signed_comments_opening and its last line matches signed_comments_signature. The agent posts under your login; the signature keeps its words from being read as yours. Turn on if your agents sign their comments that way.",
       "default": false
     },
     "signed_comments_opening": {

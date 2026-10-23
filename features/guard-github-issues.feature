@@ -2,11 +2,11 @@
 Feature: guard-github-issues
   One GitHub issue create, transfer or delete per human turn. The human's
   own turn is the door: it opens on UserPromptSubmit and the first identifier
-  write of that turn to run spends it. The door is named apart from the claude
-  plugin's own copy of this hook, so the two never spend each other's.
+  write of that turn to run spends it. The door is named apart from any other
+  plugin's copy of this hook, so the two never spend each other's.
 
   Why. An issue number is an identifier things link to where no agent can
-  see, so minting or moving one is a one-way door (Solace, 2026-09-30): one
+  see, so minting or moving one is a one-way door (the maintainer, 2026-09-30): one
   create, transfer or delete per human turn, never two in one call, never one
   in a loop.
 
@@ -28,7 +28,7 @@ Feature: guard-github-issues
   deleteIssue; the MCP create_issue, transfer_issue, delete_issue, and
   issue_write with method create. The command is read through the shell
   scanner, so `sh -c`, `eval` and `xargs` bodies are seen; a script file is
-  not. The door is named apart from the claude plugin's own copy because the
+  not. The door is named apart from any other plugin's copy because the
   same session_id can run both plugins, and a shared name would let one
   plugin's UserPromptSubmit spend the other's door.
 

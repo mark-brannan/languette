@@ -159,7 +159,7 @@ Evidence that bears on the choice, from the clustering:
 2. Are clusters I through K (repo, release, secret, visibility deletion) in
    range at all, or is `gh` outside the agent's reach by other means?
 3. Does `guard-github-issues` stay one guard, or does a PR sibling join it
-   (#125)? Reopening an approved name is a ruling.
+   (#125)? Reopening an approved name is the maintainer's decision.
 4. Does `guard-commits` stay about checks, or also absorb G (what a commit
    sweeps in)?
 

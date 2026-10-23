@@ -25,6 +25,8 @@ SPENT = ".languette-ask"            # appended to the transcript path
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
+# A control character: never written into a record line, never read from one.
+_CTRL = re.compile(r"[\x00-\x1f\x7f]")
 KINDS = frozenset("git gh-api pr-list which read path physical clock ruleset-cache claim worktree run door "
                   "send-state".split())
 ACTS = {"ruleset-keep": "_ruleset_keep", "send-keep": "_send_keep", "worktree-keep": "_wt_keep",
@@ -212,8 +214,9 @@ class World:
     # ${TMPDIR:-/tmp}/languette-guard-worktrees.<session>[.<agent>] lists the
     # toplevels this session reached by a vouched route, one "<top>\t<inode of
     # top/.git>" per line; <record>.arrive is what the previous call left for
-    # this one. Every failure to read or write leaves the guard's rule as
-    # strict as the cwd alone.
+    # this one, an `add<TAB><path>` line among it for a `git worktree add`.
+    # Every failure to read or write leaves the guard's rule as strict as the
+    # cwd alone.
 
     def _worktree(self, op, *args):
         if op not in ("arrive", "recorded", "scratchpad"):
@@ -236,11 +239,26 @@ class World:
         except OSError:
             return None
 
+    @staticmethod
+    def _wt_made_since(top, since):
+        """The inode of top/.git when it is a regular gitfile changed no earlier
+        than `since` (ns, the same kernel clock), else None."""
+        try:
+            st = os.lstat(os.path.join(top, ".git"))
+            if not stat.S_ISREG(st.st_mode) or st.st_ctime_ns < since:
+                return None
+            with open(os.path.join(top, ".git"), "rb") as f:
+                return st.st_ino if f.read(8) == b"gitdir: " else None
+        except OSError:
+            return None
+
     def _wt_arrive(self, rec, own_top):
         """(usable, adopt): the record is this user's; and this call reached
         `own_top` by a vouched route (the session's first call, or an arrival
         the previous call left: `enter`, or a path under own_top). The arrival
-        is consumed exactly once."""
+        is consumed exactly once; an `add` line in it is recorded now if a
+        gitfile made since the arrival was left stands at its path, and is
+        otherwise dropped."""
         adopt = False
         if not os.path.lexists(rec):
             try:                               # O_EXCL: two first calls racing must not truncate each other
@@ -250,15 +268,22 @@ class World:
                 pass
         if not self._wt_mine(rec):
             return False, False
-        arrival = rec + ".arrive"
-        if not adopt and own_top and self._wt_mine(arrival):
+        arrival, lines, left = rec + ".arrive", [], None
+        if self._wt_mine(arrival):
             try:
+                left = os.lstat(arrival).st_ctime_ns
                 with open(arrival, encoding="utf-8") as f:
-                    for a in f.read().splitlines():
-                        if a == "enter" or (a and (a + "/").startswith(own_top + "/")):
-                            adopt = True
-            except OSError:
-                pass
+                    lines = f.read().splitlines()
+            except (OSError, UnicodeDecodeError):
+                lines = []
+        for a in lines:
+            if a.startswith("add\t"):
+                top = a[4:]
+                ino = None if _CTRL.search(top) or not top.startswith("/") else self._wt_made_since(top, left)
+                if ino is not None:
+                    self._wt_append(rec, top, ino)
+            elif own_top and not adopt and (a == "enter" or (a and (a + "/").startswith(own_top + "/"))):
+                adopt = True
         try:
             os.unlink(arrival)
         except OSError:
@@ -279,8 +304,14 @@ class World:
 
     def _wt_keep(self, rec, top):
         ino = self._wt_inode(top)
-        if ino is None:
-            return None
+        if ino is not None:
+            self._wt_append(rec, top, ino)
+
+    @staticmethod
+    def _wt_append(rec, top, ino):
+        """One "<top>\t<ino>" line; a top with a control character is never written."""
+        if _CTRL.search(top):
+            return
         try:
             with open(rec, "a", encoding="utf-8") as f:
                 f.write(f"{top}\t{ino}\n")
