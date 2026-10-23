@@ -104,8 +104,10 @@ Feature: guard-worktrees
   deny the session's new worktree. Own is the cwd's toplevel now plus every
   recorded one. A toplevel is recorded only when reached by a route the guard
   vouches for: the first call of the session; the call after
-  EnterWorktree(name=...); or a `cd` the guard allowed into a path that did
-  not exist yet when checked (`git worktree add X && cd X`). A cwd reached
+  EnterWorktree(name=...); a `cd` the guard allowed into a path that did
+  not exist yet when checked (`git worktree add X && cd X`); or the path a
+  `git worktree add` the guard allowed names, when no worktree stood there
+  yet, bound to its `.git` inode the first time it is reached. A cwd reached
   any other way (`cd "$VAR"`) is own while the shell stands in it and is
   never recorded, so an unchecked route cannot be laundered into a lasting
   allow. Each record line carries the inode of the worktree's `.git` file, so
@@ -770,6 +772,61 @@ Feature: guard-worktrees
       Then the guard is silent
       When the agent runs `git -C {TMP}/repo/.claude/worktrees/mine status`
       Then the guard is silent
+
+    Scenario Outline: a worktree the session added is its own in a later call
+      Given the session is "s7"
+      When the agent runs `git status`
+      And the working directory is "<from>"
+      And the agent runs `<add>`
+      Then the guard is silent
+      Given a linked worktree "{TMP}/repo/.claude/worktrees/added7" of the repository at "{TMP}/repo"
+      When the working directory is "{TMP}/repo/.claude/worktrees/mine"
+      And the agent runs `cd ../added7 && git status`
+      Then the guard is silent
+      When the working directory is "{TMP}/other-clone"
+      And the agent runs `git -C {TMP}/repo/.claude/worktrees/added7 status`
+      Then the guard is silent
+      When the agent calls tool "Edit" with input `{"file_path": "{TMP}/repo/.claude/worktrees/added7/f.txt"}`
+      Then the guard is silent
+      When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
+      Then the guard denies
+
+      Examples:
+        | from                              | add                                                       |
+        | {TMP}/repo/.claude/worktrees/mine | git worktree add ../added7 -b added7                      |
+        | {TMP}/other-clone                 | git -C {TMP}/repo worktree add -b added7 .claude/worktrees/added7 |
+        | {TMP}/repo/.claude/worktrees/mine | cd .. && git worktree add --detach added7 HEAD            |
+
+    Scenario: a worktree another session added is still foreign
+      Given the session is "s8a"
+      When the agent runs `git status`
+      And the agent runs `git worktree add ../added8 -b added8`
+      Then the guard is silent
+      Given a linked worktree "{TMP}/repo/.claude/worktrees/added8" of the repository at "{TMP}/repo"
+      And the session is "s8b"
+      When the agent runs `git status`
+      And the agent runs `cd ../added8`
+      Then the guard denies
+
+    Scenario: with no record to write, an added worktree stays foreign
+      Given the session is "s9"
+      And TMPDIR is "{TMP}/no-such-dir"
+      When the agent runs `git status`
+      And the agent runs `git worktree add ../added9 -b added9`
+      Then the guard is silent
+      Given a linked worktree "{TMP}/repo/.claude/worktrees/added9" of the repository at "{TMP}/repo"
+      When the agent runs `cd ../added9`
+      Then the guard denies
+
+    Scenario: an add naming a worktree that already stood there records nothing
+      Given the session is "s10"
+      When the agent runs `git status`
+      And the working directory is "{TMP}/repo/.claude/worktrees"
+      And the agent runs `git worktree add -f theirs`
+      Then the guard is silent
+      When the working directory is "{TMP}/repo/.claude/worktrees/mine"
+      And the agent runs `cd ../theirs`
+      Then the guard denies
 
     Scenario: a cd that names a sibling which already existed is not recorded
       Given the session is "s3b"

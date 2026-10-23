@@ -85,6 +85,7 @@ class Act(Need):
         ruleset-keep    slug, branch, text  the ruleset cache's entry
         send-keep       session, op, arg    guard-cross-session-send's state (op: clear, read, names)
         worktree-keep   rec, top            a toplevel into guard-worktrees' per-session record
+        worktree-add    rec, top            a `git worktree add` path into it, bound on first reach
         worktree-leave  rec, text           what the next call may adopt (<rec>.arrive)
         door-open       session             guard-github-issues' door, fresh; any claim dropped
         door-spend      session             that door and its claim, gone

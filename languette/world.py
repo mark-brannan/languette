@@ -28,7 +28,7 @@ RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before 
 KINDS = frozenset("git gh-api pr-list which read path physical clock ruleset-cache claim worktree run door "
                   "send-state".split())
 ACTS = {"ruleset-keep": "_ruleset_keep", "send-keep": "_send_keep", "worktree-keep": "_wt_keep",
-        "worktree-leave": "_wt_leave", "door-open": "_door_open", "door-spend": "_door_spend"}
+        "worktree-add": "_wt_add", "worktree-leave": "_wt_leave", "door-open": "_door_open", "door-spend": "_door_spend"}
 DOOR = "languette-guard-github-issues."   # + the session id, under $TMPDIR
 SEND_STATE = "languette-guard-cross-session-send."   # + session id, under $TMPDIR
 SEND_SUBAGENTS_MAX = 500            # names and ids kept per session; the oldest go first
@@ -211,8 +211,9 @@ class World:
     # --- guard-worktrees' per-session record -----------------------------
     # ${TMPDIR:-/tmp}/languette-guard-worktrees.<session>[.<agent>] lists the
     # toplevels this session reached by a vouched route, one "<top>\t<inode of
-    # top/.git>" per line; <record>.arrive is what the previous call left for
-    # this one. Every failure to read or write leaves the guard's rule as
+    # top/.git>" per line, or "<top>\t+" for the path of a `git worktree add`
+    # not yet bound to an inode; <record>.arrive is what the previous call left
+    # for this one. Every failure to read or write leaves the guard's rule as
     # strict as the cwd alone.
 
     def _worktree(self, op, *args):
@@ -266,6 +267,8 @@ class World:
         return True, adopt
 
     def _wt_recorded(self, rec, top):
+        """True for a line bound to top's `.git` inode now; "added" for an
+        added path no line has bound yet; else False."""
         if not self._wt_mine(rec):
             return False
         ino = self._wt_inode(top)
@@ -273,9 +276,14 @@ class World:
             return False
         try:
             with open(rec, encoding="utf-8") as f:
-                return f"{top}\t{ino}" in f.read().splitlines()
+                lines = f.read().splitlines()
         except OSError:
             return False
+        if f"{top}\t{ino}" in lines:
+            return True
+        if any(x.startswith(top + "\t") and x != f"{top}\t+" for x in lines):
+            return False                       # bound to another inode: re-created since
+        return "added" if f"{top}\t+" in lines else False
 
     def _wt_keep(self, rec, top):
         ino = self._wt_inode(top)
@@ -286,6 +294,17 @@ class World:
                 f.write(f"{top}\t{ino}\n")
         except OSError:
             pass
+
+    def _wt_add(self, rec, top):
+        """Append "<top>\t+" to a record that is this user's, never through a link."""
+        if not self._wt_mine(rec):
+            return
+        try:
+            fd = os.open(rec, os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW)
+        except OSError:
+            return
+        with os.fdopen(fd, "a", encoding="utf-8") as fh:
+            fh.write(f"{top}\t+\n")
 
     @staticmethod
     def _wt_leave(rec, text):

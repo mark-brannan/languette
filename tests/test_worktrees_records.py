@@ -71,6 +71,23 @@ def test_a_record_whose_inode_is_stale_is_not_own(fx):
     assert _hook(_bash(f"git -C {new3} status", fx["clone"], s), env) == "deny"
 
 
+def test_an_added_path_is_bound_to_the_first_worktree_reached_there(fx):
+    """A `git worktree add` path is recorded unbound; the first reach binds its
+    inode, so a worktree re-created there later is not inherited."""
+    s, new4 = "11111111-0000-4000-8000-000000000004", fx["wts"] / "new4"
+    env = _env(fx)
+    assert _hook(_bash("git status", fx["mine"], s), env) == "allow"
+    assert _hook(_bash("git worktree add ../new4 -b new4", fx["mine"], s), env) == "allow"
+    rec = fx["records"] / f"languette-guard-worktrees.{s}"
+    assert f"{new4}\t+" in rec.read_text().splitlines()
+    subprocess.run(["git", "-C", str(fx["repo"]), "worktree", "add", "-q", "-b", "new4", str(new4)], check=True)
+    assert _hook(_bash("cd ../new4", fx["mine"], s), env) == "allow"
+    ino = (new4 / ".git").stat().st_ino
+    assert f"{new4}\t{ino}" in rec.read_text().splitlines()
+    rec.write_text(rec.read_text().replace(f"{new4}\t{ino}", f"{new4}\t1"))
+    assert _hook(_bash("cd ../new4", fx["mine"], s), env) == "deny"
+
+
 def test_a_symlinked_record_grants_nothing(fx):
     """A shared /tmp could plant one."""
     s = "11111111-0000-4000-8000-000000000007"

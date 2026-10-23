@@ -29,8 +29,10 @@ allowed. A session's own: the cwd's toplevel; a linked worktree with a path
 component equal to the payload's session_id (its scratchpad); and toplevels
 recorded in ${TMPDIR:-/tmp}/languette-guard-worktrees.<session>[.<agent>]
 when reached by a route this guard vouches for (the session's first call, the
-call after EnterWorktree(name=...), a cd into a path that did not exist yet).
-Each record line carries the inode of the worktree's `.git`; a record not
+call after EnterWorktree(name=...), a cd into a path that did not exist yet),
+or named as the path of a `git worktree add` this guard allowed while nothing
+that is a worktree stood there. Each record line carries the inode of the
+worktree's `.git`, bound the first time an added path is reached; a record not
 owned by this user, or a symlink, is ignored. EnterWorktree(path=...) is
 denied outright. Redirection targets are not seen. The deny names a
 one-command recipe for the session's own worktree.
@@ -263,10 +265,39 @@ def _pathish(t):
     return t if "/" in t else ""
 
 
+def _worktree_add(s, a, b, nested):
+    """(path, [-C values]) for a `git worktree add <path>` in segment a..b, or None."""
+    g = sw.cmd_index(s, a, b, sw.GIT, nested)
+    if g is None:
+        return None
+    sub = sw.git_subcommand(s, g, b)
+    if sub + 1 > b or s.w[sub] != "worktree" or s.w[sub + 1] != "add":
+        return None
+    cs = [s.w[i + 1] for i in sw.git_options(s, g, sub) if s.w[i] == "-C"]
+    i = sub + 2
+    while i <= b:
+        if s.k[i] != "w":
+            return None
+        w = s.w[i]
+        if w == "--":
+            i += 1
+            break
+        if w in ("-b", "-B", "--reason"):
+            i += 2
+        elif w.startswith("-"):
+            i += 1
+        else:
+            break
+    if i > b or s.k[i] != "w":
+        return None
+    return s.w[i], cs
+
+
 def _foreign_words(doc):
     """("T",) where a text begins (its shell starts in the payload cwd),
     ("C", w) for a cd/pushd target, ("W", w) for any other path-shaped word or
-    the word after -C, in order."""
+    the word after -C, ("A", path, [-C values]) for a `git worktree add`, in
+    order."""
     out = []
     for x, (text, nested) in enumerate(doc.texts()):
         s = doc.scan(text)
@@ -299,6 +330,9 @@ def _foreign_words(doc):
                     continue
                 seen.add((ncd, t))
                 out.append(("W", t))
+            add = _worktree_add(s, a, b, nested)
+            if add:
+                out.append(("A", *add))
     return out
 
 
@@ -312,7 +346,7 @@ class _Session:
         self.env, self.own_top, self.home = env, own_top, home
         sid, aid = payload.get("session_id"), payload.get("agent_id")
         self.sid = sid if isinstance(sid, str) else ""
-        self.rec = None
+        self.rec, self.bound = None, set()
         if self.sid:
             tag = re.sub(r"[^A-Za-z0-9_-]", "_", self.sid)
             if isinstance(aid, str) and aid:
@@ -323,9 +357,21 @@ class _Session:
         return bool(self.sid) and f"/{self.sid}/" in f"/{d}/"
 
     def recorded(self, top):
+        """Whether `top` is in the record; an added path found there is bound
+        to its `.git` inode now, so a later stranger at that path is not."""
         if not self.rec:
             return False
-        return (yield Need("worktree", "recorded", self.rec, top))
+        r = yield Need("worktree", "recorded", self.rec, top)
+        if r == "added" and top not in self.bound:
+            self.bound.add(top)
+            yield Act("worktree-keep", self.rec, top)
+        return bool(r)
+
+    def added(self, paths):
+        """Record the paths of the `git worktree add`s this allowed call runs."""
+        if self.rec:
+            for p in paths:
+                yield Act("worktree-add", self.rec, p)
 
     def leave(self, text):
         """What the next call may adopt as its own: `enter`, or the arrivals."""
@@ -440,10 +486,35 @@ def _foreign(doc):
     cmd = ti.get("command")
     if not isinstance(cmd, str) or not cmd:
         return
-    arrivals, vcwd, n = [], pcwd, 0
+    arrivals, adds, vcwd, n = [], [], pcwd, 0
+
+    def add_target(word, cs):
+        """The canonical path a `git worktree add` will create, or None when it
+        can't be told or something that is a worktree already stands there."""
+        base = vcwd
+        for c in cs:
+            if not base:
+                break
+            d, rest = yield from _resolve_dir(c, base, home)
+            base = "" if rest else d
+        if not base:
+            return None
+        d, rest = yield from _resolve_dir(word, base, home)
+        if not d:
+            return None
+        p = d.rstrip("/") + "/" + os.path.normpath(rest) if rest else d
+        if (yield Need("path", "lexists", p + "/.git")) or (rest and (yield Need("path", "lexists", p))):
+            return None
+        return None if sess.under_scratch(p) else p
+
     for ev in _foreign_words(doc):
         if ev[0] == "T":
             vcwd = pcwd
+            continue
+        if ev[0] == "A":
+            p = yield from add_target(ev[1], ev[2])
+            if p:
+                adds.append(p)
             continue
         kind, word = ev
         if not word:
@@ -468,6 +539,7 @@ def _foreign(doc):
     # Allowed. Leave this command's arrivals for the next call to consume.
     if arrivals:
         yield from sess.leave("\n".join(arrivals))
+    yield from sess.added(adds)
 
 
 CONTROLS = (("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME", _checkout_home),
