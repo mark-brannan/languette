@@ -121,4 +121,4 @@ an install.
 - Shipped rules as JSON beside the code, or as Python data in the guard.
 - How wide a condition's closed list grows before a guard is better as code.
 - #134's step 3 asks the same question for git and GitHub alone; this design
-  is one answer to it, not a ruling on it.
+  is one answer to it, not a decision on it.

@@ -23,7 +23,7 @@ jobs:
       # Overriding replaces the default list, so restate it with claude[bot].
       allowed-bots: mergify[bot],mark-brannan-release-please[bot],claude[bot]
       prompt: |
-        Review this pull request to a public repo of shell and awk hook guards
+        Review this pull request to a public repo of Python hook guards
         for coding agents. A guard is a deterministic check that runs before an
         agent's action: it must fail closed, never execute its input, and never
         depend on a model. Flag correctness bugs, quoting and injection holes,
