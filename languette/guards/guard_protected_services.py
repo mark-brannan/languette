@@ -35,6 +35,8 @@ def rules(env):
 def judge(doc):
     """The deny reason for the command, or None."""
     for rule in rules(doc.env):
+        if rule["action"] != "deny":           # a verdict here is a deny; no other action is read yet
+            continue
         verb = sw.ctl_hit(doc, rule["match"])
         if verb:
             return say("protected_stop", verb=verb, way_user=WAY_USER)

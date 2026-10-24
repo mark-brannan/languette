@@ -1280,10 +1280,10 @@ def unit_names(u):
     return {u, bare, bare.split("@")[0]}
 
 
-def service_stop(s, a, b, hit, host_verbs=_CTL_HOST, verbs=CTL_STOPS):
+def service_stop(s, a, b, hit, host_verbs=_CTL_HOST, verbs=CTL_STOPS, cmd=_CTL):
     """`<verb>` or `<verb> <unit>` when the segment's host `systemctl` runs one of `host_verbs`,
     or a verb of `verbs` (verb: the long options it needs) on a unit `hit` accepts; else None."""
-    g = cmd_index(s, a, b, _CTL, True)
+    g = cmd_index(s, a, b, cmd, True)
     if g is None:
         return None
     words = [s.w[i] for i in range(g + 1, b + 1) if s.k[i] == "w"]
@@ -1315,8 +1315,9 @@ def service_stop(s, a, b, hit, host_verbs=_CTL_HOST, verbs=CTL_STOPS):
 
 # A command rule on systemctl: docs/design/guard-rules.md, "Command rules". Its match is
 # {"cmd": "systemctl", "verbs": {verb: [long options it needs]}, "unit": condition}, and it hits
-# when a verb, holding its options, acts on a unit the condition accepts. Conditions are a closed
-# list: {"units": [pattern]}, a unit that answers to a `*` glob of the list.
+# when a verb, holding its options, acts on a unit the condition accepts. `cmd` names the program
+# (read with systemctl's grammar). Conditions are a closed list: {"units": [pattern]}, a unit that
+# answers to an fnmatch pattern of the list (`*`, `?` and `[...]` all match).
 def unit_test(cond):
     """The test on a unit that condition `cond` names, or None when no unit can pass it. A glob
     in the unit may name a listed one, so it passes: the test fails closed."""
@@ -1332,10 +1333,11 @@ def ctl_hit(doc, match, prose=PROSE):
     hit = unit_test(match["unit"])
     if hit is None:
         return None
+    cmd = re.compile(r"(?:^|/)" + re.escape(match["cmd"]) + r"\Z")
     for t, _ in doc.texts(prose):
         s = doc.scan(t)
         for a, b in s.segments():
-            verb = a <= b and service_stop(s, a, b, hit, host_verbs=(), verbs=match["verbs"])
+            verb = a <= b and service_stop(s, a, b, hit, host_verbs=(), verbs=match["verbs"], cmd=cmd)
             if verb:
                 return verb
     return None
