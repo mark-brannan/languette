@@ -344,7 +344,8 @@ class Ctx:
                 # The row's verdict is the named guard's own. With no finding at all, the hook
                 # answered before any guard judged (no cwd, say), and that answer stands.
                 event = json.loads(stdin).get("hook_event_name") or "PreToolUse"
-                fields = verdict.verdict(event, [f for f in seen if f[0] == self.guard])
+                fields = verdict.verdict(event, [f for f in seen if f[0] == self.guard],
+                                         json.loads(stdin).get("permission_mode"))
                 self.verdict = Verdict(run._out(event, fields) if fields else "")
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
@@ -778,7 +779,7 @@ def _fails_mid_run(ctx, guard):
     assert "languette/run.py" in hooks_json_commands()[guard]
     shutil.copytree(ROOT / "languette", root / "languette", ignore=shutil.ignore_patterns("__pycache__"))
     with open(root / "languette/verdict.py", "a") as f:
-        f.write("\n\ndef verdict(event, findings):\n    raise RuntimeError('boom')\n")
+        f.write("\n\ndef verdict(event, findings, mode=None):\n    raise RuntimeError('boom')\n")
     ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
 
 

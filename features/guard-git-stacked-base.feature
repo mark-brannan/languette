@@ -103,6 +103,29 @@ Feature: guard-git-stacked-base
     When the agent runs `git push origin --delete claude/base-branch`
     Then the guard asks
 
+  # The runner's rule for every guard's ask, shown on this one.
+  Scenario Outline: an ask where no one can answer it is a deny naming the guard
+    Given the permission mode is "<mode>"
+    When the agent runs `git push origin --delete "$b"`
+    Then the guard denies, naming "guard-git-stacked-base: this needs the user's approval, and in <mode> no one is there to approve it"
+
+    Examples:
+      | mode              |
+      | dontAsk           |
+      | bypassPermissions |
+
+  Scenario Outline: an ask where someone can answer it stays an ask
+    Given the permission mode is "<mode>"
+    When the agent runs `git push origin --delete "$b"`
+    Then the guard asks
+
+    Examples:
+      | mode        |
+      | default     |
+      | auto        |
+      | acceptEdits |
+      | plan        |
+
   Scenario: the --head lookup is bounded too
     # The --base lookup is the first gh call and finds nothing for this
     # branch; the --head lookup is the second, and it is the one that hangs.
