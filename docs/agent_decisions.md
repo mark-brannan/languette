@@ -392,3 +392,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261024t050108z
 - Pass 5: Refuse text in guard_disks and conditional fragments passed as blanks, not extra codes Undo: git revert the PR ([#242](https://github.com/mark-brannan/languette/pull/242))
+
+### 20261024t051123z
+- Normalise ?query, #fragment and trailing slashes in the shared scan.gh_api_path, not per guard; every caller only matches more Undo: revert the gh_api_path change and strip locally in each guard ([#243](https://github.com/mark-brannan/languette/pull/243))
