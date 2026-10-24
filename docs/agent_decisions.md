@@ -398,3 +398,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261024t051125z
 - guard-duplicate-prs denies a body file the command writes once but not from a heredoc, rather than reading the stale file on disk Undo: drop the not-from-a-heredoc deny branch ([#243](https://github.com/mark-brannan/languette/pull/243))
+
+### 20261024t051128z
+- Keep the new duplicate-prs deny text inline; the guard does not use the messages catalog yet Undo: move the text into messages.py ([#243](https://github.com/mark-brannan/languette/pull/243))
