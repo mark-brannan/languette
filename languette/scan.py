@@ -19,6 +19,7 @@ tokens are the same contract whichever rung read them. Below shfmt the awk
 lexer reads the words; the rung above it only accepts or refuses.
 """
 
+import fnmatch
 import functools
 import json
 import os
@@ -1269,15 +1270,19 @@ _CTL_READ = {"status", "show", "cat", "help", "list-units", "list-unit-files", "
              "start", "reload", "enable", "reenable", "daemon-reload"}
 
 
+# A stop verb, and the long options it needs to stop the unit: `disable` and `mask` stop it only with --now.
+CTL_STOPS = {**{v: [] for v in sorted(_CTL_STOP)}, "disable": ["--now"], "mask": ["--now"]}
+
+
 def unit_names(u):
     """The names `u` answers to: as written, without its unit-type suffix, and without its `@instance`."""
     bare = re.sub(r"\.(?:service|socket|target|scope|slice)\Z", "", u)
     return {u, bare, bare.split("@")[0]}
 
 
-def service_stop(s, a, b, hit, host_verbs=_CTL_HOST):
+def service_stop(s, a, b, hit, host_verbs=_CTL_HOST, verbs=CTL_STOPS):
     """`<verb>` or `<verb> <unit>` when the segment's host `systemctl` runs one of `host_verbs`,
-    or stops a unit `hit` accepts; else None."""
+    or a verb of `verbs` (verb: the long options it needs) on a unit `hit` accepts; else None."""
     g = cmd_index(s, a, b, _CTL, True)
     if g is None:
         return None
@@ -1301,10 +1306,38 @@ def service_stop(s, a, b, hit, host_verbs=_CTL_HOST):
     for i, w in enumerate(pos):
         if w in host_verbs:
             return w
-        if w in _CTL_STOP or (w in ("disable", "mask") and "--now" in words):
+        if w in verbs and all(o in words for o in verbs[w]):
             unit = next((u for u in pos[i + 1:] if hit(u)), None)
             if unit:
                 return f"{w} {unit}"
+    return None
+
+
+# A command rule on systemctl: docs/design/guard-rules.md, "Command rules". Its match is
+# {"cmd": "systemctl", "verbs": {verb: [long options it needs]}, "unit": condition}, and it hits
+# when a verb, holding its options, acts on a unit the condition accepts. Conditions are a closed
+# list: {"units": [pattern]}, a unit that answers to a `*` glob of the list.
+def unit_test(cond):
+    """The test on a unit that condition `cond` names, or None when no unit can pass it. A glob
+    in the unit may name a listed one, so it passes: the test fails closed."""
+    pats = cond["units"]
+    if not pats:
+        return None
+    return lambda u: any(c in u for c in "*?[") or any(
+        fnmatch.fnmatchcase(n, p) for n in unit_names(u) for p in pats)
+
+
+def ctl_hit(doc, match, prose=PROSE):
+    """`<verb> <unit>` for the first systemctl in the command that `match` fits, or None."""
+    hit = unit_test(match["unit"])
+    if hit is None:
+        return None
+    for t, _ in doc.texts(prose):
+        s = doc.scan(t)
+        for a, b in s.segments():
+            verb = a <= b and service_stop(s, a, b, hit, host_verbs=(), verbs=match["verbs"])
+            if verb:
+                return verb
     return None
 
 
