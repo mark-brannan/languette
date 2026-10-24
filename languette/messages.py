@@ -238,6 +238,114 @@ MESSAGES = {
         "`systemctl {verb}` is blocked: it stops a protected service, one the user's machine "
         "depends on (the protected_services setting). {way_user}"
     ),
+    # Pass 5: approval-gated commands, pushes, disks, cross-session sends, duplicate PRs.
+    "ask_first_cannot_look": "ask-first: {err}. A gate that cannot look fails closed: retry from the project directory.",
+    "ask_first_invalid": (
+        "ask-first: {path} is invalid: {err}. Every Bash command is denied until it is fixed, "
+        "because the guard cannot tell which commands the repo meant to cover. Fix it with "
+        "the Edit tool, or tell the user."
+    ),
+    "ask_first_times": "; this command runs it {n} times and has {have} unspent",
+    "ask_first_cheaper": " Cheaper forms: {cheaper}.",
+    "ask_first_need": (
+        "`{id}` ({path}) needs the user's approval for each run{times}. Cost: {cost}.{cheaper}"
+        " If a cheaper form answers the question, use it instead. Otherwise call AskUserQuestion: "
+        "give the exact command (`{cmd}`), why it must run now, and the "
+        "cost above, with one option labelled exactly \"{label}\" and one to skip. "
+        "One approval is one run; ask again before running it again."
+    ),
+    "hooks_skipped": (
+        "{guard}: --no-verify, -n or core.hooksPath skips this repo's hooks, and that is the user's call, not "
+        "yours: a hook that blocks a commit, push or merge is telling you something. "
+        "`{cmd}` skips them {runs} time{runs_s} and has {have} "
+        "unspent approval{have_s}. "
+        "Better, fix what the blocking hook reported and run it without the flag. "
+        "If the user must have the hooks skipped, call AskUserQuestion: give the exact "
+        "command and why it cannot pass the hooks, with one option labelled exactly "
+        "\"{label}\" and one to decline. One approval is one run; ask again "
+        "before skipping the hooks again."
+    ),
+    "disks_way_out": (
+        "Work on an image file in /tmp or the scratchpad instead; a real disk is the user's to write, so "
+        "hand them the exact command."
+    ),
+    "disks_refused": "`{what}` is blocked: {why}. {way_out}",
+    "disks_blocked": "`{what} {raw}` is blocked: {abs_} is {kind}. {way_out}",
+    "cross_session_way_out": (
+        "Ask the user to send it themselves, or from a session that has not read untrusted content; "
+        "/clear starts this one afresh."
+    ),
+    "cross_session_deny": (
+        "{guard}: a message to {target} is blocked: {why}, and in "
+        "{mode} no prompt can show the user what leaves the "
+        "session. {way_out}"
+    ),
+    "ruleset_admin": (
+        "guard-bypass-ruleset: `gh pr merge --admin` merges past the PR's required reviews and checks on "
+        "the user's bypass. Merge without --admin, or with --auto to merge once the checks pass. "
+        "Bypassing is the user's to do, from their own terminal."
+    ),
+    "ruleset_head_unknown": (
+        "guard-bypass-ruleset: this {prog} push sends the current branch, and the hook can't "
+        "tell which branch that is (another directory, or a detached HEAD), so it can't check "
+        "whether the push goes around a rule that requires a pull request."
+    ),
+    "ruleset_repo_unknown": (
+        "guard-bypass-ruleset: this pushes to `{branch}` through remote `{remote}`, in a repository the "
+        "hook can't find (a cd or -C it can't follow, or GIT_DIR), so it can't ask GitHub whether "
+        "`{branch}` requires a pull request. The agent runs on your credentials, so it can use your "
+        "bypass."
+    ),
+    "ruleset_needs_pr": (
+        "guard-bypass-ruleset: `{branch}` on {slug} requires a pull request, and this push would go "
+        "around it on the user's bypass. Push a branch and open a PR. A direct push is the user's "
+        "to make, from their own terminal."
+    ),
+    "ruleset_github_silent": (
+        "guard-bypass-ruleset: this pushes to `{branch}` on {slug}, and GitHub couldn't say "
+        "whether `{branch}` requires a pull request (gh missing, signed out, offline or "
+        "an error):\n  gh api repos/{slug}/rules/branches/{branch_q}\n"
+        "The agent runs on your credentials, so it can use your bypass."
+    ),
+    "ruleset_refused": (
+        "guard-bypass-ruleset: {refused}, so the hook can't check whether it goes around a rule that "
+        "requires a pull request. The agent runs on your credentials, so it can use your bypass."
+    ),
+    "dup_body_opaque": (
+        "the body is built at run time ({v}) and no heredoc in this command feeds it, so its "
+        "text cannot be checked for an issue it closes. Write it literally, in a heredoc in the "
+        "same command, or in a file and pass --body-file <path>."
+    ),
+    "dup_body_stdin": (
+        "the body comes from stdin (--body-file -) and there is no heredoc in the command, so "
+        "it cannot be checked. Put the text in a heredoc in the same command, or in a file and "
+        "pass --body-file <path>."
+    ),
+    "dup_body_file": (
+        "--body-file {v} {got}, so the body cannot be checked for an issue it closes. Write "
+        "it to that path from a heredoc in this same command, or create the file in an "
+        "earlier command and retry; spell the path out, since a variable set in an earlier "
+        "command is invisible here."
+    ),
+    "dup_repo_unknown": (
+        "{guard}: this PR would close #{n}, and the hook can't tell which repo it is opened "
+        "on (no --repo, and the working directory's origin is not on github.com, or a cd "
+        "moves it), so it can't check whether an open PR already references #{n}. Pass "
+        "--repo owner/name, or read the issue first."
+    ),
+    "dup_github_silent": (
+        "{guard}: this PR would close {repo}#{n}, and GitHub couldn't say whether an open PR "
+        "already references it (gh missing, signed out, offline, an error, or a "
+        "timeline past {page} events):\n"
+        "  gh api repos/{repo}/issues/{n}/timeline\n"
+        "Read the issue before opening a second PR on it."
+    ),
+    "dup_open": (
+        "PR {named} is open and already references {issue}, which this PR would close "
+        "too, so this command is blocked. If this PR replaces it, close "
+        "{pr} first or say `Supersedes {pr}` in this body. If both "
+        "are wanted, drop the closing keyword here and link the issue in prose."
+    ),
 }
 
 
