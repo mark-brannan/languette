@@ -6,9 +6,10 @@ a trailing `.service` optional, `*` globs allowed. Unset or empty, it guards
 nothing: the user fills it. A pattern matches the unit as written, without its
 type suffix, or without its `@instance`. A glob in the unit fails closed. The
 services a session runs on (ssh, the network) are guard-host-availability's.
+Its one rule is a command rule (docs/design/guard-rules.md), matched by scan's
+systemctl rule matcher; the setting fills its list of units.
 """
 
-import fnmatch
 import re
 
 from languette import scan as sw
@@ -25,21 +26,20 @@ def protected(env):
     return tuple(got)
 
 
+def rules(env):
+    """The guard's one rule, its units the protected_services setting's."""
+    return [{"id": "protected-stop", "action": "deny",
+             "match": {"cmd": "systemctl", "verbs": sw.CTL_STOPS, "unit": {"units": list(protected(env))}}}]
+
+
 def judge(doc):
     """The deny reason for the command, or None."""
-    pats = protected(doc.env)
-    if not pats:
-        return None
-
-    def hit(u):
-        return any(c in u for c in "*?[") or any(fnmatch.fnmatchcase(n, p) for n in sw.unit_names(u) for p in pats)
-
-    for t, _ in doc.texts():
-        s = doc.scan(t)
-        for a, b in s.segments():
-            verb = a <= b and sw.service_stop(s, a, b, hit, host_verbs=())
-            if verb:
-                return say("protected_stop", verb=verb, way_user=WAY_USER)
+    for rule in rules(doc.env):
+        if rule["action"] != "deny":           # a verdict here is a deny; no other action is read yet
+            continue
+        verb = sw.ctl_hit(doc, rule["match"])
+        if verb:
+            return say("protected_stop", verb=verb, way_user=WAY_USER)
     return None
 
 
