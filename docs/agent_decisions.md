@@ -395,3 +395,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261024t051123z
 - Normalise ?query, #fragment and trailing slashes in the shared scan.gh_api_path, not per guard; every caller only matches more Undo: revert the gh_api_path change and strip locally in each guard ([#243](https://github.com/mark-brannan/languette/pull/243))
+
+### 20261024t051125z
+- guard-duplicate-prs denies a body file the command writes once but not from a heredoc, rather than reading the stale file on disk Undo: drop the not-from-a-heredoc deny branch ([#243](https://github.com/mark-brannan/languette/pull/243))
