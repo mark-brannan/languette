@@ -32,6 +32,7 @@ carries text but is not one it knows -> deny, with the fix in the reason.
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Need, allow, deny
 
 NAME = "guard-private-terms"
@@ -51,10 +52,6 @@ _GRAPHQL = re.compile(r"addComment|createIssue|updateIssue|createPullRequest|upd
 _BACKSTOP = re.compile(r"(?:^|[^A-Za-z0-9_./-])gh\s+(?:issue|pr)\s+(?:create|comment|edit|review|close|reopen|merge)(?:\s|$)",
                        re.M)
 _NAME_CHAR = "A-Za-z0-9_.-"
-
-
-def _deny(why):
-    return deny(f"{NAME}: {why}")
 
 
 def _flat(t):
@@ -394,33 +391,20 @@ def check(doc):
 
     unseen = next((v for k, v in meta if k == "UNSEEN"), None)
     if unseen is not None:
-        return _deny(f"the flag `{unseen}` looks like it carries text to post, but this hook doesn't recognise its "
-                     "shape and cannot see what it holds. Recognised: --body/--title/--comment/--subject (or "
-                     "-b/-t/-c), --body-file/--comment-file/-F/--input <path>, --label/--add-label, gh api "
-                     f"-f/-F/--field/--raw-field. Use one of those, or {TO_PRIVATE}.")
+        return deny(say("pt_unseen", guard=NAME, unseen=unseen, to_private=TO_PRIVATE))
     try:
         listed = yield Need("read", terms_file)
     except Exception:  # noqa: BLE001
-        return _deny(f"the private-terms file ({terms_file}), set as the private_terms_file option, is unreadable, "
-                     "so text bound for a public repo cannot be checked. Fix the path in the plugin's "
-                     "private_terms_file option (/plugin configure languette@languette), or clear the option to "
-                     f"turn the check off. To post without the check, {TO_PRIVATE}.")
+        return deny(say("pt_unreadable", guard=NAME, terms_file=terms_file, to_private=TO_PRIVATE))
     terms = [t for t in (line.strip() for line in listed.split("\n")) if t and not t.startswith("#")]
     if not terms:
-        return _deny(f"the private-terms file ({terms_file}) is readable but has no terms in it -- only comments "
-                     "and blank lines, or nothing at all. An empty list matches nothing, so every post would pass "
-                     "unchecked, which is indistinguishable from a check that ran. Populate it (one term per line, "
-                     f"# for comments) and retry. To post without the check, {TO_PRIVATE}.")
+        return deny(say("pt_no_terms", guard=NAME, terms_file=terms_file, to_private=TO_PRIVATE))
     opaque = next((v for k, v in meta if k == "OPAQUE"), None)
     if opaque is not None:
-        return _deny(f"the body or title is built at run time ({opaque}) and no heredoc in this command feeds it, "
-                     "so its text cannot be checked before it is posted. Write it literally, in a heredoc in the "
-                     "same command, or in a file and pass --body-file <path>.")
+        return deny(say("pt_opaque", guard=NAME, opaque=opaque))
     kinds = {k for k, _ in meta}
     if "HEREDOC" not in kinds and "STDIN" in kinds:
-        return _deny("the body comes from stdin (-F - / --input -) and there is no heredoc in the command, so it "
-                     "cannot be checked. Put the text in a heredoc in the same command, or in a file and pass "
-                     "--body-file <path>.")
+        return deny(say("pt_stdin", guard=NAME))
 
     # Replayed in command order, so a cd or an assignment before a path applies to it.
     home = env.get("HOME") or ""
@@ -460,12 +444,7 @@ def check(doc):
             continue
         text_file += body + "\n"
     if bad is not None:
-        return _deny(f"--body-file {bad} cannot be read, so the text about to be posted cannot be checked. Write it "
-                     "to that same path from a heredoc in this same command (cat > PATH <<EOF ... EOF, or tee PATH "
-                     "<<EOF) -- the gate reads the heredoc body directly, so the file need not exist yet. Otherwise "
-                     "create the file in an earlier command and retry. The path is resolved with the $VARs this "
-                     "same command assigns before it, after any cd in it, with . and .. collapsed; a variable set in "
-                     "an earlier command is invisible here, so spell the path out.")
+        return deny(say("pt_body_file", guard=NAME, bad=bad))
 
     text = text_cmd + text_file
     low = text.lower()
@@ -484,11 +463,7 @@ def check(doc):
             return allow(_walk(ti, lambda v: home_re.sub("~", v)))
 
     hits = [t for t in terms if t.lower() in low]
-    return _deny(f"the text about to be posted to a public repo contains private term(s) from the denylist: "
-                 f"{', '.join(hits)}. Private detail does not go on public GitHub, ever -- it stays in GitHub's "
-                 f"history. Either {TO_PRIVATE} and link it from here, or rewrite the body without the term. Do "
-                 "not paraphrase it into something recognisable.")
-
+    return deny(say("pt_hits", guard=NAME, hits=', '.join(hits), to_private=TO_PRIVATE))
 
 def _strings(v):
     """Every string in v, depth first, as jq's `.. | strings` lists them."""

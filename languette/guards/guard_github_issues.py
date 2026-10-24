@@ -30,6 +30,7 @@ another plugin's copy of this guard never spends it.
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Act, Need, claim, deny
 
 NAME = "guard-github-issues"
@@ -65,16 +66,6 @@ def _repo_flag(s, lo, hi):
             repo, i = r
         i += 1
     return repo
-
-
-def _ask(label):
-    return ("Show the human the draft and wait for their yes: call AskUserQuestion with the title or number "
-            f"and the repo, one option labelled exactly \"{label}\" and one to decline. One yes is one write; "
-            "ask again for the next.")
-
-
-def _deny(why):
-    return deny(f"{NAME}: {why}")
 
 
 def _skip_r(s, lo, hi):
@@ -230,14 +221,14 @@ def check(doc):
     try:
         found, loop = _writes(doc)
     except Exception as e:  # noqa: BLE001 -- fails closed
-        return _deny(f"the command could not be read ({type(e).__name__}), so this call could not be checked")
+        return deny(say("gi_unreadable", guard=NAME, kind=type(e).__name__))
     n = len(found)
     if n == 0:
         return None
     if n > 1:
-        return _deny(f"{n} issue creates, transfers or deletes in one call. One per human turn, never a batch.")
+        return deny(say("gi_batch", guard=NAME, n=n))
     if loop:
-        return _deny("an issue create, transfer or delete inside a loop. One per human turn, never a batch.")
+        return deny(say("gi_loop", guard=NAME))
     why = yield from _door(payload, session)
     if why is None:
         return None
@@ -245,9 +236,8 @@ def check(doc):
     try:
         _, spent = yield from claim({label: 1})
     except (OSError, ValueError) as e:
-        return _deny(f"cannot read the session transcript to look for the user's yes, or record it as spent ({e}). "
-                     f"{why} {_ask(label)}")
-    return None if spent else _deny(f"{why} {_ask(label)}")
+        return deny(say("gi_transcript", guard=NAME, err=e, why=why, ask=say("gi_ask", label=label)))
+    return None if spent else deny(say("gi_door", guard=NAME, why=why, ask=say("gi_ask", label=label)))
 
 
 def _door(payload, session):

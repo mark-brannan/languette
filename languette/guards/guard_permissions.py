@@ -174,8 +174,7 @@ def _verdict(targets, home, physical, extra_roots=()):
     roots = paths.own_roots(home, physical, extra_roots)
     for abs_, what, raw in targets:
         if not paths.under(abs_, roots):
-            return deny(f"`{what} {raw}` is blocked: only the scratchpad, /tmp, agent worktrees and paths named "
-                        f"in LANGUETTE_PERM_ALLOW may be swept, and {abs_} is none of those. {_WAY_OUT}")
+            return deny(say("perm_not_allowed", what=what, raw=raw, abs_=abs_, way_out=_WAY_OUT))
         phys = physical(abs_)
         if phys != abs_ and not paths.under(phys, roots):
             return deny(say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys, way_out=_WAY_OUT))

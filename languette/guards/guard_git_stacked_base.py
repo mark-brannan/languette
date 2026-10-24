@@ -21,6 +21,7 @@ import json
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Need, ask, deny
 
 NAME = "guard-git-stacked-base"
@@ -126,17 +127,8 @@ def deletions(doc):
     return out
 
 
-def _advice(b):
-    return ("A stacked PR is retargeted only when its base disappears because the base PR merged. Merge "
-            "bottom-up with `gh pr merge --delete-branch` (which this hook never fires on), or retarget the "
-            f"dependents to their next base first:\n  gh pr list --base {b} --json number,title\n"
-            "  gh pr edit <n> --base <new-base>")
-
-
 def _unreadable(b):
-    return ask(f"{NAME}: this deletes remote branch `{b}`, but the open-PR list could not be read (no auth, no "
-               "network, a 20s timeout, or not a GitHub repo), so PRs stacked on it can't be checked. Confirm by "
-               f"hand first:\n{LIST}")
+    return ask(say("sb_unreadable", guard=NAME, b=b, list=LIST))
 
 
 def check(doc):
@@ -148,25 +140,18 @@ def check(doc):
     if not found:
         return None
     if any(b == "?" for _, b in found):
-        return ask(f"{NAME}: this deletes a remote branch named by a variable or a glob, so the branch can't be "
-                   f"resolved and checked for open PRs stacked on it. Confirm no open PR names it as base or head:\n{LIST}")
+        return ask(say("sb_unresolved", guard=NAME, list=LIST))
     if any(r == "?" for r, _ in found):
-        return ask(f"{NAME}: this deletes a remote branch in a repository other than the current directory's "
-                   "(`git -C`, `--git-dir`, `GIT_DIR=`), so its open PRs can't be checked from here. Confirm none "
-                   "names the branch as base or head:\n"
-                   "  gh -R <owner>/<repo> pr list --state open --json number,baseRefName,headRefName")
+        return ask(say("sb_other_repo", guard=NAME))
     if not (yield Need("which", "gh")):
-        return ask(f"{NAME}: this deletes a remote branch, but `gh` is not installed, so open PRs based on it can't "
-                   "be checked. Deleting a branch an open PR points at closes that PR silently.")
+        return ask(say("sb_no_gh", guard=NAME))
     bound = None
     for t in ("timeout", "gtimeout"):          # GNU coreutils' name, then Homebrew's
         if (yield Need("which", t)):
             bound = t
             break
     if not bound:
-        return ask(f"{NAME}: this deletes a remote branch, but neither `timeout` nor `gtimeout` is installed "
-                   "(macOS: `brew install coreutils`), so the open-PR list can't be read without risking a hang. "
-                   f"Deleting a branch an open PR points at closes that PR silently. Confirm by hand first:\n{LIST}")
+        return ask(say("sb_no_timeout", guard=NAME, list=LIST))
     cwd = payload["cwd"]
     for repo, b in dict.fromkeys(found):
         for side, field in (("--base", "baseRefName"), ("--head", "headRefName")):
@@ -178,15 +163,9 @@ def check(doc):
             try:
                 prs = [f"#{p['number']} {p['title']}" for p in json.loads(out) if p.get(field) == b]
             except (ValueError, TypeError, KeyError, AttributeError):
-                return ask(f"{NAME}: deleting remote branch `{b}`, but the open-PR list could not be parsed, so "
-                           "PRs stacked on it can't be checked.")
+                return ask(say("sb_unparsed", guard=NAME, b=b))
             if prs and side == "--base":
-                return deny(f"{NAME}: `{b}` is the base branch of open PR(s):\n" + "\n".join(prs) +
-                            "\nDeleting it closes every one of them -- GitHub does not retarget a PR whose base is "
-                            "deleted outside a merge, and each has to be reopened and retargeted by hand.\n\n"
-                            + _advice(b))
+                return deny(say("sb_base_open", guard=NAME, b=b, prs="\n".join(prs), advice=say("sb_advice", b=b)))
             if prs:
-                return deny(f"{NAME}: `{b}` is the head branch of open PR(s):\n" + "\n".join(prs) +
-                            "\nDeleting it closes them and throws the work away. Merge or close the PR first; "
-                            "`gh pr merge --delete-branch` deletes the branch the safe way.")
+                return deny(say("sb_head_open", guard=NAME, b=b, prs="\n".join(prs)))
     return None

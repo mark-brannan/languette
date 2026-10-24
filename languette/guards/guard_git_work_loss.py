@@ -20,6 +20,7 @@ not the flag. git takes any unambiguous prefix of a long option, so --har is
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Refuse, deny
 
 NAME = "guard-git-work-loss"
@@ -186,5 +187,5 @@ def check(doc):
                 if a <= b:
                     _segment(s, a, b, nested, env)
     except Refuse as r:
-        return deny(f"{NAME}: {r}")
+        return deny(say("judged", guard=NAME, why=r))
     return None

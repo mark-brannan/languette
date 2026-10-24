@@ -325,11 +325,7 @@ def check(doc):
         n, have = len(found[r]), len(approved[label])
         if have >= n:
             continue
-        parts.append(
-            f"`{cmd.strip()}` {what} (`{r}`)"
-            + (f"; it runs the rule {n} times and has {have} unspent approvals" if n > 1 else "")
-            + f". Cost: {cost}. Instead, look first: {instead.format(tool=found[r][0])}."
-            f" If the user then wants this run, call AskUserQuestion: give the exact command, why it must run "
-            f"now and the cost above, with one option labelled exactly \"{label}\" and one to skip. "
-            "One approval is one run; ask again before running it again.")
-    return deny("guard-infra: " + "\n\n".join(parts))
+        parts.append(say("infra_need", cmd=cmd.strip(), what=what, rule=r,
+                         times=(say("infra_times", n=n, have=have) if n > 1 else ""),
+                         cost=cost, instead=instead.format(tool=found[r][0]), label=label))
+    return deny(say("judged", guard="guard-infra", why="\n\n".join(parts)))

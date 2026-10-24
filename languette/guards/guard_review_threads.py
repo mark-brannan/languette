@@ -22,6 +22,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Need, ask, deny
 
 NAME = "guard-review-threads"
@@ -226,12 +227,9 @@ def _judge(tid, viewer, comments):
         return None
     mine = [c for c in comments[bots[-1] + 1:] if _login(c) == me]
     if not mine:
-        return deny(f"{NAME}: review thread {tid} has no reply from {viewer} after the bot's last comment, so "
-                    f"resolving it would close a finding nobody answered. {DO}")
+        return deny(say("rt_no_reply", guard=NAME, tid=tid, viewer=viewer, do=DO))
     if not any(SHA.search(str(c.get("body") or "")) or LINK.search(str(c.get("body") or "")) for c in mine):
-        return deny(f"{NAME}: the reply on review thread {tid} after the bot's last comment names no commit and no "
-                    f"link (a sha of 7 to 40 hex characters, an https:// URL, or owner/repo#n), so the dismissal "
-                    f"rests on nothing. {DO}")
+        return deny(say("rt_no_link", guard=NAME, tid=tid, do=DO))
     return None
 
 
@@ -262,18 +260,13 @@ def check(doc):
     cwd = cwd if isinstance(cwd, str) and cwd.startswith("/") else ""
     ids, why = yield from _resolves(doc, cmd, cwd, (doc.env or {}).get("HOME") or "")
     if why:
-        return deny(f"{NAME}: this graphql call may resolve a review thread, and the guard cannot tell which review "
-                    f"thread ({why}), so it cannot check that a bot's finding was answered. Put the query and any "
-                    "thread's PRRT_ id in the command literally, pass run-time values as GraphQL variables "
-                    "(-f name=value), or run gh alone with an absolute path to the query file. " + DO)
+        return deny(say("rt_unknown_thread", guard=NAME, why=why, do=DO))
     if ids and not cwd:
         cwd = yield Need("cwd")
     for tid in ids:
         got = yield from _thread(cwd, tid)
         if isinstance(got, str):
-            return ask(f"{NAME}: this resolves review thread {tid}, and GitHub could not be read to check that a "
-                       f"bot's finding on it was answered ({got}). Approve only if the thread was answered with "
-                       "the fix commit or a link to the record the dismissal rests on.")
+            return ask(say("rt_unreadable", guard=NAME, tid=tid, got=got))
         v = _judge(tid, *got)
         if v:
             return v
