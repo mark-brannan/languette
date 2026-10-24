@@ -137,7 +137,7 @@ def verdict(event, findings):
     """The one decision for a call, from every guard's finding: the fields of
     hookSpecificOutput, or None for silence. `findings` is [(guard name, result,
     crashed)] in the order the guards judged. A deny outranks an ask, an ask a
-    rewrite; the first rewrite wins, since two cannot both apply."""
+    bare rewrite, and an ask carries a rewrite along; the first rewrite wins, since two cannot both apply."""
     if event != "PreToolUse":                  # state-keeping events: nothing to decide
         return None
     reasons, asks, notes, rewrites = [], [], [], []
@@ -148,14 +148,14 @@ def verdict(event, findings):
             reasons.append(r["permissionDecisionReason"])
         if r.get("permissionDecision") == "ask":
             asks.append(r["permissionDecisionReason"])
-        if r.get("permissionDecision") == "allow" and "updatedInput" in r:
+        if "updatedInput" in r:
             rewrites.append(r["updatedInput"])
         if r.get("additionalContext"):
             notes.append(r["additionalContext"])
     if reasons:
         return deny("\n\n".join(reasons))
     if asks:
-        return ask("\n\n".join(asks))
+        return {**ask("\n\n".join(asks)), **({"updatedInput": rewrites[0]} if rewrites else {})}
     if rewrites:
         return {**allow(rewrites[0]), **(context("\n\n".join(notes)) if notes else {})}
     if notes:
