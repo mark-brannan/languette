@@ -31,6 +31,7 @@ import os
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Need, Refuse, ask, deny
 
 NAME = "guard-duplicate-prs"
@@ -55,7 +56,7 @@ _HTML = re.compile(rf"github\.com/({_NAME}/{_NAME})/(?:pull|issues)/[0-9]+")
 
 
 def _deny(why):
-    return deny(f"{NAME}: {why}")
+    return deny(say("judged", guard=NAME, why=why))
 
 
 def refs(rx, text, repo):
@@ -219,14 +220,10 @@ def _body(post, cwd, cd, docs, fed, env):
         if kind == "text":
             text += v + "\n"
         elif kind == "opaque":
-            return _deny(f"the body is built at run time ({v}) and no heredoc in this command feeds it, so its "
-                         "text cannot be checked for an issue it closes. Write it literally, in a heredoc in the "
-                         "same command, or in a file and pass --body-file <path>.")
+            return _deny(say("dup_body_opaque", v=v))
         elif kind == "stdin":
             if not docs:
-                return _deny("the body comes from stdin (--body-file -) and there is no heredoc in the command, so "
-                             "it cannot be checked. Put the text in a heredoc in the same command, or in a file and "
-                             "pass --body-file <path>.")
+                return _deny(say("dup_body_stdin"))
             text += "".join(body + "\n" for body, _ in docs)
         elif v in fed or _abs(v, cwd, cd, env) in fed:     # this command writes it from a heredoc: that text, not the file's
             text += "".join(body + "\n" for body, _ in docs)
@@ -235,10 +232,7 @@ def _body(post, cwd, cd, docs, fed, env):
             got = Refuse("is a relative path after a cd, and the guard cannot tell where the command stands") \
                 if p is None else (yield from _fetch(p))
             if isinstance(got, Refuse):
-                return _deny(f"--body-file {v} {got}, so the body cannot be checked for an issue it closes. Write "
-                             "it to that path from a heredoc in this same command, or create the file in an "
-                             "earlier command and retry; spell the path out, since a variable set in an earlier "
-                             "command is invisible here.")
+                return _deny(say("dup_body_file", v=v, got=got))
             text += got + "\n"
     return text
 
@@ -289,28 +283,18 @@ def _judge(text, slug):
     asked = None
     for repo, n in closes:
         if repo is None:
-            asked = asked or ask(f"{NAME}: this PR would close #{n}, and the hook can't tell which repo it is opened "
-                                 "on (no --repo, and the working directory's origin is not on github.com, or a cd "
-                                 f"moves it), so it can't check whether an open PR already references #{n}. Pass "
-                                 "--repo owner/name, or read the issue first.")
+            asked = asked or ask(say("dup_repo_unknown", guard=NAME, n=n))
             continue
         prs = yield from _open_prs(repo, n)
         if prs is None:
-            asked = asked or ask(f"{NAME}: this PR would close {repo}#{n}, and GitHub couldn't say whether an open PR "
-                                 "already references it (gh missing, signed out, offline, an error, or a "
-                                 f"timeline past {PAGE} events):\n"
-                                 f"  gh api repos/{repo}/issues/{n}/timeline\n"
-                                 "Read the issue before opening a second PR on it.")
+            asked = asked or ask(say("dup_github_silent", guard=NAME, repo=repo, n=n, page=PAGE))
             continue
         for pr_repo, m, title in prs:
             if (pr_repo, m) in gone:
                 continue
             here = lambda r, x: f"#{x}" if r == repo else f"{r}#{x}"
             named = here(pr_repo, m) + (f" ({title})" if title else "")
-            return _deny(f"PR {named} is open and already references {here(repo, n)}, which this PR would close "
-                         "too, so this command is blocked. If this PR replaces it, close "
-                         f"{here(pr_repo, m)} first or say `Supersedes {here(pr_repo, m)}` in this body. If both "
-                         "are wanted, drop the closing keyword here and link the issue in prose.")
+            return _deny(say("dup_open", named=named, issue=here(repo, n), pr=here(pr_repo, m)))
     return asked
 
 
