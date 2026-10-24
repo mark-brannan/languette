@@ -27,12 +27,12 @@ def protected(env):
 
 
 def rules(env):
-    """The guard's one rule, its units the protected_services setting's."""
+    """The guard's rules, their units the protected_services setting's."""
     unit = {"units": list(protected(env))}
     return [{"id": "protected-stop", "action": "deny",
              "match": {"cmd": "systemctl", "verbs": sw.CTL_STOPS, "unit": unit}},
             {"id": "protected-service-stop", "action": "deny",
-             "match": {"cmd": "service", "verbs": {"stop": [], "restart": []}, "unit": unit}},
+             "match": {"cmd": "service", "verbs": {**{v: o for v, o in sw.CTL_STOPS.items() if not o}, "force-reload": [], "force-stop": [], "--full-restart": []}, "unit": unit}},
             {"id": "protected-kill", "action": "deny", "match": {"cmd": "pkill", "unit": unit}},
             {"id": "protected-killall", "action": "deny", "match": {"cmd": "killall", "unit": unit}}]
 

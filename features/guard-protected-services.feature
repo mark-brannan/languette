@@ -47,6 +47,10 @@ Feature: guard-protected-services
       | pkill -f 'postgresql.*16/main'  | a pattern that contains the unit     |
       | pkill -u postgres postgresql    | an option's value is not the pattern |
       | killall postgresql              |                                      |
+      | service postgresql try-restart  | systemctl's other stops              |
+      | service postgresql --full-restart | a flag that restarts               |
+      | pkill -f '[p]ostgresql'         | a regex fails closed                 |
+      | pkill 'postgre.ql'              | a regex fails closed                 |
       | killall -9 postgresql           |                                      |
       | killall -s KILL postgresql      |                                      |
       | /usr/bin/pkill -f postgresql    | by path                              |
@@ -71,6 +75,7 @@ Feature: guard-protected-services
       | pkill -f nginx                  | postgresql   |                                            |
       | killall nginx                   | postgresql   |                                            |
       | pkill -u postgres nginx         | postgresql   | a user filter is not the pattern           |
+      | killall --user postgres nginx   | postgresql   | a user filter is not the name              |
       | echo pkill postgresql           | postgresql   | prose that names a command is not it       |
 
     @also_guard-host-availability

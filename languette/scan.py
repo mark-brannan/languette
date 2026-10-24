@@ -1326,16 +1326,16 @@ def unit_test(cond, loose=False):
         return None
     if loose:                                  # a process pattern: it and a listed unit's stem contain one another
         stems = [re.split(r"[*?\[]", p)[0] for p in pats]
-        return lambda u: bool(u) and any(s and (s in u or u in s) for s in stems) or any(
+        return lambda u: bool(u) and (re.search(r"[.\[\]*+?(){}|^$\\]", u) or any(s and (s in u or u in s) for s in stems)) or any(
             fnmatch.fnmatchcase(n, p) for n in unit_names(u) for p in pats)
     return lambda u: any(c in u for c in "*?[") or any(
         fnmatch.fnmatchcase(n, p) for n in unit_names(u) for p in pats)
 
 
-# The same rule on `service` (`service <unit> <verb>`, verbs as above) and on `pkill` and
+# The same rule on `service` (`service <unit> <verb>`, verbs as above; it passes any verb to systemctl) and on `pkill` and
 # `killall` (no verbs: the pattern or name is the unit; one that contains a listed unit or is
 # contained in one names it, so `pkill -f 'postgresql.*main'` and `killall postgres` both hit).
-_PROC_ARG = frozenset("-u -U -g -G -P -s -t -T -F -c --signal --euid --uid --group --pgroup --session".split())
+_PROC_ARG = frozenset("-u -U -g -G -P -s -t -T -F -c -o -y --user --older-than --younger-than --signal --euid --uid --group --pgroup --session".split())
 
 
 def proc_stop(s, a, b, hit, match, cmd):
@@ -1352,10 +1352,10 @@ def proc_stop(s, a, b, hit, match, cmd):
             skip = False
         elif w in _PROC_ARG and "verbs" not in match:
             skip = True
-        elif not w.startswith("-"):
+        elif not w.startswith("-") or w == "--full-restart":
             pos.append(w)
     if "verbs" in match:                       # service: the unit leads, the verb follows
-        return f"{pos[1]} {pos[0]}" if len(pos) > 1 and pos[1] in match["verbs"] and hit(pos[0]) else None
+        return f"{pos[0]} {pos[1]}" if len(pos) > 1 and pos[1] in match["verbs"] and hit(pos[0]) else None
     return next((u for u in pos if hit(u)), None)
 
 
