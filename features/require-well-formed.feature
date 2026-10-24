@@ -75,7 +75,7 @@ Feature: require-well-formed
       """
     Then the guard denies, naming "1:5: unclosed here-document"
 
-  @python_only
+  @awk_only
   Scenario Outline: on the awk rung alone, a quote that never closes is denied
     When the agent runs `<command>`
     Then the guard denies, naming "<found>"
@@ -85,7 +85,7 @@ Feature: require-well-formed
       | echo "unclosed                | awk: the " opened at `"unclosed`       |
       | git commit -m 'half; rm -rf x | awk: the ' opened at `'half; rm -rf x` |
 
-  @python_only
+  @awk_only
   Scenario: on the awk rung alone, a quote left open on a heredoc opener line is denied, the lines after it unstripped
     When the agent runs:
       """
