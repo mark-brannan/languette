@@ -1434,17 +1434,24 @@ def _literals(p):
 
 def _may_match(pat, names, fold):
     """Could process pattern `pat`, a regex, select a process of one of `names`? It does when it,
-    or a word or path part of it, finds one of the names, or holds one. Its anchors are dropped first,
-    since a process's name or command line is not the unit's name (`^postgres$` selects PostgreSQL's
-    daemon). One that does not compile fails closed."""
+    or a word or path part of it, finds one of the names, or holds one. It is tried without its
+    anchors too, since a process's name or command line is not the unit's name (`^postgres$`
+    selects PostgreSQL's daemon); that try only adds hits. One that does not compile fails closed."""
     flags = re.I if fold else 0
-    pat = re.sub(r"\\[AZbB]|[\^$]", "", pat)
-    parts = {pat} | {f for f in re.split(r"[\s/]+", pat) if f}
+
+    def finds(p):
+        parts = {p} | {f for f in re.split(r"[\s/]+", p) if f}
+        return any(re.search(f, n, flags) for f in parts for n in names)
     try:
-        if any(re.search(f, n, flags) for f in parts for n in names):
+        if finds(pat):
             return True
     except re.error:
         return True
+    try:                                       # dropping anchors may break `[^x]` or `\$`: no hit then
+        if finds(re.sub(r"\\[AZbB]|[\^$]", "", pat)):
+            return True
+    except re.error:
+        pass
     low = pat.lower() if fold else pat
     return any((n.lower() if fold else n) in low for n in names)
 

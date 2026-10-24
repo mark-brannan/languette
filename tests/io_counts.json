@@ -2301,6 +2301,7 @@
  "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[killall -s KILL postgresql-]": {"git": 1},
  "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[killall postgres-a name the unit's name holds]": {"git": 1},
  "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[killall postgresql-]": {"git": 1},
+ "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[pkill '[^x]ostgresql'-a negated class]": {"git": 1},
  "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[pkill '^postgres$'-an anchored pattern]": {"git": 1},
  "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[pkill 'postgre.ql'-a regex fails closed]": {"git": 1},
  "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[pkill -9 postgresql-a signal flag]": {"git": 1},
