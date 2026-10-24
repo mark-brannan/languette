@@ -10,7 +10,7 @@ Feature: guard-git-work-loss
   in a parallel session's files. The stash stack is shared across worktrees,
   so a pop, a bare drop or a clear can take another session's entry; apply
   and drop by sha pass. Force push is bare `--force`, `-f` or a `+refspec`
-  anywhere, `--force-with-lease` to main or master, or deleting main;
+  anywhere, `--force-with-lease` to main or master (asks), or deleting main;
   rebasing a session branch, with `--force-with-lease` to that branch, is the
   one legitimate force. `git checkout .`, `git restore .` and `git clean -f`
   throw away uncommitted work, as `reset --hard` does, and `branch -D` throws
@@ -92,10 +92,10 @@ Feature: guard-git-work-loss
     @also_guard-bypass-ruleset
     Examples:
       | command                                                           | verdict   | note                     |
-      | git push --force-with-lease origin main                           | denies    | force to main            |
-      | git push --force-with-lease origin HEAD:main                      | denies    | HEAD:main is main        |
-      | git push --force-with-lease origin foo:refs/heads/main            | denies    | refs/heads/main is main  |
-      | git push --force-with-lease=master origin master                  | denies    | master is main too       |
+      | git push --force-with-lease origin main                           | asks      | force to main            |
+      | git push --force-with-lease origin HEAD:main                      | asks      | HEAD:main is main        |
+      | git push --force-with-lease origin foo:refs/heads/main            | asks      | refs/heads/main is main  |
+      | git push --force-with-lease=master origin master                  | asks      | master is main too       |
       | git push origin HEAD:main                                         | is silent | not a force              |
 
   Scenario Outline: discarding uncommitted work is denied
@@ -301,7 +301,7 @@ Feature: guard-git-work-loss
     @also_guard-bypass-ruleset
     Examples:
       | command                                            | verdict   | note                            |
-      | git push --force-w origin main                     | denies    | the same, to main               |
+      | git push --force-w origin main                     | asks      | the same, to main               |
 
   Scenario: reset --hard named in a heredoc is not run
     When the agent runs:
