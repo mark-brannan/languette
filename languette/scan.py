@@ -1318,26 +1318,61 @@ def service_stop(s, a, b, hit, host_verbs=_CTL_HOST, verbs=CTL_STOPS, cmd=_CTL):
 # when a verb, holding its options, acts on a unit the condition accepts. `cmd` names the program
 # (read with systemctl's grammar). Conditions are a closed list: {"units": [pattern]}, a unit that
 # answers to an fnmatch pattern of the list (`*`, `?` and `[...]` all match).
-def unit_test(cond):
+def unit_test(cond, loose=False):
     """The test on a unit that condition `cond` names, or None when no unit can pass it. A glob
     in the unit may name a listed one, so it passes: the test fails closed."""
     pats = cond["units"]
     if not pats:
         return None
+    if loose:                                  # a process pattern: it and a listed unit's stem contain one another
+        stems = [re.split(r"[*?\[]", p)[0] for p in pats]
+        return lambda u: bool(u) and any(s and (s in u or u in s) for s in stems) or any(
+            fnmatch.fnmatchcase(n, p) for n in unit_names(u) for p in pats)
     return lambda u: any(c in u for c in "*?[") or any(
         fnmatch.fnmatchcase(n, p) for n in unit_names(u) for p in pats)
 
 
+# The same rule on `service` (`service <unit> <verb>`, verbs as above) and on `pkill` and
+# `killall` (no verbs: the pattern or name is the unit; one that contains a listed unit or is
+# contained in one names it, so `pkill -f 'postgresql.*main'` and `killall postgres` both hit).
+_PROC_ARG = frozenset("-u -U -g -G -P -s -t -T -F -c --signal --euid --uid --group --pgroup --session".split())
+
+
+def proc_stop(s, a, b, hit, match, cmd):
+    """`<verb> <unit>` (`<unit>` alone for pkill and killall) when the segment runs `match`'s command on a unit `hit` accepts."""
+    g = cmd_index(s, a, b, cmd, True)
+    if g is None:
+        return None
+    pos, skip = [], False
+    for i in range(g + 1, b + 1):
+        w = s.w[i]
+        if s.k[i] != "w":
+            continue
+        if skip:
+            skip = False
+        elif w in _PROC_ARG and "verbs" not in match:
+            skip = True
+        elif not w.startswith("-"):
+            pos.append(w)
+    if "verbs" in match:                       # service: the unit leads, the verb follows
+        return f"{pos[1]} {pos[0]}" if len(pos) > 1 and pos[1] in match["verbs"] and hit(pos[0]) else None
+    return next((u for u in pos if hit(u)), None)
+
+
 def ctl_hit(doc, match, prose=PROSE):
-    """`<verb> <unit>` for the first systemctl in the command that `match` fits, or None."""
-    hit = unit_test(match["unit"])
+    """`<verb> <unit>` for the first command in the text that `match` fits, or None."""
+    proc = match["cmd"] in ("service", "pkill", "killall")
+    hit = unit_test(match["unit"], loose=match["cmd"] in ("pkill", "killall"))
     if hit is None:
         return None
     cmd = re.compile(r"(?:^|/)" + re.escape(match["cmd"]) + r"\Z")
     for t, _ in doc.texts(prose):
         s = doc.scan(t)
         for a, b in s.segments():
-            verb = a <= b and service_stop(s, a, b, hit, host_verbs=(), verbs=match["verbs"], cmd=cmd)
+            if proc:
+                verb = a <= b and proc_stop(s, a, b, hit, match, cmd)
+            else:
+                verb = a <= b and service_stop(s, a, b, hit, host_verbs=(), verbs=match["verbs"], cmd=cmd)
             if verb:
                 return verb
     return None

@@ -6,8 +6,8 @@ a trailing `.service` optional, `*` globs allowed. Unset or empty, it guards
 nothing: the user fills it. A pattern matches the unit as written, without its
 type suffix, or without its `@instance`. A glob in the unit fails closed. The
 services a session runs on (ssh, the network) are guard-host-availability's.
-Its one rule is a command rule (docs/design/guard-rules.md), matched by scan's
-systemctl rule matcher; the setting fills its list of units.
+Its rules are command rules (docs/design/guard-rules.md) on systemctl, service,
+pkill and killall, matched by scan's ctl_hit; the setting fills their units.
 """
 
 import re
@@ -28,8 +28,13 @@ def protected(env):
 
 def rules(env):
     """The guard's one rule, its units the protected_services setting's."""
+    unit = {"units": list(protected(env))}
     return [{"id": "protected-stop", "action": "deny",
-             "match": {"cmd": "systemctl", "verbs": sw.CTL_STOPS, "unit": {"units": list(protected(env))}}}]
+             "match": {"cmd": "systemctl", "verbs": sw.CTL_STOPS, "unit": unit}},
+            {"id": "protected-service-stop", "action": "deny",
+             "match": {"cmd": "service", "verbs": {"stop": [], "restart": []}, "unit": unit}},
+            {"id": "protected-kill", "action": "deny", "match": {"cmd": "pkill", "unit": unit}},
+            {"id": "protected-killall", "action": "deny", "match": {"cmd": "killall", "unit": unit}}]
 
 
 def judge(doc):
@@ -39,7 +44,7 @@ def judge(doc):
             continue
         verb = sw.ctl_hit(doc, rule["match"])
         if verb:
-            return say("protected_stop", verb=verb, way_user=WAY_USER)
+            return say("protected_stop", verb=f"{rule['match']['cmd']} {verb}", way_user=WAY_USER)
     return None
 
 

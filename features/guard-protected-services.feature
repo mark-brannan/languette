@@ -31,6 +31,26 @@ Feature: guard-protected-services
       | systemctl stop postgresql.socket             | postgresql                | its socket                 |
       | systemctl stop wg-quick@wg0                  | wg-quick@wg0              | one instance, named        |
 
+  Scenario Outline: the same stop made with service, pkill or killall is denied
+    Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "postgresql"
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | command                         | note                                 |
+      | service postgresql stop         |                                      |
+      | service postgresql restart      |                                      |
+      | sudo service postgresql stop    | behind sudo                          |
+      | pkill postgresql                |                                      |
+      | pkill -9 postgresql             | a signal flag                        |
+      | pkill -f postgresql             | a pattern over command lines         |
+      | pkill -f 'postgresql.*16/main'  | a pattern that contains the unit     |
+      | pkill -u postgres postgresql    | an option's value is not the pattern |
+      | killall postgresql              |                                      |
+      | killall -9 postgresql           |                                      |
+      | killall -s KILL postgresql      |                                      |
+      | /usr/bin/pkill -f postgresql    | by path                              |
+
   Scenario Outline: without a match, a stop is the agent's
     Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "<setting>"
     When the agent runs `<command>`
@@ -44,6 +64,14 @@ Feature: guard-protected-services
       | systemctl stop wg-quick@wg1     | wg-quick@wg0 | another instance                           |
       | systemctl --user stop postgresql | postgresql  | the user's own manager                     |
       | echo systemctl stop postgresql  | postgresql   | prose that names a command is not it       |
+      | service nginx stop              | postgresql   | another service                            |
+      | service postgresql status       | postgresql   | a read, not a stop                         |
+      | service postgresql stop         |              | unset: nothing is protected                |
+      | pkill nginx                     | postgresql   |                                            |
+      | pkill -f nginx                  | postgresql   |                                            |
+      | killall nginx                   | postgresql   |                                            |
+      | pkill -u postgres nginx         | postgresql   | a user filter is not the pattern           |
+      | echo pkill postgresql           | postgresql   | prose that names a command is not it       |
 
     @also_guard-host-availability
     Examples:
