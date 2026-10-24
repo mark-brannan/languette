@@ -199,13 +199,13 @@ def parse(doc):
     cwd = payload["cwd"]
     home = env.get("HOME", "")
     if not home.startswith("/"):
-        return deny(say("home_not_absolute", guard="guard-disks")), None, []
+        return deny(say("home_not_absolute", guard=NAME)), None, []
 
     judge = _Judge(cwd, home)
     try:
         judge.run(doc)
     except Refuse as e:
-        return deny(say("judged", guard="guard-disks", why=e)), None, []
+        return deny(say("judged", guard=NAME, why=e)), None, []
     return None, home, judge.targets
 
 
@@ -225,11 +225,12 @@ def judge(parsed, answers):
     for abs_, what, raw in targets:
         if not paths.under(abs_, roots):
             kind = "a device node" if abs_.startswith("/dev/") else "outside the scratchpad, /tmp and agent worktrees"
-            return deny(say("disks_blocked", what=what, raw=raw, abs_=abs_, kind=kind, way_out=_WAY_OUT))
+            why = say("disks_blocked", what=what, raw=raw, abs_=abs_, kind=kind, way_out=_WAY_OUT)
+            return deny(say("judged", guard=NAME, why=why))
         phys = physical(abs_)
         if phys != abs_ and not paths.under(phys, roots):
-            return deny("guard-disks: " + say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys,
-                                              way_out=_WAY_OUT))
+            why = say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys, way_out=_WAY_OUT)
+            return deny(say("judged", guard=NAME, why=why))
     return None
 
 

@@ -245,6 +245,8 @@ MESSAGES = {
         "because the guard cannot tell which commands the repo meant to cover. Fix it with "
         "the Edit tool, or tell the user."
     ),
+    "ask_first_times": "; this command runs it {n} times and has {have} unspent",
+    "ask_first_cheaper": " Cheaper forms: {cheaper}.",
     "ask_first_need": (
         "`{id}` ({path}) needs the user's approval for each run{times}. Cost: {cost}.{cheaper}"
         " If a cheaper form answers the question, use it instead. Otherwise call AskUserQuestion: "
@@ -268,7 +270,7 @@ MESSAGES = {
         "hand them the exact command."
     ),
     "disks_refused": "`{what}` is blocked: {why}. {way_out}",
-    "disks_blocked": "guard-disks: `{what} {raw}` is blocked: {abs_} is {kind}. {way_out}",
+    "disks_blocked": "`{what} {raw}` is blocked: {abs_} is {kind}. {way_out}",
     "cross_session_way_out": (
         "Ask the user to send it themselves, or from a session that has not read untrusted content; "
         "/clear starts this one afresh."

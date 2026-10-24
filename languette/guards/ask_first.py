@@ -141,9 +141,8 @@ def check(doc):
         if have >= runs[c["id"]]:
             continue
         parts.append(say("ask_first_need", id=c["id"], path=path,
-                         times=(f"; this command runs it {runs[c['id']]} times and has {have} unspent"
-                                if runs[c["id"]] > 1 else ""),
+                         times=(say("ask_first_times", n=runs[c["id"]], have=have) if runs[c["id"]] > 1 else ""),
                          cost=c["cost"],
-                         cheaper=(f" Cheaper forms: {c['cheaper']}." if c.get("cheaper") else ""),
+                         cheaper=(say("ask_first_cheaper", cheaper=c["cheaper"]) if c.get("cheaper") else ""),
                          cmd=cmd.strip(), label=c["approve_label"]))
     return deny(say("judged", guard="ask-first", why="\n\n".join(parts)))
