@@ -100,6 +100,15 @@ Feature: guard-review-threads
       | App[bot]       | app      | is silent                                    | case and [bot] are ignored  |
       |                | app      | denies, naming "no reply from me after"      | unset: the gh login alone   |
       | other          | app      | denies, naming "no reply from me after"      | an unlisted login           |
+      | app, someone   | someone  | is silent                                    | spaces round entries ignored |
+
+  Scenario: a listed login that is also a reviewer still counts as a bot when it names no record
+    Given CLAUDE_PLUGIN_OPTION_REVIEW_THREAD_LOGINS is "claude"
+    And review thread "PRRT_t1" holds:
+      | type | author | body                |
+      | Bot  | claude | Consider a rename.  |
+    When the agent runs `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=PRRT_t1`
+    Then the guard denies, naming "no reply from me after"
 
   Scenario Outline: each kind of bot is recognised
     Given review thread "PRRT_t1" holds:

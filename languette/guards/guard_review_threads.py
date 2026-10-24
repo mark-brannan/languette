@@ -223,8 +223,14 @@ def _judge(tid, viewer, comments, also=()):
     """deny for one thread, or None. The comments of the viewer and of the
     logins in the review_thread_logins option are replies, even when one is
     itself a bot."""
-    me = {_norm(viewer), *map(_norm, also)}
-    bots = [i for i, c in enumerate(comments) if _bot(c) and _login(c) not in me]
+    vme = _norm(viewer)
+    me = {vme, *map(_norm, also)}
+
+    def reply(c):  # a listed login's comment is a reply only when it names a record
+        body = str(c.get("body") or "")
+        return _login(c) == vme or (_login(c) in me and bool(SHA.search(body) or LINK.search(body)))
+
+    bots = [i for i, c in enumerate(comments) if _bot(c) and not reply(c)]
     if not bots:
         return None
     mine = [c for c in comments[bots[-1] + 1:] if _login(c) in me]
@@ -269,7 +275,7 @@ def check(doc):
         got = yield from _thread(cwd, tid)
         if isinstance(got, str):
             return ask(say("rt_unreadable", guard=NAME, tid=tid, got=got))
-        v = _judge(tid, *got, [x for x in ((doc.env or {}).get(OPTION) or "").split(",") if x.strip()])
+        v = _judge(tid, *got, [x.strip() for x in ((doc.env or {}).get(OPTION) or "").split(",") if x.strip()])
         if v:
             return v
     return None
