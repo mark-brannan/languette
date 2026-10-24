@@ -194,6 +194,21 @@ def test_protected_services_starts_empty():
                 equal_to(()))
 
 
+def test_a_command_rules_cmd_picks_the_program_it_matches():
+    from languette import scan
+    from languette.document import Document
+
+    def hit(cmd, command):
+        doc = Document({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": "/"}, {})
+        match = {"cmd": cmd, "verbs": scan.CTL_STOPS, "unit": {"units": ["nginx"]}}
+        return scan.ctl_hit(doc, match)
+
+    assert_that(hit("systemctl", "systemctl stop nginx"), equal_to("stop nginx"))
+    assert_that(hit("systemctl", "foo stop nginx"), equal_to(None))
+    assert_that(hit("foo", "foo stop nginx"), equal_to("stop nginx"))
+    assert_that(hit("foo", "systemctl stop nginx"), equal_to(None))
+
+
 # The parser ladder's pip parsers (docs/decisions.md, "Runtime dependencies"):
 # optional, and imported only by scan.py, which reads on without them.
 LADDER = {"languette/scan.py": {"tree_sitter", "tree_sitter_bash", "bashlex"}}
