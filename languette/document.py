@@ -65,8 +65,9 @@ class Document:
             if self.command is None:
                 return None
             try:
-                if self.reading()[1]:
-                    return self.reading()[1]
+                refused = self.reading()[1]
+                if refused:
+                    return refused
                 self.texts()
             except sw.Unparseable as e:
                 return e
