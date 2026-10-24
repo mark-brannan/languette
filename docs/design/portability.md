@@ -9,7 +9,9 @@ pipeline](guard-pipeline.md), [guard rules](guard-rules.md),
 ## Purpose
 
 Languette is for anyone who runs an agent, not for the one setup it was
-born in. Every assumption about its first home that reaches the code is a
+born in. It is harm reduction: for its author first, and for anyone else
+who works with agentic coding tools and wants to protect themselves from
+what an agent may do. Every assumption about its first home that reaches the code is a
 step a new user must undo before the guards are theirs, and most such
 steps are invisible until a stranger trips on one. Without a written rule
 new work slides back toward the maintainer's own machine, login and
@@ -59,7 +61,7 @@ habits, because that is where it is tested. This document is the line.
    library. Each is found on the path, never at a fixed location. WSL is
    the first platform and the README leads with it on purpose; it is a
    recommendation, not an assumption. Nothing in the code requires WSL,
-   and the maintainer runs it on more than one platform.
+   and the author runs it on more than one platform.
 
 8. **Costs are declared, not discovered.** What a check may read, run or
    fetch is written down per test and held there, so a new platform or a
