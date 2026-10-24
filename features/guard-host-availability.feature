@@ -6,6 +6,10 @@ Feature: guard-host-availability
   or the display manager. No agent area makes them safe. Any other service is
   the agent's to stop.
 
+  Why. These commands take the machine, or the session the agent runs on,
+  down with it. No agent area undoes that, so the guard refuses them at
+  command position and as the one-word script of sh -c.
+
   Scenario Outline: the fork-bomb shape and a power command are denied
     When the agent runs `<command>`
     Then the guard denies, naming "<naming>"

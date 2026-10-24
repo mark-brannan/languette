@@ -5,6 +5,10 @@ Feature: guard-pipe-to-shell
   into the command line. Saving the download and running the file is the safe
   way, and passes.
 
+  Why. A download run as it arrives executes code nobody has read. Saved
+  first, it can be inspected. An interpreter given a script of its own is
+  not reading the download as code, so that form passes.
+
   Scenario Outline: a download piped into an interpreter is denied
     When the agent runs `<command>`
     Then the guard denies, naming "<naming>"

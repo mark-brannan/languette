@@ -3,6 +3,10 @@ Feature: guard-scheduled-jobs
   `crontab -r`, which deletes the whole crontab with no undo, is denied.
   Listing the crontab and replacing it from a file pass.
 
+  Why. crontab -r deletes the whole schedule at once, and nothing in the
+  tool brings it back. Only that flag is refused; the rest of crontab stays
+  usable.
+
   Scenario Outline: crontab -r is denied
     When the agent runs `<command>`
     Then the guard denies, naming "<naming>"

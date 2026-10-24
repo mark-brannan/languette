@@ -6,6 +6,11 @@ Feature: guard-permissions
   The working directory is {CWD}, a directory outside $HOME, unless a
   scenario says otherwise.
 
+  Why. A recursive chown, chgrp or chmod reaches every file under its
+  target, and chmod 777 opens them to everyone. Never /, $HOME itself or
+  anything inside a .git. A target this guard cannot resolve to one allowed
+  path is denied on sight, naming what it saw.
+
   Scenario Outline: a recursive sweep of anything but the agent's own area is denied, however the flag is spelled
     When the agent runs `<command>`
     Then the guard denies, naming "<naming>"
