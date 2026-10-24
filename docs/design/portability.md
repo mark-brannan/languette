@@ -67,9 +67,12 @@ habits, because that is where it is tested. This document is the line.
 
 9. **A tool is recognised by what it does, not by who uses it.** A program
    that rewrites the work tree, moves a branch or deletes outside the
-   repository is dangerous for that reason, whoever's habit it is. When
-   one such program is named, the name stands for a class, and the rule
-   says which class.
+   repository is dangerous for that reason, whoever's habit it is. Dotfile
+   managers are one such category: each treats the home directory as a
+   work tree, and they differ in how (a bare repository over the home, a
+   source directory applied onto it, a wrapper around git). Languette
+   works with the category without prejudice; a rule names the hazard,
+   and a named program is one row of a table, never the rule itself.
 
 ## What enforces it
 
