@@ -1,13 +1,17 @@
 """guard-protected-services: features/guard-protected-services.feature is the spec.
 
-Blocks a `systemctl` stop, restart, kill or `disable --now` of a service the
-user's machine depends on: the protected_services setting, comma-separated,
-a trailing `.service` optional, `*` globs allowed. Unset or empty, it guards
-nothing: the user fills it. A pattern matches the unit as written, without its
-type suffix, or without its `@instance`. A glob in the unit fails closed. The
-services a session runs on (ssh, the network) are guard-host-availability's.
-Its one rule is a command rule (docs/design/guard-rules.md), matched by scan's
-systemctl rule matcher; the setting fills its list of units.
+Blocks a stop, restart, kill or `disable --now` of a service the user's
+machine depends on, made with `systemctl`, the SysV `service`, `invoke-rc.d`,
+`rc-service` or `/etc/init.d/<unit>`, `pkill` or `killall`: the
+protected_services setting, comma-separated, a trailing `.service` optional,
+`*` globs allowed. Unset or empty, it guards nothing: the user fills it. A
+pattern matches the unit as written, without its type suffix, or without its
+`@instance`. A glob in the unit fails closed, as does a pkill pattern (or a
+`killall -r` one) that could select a listed unit's process, and an operand the
+scan cannot read. The services a session runs on (ssh, the network) are
+guard-host-availability's. Its rules are command rules
+(docs/design/guard-rules.md), each naming its program's description in scan,
+matched by scan's ctl_hit; the setting fills their units.
 """
 
 import re
@@ -27,9 +31,15 @@ def protected(env):
 
 
 def rules(env):
-    """The guard's one rule, its units the protected_services setting's."""
+    """The guard's rules, their units the protected_services setting's."""
+    unit = {"units": list(protected(env))}
     return [{"id": "protected-stop", "action": "deny",
-             "match": {"cmd": "systemctl", "verbs": sw.CTL_STOPS, "unit": {"units": list(protected(env))}}}]
+             "match": {"cmd": "systemctl", "program": "systemctl", "verbs": sw.CTL_STOPS, "unit": unit}},
+            {"id": "protected-sysv-stop", "action": "deny",
+             "match": {"cmd": list(sw.SYSV_CMDS), "program": "sysv", "verbs": sw.SERVICE_STOPS, "unit": unit}},
+            {"id": "protected-kill", "action": "deny", "match": {"cmd": "pkill", "program": "pkill", "unit": unit}},
+            {"id": "protected-killall", "action": "deny",
+             "match": {"cmd": "killall", "program": "killall", "unit": unit}}]
 
 
 def judge(doc):
