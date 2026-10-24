@@ -9,9 +9,10 @@ throwaway prototype (about 100 lines, standard library plus languette's own
 Yes, for the common carriers, and cheaply. A scan that (1) finds a database
 client in a command segment, (2) takes the quoted strings and heredoc bodies
 the shell scan already hands over, and (3) masks comments and string literals
-before reading each statement's head word, flagged every destructive
-statement in the planned rows of `features/data.feature` that is SQL text
-(see "Measured"). On a corpus of 119,438 distinct agent commands it flagged
+before reading each statement's head word, flagged 20 of the 25
+destructive rows in `features/data.feature`. Of the five misses, three are
+argv or flag rules, `LOAD DATA OVERWRITE` is a missing head word and
+`WHERE true` is a tautology (see "Measured"). On a corpus of 119,438 distinct agent commands it flagged
 nothing, and it cost about 5 ms per candidate command.
 
 What it cannot see is text that is not on the command line: a `.sql` file, a
@@ -136,8 +137,9 @@ Worth it, modestly, as a stdlib scan inside `guard-databases`, verdict
 
 - Why: the false-positive rate on the available corpus is 0 once the client
   must be present; the hazard is as in the README's lede (erased rows are not
-  a waste of an hour); and `data.feature` already carries 25 planned rows
-  this scan would turn from `@planned` to green, apart from the argv rows.
+  a waste of an hour); and `data.feature` already carries 25 planned rows,
+  of which this scan would turn 22 from `@planned` to green; the exceptions
+  are the argv and flag rows and the `WHERE true` tautology.
 - Why not more: no real database command appears in the corpus, so the need
   rests on the hazard, not on a measured miss. #125's rule (an incident
   first) is not met by this evidence; it is the maintainer's call whether a
@@ -168,5 +170,6 @@ Candidate issue, not filed:
 > agent commands). Hazard: erased rows. Concept: a setting of
 > `guard-databases`; stdlib mask-and-split reader over quoted words and
 > heredoc bodies of a segment naming psql, mysql, sqlite3, bq or snow; gather
-> reads `-f`/`<` files; verdict `asks`. Done when the `@planned` SQL rows in
-> `features/data.feature` pass; the argv rows stay separate.
+> reads `-f`/`<` files; verdict `asks`. Add `LOAD DATA OVERWRITE` to the head words. Done when the `@planned` SQL
+> rows in `features/data.feature` pass, except the `WHERE true` tautology row,
+> which stays `@planned` until a parser is justified; the argv rows stay separate.
