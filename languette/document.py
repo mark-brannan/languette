@@ -76,8 +76,8 @@ class Document:
 
     def reading(self):
         """(rung, the Unparseable that rung refused with or None) for the Bash
-        command, from the one scan.parse of the call: the guards and the
-        decision record see the same reading."""
+        command, from the one scan.parse of the call: require-well-formed and
+        the decision record see the same reading."""
         def read():
             try:
                 return sw.parse(self.command)[0], None
