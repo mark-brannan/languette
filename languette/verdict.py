@@ -12,6 +12,14 @@ a walk; check catches it and returns deny. Standard library only.
 
 from languette.messages import say
 
+# Claude Code's permission_mode values in which a hook's ask reaches no one:
+# dontAsk denies every prompt unseen, bypassPermissions skips it. A headless
+# run sends its configured mode, so it is not told apart here.
+NO_PROMPT = frozenset({"dontAsk", "bypassPermissions"})
+# ...and those in which AskUserQuestion reaches no one: dontAsk denies it even
+# when allowed; bypassPermissions still shows it.
+NO_QUESTION = frozenset({"dontAsk"})
+
 WAY_USER = "That is the user's to run, not an agent's: say what you need and hand them the exact command."
 
 
@@ -133,29 +141,32 @@ def allow(updated_input):
     return {"permissionDecision": "allow", "updatedInput": updated_input}
 
 
-def verdict(event, findings):
+def verdict(event, findings, mode=None):
     """The one decision for a call, from every guard's finding: the fields of
     hookSpecificOutput, or None for silence. `findings` is [(guard name, result,
     crashed)] in the order the guards judged. A deny outranks an ask, an ask a
-    bare rewrite, and an ask carries a rewrite along; the first rewrite wins, since two cannot both apply."""
+    bare rewrite, and an ask carries a rewrite along; the first rewrite wins, since two cannot both apply.
+    In a permission `mode` where no one can answer (NO_PROMPT), an ask is a deny that says so."""
     if event != "PreToolUse":                  # state-keeping events: nothing to decide
         return None
     reasons, asks, notes, rewrites = [], [], [], []
-    for _, r, _ in findings:
+    for name, r, _ in findings:
         if not r:
             continue
         if r.get("permissionDecision") == "deny":
             reasons.append(r["permissionDecisionReason"])
         if r.get("permissionDecision") == "ask":
-            asks.append(r["permissionDecisionReason"])
+            asks.append((name, r["permissionDecisionReason"]))
         if "updatedInput" in r:
             rewrites.append(r["updatedInput"])
         if r.get("additionalContext"):
             notes.append(r["additionalContext"])
     if reasons:
         return deny("\n\n".join(reasons))
+    if asks and mode in NO_PROMPT:
+        return deny("\n\n".join(say("unattended_ask", guard=n, mode=mode, why=r) for n, r in asks))
     if asks:
-        return {**ask("\n\n".join(asks)), **({"updatedInput": rewrites[0]} if rewrites else {})}
+        return {**ask("\n\n".join(r for _, r in asks)), **({"updatedInput": rewrites[0]} if rewrites else {})}
     if rewrites:
         return {**allow(rewrites[0]), **(context("\n\n".join(notes)) if notes else {})}
     if notes:

@@ -17,6 +17,11 @@ MESSAGES = {
         "languette: no guard is named {name}, so this hook checks nothing. This is a gate and fails "
         "closed: reinstall the plugin, or copy the entry again from hooks/hooks.json"
     ),
+    # An ask where no one can answer it (languette.verdict.NO_PROMPT).
+    "unattended_ask": (
+        "{guard}: this needs the user's approval, and in {mode} no one is there to approve it, "
+        "so it is denied instead of asked. What it would have asked: {why}"
+    ),
     "guard_crashed": "{guard}: guard crashed ({kind}: {err}), cannot inspect the command",
     "home_not_absolute": "{guard}: $HOME is not an absolute path, cannot resolve targets",
     "too_many": (
@@ -253,6 +258,11 @@ MESSAGES = {
         "give the exact command (`{cmd}`), why it must run now, and the "
         "cost above, with one option labelled exactly \"{label}\" and one to skip. "
         "One approval is one run; ask again before running it again."
+    ),
+    "ask_first_unattended": (
+        "`{id}` ({path}) needs the user's approval for each run, and in {mode} no one is there to "
+        "approve it: AskUserQuestion is denied unseen. Cost: {cost}.{cheaper} If a cheaper form "
+        "answers the question, use it instead; otherwise leave `{cmd}` for the user to run."
     ),
     "hooks_skipped": (
         "{guard}: --no-verify, -n or core.hooksPath skips this repo's hooks, and that is the user's call, not "

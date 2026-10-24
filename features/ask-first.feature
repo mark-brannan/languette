@@ -89,6 +89,23 @@ Feature: ask-first
       When the agent runs `npm run e2e`
       Then the guard denies, naming "call AskUserQuestion"
 
+    # dontAsk denies AskUserQuestion unseen; bypassPermissions still shows it.
+    Scenario Outline: where no one can approve, the deny says so instead of sending the agent to ask
+      Given the permission mode is "<mode>"
+      When the agent runs `npm run e2e`
+      Then the guard denies, naming "<says>"
+
+      Examples:
+        | mode              | says                                     |
+        | dontAsk           | ask-first: `e2e`                         |
+        | dontAsk           | in dontAsk no one is there to approve it |
+        | bypassPermissions | call AskUserQuestion                     |
+
+    Scenario: in dontAsk the deny does not send the agent to AskUserQuestion
+      Given the permission mode is "dontAsk"
+      When the agent runs `npm run e2e`
+      Then the guard denies, not naming "call AskUserQuestion"
+
     Scenario Outline: a listed command is denied however it is reached
       When the agent runs `<command>`
       Then the guard denies
