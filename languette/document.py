@@ -65,12 +65,25 @@ class Document:
             if self.command is None:
                 return None
             try:
-                sw.check(self.command)
+                refused = self.reading()[1]
+                if refused:
+                    return refused
                 self.texts()
             except sw.Unparseable as e:
                 return e
             return None
         return self._kept(("refusal",), read)
+
+    def reading(self):
+        """(rung, the Unparseable that rung refused with or None) for the Bash
+        command, from the one scan.parse of the call: require-well-formed and
+        the decision record see the same reading."""
+        def read():
+            try:
+                return sw.parse(self.command)[0], None
+            except sw.Unparseable as e:
+                return e.rung, e
+        return self._kept(("reading",), read)
 
     def scan(self, text):
         """The scan.Scan of `text`, one per text per call. A guard reads it, never changes it."""

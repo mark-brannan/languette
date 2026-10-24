@@ -657,7 +657,7 @@ def heredocs(b):
 class Scan:
     def __init__(self, text):
         """Read by the first rung on hand. The command itself is checked once,
-        by check(); a text that only might be shell -- a nested string, the
+        by the Document's reading(); a text that only might be shell -- a nested string, the
         text with heredocs stripped -- falls to the awk rung when a rung
         refuses it or its tree cannot be mapped. A failed run (RunFailed)
         raises: the clock never picks the reader. Only shfmt's tree maps."""

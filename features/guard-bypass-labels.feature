@@ -51,7 +51,7 @@ Feature: guard-bypass-labels
       Examples:
         | repo                                | label          |
         | o/r                                 | churn-ok       |
-        | mark-brannan/claude_prompts_scratch | Mixed-Loops-OK |
+        | you/notes                           | Mixed-Loops-OK |
 
     Scenario Outline: the gh is found however it is reached
       When the agent runs `<command>`
@@ -131,7 +131,7 @@ Feature: guard-bypass-labels
 
       Examples:
         | command                                                                   | label          |
-        | gh api repos/mark-brannan/dotfiles/issues/12/labels -f "labels[]=churn-ok" | churn-ok       |
+        | gh api repos/o/dots/issues/12/labels -f "labels[]=churn-ok" | churn-ok       |
         | gh api repos/o/r/issues/12/labels -F 'labels[]=Mixed-Loops-OK'            | mixed-loops-ok |
         | gh api -X PUT repos/o/r/issues/12/labels --field labels[]=churn-ok        | churn-ok       |
         | gh api --method PATCH repos/o/r/issues/12 -f labels[]=ready -f labels[]=churn-ok | churn-ok |
@@ -276,7 +276,7 @@ Feature: guard-bypass-labels
       Examples:
         | tool                                     | input                                                                           | label          |
         | mcp__github__update_pull_request         | {"owner":"o","repo":"r","pullNumber":12,"labels":["ready","mixed-loops-ok"]}    | mixed-loops-ok |
-        | mcp__github__update_issue                | {"owner":"mark-brannan","repo":"claude_prompts_scratch","issue_number":12,"labels":["Churn-OK"]} | churn-ok |
+        | mcp__github__update_issue                | {"owner":"you","repo":"notes","issue_number":12,"labels":["Churn-OK"]} | churn-ok |
         | mcp__gitea__edit_issue                   | {"owner":"o","repo":"r","index":3,"labels":"ready,churn-ok"}                    | churn-ok       |
         | mcp__github__add_labels                  | {"owner":"o","repo":"r","issue_number":12,"labels":["churn-ok"]}                | churn-ok       |
         | mcp__github__update_issue                | {"owner":"o","repo":"r","issue_number":12,"labels":[{"name":"churn-ok"}]}       | churn-ok       |
