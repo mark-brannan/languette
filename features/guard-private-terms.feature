@@ -373,7 +373,7 @@ Feature: guard-private-terms
 
     Scenario Outline: with no repo named, the origin of the working directory decides, unless the command moves
       Given a clone of "git@github.com:you/notes.git" at "{TMP}/private" on branch "main"
-      And a clone of "https://github.com/mark-brannan/colregs.git" at "{TMP}/public" on branch "main"
+      And a clone of "https://github.com/o/r.git" at "{TMP}/public" on branch "main"
       And the directory "{TMP}/nogit"
       And the working directory is "<cwd>"
       When the agent runs `<command>`
@@ -418,7 +418,7 @@ Feature: guard-private-terms
       @also_guard-github-issues
       Examples:
         | command                                                                                                                                                     |
-        | gh issue create -R o/r -t "Ruling: Q-14" -b "Argument in mark-brannan/colregs requirements.md; see https://github.com/mark-brannan/colregs-engine/pull/25 and claude_prompts_scratch#3" |
+        | gh issue create -R o/r -t "Ruling: Q-14" -b "Argument in o/r requirements.md; see https://github.com/o/r-engine/pull/25 and o/state#3" |
 
     Scenario: a Bash call with no command, and a tool this guard does not gate, are silent
       When the agent calls tool "Bash" with input `{}`
