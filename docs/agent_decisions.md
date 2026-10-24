@@ -410,3 +410,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261024t051543z
 - left the _MALFORMED template and the two inline denies in guard_recursive_delete out of pass 6 Undo: revert the commit (no PR, branch messages-pass-6)
+
+### 20261024t051557z
+- Put the new duplicate-prs deny text in messages.py (dup_body_rewritten, dup_body_not_heredoc), replacing the inline call, once #242 moved the guard onto the catalog Undo: inline the two strings again ([#243](https://github.com/mark-brannan/languette/pull/243))
