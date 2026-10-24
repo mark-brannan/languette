@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.5](https://github.com/mark-brannan/languette/compare/v0.0.4...v0.0.5) (2026-10-24)
+
+
+### Features
+
+* **guard-bypass-labels:** default to no guarded labels; churn-ok and mixed-loops-ok are the driver's ([#236](https://github.com/mark-brannan/languette/issues/236)) ([a81b46f](https://github.com/mark-brannan/languette/commit/a81b46f701accb93e2a9a12b881b672d2ecfbcef))
+
+
+### Bug Fixes
+
+* **guard-bypass-ruleset:** a flag value named merge is not a pr merge ([#234](https://github.com/mark-brannan/languette/issues/234)) ([d18c041](https://github.com/mark-brannan/languette/commit/d18c041a24f363b5c250f468963f75a113c348bd))
+* **guard-worktrees:** a worktree the session adds is its own ([#238](https://github.com/mark-brannan/languette/issues/238)) ([ba951de](https://github.com/mark-brannan/languette/commit/ba951de7d2f09e547e7024f1a8e86485de286c1a))
+
+
+### Documentation
+
+* comments, specs and metadata speak of the maintainer and decisions, not one workflow ([#240](https://github.com/mark-brannan/languette/issues/240)) ([97777e3](https://github.com/mark-brannan/languette/commit/97777e3c14f39147774e23089810e769aad70ed8))
+* **decisions:** the decisions file names the maintainer once, in its header ([#239](https://github.com/mark-brannan/languette/issues/239)) ([f73ab26](https://github.com/mark-brannan/languette/commit/f73ab263b0446571dc2ad81a386cbe63d36929f0))
+
 ## [0.0.4](https://github.com/mark-brannan/languette/compare/v0.0.3...v0.0.4) (2026-10-15)
 
 
