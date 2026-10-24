@@ -2,17 +2,17 @@
 Feature: guard-review-threads
   A review bot's thread is resolved only on a fix or a record. When a Bash
   call resolves a GitHub review thread (`gh api graphql` with a
-  `resolveReviewThread` mutation), the guard reads that thread from GitHub
-  and denies unless both hold: the current gh login replied after the
-  bot's last comment, and that reply names a commit (7 to 40 hex
-  characters) or a link (an `https://` URL, or `owner/repo#n`). A thread
-  no bot commented on is not this guard's. A query that opens with `{` or
-  `query` is a read, whatever run-time values fill it. A file a `-F` field
-  or `--input` names is read, when gh runs alone in the call. A graphql
-  query the guard cannot read otherwise (built at run time, a file it
-  cannot open, stdin with no heredoc) or a thread it cannot identify is a
-  deny that says so; GitHub that cannot be read is an ask, as for the
-  other guards that ask GitHub.
+  `resolveReviewThread` mutation), the guard reads that thread from GitHub and
+  denies unless both hold: the current gh login, or a login the
+  review_thread_logins option lists, replied after the bot's last comment, and
+  that reply names a commit (7 to 40 hex characters) or a link (an `https://`
+  URL, or `owner/repo#n`). A thread no bot commented on is not this guard's. A
+  query that opens with `{` or `query` is a read, whatever run-time values
+  fill it. A file a `-F` field or `--input` names is read, when gh runs alone
+  in the call. A graphql query the guard cannot read otherwise (built at run
+  time, a file it cannot open, stdin with no heredoc) or a thread it cannot
+  identify is a deny that says so; GitHub that cannot be read is an ask, as
+  for the other guards that ask GitHub.
 
   Why. An agent reversed an instruction it had been given; the review bot
   flagged it, and the agent replied that the replacement was intended,
@@ -23,15 +23,16 @@ Feature: guard-review-threads
   to the decision, design note or issue the dismissal rests on. With
   nothing behind it, the thread stays open for a person.
 
-  gh is a stub throughout: it answers as GH_LOGIN, and each thread a
-  scenario sets up is what it answers for that id; any other id is not
-  found. The review_thread_logins option adds comma-separated logins whose
-  replies count as the gh login's own; unset, none. A bot is an author GitHub calls a Bot, a login ending in `[bot]`,
-  or one of coderabbitai, claude, copilot-pull-request-reviewer and
-  github-actions; the gh login's own comments are replies, even when that
-  login is a bot. The guard checks that a reply names a record, not that
-  the commit exists. Only gh is read: a POST to the GraphQL endpoint by
-  another client (curl, a script) is not this guard's.
+  gh is a stub throughout: it answers as GH_LOGIN, and each thread a scenario
+  sets up is what it answers for that id; any other id is not found. The
+  review_thread_logins option adds comma-separated logins whose comments count
+  as the gh login's own replies, except the one that opens the thread, which
+  is a finding whoever wrote it; unset, none. A bot is an author GitHub calls
+  a Bot, a login ending in `[bot]`, or one of coderabbitai, claude,
+  copilot-pull-request-reviewer and github-actions; the gh login's own
+  comments are replies, even when that login is a bot. The guard checks that a
+  reply names a record, not that the commit exists. Only gh is read: a POST to
+  the GraphQL endpoint by another client (curl, a script) is not this guard's.
 
   Background:
     Given the stub "gh" is first on PATH, for a Python guard
@@ -95,20 +96,50 @@ Feature: guard-review-threads
     Then the guard <outcome>
 
     Examples:
-      | list           | replier  | outcome                                      | note                        |
-      | app, someone   | app      | is silent                                    | a listed login              |
-      | App[bot]       | app      | is silent                                    | case and [bot] are ignored  |
-      |                | app      | denies, naming "no reply from me after"      | unset: the gh login alone   |
-      | other          | app      | denies, naming "no reply from me after"      | an unlisted login           |
-      | app, someone   | someone  | is silent                                    | spaces round entries ignored |
+      | replier  | list           | outcome                                 | note                         |
+      | app      | app, someone   | is silent                               | a listed login               |
+      | app      | App[bot]       | is silent                               | case and [bot] are ignored   |
+      | app      |                | denies, naming "no reply from me after" | unset: the gh login alone    |
+      | app      | other          | denies, naming "no reply from me after" | an unlisted login            |
+      | someone  | app, someone   | is silent                               | spaces round entries ignored |
 
-  Scenario: a listed login that is also a reviewer still counts as a bot when it names no record
+  Scenario Outline: a listed login's opening comment is a finding, whatever it cites
     Given CLAUDE_PLUGIN_OPTION_REVIEW_THREAD_LOGINS is "claude"
     And review thread "PRRT_t1" holds:
-      | type | author | body                |
-      | Bot  | claude | Consider a rename.  |
+      | type | author | body   |
+      | Bot  | claude | <body> |
     When the agent runs `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=PRRT_t1`
     Then the guard denies, naming "no reply from me after"
+
+    Examples:
+      | body                          | note                  |
+      | Consider a rename.            | names no record       |
+      | Reverts the fix from 3f2a9c1. | cites a sha           |
+      | See https://example.com/x.    | cites a link          |
+
+  Scenario Outline: a listed login's later comment does not undo its earlier reply
+    Given CLAUDE_PLUGIN_OPTION_REVIEW_THREAD_LOGINS is "app"
+    And review thread "PRRT_t1" holds:
+      | type | author       | body                                   |
+      | Bot  | coderabbitai | This reverses the earlier instruction.  |
+      | Bot  | app          | Fixed in 3f2a9c1.                       |
+      | Bot  | app          | <later>                                 |
+    When the agent runs `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=PRRT_t1`
+    Then the guard is silent
+
+    Examples:
+      | later                | note                       |
+      | Thanks, all done.    | a plain comment, no record |
+      | Also see o/r#12.     | a comment with a record    |
+
+  Scenario: a listed login's reply that names no record still leaves the thread open
+    Given CLAUDE_PLUGIN_OPTION_REVIEW_THREAD_LOGINS is "app"
+    And review thread "PRRT_t1" holds:
+      | type | author       | body                                   |
+      | Bot  | coderabbitai | This reverses the earlier instruction.  |
+      | Bot  | app          | The replacement is intended.            |
+    When the agent runs `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=PRRT_t1`
+    Then the guard denies, naming "names no commit and no link"
 
   Scenario Outline: each kind of bot is recognised
     Given review thread "PRRT_t1" holds:
