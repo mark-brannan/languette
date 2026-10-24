@@ -73,7 +73,7 @@ Feature: guard-git-work-loss
       | git stash list --format="%H %gs" | is silent |                                            |
       | git stash drop stash@{0}         | is silent |                                            |
 
-  Scenario Outline: a force push is denied, unless it is a lease to a branch that is not main
+  Scenario Outline: a force push is denied, a lease to main asks, a lease to any other branch passes
     When the agent runs `<command>`
     Then the guard <verdict>
 
@@ -97,6 +97,8 @@ Feature: guard-git-work-loss
       | git push --force-with-lease origin foo:refs/heads/main            | asks      | refs/heads/main is main  |
       | git push --force-with-lease=master origin master                  | asks      | master is main too       |
       | git push origin HEAD:main                                         | is silent | not a force              |
+      | git push --force-with-lease origin main && git reset --hard       | denies    | an ask does not hide a later deny |
+      | git reset --hard && git push --force-with-lease origin main       | denies    | a deny before an ask still denies |
 
   Scenario Outline: discarding uncommitted work is denied
     When the agent runs `<command>`

@@ -187,14 +187,18 @@ def check(doc):
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd:
         return None
+    asked = None
     try:
         for text, nested in doc.texts():
             s = doc.scan(text)
             for a, b in s.segments():
                 if a <= b:
-                    _segment(s, a, b, nested, env)
-    except Ask as r:
-        return ask(say("judged", guard=NAME, why=r))
+                    try:
+                        _segment(s, a, b, nested, env)
+                    except Ask as r:
+                        asked = asked or r
     except Refuse as r:
         return deny(say("judged", guard=NAME, why=r))
+    if asked:
+        return ask(say("judged", guard=NAME, why=asked))
     return None
