@@ -168,7 +168,7 @@ Feature: guard-worktrees
         | command                                          |
         | yadm checkout .                                  |
 
-    @python_only
+    @awk_only
     Scenario Outline: a branch switch in $HOME follows the guard's option and its checkout-home part
       Given the working directory is "{TMP}"
       And <setting> is "<value>"
@@ -392,7 +392,7 @@ Feature: guard-worktrees
       And a git repository at "{TMP}/other-clone"
       And the working directory is "{TMP}/repo/.claude/worktrees/mine"
 
-    @python_only
+    @awk_only
     Scenario Outline: reaching into another worktree follows the foreign part's setting
       Given CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_FOREIGN is "<value>"
       When the agent runs `git -C ../theirs status`

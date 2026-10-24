@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "languette"
-version = "0.0.5"
+version = "0.0.6"
 description = "Fail-closed guards against risky actions by coding agents, and a doctor that says whether they are on."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -33,7 +33,7 @@ markers = [
   "python: run the scenario against languette/ in-process",
   "hook: run the scenario against a hooks/hooks.json command, by subprocess",
   "shfmt_only: run the scenario against the shfmt rung only",
-  "python_only: run the scenario against the awk rung only",
+  "awk_only: run the scenario against the awk rung only",
   "no_shfmt: run the scenario on every engine but the shfmt rung, whose parse check denies it first",
   "table: the scenario's examples are the README's table",
   "family: a feature named for a family of guards; its scenarios run against every guard",

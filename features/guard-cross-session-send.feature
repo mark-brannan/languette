@@ -70,7 +70,6 @@ Feature: guard-cross-session-send
       | default     |
       | auto        |
       | acceptEdits |
-      | dontAsk     |
       | plan        |
 
   Scenario: the first line shown is cut to 80 characters
@@ -237,7 +236,7 @@ Feature: guard-cross-session-send
     And the agent sends "api-worker" the message `see above`
     Then the guard denies
 
-  Scenario Outline: a session whose start was not seen is unknown: deny in bypassPermissions, ask elsewhere
+  Scenario Outline: a session whose start was not seen is unknown: deny where no prompt can fire, ask elsewhere
     Given the session is "s9"
     And the permission mode is "<mode>"
     When the agent sends "api-worker" the message `hello`
@@ -246,6 +245,7 @@ Feature: guard-cross-session-send
     Examples:
       | mode              | verdict |
       | bypassPermissions | denies  |
+      | dontAsk           | denies  |
       | default           | asks    |
 
   Scenario Outline: a resumed or compacted session with no state stays unknown
