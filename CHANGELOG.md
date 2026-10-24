@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.7](https://github.com/mark-brannan/languette/compare/v0.0.6...v0.0.7) (2026-10-24)
+
+
+### Features
+
+* **guard-git-work-loss:** --force-with-lease to main asks instead of denying ([#258](https://github.com/mark-brannan/languette/issues/258)) ([c5422bb](https://github.com/mark-brannan/languette/commit/c5422bbefc2bb89418560cb5c44744341ada4c2b))
+* **guard-review-threads:** a review_thread_logins setting names the logins whose reply counts ([#256](https://github.com/mark-brannan/languette/issues/256)) ([6b847a4](https://github.com/mark-brannan/languette/commit/6b847a4b422fd4c3747efbf6118b394556f4e2f6))
+
+
+### Bug Fixes
+
+* **verdict:** an ask with no one to answer it is a deny that names the guard ([#260](https://github.com/mark-brannan/languette/issues/260)) ([557accc](https://github.com/mark-brannan/languette/commit/557accca6b70295bdaddf41f3e3df6a97c4c7017))
+
+
+### Documentation
+
+* **features:** restore the why of six guard features ([#257](https://github.com/mark-brannan/languette/issues/257)) ([b9566e8](https://github.com/mark-brannan/languette/commit/b9566e8249db7232f9bcab508548516ff3e246e0))
+* **research:** a cheap cost estimate for a Bash command ([#261](https://github.com/mark-brannan/languette/issues/261)) ([3cd9549](https://github.com/mark-brannan/languette/commit/3cd95497abdf2ddd642bd94912ea19b967e4cc58))
+
 ## [0.0.6](https://github.com/mark-brannan/languette/compare/v0.0.5...v0.0.6) (2026-10-24)
 
 
