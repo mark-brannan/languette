@@ -53,6 +53,9 @@ CLOSES = re.compile(rf"(?<![A-Za-z0-9_-])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]
 SUPERSEDES = re.compile(rf"(?<![A-Za-z0-9_-])(?:supersedes|replaces)(?:[ \t]*:[ \t]*|[ \t]+){_REF}", re.IGNORECASE)
 _GITHUB = re.compile(rf"github\.com(?::\d+)?[:/]+({_NAME})/({_NAME}?)(?:\.git)?/?\Z", re.IGNORECASE)
 _HTML = re.compile(rf"github\.com/({_NAME}/{_NAME})/(?:pull|issues)/[0-9]+")
+# A path the command appends to: the file is its old text plus what is appended, never
+# a heredoc's text alone. Over-matches a `>>` inside a heredoc body, which only costs a deny.
+_APPEND = re.compile(r""">>[ \t]*(["']?)([^\s;|&<>"']+)\1""")
 
 
 def _deny(why):
@@ -160,7 +163,7 @@ def _api(s, g, hi):
             i, path = sw.gh_api_word(t, i, path)
         i += 1
     p = sw.gh_api_path(path)
-    m = re.fullmatch(rf"repos/({_NAME}|\{{owner\}})/({_NAME}|\{{repo\}})/pulls/?", p)
+    m = re.fullmatch(rf"repos/({_NAME}|\{{owner\}})/({_NAME}|\{{repo\}})/pulls", p)
     if not m or method in ("GET", "HEAD") or (method == "" and not fields):
         return None
     # gh fills {owner}/{repo} from the cwd's repo: None sends _slug to git.
@@ -213,8 +216,11 @@ def _abs(p, cwd, cd, env):
     return os.path.normpath(p) if p else p
 
 
-def _body(post, cwd, cd, docs, fed, env):
-    """The text of the body `post` sends, or the deny that says why it cannot be read."""
+def _body(post, cwd, cd, docs, writes, env):
+    """The text of the body `post` sends, or the deny that says why it cannot be read.
+    `writes` maps each path the command writes to (times written, whether a heredoc
+    writes it, whether it is appended to); a heredoc's text stands for the file only
+    when it is the path's one write and that write replaces the file."""
     text = ""
     for kind, v in post.parts:
         if kind == "text":
@@ -225,8 +231,15 @@ def _body(post, cwd, cd, docs, fed, env):
             if not docs:
                 return _deny(say("dup_body_stdin"))
             text += "".join(body + "\n" for body, _ in docs)
-        elif v in fed or _abs(v, cwd, cd, env) in fed:     # this command writes it from a heredoc: that text, not the file's
-            text += "".join(body + "\n" for body, _ in docs)
+        elif got := writes.get(_abs(v, cwd, cd, env) or v):
+            n, fed, app = got
+            if n != 1:
+                return _deny(say("dup_body_rewritten", v=v, n=n))
+            if app:
+                return _deny(say("dup_body_appended", v=v))
+            if not fed:
+                return _deny(say("dup_body_not_heredoc", v=v))
+            text += "".join(body + "\n" for body, _ in docs)    # its one write is a heredoc: that text, not the file's
         else:
             p = _abs(v, cwd, cd, env)
             got = Refuse("is a relative path after a cd, and the guard cannot tell where the command stands") \
@@ -311,25 +324,37 @@ def check(doc):
         if not isinstance(cmd, str) or ("gh" not in cmd):
             return None
         found, cd, docs = posts(doc)
-        fed = set(sw.writes(cmd + "\n", True))
+        written, fed = sw.writes(cmd + "\n", False), sw.writes(cmd + "\n", True)
+        appended = [m.group(2) for m in _APPEND.finditer(cmd)]
     elif _MCP.match(tool):
         body, owner, repo = ti.get("body"), ti.get("owner"), ti.get("repo")
         post = _Post(f"{owner}/{repo}" if isinstance(owner, str) and owner and isinstance(repo, str) and repo
                      else None)
         if isinstance(body, str):
             post.parts.append(("text", body))
-        found, cd, docs, fed = [post], False, [], set()
+        found, cd, docs, written, fed, appended = [post], False, [], [], [], []
     else:
         return None
     if not any(p.parts for p in found):
         return None
     if not isinstance(cwd, str) or not cwd.startswith("/"):
         cwd = yield Need("cwd")
+    writes = {}
+    for w in written:
+        k = _abs(w, cwd, cd, env) or w
+        writes[k] = (writes.get(k, (0, False, False))[0] + 1, False, False)
+    for w in fed:
+        k = _abs(w, cwd, cd, env) or w
+        writes[k] = (writes.get(k, (0, False, False))[0], True, False)
+    for w in appended:
+        k = _abs(w, cwd, cd, env) or w
+        if k in writes:
+            writes[k] = (writes[k][0], writes[k][1], True)
     asked = None
     for post in found:
         if not post.parts:
             continue
-        text = yield from _body(post, cwd, cd, docs, fed | {_abs(w, cwd, cd, env) for w in fed} - {None}, env)
+        text = yield from _body(post, cwd, cd, docs, writes, env)
         if isinstance(text, dict):
             return text
         if not CLOSES.search(text):

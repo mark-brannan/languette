@@ -209,7 +209,6 @@ class _Read:
                 i, path = sw.gh_api_word(t, i, path)
             i += 1
         p = sw.gh_api_path(path)
-        p = re.split(r"[?#]", p, maxsplit=1)[0]
         if p == "graphql":
             query = next((src for key, src in fields if key == "query"), None)
             if query is not None or inp is not None:

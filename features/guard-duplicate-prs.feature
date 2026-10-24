@@ -41,6 +41,9 @@ Feature: guard-duplicate-prs
       | sh -c 'gh pr create -t t -b "Closes #114"'                      | nested in sh -c              |
       | gh api repos/o/r/pulls -f title=t -f head=h -f base=main -f body='Closes #114' | the REST spelling |
       | gh api repos/{owner}/{repo}/pulls -f title=t -f body='Closes #114' | gh's placeholders, the cwd's repo |
+      | gh api "repos/o/r/pulls?x=1" -f title=t -f body='Closes #114'  | a ?query on the path         |
+      | gh api repos/o/r/pulls#top -f title=t -f body='Closes #114'    | a #fragment on the path      |
+      | gh api https://api.github.com/repos/o/r/pulls/ -f title=t -f body='Closes #114' | the full URL, a trailing slash |
 
   Scenario: the body from a heredoc command substitution is read
     Given GH_TIMELINE is "open-pr"
@@ -114,6 +117,7 @@ Feature: guard-duplicate-prs
       | gh pr view 114                                  | not a create                     |
       | echo gh pr create -b "Closes #114"              | text, not a create               |
       | gh api repos/o/r/pulls                          | a read of the PR list            |
+      | gh api "repos/o/r/pulls?state=open"             | a read of the PR list, a ?query  |
       | gh pr create -t "Closes #114" -b "a fix"        | the title is not the body        |
 
   Scenario: a body file is read and judged
@@ -179,6 +183,72 @@ Feature: guard-duplicate-prs
       gh pr create -R o/r -t t -F {PROJ}/pr.md
       """
     Then the guard denies, naming "PR #120"
+
+  Scenario: a body file a heredoc writes and a later command changes again is denied
+    Given GH_TIMELINE is "open-pr"
+    And a project directory
+    When the agent runs:
+      """
+      cat > {PROJ}/pr.md <<'EOF'
+      Moves the parser.
+      EOF
+      echo 'Closes #114' >> {PROJ}/pr.md
+      gh pr create -R o/r -t t -F {PROJ}/pr.md
+      """
+    Then the guard denies, naming "is changed again in this same command (written 2 times)"
+
+  Scenario: a body file two heredocs write is denied
+    Given GH_TIMELINE is "open-pr"
+    And a project directory
+    When the agent runs:
+      """
+      cat > {PROJ}/pr.md <<'EOF'
+      Closes #114
+      EOF
+      cat > {PROJ}/pr.md <<'EOF'
+      Moves the parser.
+      EOF
+      gh pr create -R o/r -t t -F {PROJ}/pr.md
+      """
+    Then the guard denies, naming "is changed again in this same command"
+
+  Scenario: a body file one heredoc appends to is denied, not judged by the heredoc alone
+    Given GH_TIMELINE is "open-pr"
+    And a project directory
+    And the file "pr.md" holds:
+      """
+      Closes #114
+      """
+    When the agent runs:
+      """
+      cat >> {PROJ}/pr.md <<'EOF'
+      Moves the parser.
+      EOF
+      gh pr create -R o/r -t t -F {PROJ}/pr.md
+      """
+    Then the guard denies, naming "is appended to in this same command"
+
+  Scenario: a body file the command writes, not from a heredoc, is denied rather than read stale
+    Given GH_TIMELINE is "open-pr"
+    And a project directory
+    And the file "pr.md" holds:
+      """
+      An earlier body, closing nothing.
+      """
+    When the agent runs `echo 'Closes #114' > {PROJ}/pr.md && gh pr create -R o/r -t t -F {PROJ}/pr.md`
+    Then the guard denies, naming "is changed in this same command, and not from a heredoc"
+
+  Scenario: a body file one heredoc writes, closing nothing, passes
+    Given GH_TIMELINE is "open-pr"
+    And a project directory
+    When the agent runs:
+      """
+      cat > {PROJ}/pr.md <<'EOF'
+      Moves the parser.
+      EOF
+      gh pr create -R o/r -t t -F {PROJ}/pr.md
+      """
+    Then the guard is silent
 
   Scenario Outline: the MCP create_pull_request is judged the same
     Given GH_TIMELINE is "open-pr"
