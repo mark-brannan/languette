@@ -150,6 +150,14 @@ Feature: guard-git-work-loss
       | git -C {TMP}/clean checkout .    | -C names the tree; not looked at      |
       | cd {TMP}/clean && git restore .  | a cd moves the tree                   |
       | git clean -fdx                   | ignored files are not in the status   |
+      | env --chdir={TMP}/clean git checkout . | a wrapper's chdir moves the tree |
+      | sudo -D {TMP}/clean git checkout .     | a wrapper's chdir moves the tree |
+      | git -c core.worktree={TMP}/clean checkout . | -c can re-aim the work tree |
+      | GIT_CONFIG_COUNT=0 git checkout .      | config from the environment      |
+      | touch x && git clean -fd         | an earlier segment can dirty the tree |
+      | echo x > f && git checkout -- .  | a redirect can dirty the tree         |
+      | git apply p && git checkout .    | the patch is the work being discarded |
+      | git merge --squash b && git reset --hard | the staged result would go    |
 
   Scenario Outline: discarding is denied when the working tree has changes
     Given a git repository at "{TMP}/dirty"

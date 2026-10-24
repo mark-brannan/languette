@@ -20,6 +20,7 @@ not the flag. git takes any unambiguous prefix of a long option, so --har is
 
 import re
 
+from languette import paths
 from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Need, Refuse, deny
@@ -31,8 +32,11 @@ RULE = {"add": "BLANKET_STAGING", "commit": "BLANKET_STAGING", "stash": "STASH",
 _WHOLE = re.compile(r"(?:\.|\./|\./\*|:/|:/\.|\*)\Z")
 _MAIN = re.compile(r"(?:refs/heads/)?(?:main|master)\Z")
 STATUS_TIMEOUT = 5
-# Words that move, or re-aim, the tree a discard is judged in.
-_AIM = re.compile(r"(?:cd|pushd|popd|-C|--git-dir|--work-tree|GIT_DIR=.*|GIT_WORK_TREE=.*|--git-dir=.*|--work-tree=.*)\Z")
+# Words that re-aim the tree a discard is judged in, or the config git reads: a git option
+# naming a tree or config, the environment's spelling of the same, any config naming a work
+# tree. A cd, pushd, popd or wrapper chdir is paths.moves_directory's.
+_AIM = re.compile(r"(?:-C|-c|--git-dir|--work-tree|--config-env|(?:--git-dir|--work-tree|--config-env)=.*"
+                  r"|GIT_(?:DIR|WORK_TREE|COMMON_DIR|INDEX_FILE|CONFIG\w*)=.*|.*core\.worktree=.*)\Z", re.I)
 
 
 def _has(t, ch):
@@ -151,9 +155,10 @@ def _reset(a):
 
 def _nothing_to_lose(doc, sub, args):
     """True when the discard `sub args` cannot lose anything: no word of the command moves
-    or re-aims the tree, the payload's cwd is a git work tree with a clean status, and the
-    discard is not one that reaches past the status (clean -x) or drops a commit (reset to
-    a ref). Any failure to ask is False."""
+    or re-aims the tree, no other segment of it can run before the discard and dirty the
+    tree (the status is read before the command runs), the payload's cwd is a git work
+    tree with a clean status, and the discard is not one that reaches past the status
+    (clean -x) or drops a commit (reset to a ref). Any failure to ask is False."""
     cwd = doc.payload.get("cwd")
     if not isinstance(cwd, str) or not cwd.startswith("/"):
         return False
@@ -161,10 +166,11 @@ def _nothing_to_lose(doc, sub, args):
         return False
     if sub == "clean" and any(_has(t, "x") or _has(t, "X") for t in args):
         return False
-    for text, _ in doc.texts():
-        s = doc.scan(text)
-        if any(k == "w" and _AIM.match(w) for k, w in zip(s.k, s.w)):
-            return False
+    scans = [(doc.scan(text), nested) for text, nested in doc.texts()]
+    if paths.moves_directory(scans) or not sw.alone(scans, sw.GIT):
+        return False
+    if any(k == "w" and _AIM.match(w) for s, _ in scans for k, w in zip(s.k, s.w)):
+        return False
     try:
         rc, out, _ = yield Need("run", cwd, STATUS_TIMEOUT, "git", "-c", "status.showUntrackedFiles=all", "status", "--porcelain",
                            "--untracked-files=all", "--ignore-submodules=none")
