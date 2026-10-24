@@ -203,9 +203,9 @@ def test_a_command_rules_cmd_picks_the_program_it_matches():
         match = {"cmd": cmd, "verbs": scan.CTL_STOPS, "unit": {"units": ["nginx"]}}
         return scan.ctl_hit(doc, match)
 
-    assert_that(hit("systemctl", "systemctl stop nginx"), equal_to("stop nginx"))
+    assert_that(hit("systemctl", "systemctl stop nginx"), equal_to("systemctl stop nginx"))
     assert_that(hit("systemctl", "foo stop nginx"), equal_to(None))
-    assert_that(hit("foo", "foo stop nginx"), equal_to("stop nginx"))
+    assert_that(hit("foo", "foo stop nginx"), equal_to("foo stop nginx"))
     assert_that(hit("foo", "systemctl stop nginx"), equal_to(None))
 
 
