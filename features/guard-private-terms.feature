@@ -31,7 +31,10 @@ Feature: guard-private-terms
 
   A home-directory path in that text is a sanitization job, not a denial job:
   where this Claude Code version's PreToolUse hooks support rewriting the
-  call (`updatedInput`) the guard replaces it with `~` and allows; otherwise
+  call (`updatedInput`) the guard replaces it with `~` in the posted text
+  alone and asks, so a person still sees the rewrite; a path the command
+  also holds outside the posted text is a denial, since a text match cannot tell
+  which copy is posted; otherwise
   it stays a denial whose reason names the substitution to make by hand.
 
   The target repo is --repo/-R, GH_REPO=, a positional issue or PR URL or
@@ -189,13 +192,40 @@ Feature: guard-private-terms
       | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"clean"}                       | is silent |
 
   @also_guard-signed-comments
-  Scenario: the home directory in the text is rewritten to ~ and the post allowed
+  Scenario: the home directory in the text is rewritten to ~ and the rewrite asked about
     Given the private terms file holds:
       """
       {HOME}
       """
     When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
-    Then the guard allows, rewriting the command to "gh issue comment 3 -R o/r -b ~/x"
+    Then the guard asks, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"
+
+  @also_guard-signed-comments
+  Scenario: only the posted text is rewritten, not a cd before it
+    Given the private terms file holds:
+      """
+      {HOME}
+      """
+    When the agent runs `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "under {HOME}/x"`
+    Then the guard asks, rewriting the command to `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "under ~/x"`
+
+  @also_guard-signed-comments
+  Scenario: a path the command also uses outside the posted text is a denial, not a guess at which is posted
+    Given the private terms file holds:
+      """
+      {HOME}
+      """
+    When the agent runs `gh pr comment 3 -R o/r --body "{HOME}/x" && cd {HOME}/x`
+    Then the guard denies, naming "{HOME}"
+
+  @also_guard-signed-comments
+  Scenario: a body that repeats an earlier cd path is a denial too
+    Given the private terms file holds:
+      """
+      {HOME}
+      """
+    When the agent runs `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "{HOME}/x"`
+    Then the guard denies, naming "{HOME}"
 
   @also_guard-github-issues
   Scenario: a terms file that is set but cannot be read denies, naming the option
@@ -323,7 +353,7 @@ Feature: guard-private-terms
         {HOME}
         """
       When the agent calls MCP tool "mcp__github__add_issue_comment" with input `{"owner":"o","repo":"r","issue_number":3,"body":"repro under {HOME}/project"}`
-      Then the guard allows, rewriting the input field "body" to "repro under ~/project"
+      Then the guard asks, rewriting the input field "body" to "repro under ~/project"
 
     # --- gh api -------------------------------------------------------------------
 

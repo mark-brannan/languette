@@ -748,16 +748,16 @@ def _warns(ctx, text):
     assert_that(ctx.verdict, warns_about(text))
 
 
-@then(parsers.re(r'the guard allows, rewriting the command to "(?P<text>.*)"'))
+@then(parsers.re(r'the guard asks, rewriting the command to [`"](?P<text>.*)[`"]$'))
 def _rewrites(ctx, text):
-    assert ctx.verdict.decision == "allow", ctx.verdict.show()
+    assert ctx.verdict.decision == "ask", ctx.verdict.show()
     got = ctx.verdict.out.get("updatedInput", {}).get("command")
     assert got == ctx.expand(text), f"rewritten to {got!r}, want {ctx.expand(text)!r}"
 
 
-@then(parsers.re(r'the guard allows, rewriting the input field "(?P<key>[a-z_]+)" to "(?P<text>.*)"'))
+@then(parsers.re(r'the guard asks, rewriting the input field "(?P<key>[a-z_]+)" to "(?P<text>.*)"'))
 def _rewrites_field(ctx, key, text):
-    assert ctx.verdict.decision == "allow", ctx.verdict.show()
+    assert ctx.verdict.decision == "ask", ctx.verdict.show()
     got = ctx.verdict.out.get("updatedInput", {}).get(key)
     assert got == ctx.expand(text), f"{key} rewritten to {got!r}, want {ctx.expand(text)!r}"
 

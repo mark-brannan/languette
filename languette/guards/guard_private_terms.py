@@ -16,7 +16,7 @@ never its path; for MCP, every string in tool_input. Each term is matched
 case-insensitively as plain text, and the reason names the terms that hit.
 
 A home-directory path in the text is sanitized, not denied: rewritten to `~`
-and allowed, unless it sits in a file's contents, which a rewrite cannot reach.
+in the posted text alone and asked about, unless it sits in a file's contents, which a rewrite cannot reach.
 
 The target repo is --repo/-R, GH_REPO=, a positional URL or owner/repo#n, the
 gh api path, or MCP owner/repo; failing those, the origin of the cwd, unless
@@ -33,7 +33,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Need, allow, deny
+from languette.verdict import Need, ask, deny
 
 NAME = "guard-private-terms"
 _MCP = ("create_issue|update_issue|issue_write|add_issue_comment|create_pull_request|update_pull_request|"
@@ -459,8 +459,23 @@ def check(doc):
         home_re = re.compile(rf"(?<![{_NAME_CHAR}]){re.escape(home)}(?![{_NAME_CHAR}])")
         if not any(t.lower() in home_re.sub("~", text).lower() for t in terms):
             if tool == "Bash":
-                return allow({"command": home_re.sub("~", ti["command"]).rstrip("\n")})
-            return allow(_walk(ti, lambda v: home_re.sub("~", v)))
+                # Only the posted values change; a cd or other use of the path stays. A
+                # text match cannot tell which copy is posted, so a value found other
+                # than once (also used elsewhere, or hidden by quoting) is a denial.
+                new = ti["command"]
+                for k, v in reversed(meta):
+                    if k not in ("T", "HDTXT") or home not in v:
+                        continue
+                    if new.count(v) != 1:
+                        break
+                    i = new.index(v)
+                    # A bare word is not quoted, so a ~ at its start would expand: escape it.
+                    bare = k == "T" and (i == 0 or new[i - 1] in " \t=")
+                    new = new[:i] + home_re.sub("\\~" if bare and v.startswith(home) else "~", v) + new[i + len(v):]
+                else:
+                    return {**ask(say("pt_home", guard=NAME)), "updatedInput": {"command": new.rstrip("\n")}}
+            else:
+                return {**ask(say("pt_home", guard=NAME)), "updatedInput": _walk(ti, lambda v: home_re.sub("~", v))}
 
     hits = [t for t in terms if t.lower() in low]
     return deny(say("pt_hits", guard=NAME, hits=', '.join(hits), to_private=TO_PRIVATE))

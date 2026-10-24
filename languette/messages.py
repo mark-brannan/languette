@@ -477,6 +477,10 @@ MESSAGES = {
         "same command assigns before it, after any cd in it, with . and .. collapsed; a variable set in "
         "an earlier command is invisible here, so spell the path out."
     ),
+    "pt_home": (
+        "{guard}: the text about to be posted to a public repo names the home directory. Post "
+        "`~` in its place. The rewrite does this; check it and approve it."
+    ),
     "pt_hits": (
         "{guard}: the text about to be posted to a public repo contains private term(s) from the denylist: "
         "{hits}. Private detail does not go on public GitHub, ever -- it stays in GitHub's "
