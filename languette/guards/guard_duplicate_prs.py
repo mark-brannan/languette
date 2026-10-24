@@ -53,6 +53,9 @@ CLOSES = re.compile(rf"(?<![A-Za-z0-9_-])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]
 SUPERSEDES = re.compile(rf"(?<![A-Za-z0-9_-])(?:supersedes|replaces)(?:[ \t]*:[ \t]*|[ \t]+){_REF}", re.IGNORECASE)
 _GITHUB = re.compile(rf"github\.com(?::\d+)?[:/]+({_NAME})/({_NAME}?)(?:\.git)?/?\Z", re.IGNORECASE)
 _HTML = re.compile(rf"github\.com/({_NAME}/{_NAME})/(?:pull|issues)/[0-9]+")
+# A path the command appends to: the file is its old text plus what is appended, never
+# a heredoc's text alone. Over-matches a `>>` inside a heredoc body, which only costs a deny.
+_APPEND = re.compile(r""">>[ \t]*(["']?)([^\s;|&<>"']+)\1""")
 
 
 def _deny(why):
@@ -216,7 +219,8 @@ def _abs(p, cwd, cd, env):
 def _body(post, cwd, cd, docs, writes, env):
     """The text of the body `post` sends, or the deny that says why it cannot be read.
     `writes` maps each path the command writes to (times written, whether a heredoc
-    writes it); a heredoc's text stands for the file only when it is the path's one write."""
+    writes it, whether it is appended to); a heredoc's text stands for the file only
+    when it is the path's one write and that write replaces the file."""
     text = ""
     for kind, v in post.parts:
         if kind == "text":
@@ -228,9 +232,11 @@ def _body(post, cwd, cd, docs, writes, env):
                 return _deny(say("dup_body_stdin"))
             text += "".join(body + "\n" for body, _ in docs)
         elif got := writes.get(_abs(v, cwd, cd, env) or v):
-            n, fed = got
+            n, fed, app = got
             if n != 1:
                 return _deny(say("dup_body_rewritten", v=v, n=n))
+            if app:
+                return _deny(say("dup_body_appended", v=v))
             if not fed:
                 return _deny(say("dup_body_not_heredoc", v=v))
             text += "".join(body + "\n" for body, _ in docs)    # its one write is a heredoc: that text, not the file's
@@ -319,13 +325,14 @@ def check(doc):
             return None
         found, cd, docs = posts(doc)
         written, fed = sw.writes(cmd + "\n", False), sw.writes(cmd + "\n", True)
+        appended = [m.group(2) for m in _APPEND.finditer(cmd)]
     elif _MCP.match(tool):
         body, owner, repo = ti.get("body"), ti.get("owner"), ti.get("repo")
         post = _Post(f"{owner}/{repo}" if isinstance(owner, str) and owner and isinstance(repo, str) and repo
                      else None)
         if isinstance(body, str):
             post.parts.append(("text", body))
-        found, cd, docs, written, fed = [post], False, [], [], []
+        found, cd, docs, written, fed, appended = [post], False, [], [], [], []
     else:
         return None
     if not any(p.parts for p in found):
@@ -335,10 +342,14 @@ def check(doc):
     writes = {}
     for w in written:
         k = _abs(w, cwd, cd, env) or w
-        writes[k] = (writes.get(k, (0, False))[0] + 1, False)
+        writes[k] = (writes.get(k, (0, False, False))[0] + 1, False, False)
     for w in fed:
         k = _abs(w, cwd, cd, env) or w
-        writes[k] = (writes.get(k, (0, False))[0], True)
+        writes[k] = (writes.get(k, (0, False, False))[0], True, False)
+    for w in appended:
+        k = _abs(w, cwd, cd, env) or w
+        if k in writes:
+            writes[k] = (writes[k][0], writes[k][1], True)
     asked = None
     for post in found:
         if not post.parts:

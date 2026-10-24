@@ -333,6 +333,11 @@ MESSAGES = {
         "one heredoc and nothing else in this command, or write the file in an earlier command "
         "and retry."
     ),
+    "dup_body_appended": (
+        "--body-file {v} is appended to in this same command, so the text gh sends is the "
+        "file's old text plus the append, not the heredoc alone. Write the body to that path "
+        "with `>` from one heredoc, or write the file in an earlier command and retry."
+    ),
     "dup_body_not_heredoc": (
         "--body-file {v} is changed in this same command, and not from a heredoc, so the file "
         "on disk is not yet the text gh sends. Write the body to that path from a heredoc in "

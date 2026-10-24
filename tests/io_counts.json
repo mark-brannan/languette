@@ -45,6 +45,7 @@
  "tests/test_features.py::test_a_body_file_a_heredoc_writes_and_a_later_command_changes_again_is_denied": {"git": 3},
  "tests/test_features.py::test_a_body_file_is_read_and_judged": {"git": 3, "gh-api": 1},
  "tests/test_features.py::test_a_body_file_on_disk_is_read_never_its_path": {"git": 10},
+ "tests/test_features.py::test_a_body_file_one_heredoc_appends_to_is_denied_not_judged_by_the_heredoc_alone": {"git": 3},
  "tests/test_features.py::test_a_body_file_one_heredoc_writes_closing_nothing_passes": {"git": 3},
  "tests/test_features.py::test_a_body_file_that_supersedes_the_open_pr_passes": {"git": 3, "gh-api": 1},
  "tests/test_features.py::test_a_body_file_the_command_writes_not_from_a_heredoc_is_denied_rather_than_read_stale": {"git": 3},

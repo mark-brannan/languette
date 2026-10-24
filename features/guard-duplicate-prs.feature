@@ -212,6 +212,22 @@ Feature: guard-duplicate-prs
       """
     Then the guard denies, naming "is changed again in this same command"
 
+  Scenario: a body file one heredoc appends to is denied, not judged by the heredoc alone
+    Given GH_TIMELINE is "open-pr"
+    And a project directory
+    And the file "pr.md" holds:
+      """
+      Closes #114
+      """
+    When the agent runs:
+      """
+      cat >> {PROJ}/pr.md <<'EOF'
+      Moves the parser.
+      EOF
+      gh pr create -R o/r -t t -F {PROJ}/pr.md
+      """
+    Then the guard denies, naming "is appended to in this same command"
+
   Scenario: a body file the command writes, not from a heredoc, is denied rather than read stale
     Given GH_TIMELINE is "open-pr"
     And a project directory
