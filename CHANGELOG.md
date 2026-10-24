@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.6](https://github.com/mark-brannan/languette/compare/v0.0.5...v0.0.6) (2026-10-24)
+
+
+### Bug Fixes
+
+* **guards:** normalise the gh api endpoint before matching; a heredoc counts only when it is the path's one write ([#243](https://github.com/mark-brannan/languette/issues/243)) ([c9eaf97](https://github.com/mark-brannan/languette/commit/c9eaf97023da1bba7635b465c4c60514e4065685))
+
+
+### Documentation
+
+* **design:** portability rules ([#247](https://github.com/mark-brannan/languette/issues/247)) ([28a5386](https://github.com/mark-brannan/languette/commit/28a5386ea7ae31cc7a3acf2bb348a179d4c4654e))
+* **research:** guards other agent-safety tools ship that languette lacks ([#253](https://github.com/mark-brannan/languette/issues/253)) ([98fb2ba](https://github.com/mark-brannan/languette/commit/98fb2ba191446b0b5168ac3e1cb923bdfdccc26f))
+* **research:** SQL-level scan for DROP, TRUNCATE and other DDL ([#158](https://github.com/mark-brannan/languette/issues/158)) ([#241](https://github.com/mark-brannan/languette/issues/241)) ([c440bb5](https://github.com/mark-brannan/languette/commit/c440bb550f88af293b6559a839f12d86ba786707))
+
 ## [0.0.5](https://github.com/mark-brannan/languette/compare/v0.0.4...v0.0.5) (2026-10-24)
 
 
