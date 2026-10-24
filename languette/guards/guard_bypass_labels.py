@@ -80,12 +80,8 @@ def _reads(tool):
 
 
 def bypass_labels(env):
-    got = [x.strip().casefold() for x in (env.get(OPTION) or "").split(",") if x.strip()]
+    got = [x.casefold() for x in sw.listed(env.get(OPTION))]
     return tuple(got) or DEFAULT
-
-
-def _split(v):
-    return [x.strip() for x in v.split(",") if x.strip()]
 
 
 class _Found:
@@ -102,7 +98,7 @@ class _Found:
         if live:
             self.unseen.append(f"{what} `{v}` is built at run time")
         else:
-            self.labels.extend(_split(v))
+            self.labels.extend(sw.listed(v))
 
     def names(self, v, what):
         """A labels value in JSON: a list of names or {"name": ...}, or one
@@ -110,7 +106,7 @@ class _Found:
         if v is None or v == []:
             return
         if isinstance(v, str):
-            self.labels.extend(_split(v))
+            self.labels.extend(sw.listed(v))
         elif isinstance(v, list) and all(isinstance(x, str) or isinstance(x, dict) and isinstance(x.get("name"), str)
                                          for x in v):
             self.labels.extend((x if isinstance(x, str) else x["name"]).strip() for x in v)
@@ -377,7 +373,7 @@ def _mcp(f, v, any_string, depth=0):
         for x in v:
             _mcp(f, x, any_string, depth + 1)
     elif isinstance(v, str) and any_string:
-        f.labels.extend(_split(v))
+        f.labels.extend(sw.listed(v))
 
 
 def parse(doc):

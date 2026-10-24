@@ -218,6 +218,13 @@
       "default": "",
       "required": false
     },
+    "review_thread_logins": {
+      "type": "string",
+      "title": "Review thread reply logins",
+      "description": "Logins, besides the gh login, whose reply lets guard-review-threads pass a resolved review thread: comma-separated, matched case-insensitively, a trailing [bot] ignored. Empty, the default, counts the gh login alone.",
+      "default": "",
+      "required": false
+    },
     "prose_budget_commit": {
       "type": "boolean",
       "title": "Check staged prose against the repo's budgets before a commit",
