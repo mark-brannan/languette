@@ -64,8 +64,7 @@ _NO_PROMPT = frozenset({"bypassPermissions"})
 _FRESH = frozenset({"startup", "clear"})
 _REF = re.compile(r" \[[^\]\n]*\]\Z")
 
-_WAY_OUT = ("Ask the user to send it themselves, or from a session that has not read untrusted content; "
-            "/clear starts this one afresh.")
+_WAY_OUT = say("cross_session_way_out")
 
 
 def _gh_reads(words):
@@ -264,9 +263,8 @@ def check(doc):
             return None if mode in _NO_PROMPT else ask(_ask_reason(target, ti))
         why = (f"this session read untrusted content ({state['read']})" if not lost
                else "this guard cannot tell whether this session read untrusted content")
-        return deny(f"{NAME}: a message to {target} is blocked: {why}, and in "
-                    f"{mode or 'an unknown permission mode'} no prompt can show the user what leaves the "
-                    f"session. {_WAY_OUT}")
+        return deny(say("cross_session_deny", guard=NAME, target=target, why=why,
+                        mode=mode or "an unknown permission mode", way_out=_WAY_OUT))
     return ask(_ask_reason(target, ti))
 
 

@@ -105,15 +105,13 @@ def check(doc):
     try:
         path = yield from _config(payload, env)
     except Refuse as e:
-        return deny(f"ask-first: {e}. A gate that cannot look fails closed: retry from the project directory.")
+        return deny(say("ask_first_cannot_look", err=e))
     if not path:
         return None
     try:
         commands = yield from _load(path)
     except Refuse as e:
-        return deny(f"ask-first: {path} is invalid: {e}. Every Bash command is denied until it is fixed, "
-                     "because the guard cannot tell which commands the repo meant to cover. Fix it with "
-                     "the Edit tool, or tell the user.")
+        return deny(say("ask_first_invalid", path=path, err=e))
     runs, looped = {}, []
     for c in commands:
         m = [sw.matches(doc, e) for e in c["match"]]
@@ -142,13 +140,9 @@ def check(doc):
         have = len(approved[c["approve_label"]])
         if have >= runs[c["id"]]:
             continue
-        p = (f"`{c['id']}` ({path}) needs the user's approval for each run"
-             + (f"; this command runs it {runs[c['id']]} times and has {have} unspent"
-                if runs[c["id"]] > 1 else "") + f". Cost: {c['cost']}."
-             + (f" Cheaper forms: {c['cheaper']}." if c.get("cheaper") else ""))
-        p += (f" If a cheaper form answers the question, use it instead. Otherwise call AskUserQuestion: "
-              f"give the exact command (`{cmd.strip()}`), why it must run now, and the "
-              f"cost above, with one option labelled exactly \"{c['approve_label']}\" and one to skip. "
-              "One approval is one run; ask again before running it again.")
-        parts.append(p)
-    return deny("ask-first: " + "\n\n".join(parts))
+        parts.append(say("ask_first_need", id=c["id"], path=path,
+                         times=(say("ask_first_times", n=runs[c["id"]], have=have) if runs[c["id"]] > 1 else ""),
+                         cost=c["cost"],
+                         cheaper=(say("ask_first_cheaper", cheaper=c["cheaper"]) if c.get("cheaper") else ""),
+                         cmd=cmd.strip(), label=c["approve_label"]))
+    return deny(say("judged", guard="ask-first", why="\n\n".join(parts)))

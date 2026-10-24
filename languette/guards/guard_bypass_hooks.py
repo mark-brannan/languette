@@ -116,12 +116,5 @@ def check(doc):
     if spent:
         return None
     have = len(approved[APPROVE_LABEL])
-    return deny(f"{NAME}: --no-verify, -n or core.hooksPath skips this repo's hooks, and that is the user's call, not "
-                f"yours: a hook that blocks a commit, push or merge is telling you something. "
-                f"`{cmd.strip()}` skips them {runs} time{'s' * (runs > 1)} and has {have} "
-                f"unspent approval{'s' * (have != 1)}. "
-                f"Better, fix what the blocking hook reported and run it without the flag. "
-                f"If the user must have the hooks skipped, call AskUserQuestion: give the exact "
-                f"command and why it cannot pass the hooks, with one option labelled exactly "
-                f"\"{APPROVE_LABEL}\" and one to decline. One approval is one run; ask again "
-                f"before skipping the hooks again.")
+    return deny(say("hooks_skipped", guard=NAME, cmd=cmd.strip(), runs=runs, runs_s="s" * (runs > 1),
+                    have=have, have_s="s" * (have != 1), label=APPROVE_LABEL))
