@@ -42,6 +42,7 @@ import re
 from urllib.parse import quote
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Act, Need, Refuse, ask, deny
 
 NAME = "guard-bypass-ruleset"
@@ -76,9 +77,7 @@ _SPECIAL = re.compile(r"\A(?:BASH\w*|COMP\w*|HIST\w*|PWD|OLDPWD|RANDOM|SRANDOM|S
                       r"GROUPS|SHELLOPTS|PIPESTATUS|FUNCNAME|DIRSTACK|EPOCH\w*|REPLY|OPT\w*|SHLVL|_)\Z")
 HEAD, ALL, IMPLICIT = object(), object(), object()
 
-ADMIN = ("guard-bypass-ruleset: `gh pr merge --admin` merges past the PR's required reviews and checks on "
-         "the user's bypass. Merge without --admin, or with --auto to merge once the checks pass. "
-         "Bypassing is the user's to do, from their own terminal.")
+ADMIN = say("ruleset_admin")
 
 
 class _Push:
@@ -478,9 +477,7 @@ def _judge(p, env):
         dsts.remove(HEAD)
         cur = yield from _git(p, env, "symbolic-ref", "--short", "HEAD")
         if cur is None:
-            return ask(f"guard-bypass-ruleset: this {p.prog} push sends the current branch, and the hook can't "
-                       "tell which branch that is (another directory, or a detached HEAD), so it can't check "
-                       "whether the push goes around a rule that requires a pull request.")
+            return ask(say("ruleset_head_unknown", prog=p.prog))
         dsts.append(cur)
     if remote is None:
         cur = (yield from _git(p, env, "symbolic-ref", "--short", "HEAD")) or ""
@@ -499,10 +496,7 @@ def _judge(p, env):
     if not hits:
         return None
     if url is None:
-        return ask(f"guard-bypass-ruleset: this pushes to `{hits[0]}` through remote `{remote}`, in a repository the "
-                   "hook can't find (a cd or -C it can't follow, or GIT_DIR), so it can't ask GitHub whether "
-                   f"`{hits[0]}` requires a pull request. The agent runs on your credentials, so it can use your "
-                   "bypass.")
+        return ask(say("ruleset_repo_unknown", branch=hits[0], remote=remote))
     m = _GITHUB.search(url)
     if not m:
         return None
@@ -513,14 +507,10 @@ def _judge(p, env):
     for branch in hits:
         got = yield from _requires_pr(slug, branch)
         if got == "pr":
-            return deny(f"guard-bypass-ruleset: `{branch}` on {slug} requires a pull request, and this push would go "
-                        "around it on the user's bypass. Push a branch and open a PR. A direct push is the user's "
-                        "to make, from their own terminal.")
+            return deny(say("ruleset_needs_pr", branch=branch, slug=slug))
         if got is None:
-            asked = asked or ask(f"guard-bypass-ruleset: this pushes to `{branch}` on {slug}, and GitHub couldn't say "
-                                 f"whether `{branch}` requires a pull request (gh missing, signed out, offline or "
-                                 f"an error):\n  gh api repos/{slug}/rules/branches/{quote(branch, safe='')}\n"
-                                 "The agent runs on your credentials, so it can use your bypass.")
+            asked = asked or ask(say("ruleset_github_silent", branch=branch, slug=slug,
+                                       branch_q=quote(branch, safe="")))
     return asked
 
 
@@ -540,6 +530,5 @@ def check(doc):
             return v
         asked = asked or v
     if refused:
-        return ask(f"guard-bypass-ruleset: {refused}, so the hook can't check whether it goes around a rule that "
-                   "requires a pull request. The agent runs on your credentials, so it can use your bypass.")
+        return ask(say("ruleset_refused", refused=refused))
     return asked

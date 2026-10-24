@@ -29,8 +29,7 @@ _VALUE_OPTS = {
 }
 _CD_FLAGS = ("-P", "-L", "-e", "-@", "--")
 
-_WAY_OUT = ("Work on an image file in /tmp or the scratchpad instead; a real disk is the user's to write, so "
-            "hand them the exact command.")
+_WAY_OUT = say("disks_way_out")
 
 
 def redirect_targets(text):
@@ -89,7 +88,7 @@ class _Judge:
         self.moved, self.dev_moved, self.targets = False, False, []
 
     def refuse(self, what, why):
-        raise Refuse(f"`{what}` is blocked: {why}. {_WAY_OUT}")
+        raise Refuse(say("disks_refused", what=what, why=why, way_out=_WAY_OUT))
 
     def lands_in_dev(self, s, a, b):
         """A cd (or `env -C`, `sudo -D`) in a..b that may leave the working directory under /dev, or
@@ -206,7 +205,7 @@ def parse(doc):
     try:
         judge.run(doc)
     except Refuse as e:
-        return deny(f"guard-disks: {e}"), None, []
+        return deny(say("judged", guard="guard-disks", why=e)), None, []
     return None, home, judge.targets
 
 
@@ -226,7 +225,7 @@ def judge(parsed, answers):
     for abs_, what, raw in targets:
         if not paths.under(abs_, roots):
             kind = "a device node" if abs_.startswith("/dev/") else "outside the scratchpad, /tmp and agent worktrees"
-            return deny(f"guard-disks: `{what} {raw}` is blocked: {abs_} is {kind}. {_WAY_OUT}")
+            return deny(say("disks_blocked", what=what, raw=raw, abs_=abs_, kind=kind, way_out=_WAY_OUT))
         phys = physical(abs_)
         if phys != abs_ and not paths.under(phys, roots):
             return deny("guard-disks: " + say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys,
