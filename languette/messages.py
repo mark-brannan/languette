@@ -327,6 +327,17 @@ MESSAGES = {
         "earlier command and retry; spell the path out, since a variable set in an earlier "
         "command is invisible here."
     ),
+    "dup_body_rewritten": (
+        "--body-file {v} is changed again in this same command (written {n} times), so neither "
+        "a heredoc nor the file on disk is the text gh sends. Write the body to that path from "
+        "one heredoc and nothing else in this command, or write the file in an earlier command "
+        "and retry."
+    ),
+    "dup_body_not_heredoc": (
+        "--body-file {v} is changed in this same command, and not from a heredoc, so the file "
+        "on disk is not yet the text gh sends. Write the body to that path from a heredoc in "
+        "this command, or write the file in an earlier command and retry."
+    ),
     "dup_repo_unknown": (
         "{guard}: this PR would close #{n}, and the hook can't tell which repo it is opened "
         "on (no --repo, and the working directory's origin is not on github.com, or a cd "

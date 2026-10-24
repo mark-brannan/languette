@@ -229,13 +229,10 @@ def _body(post, cwd, cd, docs, writes, env):
             text += "".join(body + "\n" for body, _ in docs)
         elif got := writes.get(_abs(v, cwd, cd, env) or v):
             n, fed = got
-            if n != 1 or not fed:
-                how = f"is changed again in this same command (written {n} times)" if n != 1 else \
-                    "is changed in this same command, and not from a heredoc"
-                return _deny(f"--body-file {v} {how}, so the text on "
-                             "disk is not the text gh sends, and the guard cannot tell which text that is. Write "
-                             "the body to that path from one heredoc and nothing else in this command, or write "
-                             "the file in an earlier command and retry.")
+            if n != 1:
+                return _deny(say("dup_body_rewritten", v=v, n=n))
+            if not fed:
+                return _deny(say("dup_body_not_heredoc", v=v))
             text += "".join(body + "\n" for body, _ in docs)    # its one write is a heredoc: that text, not the file's
         else:
             p = _abs(v, cwd, cd, env)
