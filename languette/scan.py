@@ -1320,18 +1320,21 @@ def _read(s, g, b, prog):
     words, known), or None when an option sends the call to another manager or host. Quoted text
     is its text; an operand the scan cannot read is _Dark when `prog` is opaque, else as written."""
     valued, flags, away = prog.get("valued", ()), prog.get("flags", ()), prog.get("away", ())
-    ops, opts, words, known, skip = [], [], [], True, False
+    ops, opts, words, known, skip, ended = [], [], [], True, False, False
     for i in range(g + 1, b + 1):
         w = s.w[i] if s.k[i] == "w" else s.q[i]
         if skip:
             skip = False
+        elif w == "--" and s.k[i] == "w" and not ended:
+            words.append(w)
+            ended = True                       # past `--`, every word is an operand
         elif s.live[i] or s.k[i] != "w":
             if prog.get("opaque"):
                 ops.append(_Dark(w) if s.live[i] else w)
             elif s.k[i] == "w":
                 words.append(w)
                 ops.append(w)
-        elif not w.startswith("-") or w == "-":
+        elif ended or not w.startswith("-") or w == "-":
             words.append(w)
             ops.append(w)
         elif w.startswith("--"):
@@ -1431,8 +1434,11 @@ def _literals(p):
 
 def _may_match(pat, names, fold):
     """Could process pattern `pat`, a regex, select a process of one of `names`? It does when it,
-    or a word or path part of it, finds one of the names, or holds one. One that does not compile fails closed."""
+    or a word or path part of it, finds one of the names, or holds one. Its anchors are dropped first,
+    since a process's name or command line is not the unit's name (`^postgres$` selects PostgreSQL's
+    daemon). One that does not compile fails closed."""
     flags = re.I if fold else 0
+    pat = re.sub(r"\\[AZbB]|[\^$]", "", pat)
     parts = {pat} | {f for f in re.split(r"[\s/]+", pat) if f}
     try:
         if any(re.search(f, n, flags) for f in parts for n in names):
@@ -1450,9 +1456,10 @@ def _may_match(pat, names, fold):
 # [pattern]}, a unit that answers to an fnmatch pattern of the list (`*`, `?` and `[...]` all match).
 def unit_test(cond):
     """The test on a unit that condition `cond` names, or None when no unit can pass it. The test
-    takes how the operand is read: a "unit" or a process "name" answers to a listed pattern, and a
-    glob in it may name a listed one, so it passes: the test fails closed. A "regex" passes when it
-    could select a listed unit's process. `fold` folds case."""
+    takes how the operand is read: a "unit" answers to a listed pattern, and a glob in it may name a
+    listed one, so it passes: the test fails closed. A process "name" passes as a unit does, or when
+    it holds a listed name or a listed name holds it (`postgres` is PostgreSQL's daemon). A "regex"
+    passes when it could select a listed unit's process. `fold` folds case."""
     pats = cond["units"]
     if not pats:
         return None
@@ -1462,6 +1469,8 @@ def unit_test(cond):
         if how == "regex":
             return _may_match(u, names, fold)
         f = str.lower if fold else str
+        if how == "name" and any(f(n) in f(u) or f(u) in f(n) for n in names):
+            return True
         return any(c in u for c in "*?[") or any(
             fnmatch.fnmatchcase(f(n), f(p)) for n in unit_names(u) for p in pats)
     return hit

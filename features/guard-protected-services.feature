@@ -73,6 +73,10 @@ Feature: guard-protected-services
       | killall -I POSTGRESQL           | case folded                          |
       | killall -o 1h postgresql        | -o takes a value in killall          |
       | killall -r '^postgres'          | a regex                              |
+      | killall postgres                | a name the unit's name holds         |
+      | pkill '^postgres$'              | an anchored pattern                  |
+      | pkill -f '^/usr/lib/postgresql' | an anchored path                     |
+      | pkill -f -- -D.*postgresql      | an operand after -- that looks like an option |
 
   Scenario Outline: a process pattern that could name a protected service is denied
     Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "<setting>"
@@ -111,8 +115,6 @@ Feature: guard-protected-services
       | pkill -f /tmp/test.sh           | postgresql   | a path that names no listed unit           |
       | pkill -f "node server.js"       | postgresql   | a quoted pattern that names no listed unit |
       | killall python3.11              | postgresql   | a dot in a process name                    |
-      | killall re                      | redis        | killall matches the whole name             |
-      | killall post                    | postgresql   | killall matches the whole name             |
       | pkill POSTGRESQL                | postgresql   | case kept without -i                       |
       | killall -i postgresql           | nginx        | -i asks before each kill in killall        |
       | invoke-rc.d nginx stop          | postgresql   | another service                            |
