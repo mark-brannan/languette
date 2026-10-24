@@ -1,5 +1,5 @@
 """The autouse and per-scenario fixtures: the engine, the pinned parser rung,
-the write gate and the scenario's Ctx. Moved out of conftest.py unchanged."""
+the write gate and the scenario's Ctx."""
 
 import builtins
 import os

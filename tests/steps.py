@@ -1,5 +1,5 @@
-"""The step vocabulary for features/*.feature. Moved out of conftest.py
-unchanged; conftest.py imports it, so pytest-bdd finds the steps."""
+"""The step vocabulary for features/*.feature. conftest.py imports it, so
+pytest-bdd finds the steps."""
 
 import json
 import os
@@ -13,9 +13,7 @@ from pathlib import Path
 from hamcrest import assert_that, equal_to
 from pytest_bdd import given, parsers, then, when
 
-from harness import *  # noqa: F401,F403
-from harness import (ROOT, EVENTS, GUARD_NAMES, OPT_INS, SCRUB, Ctx, _respond_all, hooks_json_event_command,
-                     scattered)
+from harness import IN_PROCESS, ROOT, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
 from matchers import Verdict, asks, denies, is_silent, warns_about
 from languette import run, scan, verdict, world
 

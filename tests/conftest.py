@@ -80,7 +80,7 @@ def pytest_configure(config):
     home = tempfile.mkdtemp(prefix="languette-home-", dir="/var/tmp")
     os.mkdir(os.path.join(home, "project"))
     os.environ["HOME"] = home
-    harness._ELSEWHERE = tempfile.mkdtemp(prefix="languette-elsewhere-", dir="/var/tmp")
+    harness.ELSEWHERE = tempfile.mkdtemp(prefix="languette-elsewhere-", dir="/var/tmp")
 
 
 def pytest_unconfigure(config):
@@ -91,8 +91,8 @@ def pytest_unconfigure(config):
         os.environ["HOME"] = _REAL_HOME
     if os.path.basename(home).startswith("languette-home-"):
         shutil.rmtree(home, ignore_errors=True)
-    if harness._ELSEWHERE:
-        shutil.rmtree(harness._ELSEWHERE, ignore_errors=True)
+    if harness.ELSEWHERE:
+        shutil.rmtree(harness.ELSEWHERE, ignore_errors=True)
 
 
 

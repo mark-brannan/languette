@@ -1,12 +1,9 @@
 """The harness the step vocabulary and fixtures share: engines, the scrubbed
-environment, a scenario's Ctx, and the hooks.json lookups. Moved out of
-conftest.py unchanged."""
+environment, a scenario's Ctx, and the hooks.json lookups."""
 
 import json
 import os
 import random
-import re
-import shlex
 import shutil
 import string
 import subprocess
@@ -14,14 +11,10 @@ import sys
 import tempfile
 from pathlib import Path
 
-import pytest
-from hamcrest import assert_that, equal_to
-
-from matchers import Verdict, asks, denies, is_silent, warns_about
-
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from languette import run, scan, verdict, world  # noqa: E402
+from languette import run, verdict  # noqa: E402
+from matchers import Verdict
 
 ENGINES = ("python", "shfmt", "hook")
 IN_PROCESS = {"python": ("awk",), "shfmt": ("shfmt",)}   # engine -> scan.RUNGS
@@ -36,7 +29,7 @@ _REAL_HOME = os.environ.get("HOME")
 EVENTS = {"prompt": "UserPromptSubmit", "post": "PostToolUse"}
 
 
-_ELSEWHERE = None                              # the run's root for directories outside $HOME
+ELSEWHERE = None                              # the run's root for directories outside $HOME
 GUARD_NAMES = sorted({g.NAME for _, _, gs in run.GUARDS for g in gs})
 # Every opt-in guard's option, switched on for every in-process scenario.
 OPT_INS = sorted({g.OPT_IN for _, _, gs in run.GUARDS for g in gs if getattr(g, "OPT_IN", None)})
@@ -52,7 +45,7 @@ def scattered(seed, role):
     rng = random.Random(f"{seed}\0{role}")
     parts = ["".join(rng.choices(string.ascii_lowercase + string.digits, k=rng.randint(3, 10)))
              for _ in range(rng.randint(1, 5))]
-    d = Path(_ELSEWHERE, role, *parts)
+    d = Path(ELSEWHERE, role, *parts)
     d.mkdir(parents=True, exist_ok=True)
     return str(d)
 
