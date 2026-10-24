@@ -256,6 +256,12 @@ Feature: guard-review-threads
       | /graphql                              |
       | https://api.github.com/graphql        |
       | https://ghe.example.com/api/graphql   |
+      | "graphql?x=1"                         |
+      | graphql#top                           |
+      | graphql/                              |
+      | "/graphql/?x=1"                       |
+      | https://api.github.com/graphql/       |
+      | https://ghe.example.com/api/v3/graphql#top |
 
   Scenario: a JSON escape in the --input heredoc does not hide the mutation
     Given review thread "PRRT_t1" holds:
@@ -281,6 +287,8 @@ Feature: guard-review-threads
       | gh api "$BASE/graphql" -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}' |
       | gh api "https://$HOST/api/graphql" -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_t1"}){thread{id}}}' |
       | gh api "${BASE}/v4/graphql" -f id=PRRT_t1                                                        |
+      | gh api "$BASE/graphql/" -f id=PRRT_t1                                                            |
+      | gh api "$BASE/graphql?x=1" -f id=PRRT_t1                                                         |
 
     @also_guard-bypass-ruleset
     Examples:
@@ -296,6 +304,7 @@ Feature: guard-review-threads
       | gh api "repos/$R/pulls/5"      |
       | gh api repos/o/r/pulls/$N      |
       | gh api "user/$X"               |
+      | gh api "repos/$R/pulls/5?x=1"  |
 
   Scenario: a readable query with a run-time field resolves nothing, and is not this guard's
     When the agent runs `gh api graphql -f query='query($n:Int!){viewer{login}}' -F n="$N"`

@@ -155,7 +155,7 @@ class _Writes:
                 i, path = sw.gh_api_word(t, i, path)
             i += 1
         path = sw.gh_api_path(path)
-        if re.fullmatch(r"repos/[^/]+/[^/]+/issues/?", path) and (method == "POST" or (method == "" and fields)):
+        if re.fullmatch(r"repos/[^/]+/[^/]+/issues", path) and (method == "POST" or (method == "" and fields)):
             self._emit(rep, "create")
         if path == "graphql":
             m += _MUTATION.findall(self.hd)

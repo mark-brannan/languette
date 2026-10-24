@@ -33,7 +33,7 @@ THREAD = re.compile(r"PRRT_[A-Za-z0-9_-]+")
 BOTS = frozenset("coderabbitai claude copilot-pull-request-reviewer github-actions".split())
 SHA = re.compile(r"(?<![0-9A-Za-z])[0-9a-f]{7,40}(?![0-9A-Za-z])", re.I)
 LINK = re.compile(r"https://\S+|(?<![\w./-])[\w.-]+/[\w.-]+#[0-9]+\b")
-GRAPHQL = re.compile(r"(?:https?://[^/]+)?/*(?:api/(?:v3/)?)?graphql")
+GRAPHQL = re.compile(r"(?:api/(?:v3/)?)?graphql")                  # an endpoint after sw.gh_api_path
 VAR = re.compile(r"\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])|\$\([^)]*\)|`[^`]*`")
 # A query GraphQL can only run as a read: the shorthand `{` must be the lone
 # operation, and a named `query` takes a second operation only by operationName.
@@ -54,7 +54,7 @@ def _maybe_graphql(word):
     pieces = VAR.split(re.sub(r"[\"']", "", word))
     if len(pieces) < 2:
         return False
-    head, tail = pieces[0], pieces[-1]
+    head, tail = pieces[0], sw.gh_api_path(pieces[-1])
     ends = tail.rsplit("/", 1)[-1] == "graphql" if "/" in tail else "graphql".endswith(tail)
     starts = (any(head.startswith(p) or p.startswith(head) for p in ("http://", "https://"))
               or any(p.startswith(head.lstrip("/")) for p in ("graphql", "api/graphql", "api/v3/graphql")))
@@ -123,7 +123,7 @@ def _calls(doc, command, cwd, home):
             first = next((i for i in range(g + 1, b + 1) if s.k[i] in ("w", "q")), None)
             if "api" not in words and first not in live_at:
                 continue
-            if not any(GRAPHQL.fullmatch(w) for w in words):
+            if not any(GRAPHQL.fullmatch(sw.gh_api_path(w)) for w in words):
                 if any(_maybe_graphql(sw.word(s, i)) for i in live_at):
                     out.append({"why": "the endpoint is built at run time"})
                 continue
