@@ -51,7 +51,7 @@ tool above was found citing a specific incident for these rules.
 | Secret managers (dcg `secrets.*`: AWS Secrets Manager, Vault, 1Password, Doppler, Infisical) | secret, vault, engine and lease deletion | credentials lost or revoked | `@planned` in `secrets.feature` |
 | CI/CD (dcg `cicd.*`) | variables, secrets, runners, build history | pipelines break; history gone | `@planned` for build history (`data.feature`) and Actions secrets (`secrets.feature`) |
 | Payments (dcg `payment.*`) | customer deletion, subscription cancel, key rotation | money and customer records | `@planned` in `money.feature` |
-| Edge, API gateway, load balancer, feature flags, monitoring, email (dcg) | service, route, flag, monitor, template deletion | an outage or silent alerting loss | mostly `@planned` in `infrastructure.feature` and `data.feature` |
+| Edge, API gateway, load balancer, feature flags, monitoring, email (dcg) | service, route, flag, monitor, template deletion | an outage or silent alerting loss | mostly `@planned` in `infrastructure.feature`, `data.feature` and `stop.feature` |
 | Windows (dcg `windows.*`) | shadow copy deletion, `diskpart`, `Format-Volume`, registry, `wsl --unregister` | machine unrecoverable | `@planned` in `files.feature` |
 | Wrapper and custom rulebooks (safety-net) | the same, through `bash -c`, `python -c` | rules bypassed by nesting | not a guard: `scan` already follows `sh -c`; a user-supplied rulebook is `ask-first`'s list |
 | Kubernetes drain, namespace and Kustomize apply (dcg) | node drain, unreviewed apply | workload eviction | `kubectl delete` in `guard-infra`; `drain` `@planned` in `stop.feature`; `apply --prune` `@planned` in `infrastructure.feature` |
@@ -61,9 +61,8 @@ tool above was found citing a specific incident for these rules.
 - Most gaps are already carried as `@planned` rows. They are a queue, not a
   discovery; the survey adds no new category there.
 - One item looks new: reading secret files from disk. It has the strongest
-  hazard (irreversible disclosure), and its concept is
-  an open question of concept: a setting of the stubbed `guard-protected-paths`
-  (defined for writes) or a new guard.
+  hazard (irreversible disclosure), and its concept is open: a setting of the
+  stubbed `guard-protected-paths` (defined for writes) or a new guard.
 - Per-service packs (payments, email, monitoring, messaging) show the shape
   dcg chose: many opt-in packs, one regex each. Languette's decisions lean
   toward a rules engine with few deep special cases, so, on that current thinking, these would more likely be rows
