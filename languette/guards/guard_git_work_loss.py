@@ -1,5 +1,5 @@
 """guard-git-work-loss: the git moves that throw work away, and that an agent
-session never has a good reason to make, are denied. The spec is
+session never has a good reason to make, are denied (one is asked about). The spec is
 features/guard-git-work-loss.feature.
 
   blanket staging   git add -A / --all / . / ./ / -u with no path, git commit -a
@@ -25,6 +25,7 @@ from languette.verdict import Refuse, ask, deny
 
 
 class Ask(Refuse):
+    # Subclasses Refuse only so _segment and its callers carry it up the same path; it asks, not denies.
     pass
 
 NAME = "guard-git-work-loss"

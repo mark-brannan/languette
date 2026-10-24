@@ -1,7 +1,7 @@
 @python
 Feature: guard-git-work-loss
-  The git commands that throw work away are denied, wherever in the command
-  they hide; prose that names them is not them.
+  The git commands that throw work away are denied, or asked about, wherever in
+  the command they hide; prose that names them is not them.
 
   Why. These are the git moves that have bitten users, or sit in the same
   class, and that an agent session never has a good reason to make. Blanket
@@ -99,6 +99,14 @@ Feature: guard-git-work-loss
       | git push origin HEAD:main                                         | is silent | not a force              |
       | git push --force-with-lease origin main && git reset --hard       | denies    | an ask does not hide a later deny |
       | git reset --hard && git push --force-with-lease origin main       | denies    | a deny before an ask still denies |
+      | git push --force-with-lease origin +main                          | denies    | +refspec is a force       |
+      | git push --force-with-lease --force origin main                   | denies    | a bare --force beside the lease |
+
+    @also_guard-git-stacked-base
+    Examples:
+      | command                                                           | verdict   | note                     |
+      | git push --force-with-lease origin :main                          | denies    | deleting main, lease or not |
+      | git push --force-with-lease --delete origin main                  | denies    | deleting main, lease or not |
 
   Scenario Outline: discarding uncommitted work is denied
     When the agent runs `<command>`
