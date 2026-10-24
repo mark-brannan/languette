@@ -196,7 +196,7 @@ Feature: guard-private-terms
       {HOME}
       """
     When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
-    Then the guard asks, rewriting the command to "gh issue comment 3 -R o/r -b ~/x"
+    Then the guard asks, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"
 
   @also_guard-signed-comments
   Scenario: only the posted text is rewritten, not a cd before it
@@ -206,6 +206,15 @@ Feature: guard-private-terms
       """
     When the agent runs `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "under {HOME}/x"`
     Then the guard asks, rewriting the command to `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "under ~/x"`
+
+  @also_guard-signed-comments
+  Scenario: a body that repeats the cd path leaves the cd alone
+    Given the private terms file holds:
+      """
+      {HOME}
+      """
+    When the agent runs `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "{HOME}/x"`
+    Then the guard asks, rewriting the command to `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "~/x"`
 
   @also_guard-github-issues
   Scenario: a terms file that is set but cannot be read denies, naming the option

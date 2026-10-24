@@ -460,12 +460,20 @@ def check(doc):
         if not any(t.lower() in home_re.sub("~", text).lower() for t in terms):
             if tool == "Bash":
                 # Only the posted values change; a cd or other use of the path stays.
-                # A value that quoting hides from a verbatim match is not rewritten: deny.
-                posted = [v for k, v in meta if k in ("T", "HDTXT") and home in v]
-                if all(v in ti["command"] for v in posted):
-                    new = ti["command"]
-                    for v in posted:
-                        new = new.replace(v, home_re.sub("~", v))
+                # Each is found last-first, after the cd, and one that quoting hides
+                # from a verbatim match is not rewritten: deny.
+                new, end = ti["command"], len(ti["command"])
+                for k, v in reversed(meta):
+                    if k not in ("T", "HDTXT") or home not in v:
+                        continue
+                    i = new.rfind(v, 0, end)
+                    if i < 0:
+                        break
+                    # A bare word is not quoted, so a ~ at its start would expand: escape it.
+                    bare = k == "T" and (i == 0 or new[i - 1] in " \t=")
+                    new = new[:i] + home_re.sub("\\~" if bare and v.startswith(home) else "~", v) + new[i + len(v):]
+                    end = i
+                else:
                     return {**ask(say("pt_home", guard=NAME)), "updatedInput": {"command": new.rstrip("\n")}}
             else:
                 return {**ask(say("pt_home", guard=NAME)), "updatedInput": _walk(ti, lambda v: home_re.sub("~", v))}

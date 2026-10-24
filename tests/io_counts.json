@@ -65,6 +65,7 @@
  "tests/test_features.py::test_a_body_that_closes_nothing_is_not_looked_up[gh pr create -t t -b \"See #114; it closes soon\"-a keyword with no reference]": {"git": 1},
  "tests/test_features.py::test_a_body_that_closes_nothing_is_not_looked_up[gh pr create -t t-no body at all]": {"git": 1},
  "tests/test_features.py::test_a_body_that_closes_nothing_is_not_looked_up[gh pr view 114-not a create]": {"git": 1},
+ "tests/test_features.py::test_a_body_that_repeats_the_cd_path_leaves_the_cd_alone": {"git": 7},
  "tests/test_features.py::test_a_body_that_supersedes_the_open_pr_passes[Closes #114. Supersedes #120.]": {"git": 2, "gh-api": 1},
  "tests/test_features.py::test_a_body_that_supersedes_the_open_pr_passes[Fixes #114, replaces https://github.com/o/r/issues/120]": {"git": 2, "gh-api": 1},
  "tests/test_features.py::test_a_body_that_supersedes_the_open_pr_passes[Fixes #114; replaces: o/r#120]": {"git": 2, "gh-api": 1},
