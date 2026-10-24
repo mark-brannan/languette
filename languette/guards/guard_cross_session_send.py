@@ -35,7 +35,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Act, Need, ask, deny
+from languette.verdict import NO_PROMPT, NO_QUESTION, Act, Need, ask, deny
 
 NAME = "guard-cross-session-send"
 
@@ -58,8 +58,9 @@ _MCP_READ = frozenset("read get list search fetch query find view download expor
 _MCP_WRITE = frozenset("write create update delete add remove push merge set edit post send submit close assign "
                        "request fork transfer lock unlock move rename upload put patch insert reply resolve "
                        "dismiss approve label star unstar archive restore withdraw pray".split())
-# Modes where an ask cannot be shown, so it would pass the call unseen.
-_NO_PROMPT = frozenset({"bypassPermissions"})
+# Modes where an ask would pass the call unseen. dontAsk is left out: it falls
+# through to the ask path, where verdict turns the ask into a deny.
+_UNSEEN_ASK = NO_PROMPT - NO_QUESTION
 # SessionStart sources that begin a context without what an earlier one read.
 _FRESH = frozenset({"startup", "clear"})
 _REF = re.compile(r" \[[^\]\n]*\]\Z")
@@ -256,11 +257,11 @@ def check(doc):
         except Exception:  # noqa: BLE001 -- no team, or one this guard cannot read: no teammates known
             pass
     closed = not lost and state.get("read") is None
-    mode = payload.get("permission_mode")
+    mode = doc.mode
     target = f"`{_shown(to)}`" if to else "an unnamed target"
-    if mode in _NO_PROMPT or not isinstance(mode, str):
+    if mode in _UNSEEN_ASK or not isinstance(mode, str):
         if closed:
-            return None if mode in _NO_PROMPT else ask(_ask_reason(target, ti))
+            return None if mode in _UNSEEN_ASK else ask(_ask_reason(target, ti))
         why = (f"this session read untrusted content ({state['read']})" if not lost
                else "this guard cannot tell whether this session read untrusted content")
         return deny(say("cross_session_deny", guard=NAME, target=target, why=why,

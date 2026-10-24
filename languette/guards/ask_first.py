@@ -32,6 +32,10 @@ allows one run: its tool_use id is appended to <transcript>.languette-ask and
 never counts again. A command that runs a listed one twice needs two
 approvals; one inside a loop or xargs is denied outright, since no count of
 approvals covers it.
+
+The payload's permission_mode changes only the message: in dontAsk, where
+AskUserQuestion is denied unseen, the deny says no one can approve it instead
+of sending the agent to ask.
 """
 
 import re
@@ -141,7 +145,7 @@ def check(doc):
         if have >= runs[c["id"]]:
             continue
         cheaper = say("ask_first_cheaper", cheaper=c["cheaper"]) if c.get("cheaper") else ""
-        if doc.mode in NO_QUESTION:
+        if doc.mode in NO_QUESTION:  # any other mode, unknown or missing included, stays an ask
             parts.append(say("ask_first_unattended", id=c["id"], path=path, mode=doc.mode, cost=c["cost"],
                              cheaper=cheaper, cmd=cmd.strip()))
             continue
