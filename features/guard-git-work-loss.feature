@@ -14,7 +14,9 @@ Feature: guard-git-work-loss
   rebasing a session branch, with `--force-with-lease` to that branch, is the
   one legitimate force. `git checkout .`, `git restore .` and `git clean -f`
   throw away uncommitted work, as `reset --hard` does, and `branch -D` throws
-  away unmerged work (`-d` refuses; use that). `yadm`, a git wrapper for
+  away unmerged work (`-d` refuses; use that). On a clean working tree the
+  discards (checkout, restore, clean, `reset --hard`) have nothing to lose and
+  pass. `yadm`, a git wrapper for
   dotfiles, is treated as `git`.
 
   Each rule has its own switch, the plugin options
@@ -118,6 +120,59 @@ Feature: guard-git-work-loss
       | git restore --staged .     | is silent | unstaging is reversible   |
       | git clean -n               | is silent |                           |
       | git clean -fdn             | is silent |                           |
+
+  # Nothing to discard on a clean tree. Asked of git in the directory the
+  # session runs in, so a cd, -C, --git-dir, --work-tree or GIT_DIR in the
+  # command leaves the deny standing: there the guard cannot say which tree.
+  Scenario Outline: discarding is allowed when the working tree is clean
+    Given a git repository at "{TMP}/clean"
+    And the working directory is "{TMP}/clean"
+    When the agent runs `<command>`
+    Then the guard is silent
+
+    Examples:
+      | command           | note                                   |
+      | git checkout .    |                                        |
+      | git checkout -- . |                                        |
+      | git restore .     |                                        |
+      | git clean -fd     |                                        |
+      | git reset --hard  | HEAD, so no commit is dropped          |
+
+  Scenario Outline: discarding is still denied when the tree is clean but the target is not known
+    Given a git repository at "{TMP}/clean"
+    And the working directory is "{TMP}/clean"
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | command                          | note                                  |
+      | git reset --hard HEAD~1          | drops a commit                        |
+      | git -C {TMP}/clean checkout .    | -C names the tree; not looked at      |
+      | cd {TMP}/clean && git restore .  | a cd moves the tree                   |
+      | git clean -fdx                   | ignored files are not in the status   |
+
+  Scenario Outline: discarding is denied when the working tree has changes
+    Given a git repository at "{TMP}/dirty"
+    And the file "{TMP}/dirty/notes.txt" holds:
+      """
+      work in progress
+      """
+    And the working directory is "{TMP}/dirty"
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | command           |
+      | git checkout .    |
+      | git restore .     |
+      | git clean -fd     |
+      | git reset --hard  |
+
+  Scenario: discarding is denied in a directory that is not a git repository
+    Given the directory "{TMP}/plain"
+    And the working directory is "{TMP}/plain"
+    When the agent runs `git checkout .`
+    Then the guard denies
 
   Scenario Outline: force-deleting a branch is denied
     When the agent runs `<command>`

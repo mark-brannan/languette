@@ -221,6 +221,24 @@ Feature: guard-worktrees
         | /tmp        | GIT_WORK_TREE={TMP} git checkout some-branch                     |
         | /tmp        | git --namespace=foo --work-tree={TMP} checkout some-branch       |
 
+    # --work-tree names where files land, not which repo git runs in: the repo
+    # is still found from the directory, so HEAD in $HOME's repo moves.
+    Scenario Outline: --work-tree alone does not pin the repo; the directory still decides
+      Given the working directory is "{TMP}"
+      When the agent runs `<command>`
+      Then the guard denies
+
+      Examples:
+        | command                                     |
+        | git --work-tree=/tmp checkout some-branch   |
+        | git --work-tree /tmp checkout some-branch   |
+        | GIT_WORK_TREE=/tmp git checkout some-branch |
+
+    Scenario: --work-tree alone from outside $HOME is allowed
+      Given the working directory is "{PROJ}"
+      When the agent runs `git --work-tree=/tmp checkout some-branch`
+      Then the guard is silent
+
     # The command can move where git runs before it gets there.
     Scenario Outline: a cd, a chained -C or an exported GIT_DIR that lands in $HOME is denied
       Given the working directory is "{PROJ}"

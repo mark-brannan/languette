@@ -7,6 +7,7 @@ features/guard-git-work-loss.feature.
   force push        bare --force / -f / +refspec; --force-with-lease to main or master;
                     deleting main
   discard           git checkout . / git restore . / git clean -f / git reset --hard
+                    (allowed when `git status --porcelain` in the payload's cwd is empty)
   branch -D         and --delete --force
 
 Each rule has its own switch, CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_<RULE>,
@@ -21,7 +22,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Refuse, deny
+from languette.verdict import Need, Refuse, deny
 
 NAME = "guard-git-work-loss"
 RULE = {"add": "BLANKET_STAGING", "commit": "BLANKET_STAGING", "stash": "STASH", "push": "FORCE_PUSH",
@@ -29,6 +30,9 @@ RULE = {"add": "BLANKET_STAGING", "commit": "BLANKET_STAGING", "stash": "STASH",
         "branch": "BRANCH_DELETE"}
 _WHOLE = re.compile(r"(?:\.|\./|\./\*|:/|:/\.|\*)\Z")
 _MAIN = re.compile(r"(?:refs/heads/)?(?:main|master)\Z")
+STATUS_TIMEOUT = 5
+# Words that move, or re-aim, the tree a discard is judged in.
+_AIM = re.compile(r"(?:cd|pushd|popd|-C|--git-dir|--work-tree|GIT_DIR=.*|GIT_WORK_TREE=.*|--git-dir=.*|--work-tree=.*)\Z")
 
 
 def _has(t, ch):
@@ -145,7 +149,30 @@ def _reset(a):
                      "`git reset --soft`/`--mixed`.")
 
 
-def _segment(s, a, b, nested, env):
+def _nothing_to_lose(doc, sub, args):
+    """True when the discard `sub args` cannot lose anything: no word of the command moves
+    or re-aims the tree, the payload's cwd is a git work tree with a clean status, and the
+    discard is not one that reaches past the status (clean -x) or drops a commit (reset to
+    a ref). Any failure to ask is False."""
+    cwd = doc.payload.get("cwd")
+    if not isinstance(cwd, str) or not cwd.startswith("/"):
+        return False
+    if sub == "reset" and any(not t.startswith("-") and t != "HEAD" for t in args):
+        return False
+    if sub == "clean" and any(_has(t, "x") or _has(t, "X") for t in args):
+        return False
+    for text, _ in doc.texts():
+        s = doc.scan(text)
+        if any(k == "w" and _AIM.match(w) for k, w in zip(s.k, s.w)):
+            return False
+    try:
+        rc, out, _ = yield Need("run", cwd, STATUS_TIMEOUT, "git", "status", "--porcelain")
+    except Exception:  # noqa: BLE001
+        return False
+    return rc == 0 and out == ""
+
+
+def _segment(doc, s, a, b, nested, env):
     g = sw.cmd_index(s, a, b, sw.GIT, nested)
     if g is None:
         return
@@ -157,22 +184,28 @@ def _segment(s, a, b, nested, env):
     if rule and env.get(f"CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_{rule}") == "false":
         return
     args = s.w[i + 1:b + 1]
-    if sub == "add":
-        _add(args)
-    elif sub == "commit":
-        _commit(args)
-    elif sub == "stash":
-        _stash(args)
-    elif sub == "push":
-        _push(args)
-    elif sub in ("checkout", "restore"):
-        _discard(sub, args)
-    elif sub == "clean":
-        _clean(args)
-    elif sub == "branch":
-        _branch(args)
-    elif sub == "reset":
-        _reset(args)
+    try:
+        if sub == "add":
+            _add(args)
+        elif sub == "commit":
+            _commit(args)
+        elif sub == "stash":
+            _stash(args)
+        elif sub == "push":
+            _push(args)
+        elif sub in ("checkout", "restore"):
+            _discard(sub, args)
+        elif sub == "clean":
+            _clean(args)
+        elif sub == "branch":
+            _branch(args)
+        elif sub == "reset":
+            _reset(args)
+    except Refuse:
+        if (rule == "DISCARD" and not s.w[g].endswith("yadm")
+                and (yield from _nothing_to_lose(doc, sub, args))):
+            return
+        raise
 
 
 def check(doc):
@@ -185,7 +218,7 @@ def check(doc):
             s = doc.scan(text)
             for a, b in s.segments():
                 if a <= b:
-                    _segment(s, a, b, nested, env)
+                    yield from _segment(doc, s, a, b, nested, env)
     except Refuse as r:
         return deny(say("judged", guard=NAME, why=r))
     return None
