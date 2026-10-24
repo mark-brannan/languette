@@ -407,3 +407,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261024t051540z
 - guard-git-work-loss prefix uses the existing judged code with the Refuse reason as an indirect blank Undo: revert the commit (no PR, branch messages-pass-6)
+
+### 20261024t051543z
+- left the _MALFORMED template and the two inline denies in guard_recursive_delete out of pass 6 Undo: revert the commit (no PR, branch messages-pass-6)
