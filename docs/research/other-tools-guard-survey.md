@@ -16,7 +16,14 @@ hour; root cause comes before the guard.
 - languette: `languette/guards/` and `features/` on `main` at `46e147e`.
   "Planned" means a `@planned` row in a feature file: a verdict no guard
   gives yet.
-- Not read: Cursor and Kiro rule files, Claude Code hook collections, and
+- Kiro, docs read 2026-10-24: it has a `PreToolUse` hook that can block a
+  tool call (a command hook exits nonzero, stderr goes to the agent;
+  [hooks](https://kiro.dev/docs/hooks/actions/)), `permissions.yaml` rules of
+  capability, `*`-glob match and allow/ask/deny effect
+  ([permissions](https://kiro.dev/docs/permissions/)), and an opt-in local
+  command sandbox ([sandbox](https://kiro.dev/docs/sandbox/)). No Kiro
+  rule bodies were read.
+- Not read: Cursor rule files, Claude Code hook collections, and
   sandbox wrappers. The last are a different concept (confine the process,
   not judge the command) and appear only in the last section.
 
