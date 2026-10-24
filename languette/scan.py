@@ -1442,16 +1442,11 @@ def _may_match(pat, names, fold):
     def finds(p):
         parts = {p} | {f for f in re.split(r"[\s/]+", p) if f}
         return any(re.search(f, n, flags) for f in parts for n in names)
-    try:
-        if finds(pat):
+    try:                                       # dropping anchors may break `\$`: that fails closed too
+        if finds(pat) or finds(re.sub(r"\\[AZbB]|[\^$]", "", pat)):
             return True
     except re.error:
         return True
-    try:                                       # dropping anchors may break `[^x]` or `\$`: no hit then
-        if finds(re.sub(r"\\[AZbB]|[\^$]", "", pat)):
-            return True
-    except re.error:
-        pass
     low = pat.lower() if fold else pat
     return any((n.lower() if fold else n) in low for n in names)
 

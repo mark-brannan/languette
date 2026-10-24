@@ -2304,6 +2304,7 @@
  "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[pkill '[^x]ostgresql'-a negated class]": {"git": 1},
  "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[pkill '^postgres$'-an anchored pattern]": {"git": 1},
  "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[pkill 'postgre.ql'-a regex fails closed]": {"git": 1},
+ "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[pkill 'x\\\\$y'-stripped of anchors, it does not compile]": {"git": 1},
  "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[pkill -9 postgresql-a signal flag]": {"git": 1},
  "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[pkill -c postgresql--c takes no value in pkill]": {"git": 1},
  "tests/test_features.py::test_the_same_stop_made_with_service_pkill_or_killall_is_denied[pkill -f \"$(cat name)\"-a substitution fails closed]": {"git": 1},

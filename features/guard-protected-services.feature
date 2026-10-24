@@ -77,6 +77,7 @@ Feature: guard-protected-services
       | pkill '^postgres$'              | an anchored pattern                  |
       | pkill -f '^/usr/lib/postgresql' | an anchored path                     |
       | pkill '[^x]ostgresql'           | a negated class                      |
+      | pkill 'x\$y'                    | stripped of anchors, it does not compile |
       | pkill -f -- -D.*postgresql      | an operand after -- that looks like an option |
 
   Scenario Outline: a process pattern that could name a protected service is denied
