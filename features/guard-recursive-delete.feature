@@ -4,6 +4,11 @@ Feature: guard-recursive-delete
   directory or the agent's own area. The working directory is {CWD}, a
   directory outside $HOME, unless a scenario says otherwise.
 
+  Why. Recursive rm and find -delete remove whole trees with no undo. Only
+  targets Claude may remove pass: the scratchpad, an agent worktree, /tmp,
+  or a generated directory that is not a direct child of $HOME or /. A
+  target this guard cannot resolve to one allowed path is denied on sight.
+
   # The README's table under the promise is generated from these rows
   # (python3 tests/readme_table.py). The two known gaps: deletion from inside
   # an interpreter is out of scope, and a script's contents are never read.

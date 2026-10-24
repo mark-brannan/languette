@@ -1,7 +1,7 @@
 """guard-signed-comments: a comment an agent posts to GitHub is signed as an
 agent's. The spec is features/guard-signed-comments.feature.
 
-Experimental: the convention is one workflow's; the general shape is mark-brannan/languette#194.
+Experimental: the convention is one workflow's; the general shape is issue #194.
 
 An agent posts under the user's own login, so without a mark a review bot and
 the next agent read its reply as the user's own words. The body's first line

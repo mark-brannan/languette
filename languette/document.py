@@ -18,7 +18,7 @@ def _source(text):
 
 
 class Document:
-    __slots__ = ("payload", "env", "event", "tool", "tool_input", "command", "_text", "_memo")
+    __slots__ = ("payload", "env", "event", "tool", "tool_input", "command", "mode", "_text", "_memo")
 
     def __init__(self, payload, env):
         ti = payload.get("tool_input")
@@ -28,6 +28,9 @@ class Document:
         text = "" if cmd is None or cmd is False else cmd if isinstance(cmd, str) else json.dumps(cmd)
         fields = {"payload": payload, "env": env, "event": payload.get("hook_event_name") or "PreToolUse",
                   "tool": tool, "tool_input": ti, "command": cmd if tool == "Bash" and isinstance(cmd, str) else None,
+                  # The permission mode, read once and from the payload alone: it says whether
+                  # anyone is there to answer an ask (languette.verdict.NO_PROMPT).
+                  "mode": payload.get("permission_mode") if isinstance(payload.get("permission_mode"), str) else None,
                   "_text": text, "_memo": {}}
         for name, value in fields.items():
             object.__setattr__(self, name, value)
@@ -65,12 +68,25 @@ class Document:
             if self.command is None:
                 return None
             try:
-                sw.check(self.command)
+                refused = self.reading()[1]
+                if refused:
+                    return refused
                 self.texts()
             except sw.Unparseable as e:
                 return e
             return None
         return self._kept(("refusal",), read)
+
+    def reading(self):
+        """(rung, the Unparseable that rung refused with or None) for the Bash
+        command, from the one scan.parse of the call: require-well-formed and
+        the decision record see the same reading."""
+        def read():
+            try:
+                return sw.parse(self.command)[0], None
+            except sw.Unparseable as e:
+                return e.rung, e
+        return self._kept(("reading",), read)
 
     def scan(self, text):
         """The scan.Scan of `text`, one per text per call. A guard reads it, never changes it."""

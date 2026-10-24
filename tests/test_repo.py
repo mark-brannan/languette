@@ -13,7 +13,7 @@ import pytest
 from hamcrest import assert_that, contains_string, empty, equal_to, has_length, is_, is_not
 
 import readme_table
-from conftest import hooks_json_commands, hooks_json_prompt_command
+from harness import hooks_json_commands, hooks_json_prompt_command
 from languette import run
 from languette.guards import (guard_bypass_labels, guard_duplicate_prs, guard_github_issues, guard_private_terms,
                               guard_protected_services, guard_signed_comments)
@@ -192,6 +192,21 @@ def test_protected_services_starts_empty():
     uc = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())["userConfig"]
     assert_that(guard_protected_services.protected({guard_protected_services.OPTION: uc["protected_services"]["default"]}),
                 equal_to(()))
+
+
+def test_a_command_rules_cmd_picks_the_program_it_matches():
+    from languette import scan
+    from languette.document import Document
+
+    def hit(cmd, command):
+        doc = Document({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": "/"}, {})
+        match = {"cmd": cmd, "verbs": scan.CTL_STOPS, "unit": {"units": ["nginx"]}}
+        return scan.ctl_hit(doc, match)
+
+    assert_that(hit("systemctl", "systemctl stop nginx"), equal_to("stop nginx"))
+    assert_that(hit("systemctl", "foo stop nginx"), equal_to(None))
+    assert_that(hit("foo", "foo stop nginx"), equal_to("stop nginx"))
+    assert_that(hit("foo", "systemctl stop nginx"), equal_to(None))
 
 
 # The parser ladder's pip parsers (docs/decisions.md, "Runtime dependencies"):
