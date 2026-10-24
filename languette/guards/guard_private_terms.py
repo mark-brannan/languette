@@ -459,20 +459,19 @@ def check(doc):
         home_re = re.compile(rf"(?<![{_NAME_CHAR}]){re.escape(home)}(?![{_NAME_CHAR}])")
         if not any(t.lower() in home_re.sub("~", text).lower() for t in terms):
             if tool == "Bash":
-                # Only the posted values change; a cd or other use of the path stays.
-                # Each is found last-first, after the cd, and one that quoting hides
-                # from a verbatim match is not rewritten: deny.
-                new, end = ti["command"], len(ti["command"])
+                # Only the posted values change; a cd or other use of the path stays. A
+                # text match cannot tell which copy is posted, so a value found other
+                # than once (also used elsewhere, or hidden by quoting) is a denial.
+                new = ti["command"]
                 for k, v in reversed(meta):
                     if k not in ("T", "HDTXT") or home not in v:
                         continue
-                    i = new.rfind(v, 0, end)
-                    if i < 0:
+                    if new.count(v) != 1:
                         break
+                    i = new.index(v)
                     # A bare word is not quoted, so a ~ at its start would expand: escape it.
                     bare = k == "T" and (i == 0 or new[i - 1] in " \t=")
                     new = new[:i] + home_re.sub("\\~" if bare and v.startswith(home) else "~", v) + new[i + len(v):]
-                    end = i
                 else:
                     return {**ask(say("pt_home", guard=NAME)), "updatedInput": {"command": new.rstrip("\n")}}
             else:

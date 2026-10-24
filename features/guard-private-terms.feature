@@ -32,7 +32,9 @@ Feature: guard-private-terms
   A home-directory path in that text is a sanitization job, not a denial job:
   where this Claude Code version's PreToolUse hooks support rewriting the
   call (`updatedInput`) the guard replaces it with `~` in the posted text
-  alone and asks, so a person still sees the rewrite; otherwise
+  alone and asks, so a person still sees the rewrite; a path the command
+  also holds outside the posted text is a denial, since a text match cannot tell
+  which copy is posted; otherwise
   it stays a denial whose reason names the substitution to make by hand.
 
   The target repo is --repo/-R, GH_REPO=, a positional issue or PR URL or
@@ -208,13 +210,22 @@ Feature: guard-private-terms
     Then the guard asks, rewriting the command to `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "under ~/x"`
 
   @also_guard-signed-comments
-  Scenario: a body that repeats the cd path leaves the cd alone
+  Scenario: a path the command also uses outside the posted text is a denial, not a guess at which is posted
+    Given the private terms file holds:
+      """
+      {HOME}
+      """
+    When the agent runs `gh pr comment 3 -R o/r --body "{HOME}/x" && cd {HOME}/x`
+    Then the guard denies, naming "{HOME}"
+
+  @also_guard-signed-comments
+  Scenario: a body that repeats an earlier cd path is a denial too
     Given the private terms file holds:
       """
       {HOME}
       """
     When the agent runs `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "{HOME}/x"`
-    Then the guard asks, rewriting the command to `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "~/x"`
+    Then the guard denies, naming "{HOME}"
 
   @also_guard-github-issues
   Scenario: a terms file that is set but cannot be read denies, naming the option

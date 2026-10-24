@@ -478,8 +478,8 @@ MESSAGES = {
         "an earlier command is invisible here, so spell the path out."
     ),
     "pt_home": (
-        "{guard}: the text about to be posted to a public repo names the home directory. The "
-        "command is rewritten to post `~` in its place; check the rewrite and approve it."
+        "{guard}: the text about to be posted to a public repo names the home directory. Post "
+        "`~` in its place. The rewrite does this; check it and approve it."
     ),
     "pt_hits": (
         "{guard}: the text about to be posted to a public repo contains private term(s) from the denylist: "
