@@ -363,7 +363,7 @@ Feature: guard-git-work-loss
       | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_DISCARD         | git reset --hard            |
       | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_BRANCH_DELETE   | git branch -D foo           |
 
-  @python_only
+  @awk_only
   Scenario Outline: a rule's own setting, on, denies its command
     Given <setting> is "true"
     When the agent runs `<command>`

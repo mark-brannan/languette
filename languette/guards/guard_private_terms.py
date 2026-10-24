@@ -298,7 +298,7 @@ def _is_private(repo, env):
     if not repo:
         return False
     listed = env.get("CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS") or ""
-    return any(r.strip() and sw.norm_repo(r.strip()) == repo for r in listed.split(","))
+    return any(sw.norm_repo(r) == repo for r in sw.listed(listed))
 
 
 def normpath(p):
