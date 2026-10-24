@@ -401,3 +401,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261024t051128z
 - Keep the new duplicate-prs deny text inline; the guard does not use the messages catalog yet Undo: move the text into messages.py ([#243](https://github.com/mark-brannan/languette/pull/243))
+
+### 20261024t051130z
+- Leave scan.writes unchanged; count writes the way guard-private-terms already does Undo: extend scan.writes to read past the heredoc word ([#243](https://github.com/mark-brannan/languette/pull/243))
