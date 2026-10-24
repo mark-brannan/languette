@@ -115,17 +115,9 @@ def programs(command):
     return out
 
 
-def _rung(command):
-    try:
-        return scan.parse(command)[0], False
-    except scan.Unparseable as e:
-        return e.rung, True
-    except Exception:  # noqa: BLE001 -- a record never fails the call
-        return None, False
-
-
-def build(payload, env, only, findings, verdict, clock=time.time, extra=()):
+def build(payload, env, only, findings, verdict, doc, clock=time.time, extra=()):
     """The record of one hook call. findings: [(guard name, its result, crashed)].
+    doc: the run's Document, whose one parse gives the rung.
     extra: the project's secret rules, gathered by the caller (run.py); None
     when they could not be, and then no command text or reason is written."""
     raw = env.get(RAW) == "true"
@@ -136,7 +128,11 @@ def build(payload, env, only, findings, verdict, clock=time.time, extra=()):
            "event": payload.get("hook_event_name") or "PreToolUse", "tool": payload.get("tool_name"),
            "run": only}
     if isinstance(command, str):
-        rec["rung"], refused = _rung(command)
+        try:
+            rec["rung"], refusal = doc.reading()
+        except Exception:  # noqa: BLE001 -- a record never fails the call
+            rec["rung"], refusal = None, None
+        refused = refusal is not None
         if refused:
             rec["refused"] = True
         if raw:
