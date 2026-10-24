@@ -7,7 +7,7 @@ Feature: guard-disks
   scenario says otherwise; {UP} is the ../ for each of its levels.
 
   Why. A write onto a disk device cannot be undone. A target this guard
-  cannot resolve to one allowed path is denied on sight, with a reason
+  cannot resolve is denied on sight, with a reason
   naming what it saw, so an unresolved name is never waved through.
 
   Scenario Outline: writing onto a device is denied, however it is spelled

@@ -7,8 +7,7 @@ Feature: guard-host-availability
   the agent's to stop.
 
   Why. These commands take the machine, or the session the agent runs on,
-  down with it. No agent area undoes that, so the guard refuses them at
-  command position and as the one-word script of sh -c.
+  down with it.
 
   Scenario Outline: the fork-bomb shape and a power command are denied
     When the agent runs `<command>`
