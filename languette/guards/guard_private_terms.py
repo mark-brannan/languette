@@ -465,6 +465,7 @@ def check(doc):
     hits = [t for t in terms if t.lower() in low]
     return deny(say("pt_hits", guard=NAME, hits=', '.join(hits), to_private=TO_PRIVATE))
 
+
 def _strings(v):
     """Every string in v, depth first, as jq's `.. | strings` lists them."""
     if isinstance(v, str):
