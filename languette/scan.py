@@ -992,9 +992,11 @@ def gh_api_word(t, i, path):
 
 
 def gh_api_path(path):
-    """The endpoint a `gh api` path argument names: any https://host/ prefix and
-    leading slashes dropped (repos/o/r/issues)."""
-    return re.sub(r"^/+", "", re.sub(r"^https?://[^/]+/", "", path, count=1), count=1)
+    """The endpoint a `gh api` path argument names: any https://host/ prefix,
+    leading slashes, a ?query or #fragment, and trailing slashes dropped
+    (repos/o/r/issues)."""
+    path = re.split(r"[?#]", re.sub(r"^https?://[^/]+/", "", path, count=1), maxsplit=1)[0]
+    return path.strip("/")
 
 
 def _unq(t):
