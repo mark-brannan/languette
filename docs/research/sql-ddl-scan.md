@@ -138,7 +138,7 @@ Worth it, modestly, as a stdlib scan inside `guard-databases`, verdict
 - Why: the false-positive rate on the available corpus is 0 once the client
   must be present; the hazard is as in the README's lede (erased rows are not
   a waste of an hour); and `data.feature` already carries 25 planned rows,
-  of which this scan would turn 22 from `@planned` to green; the exceptions
+  of which this scan would turn 21 from `@planned` to green (with `LOAD DATA OVERWRITE` added); the exceptions
   are the argv and flag rows and the `WHERE true` tautology.
 - Why not more: no real database command appears in the corpus, so the need
   rests on the hazard, not on a measured miss. #125's rule (an incident
