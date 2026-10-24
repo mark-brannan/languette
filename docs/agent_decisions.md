@@ -389,3 +389,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261021t103551z
 - feature rows point guard-scheduled-jobs at a test rule file by patching its RULE_FILE in-process; no env var or setting names the file Undo: add a setting naming the rule file ([#233](https://github.com/mark-brannan/languette/pull/233))
+
+### 20261024t050108z
+- Pass 5: Refuse text in guard_disks and conditional fragments passed as blanks, not extra codes Undo: git revert the PR ([#242](https://github.com/mark-brannan/languette/pull/242))
