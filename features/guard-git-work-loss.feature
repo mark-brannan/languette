@@ -168,6 +168,23 @@ Feature: guard-git-work-loss
       | git clean -fd     |
       | git reset --hard  |
 
+  Scenario: a repo setting that hides untracked files does not make the tree clean
+    Given a git repository at "{TMP}/hidden"
+    And the file "{TMP}/hidden/notes.txt" holds:
+      """
+      work in progress
+      """
+    And the file "{TMP}/hidden/.git/config" holds:
+      """
+      [core]
+      	repositoryformatversion = 0
+      [status]
+      	showUntrackedFiles = no
+      """
+    And the working directory is "{TMP}/hidden"
+    When the agent runs `git clean -fd`
+    Then the guard denies
+
   Scenario: discarding is denied in a directory that is not a git repository
     Given the directory "{TMP}/plain"
     And the working directory is "{TMP}/plain"

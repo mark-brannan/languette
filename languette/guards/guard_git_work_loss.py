@@ -7,7 +7,7 @@ features/guard-git-work-loss.feature.
   force push        bare --force / -f / +refspec; --force-with-lease to main or master;
                     deleting main
   discard           git checkout . / git restore . / git clean -f / git reset --hard
-                    (allowed when `git status --porcelain` in the payload's cwd is empty)
+                    (allowed when `git status --porcelain` (config-proof) in the payload's cwd is empty)
   branch -D         and --delete --force
 
 Each rule has its own switch, CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_<RULE>,
@@ -166,7 +166,8 @@ def _nothing_to_lose(doc, sub, args):
         if any(k == "w" and _AIM.match(w) for k, w in zip(s.k, s.w)):
             return False
     try:
-        rc, out, _ = yield Need("run", cwd, STATUS_TIMEOUT, "git", "status", "--porcelain")
+        rc, out, _ = yield Need("run", cwd, STATUS_TIMEOUT, "git", "-c", "status.showUntrackedFiles=all", "status", "--porcelain",
+                           "--untracked-files=all", "--ignore-submodules=none")
     except Exception:  # noqa: BLE001
         return False
     return rc == 0 and out == ""
