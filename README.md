@@ -298,7 +298,7 @@ for beyond the command, it declares:
 | `guard-git-work-loss` | nothing: a pure function of the command |
 | `require-well-formed` | a shell parser; nothing runs the command |
 | `guard-recursive-delete` | the filesystem, and `LANGUETTE_RM_ALLOW` |
-| `ask-first` | the repo's list, the session transcript, the approvals spent |
+| `ask-first` | the repo's list, the session transcript, the approvals spent, and the payload's `permission_mode` |
 | `guard-bypass-hooks` | the transcript, and the approvals spent |
 | `guard-secrets` | the repo's `.languette/secrets.json`, when it has one |
 | `guard-infra` | the transcript, the approvals spent |

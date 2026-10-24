@@ -228,7 +228,7 @@ def _respond(stdin_text, env, only):
         r, crashed = _finding(g, doc, world, acts)
         findings.append((g.NAME, r, crashed))
     judged = (world, payload, findings, acts)
-    fields = verdict(event, findings)
+    fields = verdict(event, findings, doc.mode)
     return (_out(event, fields) if fields else ""), judged
 
 

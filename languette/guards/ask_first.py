@@ -39,7 +39,7 @@ import re
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Refuse, claim, deny
+from languette.verdict import NO_QUESTION, Refuse, claim, deny
 
 NAME = "ask-first"
 CONFIG = ".languette/ask-first.json"
@@ -140,9 +140,12 @@ def check(doc):
         have = len(approved[c["approve_label"]])
         if have >= runs[c["id"]]:
             continue
+        cheaper = say("ask_first_cheaper", cheaper=c["cheaper"]) if c.get("cheaper") else ""
+        if doc.mode in NO_QUESTION:
+            parts.append(say("ask_first_unattended", id=c["id"], path=path, mode=doc.mode, cost=c["cost"],
+                             cheaper=cheaper, cmd=cmd.strip()))
+            continue
         parts.append(say("ask_first_need", id=c["id"], path=path,
                          times=(say("ask_first_times", n=runs[c["id"]], have=have) if runs[c["id"]] > 1 else ""),
-                         cost=c["cost"],
-                         cheaper=(say("ask_first_cheaper", cheaper=c["cheaper"]) if c.get("cheaper") else ""),
-                         cmd=cmd.strip(), label=c["approve_label"]))
+                         cost=c["cost"], cheaper=cheaper, cmd=cmd.strip(), label=c["approve_label"]))
     return deny(say("judged", guard="ask-first", why="\n\n".join(parts)))
