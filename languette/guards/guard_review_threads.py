@@ -27,6 +27,7 @@ from languette.verdict import Need, ask, deny
 
 NAME = "guard-review-threads"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS"
+OPTION = "CLAUDE_PLUGIN_OPTION_REVIEW_THREAD_LOGINS"
 GH = re.compile(r"(?:^|/)gh\Z")
 RESOLVE = re.compile(r"(?<![A-Za-z0-9_])resolveReviewThread(?![A-Za-z0-9_])")
 THREAD = re.compile(r"PRRT_[A-Za-z0-9_-]+")
@@ -218,14 +219,15 @@ def _bot(c):
     return a.get("__typename") == "Bot" or str(a.get("login") or "").endswith("[bot]") or _login(c) in BOTS
 
 
-def _judge(tid, viewer, comments):
-    """deny for one thread, or None. The viewer's own comments are replies,
-    even when the viewer is itself a bot."""
-    me = _norm(viewer)
-    bots = [i for i, c in enumerate(comments) if _bot(c) and _login(c) != me]
+def _judge(tid, viewer, comments, also=()):
+    """deny for one thread, or None. The comments of the viewer and of the
+    logins in the review_thread_logins option are replies, even when one is
+    itself a bot."""
+    me = {_norm(viewer), *map(_norm, also)}
+    bots = [i for i, c in enumerate(comments) if _bot(c) and _login(c) not in me]
     if not bots:
         return None
-    mine = [c for c in comments[bots[-1] + 1:] if _login(c) == me]
+    mine = [c for c in comments[bots[-1] + 1:] if _login(c) in me]
     if not mine:
         return deny(say("rt_no_reply", guard=NAME, tid=tid, viewer=viewer, do=DO))
     if not any(SHA.search(str(c.get("body") or "")) or LINK.search(str(c.get("body") or "")) for c in mine):
@@ -267,7 +269,7 @@ def check(doc):
         got = yield from _thread(cwd, tid)
         if isinstance(got, str):
             return ask(say("rt_unreadable", guard=NAME, tid=tid, got=got))
-        v = _judge(tid, *got)
+        v = _judge(tid, *got, [x for x in ((doc.env or {}).get(OPTION) or "").split(",") if x.strip()])
         if v:
             return v
     return None

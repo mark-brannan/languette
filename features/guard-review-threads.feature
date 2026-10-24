@@ -25,7 +25,8 @@ Feature: guard-review-threads
 
   gh is a stub throughout: it answers as GH_LOGIN, and each thread a
   scenario sets up is what it answers for that id; any other id is not
-  found. A bot is an author GitHub calls a Bot, a login ending in `[bot]`,
+  found. The review_thread_logins option adds comma-separated logins whose
+  replies count as the gh login's own; unset, none. A bot is an author GitHub calls a Bot, a login ending in `[bot]`,
   or one of coderabbitai, claude, copilot-pull-request-reviewer and
   github-actions; the gh login's own comments are replies, even when that
   login is a bot. The guard checks that a reply names a record, not that
@@ -83,6 +84,22 @@ Feature: guard-review-threads
       | coderabbitai | Still open.       | coderabbitai | Still open.             | the bot alone                       |
       | me           | Fixed in 3f2a9c1. | coderabbitai | The fix misses a case.  | the bot spoke last                  |
       | someone-else | Fixed in 3f2a9c1. | someone-else | Also o/r#12.            | a reply from another login          |
+
+  Scenario Outline: a reply under a login the review_thread_logins option lists lets the thread close
+    Given CLAUDE_PLUGIN_OPTION_REVIEW_THREAD_LOGINS is "<list>"
+    And review thread "PRRT_t1" holds:
+      | author       | body                                   |
+      | coderabbitai | This reverses the earlier instruction.  |
+      | <replier>    | Fixed in 3f2a9c1.                       |
+    When the agent runs `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=PRRT_t1`
+    Then the guard <outcome>
+
+    Examples:
+      | list           | replier  | outcome                                      | note                        |
+      | app, someone   | app      | is silent                                    | a listed login              |
+      | App[bot]       | app      | is silent                                    | case and [bot] are ignored  |
+      |                | app      | denies, naming "no reply from me after"      | unset: the gh login alone   |
+      | other          | app      | denies, naming "no reply from me after"      | an unlisted login           |
 
   Scenario Outline: each kind of bot is recognised
     Given review thread "PRRT_t1" holds:
