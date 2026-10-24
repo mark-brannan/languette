@@ -28,7 +28,6 @@ pure function.
 """
 
 import json
-import os
 import re
 
 try:
@@ -36,16 +35,15 @@ try:
 except ImportError:                          # pragma: no cover -- 3.10 and before
     import sre_parse as _sre
 
-from languette import secrets
-from languette.verdict import Need, Refuse, ask, deny
+from languette import paths, secrets
+from languette.messages import say
+from languette.verdict import Refuse, ask, deny
 
 NAME = "guard-secrets"
 CONFIG = ".languette/secrets.json"
 MAX_REGEX = 512
 
-_WAY_OUT = ("Keep the value out of the command: read it from the environment (`\"$TOKEN\"`), a file "
-            "(`--password-file`, `gh auth login --with-token < file`) or the tool's own credential store, so the "
-            "secret is not in the transcript or in what the command writes.")
+_WAY_OUT = say("secrets_way_out")
 
 
 def _nested_repeat(pattern):
@@ -76,35 +74,12 @@ def _nested_repeat(pattern):
         return False
 
 
-def _config(payload, env):
-    """The project's list path, or None. The nearest at or above cwd wins,
-    stopping at the repo root; then $CLAUDE_PROJECT_DIR's."""
-    cwd = payload.get("cwd")
-    if isinstance(cwd, str) and cwd.startswith("/") and (yield Need("path", "isdir", cwd)):
-        d = yield Need("path", "realpath", cwd)
-        while True:
-            if (yield Need("path", "lexists", os.path.join(d, CONFIG))):
-                return os.path.join(d, CONFIG)
-            if (yield Need("path", "lexists", os.path.join(d, ".git"))) or os.path.dirname(d) == d:
-                break
-            d = os.path.dirname(d)
-    proj = env.get("CLAUDE_PROJECT_DIR")
-    if proj and (yield Need("path", "lexists", os.path.join(proj, CONFIG))):
-        return os.path.join(proj, CONFIG)
-    return None
-
-
 _SHIPPED = frozenset(r.id for r in secrets.secret_rules.RULES)
 
 
 def _load(path):
     """The project's rules, or Refuse naming what is wrong with the file."""
-    try:
-        cfg = json.loads((yield Need("read", path)))
-    except ValueError as e:
-        raise Refuse(f"not JSON ({e})")
-    except OSError as e:
-        raise Refuse(f"unreadable ({e.strerror})")
+    cfg = yield from paths.read_json(path)
     if not isinstance(cfg, dict) or not isinstance(cfg.get("patterns"), list):
         raise Refuse('the top level must be {"patterns": [...]}')
     rules, seen = [], set()
@@ -139,7 +114,7 @@ def project_rules(payload, env):
     """The project's own rules, gathered: () when it has no list, Refuse when
     the list is malformed. guard-secrets judges with them and so does the
     decision record, which masks what the guard would deny."""
-    path = yield from _config(payload, env)
+    path, _ = yield from paths.project_config(payload, env, CONFIG)
     return (yield from _load(path)) if path else ()
 
 
@@ -165,8 +140,7 @@ def check(doc):
     try:
         extra = yield from project_rules(payload, env)
     except Refuse as e:
-        return deny(f"guard-secrets: {CONFIG} is {e}, so the project's secret patterns cannot be read. "
-                    f"Fix the file; until then every Bash command is denied.")
+        return deny(say("secrets_config", config=CONFIG, err=e))
     desc = {r.id: r.description for r in tuple(secrets.secret_rules.RULES) + tuple(extra)}
     shapes, contexts = [], []
     for s in _scans(doc):
@@ -174,10 +148,8 @@ def check(doc):
             item = f"`{secrets.shown(s, f)}` ({desc.get(f.rule, f.rule.replace('context:', 'named by '))})"
             (shapes if f.how == "shape" else contexts).append(item)
     if shapes:
-        return deny(f"guard-secrets: the command holds what looks like a credential: {', '.join(shapes)}. "
-                    f"A secret pasted into a command is in the transcript and in anything it writes or posts. {_WAY_OUT}")
+        return deny(say("secrets_shape", found=", ".join(shapes), way_out=_WAY_OUT))
     if contexts:
-        return ask(f"guard-secrets: a value here is named as a credential: {', '.join(contexts)}. "
-                   f"If it is a real secret, say no and keep it out of the command. {_WAY_OUT}")
+        return ask(say("secrets_context", found=", ".join(contexts), way_out=_WAY_OUT))
     return None
 

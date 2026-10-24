@@ -47,12 +47,9 @@ from languette.verdict import Act, Need, Refuse, ask, deny
 NAME = "guard-bypass-ruleset"
 TTL = 3600
 
-_GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
 _GH = re.compile(r"(?:^|/)gh\Z")
-_CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 _EXPORT = frozenset("export declare typeset".split())
 _GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
-_GIT_VALUED = frozenset("-C -c --git-dir --work-tree --namespace --config-env".split())
 _PUSH_VALUED = frozenset("-o --push-option --repo --receive-pack --exec".split())
 _ALL = frozenset("--all --branches --mirror".split())
 _UNREADABLE = re.compile(r"[$`*?\[{]")
@@ -190,14 +187,14 @@ def _opt(x, full):
 
 
 def _push(s, a, b, nested, here, lits=None):
-    g = sw.cmd_index(s, a, b, _GIT, nested)
+    g = sw.cmd_index(s, a, b, sw.GIT, nested)
     if g is None:
         return None
     prog = "yadm" if s.w[g].endswith("yadm") else "git"
     if any(s.w[i].startswith(_GIT_ENV) for i in range(a, g)):
         here = None
-    i = g + 1
-    while i <= b and s.w[i] != "push":
+    sub = sw.git_subcommand(s, g, b)
+    for i in sw.git_options(s, g, sub):
         x = s.w[i]
         if x == "-C" and i + 1 <= b:
             lit = lits and s.live[i + 1] and lits.word(i + 1, a)
@@ -208,16 +205,14 @@ def _push(s, a, b, nested, here, lits=None):
         if cfg and (cfg.startswith("alias.") or "insteadof" in cfg):
             raise Refuse("a `-c` override of an alias or a URL rewrite can turn any subcommand into a push, "
                          "or any remote into another")
-        if x in _GIT_VALUED:
-            i += 2
-        elif x.startswith("-"):
-            i += 1
-        elif s.live[i] or _UNREADABLE.search(x):
-            raise Refuse(f"the subcommand `{x}` is built at run time")
-        else:
-            return None                        # another subcommand
+    i = sub
     if i > b:
         return None
+    x = s.w[i]
+    if x != "push":
+        if s.live[i] or _UNREADABLE.search(x):
+            raise Refuse(f"the subcommand `{x}` is built at run time")
+        return None                            # another subcommand
     remote, pos, all_, tags, dry, dashdash = None, [], False, False, False, False
     i += 1
     while i <= b:
@@ -287,6 +282,21 @@ def _admin_merge(s, a, b, nested):
     w = s.w[g + 1:b + 1]
     admin = any(x == "--admin" or x.startswith("--admin=") for x in w)
     dyn = [s.live[g + 1 + k] or bool(_UNREADABLE.search(x)) for k, x in enumerate(w)]
+    first, skip, odd = [], False, False        # the group and its verb; a literal -R value is neither
+    for k, x in enumerate(w):
+        if skip:
+            skip = False
+            if dyn[k]:                         # a run-time -R value may split into `pr merge`
+                first.append(k)
+        elif x.startswith("-"):
+            skip = x in sw.GH_REPO_FLAGS or _opt(x, "--repo") and "=" not in x
+            odd = odd or len(first) < 2 and not (skip or _opt(x, "--repo"))
+        elif len(first) < 2:
+            first.append(k)
+    # Certain only when no flag ahead of the verb but the repo flag could hide a value.
+    if (len(first) >= 2 and not odd and not dyn[first[0]] and not dyn[first[1]]
+            and (w[first[0]], w[first[1]]) != ("pr", "merge")):
+        return False                           # a literal other verb: `merge` is a flag's value, as in `--add-label merge`
     if "pr" in w and "merge" in w:
         if admin:
             return True
@@ -296,16 +306,6 @@ def _admin_merge(s, a, b, nested):
     if any(dyn):
         if admin:
             return True                        # a live subcommand beside a literal --admin
-        first, skip = [], False                # the group and its verb; a literal -R value is neither
-        for k, x in enumerate(w):
-            if skip:
-                skip = False
-                if dyn[k]:                     # a run-time -R value may split into `pr merge`
-                    first.append(k)
-            elif x.startswith("-"):
-                skip = x in ("-R", "--repo") or _opt(x, "--repo") and "=" not in x
-            elif len(first) < 2:
-                first.append(k)
         # Only a run-time group, or a run-time verb under a literal `pr`, could spell `pr merge`.
         if first and (dyn[first[0]] or (w[first[0]] == "pr" and len(first) > 1 and dyn[first[1]])):
             raise Refuse("the `gh` subcommand is built at run time and could be `pr merge --admin`")
@@ -333,7 +333,7 @@ def _loops_moved(s, segs):
     stack, out = [], set()
     for n, (c, opens, close) in enumerate(segs):
         stack += [[n, loop, False] for loop in opens]
-        if c is not None and _CD.match(s.w[c]):
+        if c is not None and sw.CD.match(s.w[c]):
             for f in stack:
                 f[2] = True
         if close and stack:
@@ -398,7 +398,7 @@ def _walk(doc, cmd, cwd, home=None):
                 here = None                    # the cd inside may not have run
             if kw and a <= b and s.k[a] == "w" and not s.quoted[a] and s.w[a] in ("else", "elif") and kw[-1]:
                 here = None                    # a branch that did not run left no cd behind it
-            if c is not None and _CD.match(s.w[c]):
+            if c is not None and sw.CD.match(s.w[c]):
                 kw = [True] * len(kw)
                 prev = _ops(s.op[a - 1]) if a > 0 else []
                 nxt = _ops(s.op[b + 1]) if b + 1 < len(s) else []

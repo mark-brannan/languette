@@ -41,11 +41,11 @@ def known_gap(request):
 
 
 def hook_command():
-    """require-well-formed's command string, read from hooks.json, never copied."""
+    """The PreToolUse command, read from hooks.json, never copied: the one command that
+    runs require-well-formed with every other guard wired for the call."""
     hooks = json.loads((ROOT / "hooks" / "hooks.json").read_text())["hooks"]
-    found = [h["command"] for entries in hooks.values() for e in entries for h in e.get("hooks", ())
-             if "--guard require-well-formed" in h.get("command", "")]
-    assert len(found) == 1, f"expected one require-well-formed hook in hooks.json, found {len(found)}"
+    found = [h["command"] for e in hooks["PreToolUse"] for h in e.get("hooks", ())]
+    assert len(found) == 1, f"expected one PreToolUse hook in hooks.json, found {len(found)}"
     return found[0]
 
 
@@ -123,7 +123,8 @@ def given_installed(machine):
     stub(machine, "claude", f'[ "$*" = "plugin list --json" ] || exit 2\nprintf %s {shlex.quote(json.dumps([entry]))}')
     (machine.home / ".claude").mkdir()
     (machine.home / ".claude/settings.json").write_text(
-        json.dumps({"pluginConfigs": {"languette@languette": {"options": {"guard_worktrees": True}}}}))
+        json.dumps({"pluginConfigs": {"languette@languette": {"options": {
+            "guard_worktrees": True, "guard_review_threads": True, "guard_signed_comments": True}}}}))
 
 
 @given(parsers.re(r"gh is (?P<state>signed in|signed out|not installed)"))

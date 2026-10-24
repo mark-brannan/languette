@@ -15,6 +15,7 @@ Feature: guard-bypass-hooks
     Given a project directory
     And the working directory is "{PROJ}"
 
+  @also_guard-bypass-ruleset
   Scenario: the reason says whose call it is, what to do instead, and how to ask
     When the agent runs `git push --no-verify`
     Then the guard denies, naming "skips this repo's hooks"
@@ -28,34 +29,18 @@ Feature: guard-bypass-hooks
 
     Examples:
       | command                                      | note                                  |
-      | git push --no-verify                         | the plain case                        |
-      | git push origin main --no-verify             | flag after the refspec                |
-      | git push --no-verify origin main             | flag before the remote                |
-      | git push --no-veri                           | an unambiguous prefix                 |
       | git commit --no-verify -m x                  | commit                                |
       | git commit -m x --no-verify                  | flag after the message                |
       | git commit -n -m x                           | -n is --no-verify on commit           |
       | git commit -nm x                             | -n in a cluster                       |
-      | git commit -anm x                            | -n in a longer cluster                |
       | git commit -m "a b" --no-verify              | a quoted message before the flag      |
       | git -C /tmp/repo commit -n -m x              | global option with a value            |
-      | git -c user.name=x push --no-verify          | global -c                             |
-      | git --git-dir=/x/.git push --no-verify       | global option with an attached value  |
       | git --config-env core.hooksPath=X commit --no-verify | global option with a separate value |
       | git --attr-source HEAD commit -n -m x        | global option with a separate value   |
       | yadm commit -n -m x                          | yadm is git                           |
-      | yadm push --no-verify                        | yadm is git                           |
-      | /usr/bin/git push --no-verify                | git by path                           |
-      | sh -c 'git push --no-verify'                 | sh -c nests                           |
       | bash -c "git commit -n -m x"                 | bash -c nests                         |
-      | env X=1 git push --no-verify                 | env prefix                            |
-      | X=1 git push --no-verify                     | assignment prefix                     |
-      | timeout 5m git push --no-verify              | timeout wrapper                       |
       | sudo git commit -n -m x                      | sudo                                  |
-      | sh -c 'env X=1 git push --no-verify'         | wrapper inside sh -c                  |
       | git add f && git commit -n -m x              | later in a chain                      |
-      | cd /tmp; git push --no-verify                | later in a ; chain                    |
-      | echo git push --no-verify \| sh              | echo into a shell                     |
       | git merge --no-verify feature                | merge                                 |
       | git merge feature --no-verify                | merge, flag last                      |
       | git merge -m x --no-verify feature           | merge, after a message                |
@@ -67,15 +52,39 @@ Feature: guard-bypass-hooks
       | git am -n fix.patch                          | -n is --no-verify on am               |
       | git am -3n fix.patch                         | -n in a cluster on am                 |
       | git -c core.hooksPath=/dev/null commit -m x  | hooks moved away                      |
-      | git -c core.hooksPath= push                  | hooks path emptied                    |
-      | git -c CORE.HOOKSPATH=x push                 | config keys ignore case               |
       | git -c core.hooksPath status                 | a bare key sets it to true            |
       | git -c user.name=x -c core.hooksPath=h merge t | the second -c                       |
       | git -C /tmp/r -c core.hooksPath=h commit -m x | after -C                             |
       | git --config-env=core.hooksPath=HP commit -m x | --config-env, attached              |
-      | git --config-env core.hooksPath=HP push      | --config-env, separate                |
       | yadm -c core.hooksPath=x commit -m x         | yadm is git                           |
+
+    @also_guard-bypass-ruleset
+    Examples:
+      | command                                      | note                                  |
+      | git push --no-verify                         | the plain case                        |
+      | git push origin main --no-verify             | flag after the refspec                |
+      | git push --no-verify origin main             | flag before the remote                |
+      | git push --no-veri                           | an unambiguous prefix                 |
+      | git -c user.name=x push --no-verify          | global -c                             |
+      | git --git-dir=/x/.git push --no-verify       | global option with an attached value  |
+      | yadm push --no-verify                        | yadm is git                           |
+      | /usr/bin/git push --no-verify                | git by path                           |
+      | sh -c 'git push --no-verify'                 | sh -c nests                           |
+      | env X=1 git push --no-verify                 | env prefix                            |
+      | X=1 git push --no-verify                     | assignment prefix                     |
+      | timeout 5m git push --no-verify              | timeout wrapper                       |
+      | sh -c 'env X=1 git push --no-verify'         | wrapper inside sh -c                  |
+      | cd /tmp; git push --no-verify                | later in a ; chain                    |
+      | echo git push --no-verify \| sh              | echo into a shell                     |
+      | git -c core.hooksPath= push                  | hooks path emptied                    |
+      | git -c CORE.HOOKSPATH=x push                 | config keys ignore case               |
+      | git --config-env core.hooksPath=HP push      | --config-env, separate                |
       | sh -c 'git -c core.hooksPath=/dev/null push' | sh -c nests                           |
+
+    @also_guard-git-work-loss
+    Examples:
+      | command                                      | note                                  |
+      | git commit -anm x                            | -n in a longer cluster                |
 
   Scenario Outline: other git commands, and text that merely names the flag, are not skipping hooks
     When the agent runs `<command>`
@@ -86,13 +95,10 @@ Feature: guard-bypass-hooks
       | git push -n                                         | -n is --dry-run on push             |
       | git push -n origin main                             | --dry-run                           |
       | git push --dry-run                                  | spelled out                         |
-      | git push origin main                                | an ordinary push                    |
-      | git push -o --no-verify                             | --no-verify is the push option      |
       | git commit -m "never use --no-verify"               | a message that names the flag       |
       | git commit -m '--no-verify'                         | a message that is the flag          |
       | git commit -m -n                                    | a message that is -n                |
       | git commit -m x -m "and git push --no-verify"       | a second message                    |
-      | git commit -am "git commit -n"                      | message in a cluster                |
       | git commit -F msg.txt                               | message from a file                 |
       | git commit --message=--no-verify                    | attached message                    |
       | git commit --amend --no-edit                        | --no-edit is not --no-verify        |
@@ -117,6 +123,17 @@ Feature: guard-bypass-hooks
       | git commit -m "git -c core.hooksPath=x push"        | a message that names it             |
       | echo -c core.hooksPath=x                            | not git                             |
 
+    @also_guard-bypass-ruleset
+    Examples:
+      | command                                             | note                                |
+      | git push origin main                                | an ordinary push                    |
+      | git push -o --no-verify                             | --no-verify is the push option      |
+
+    @also_guard-git-work-loss
+    Examples:
+      | command                                             | note                                |
+      | git commit -am "git commit -n"                      | message in a cluster                |
+
   Scenario: a heredoc commit message that names the flag is text
     When the agent runs:
       """
@@ -138,6 +155,7 @@ Feature: guard-bypass-hooks
 
   Rule: an approval allows one run
 
+    @also_guard-bypass-ruleset
     Scenario: approved once
       Given the transcript holds:
         """
@@ -156,6 +174,7 @@ Feature: guard-bypass-hooks
       When the agent runs `git commit -n -m x`
       Then the guard is silent
 
+    @also_guard-bypass-ruleset
     Scenario: approved, then spent on the first call
       Given the transcript holds:
         """
@@ -166,6 +185,7 @@ Feature: guard-bypass-hooks
       And the agent runs it again
       Then the guard denies, naming "0 unspent"
 
+    @also_guard-bypass-ruleset
     Scenario: already spent
       Given the transcript holds:
         """
@@ -179,6 +199,7 @@ Feature: guard-bypass-hooks
       When the agent runs `git push --no-verify`
       Then the guard denies
 
+    @also_guard-bypass-ruleset
     Scenario: second approval after the first is spent
       Given the transcript holds:
         """
@@ -194,6 +215,7 @@ Feature: guard-bypass-hooks
       When the agent runs `git push --no-verify`
       Then the guard is silent
 
+    @also_guard-bypass-ruleset
     Scenario: user chose another option
       Given the transcript holds:
         """
@@ -203,6 +225,7 @@ Feature: guard-bypass-hooks
       When the agent runs `git push --no-verify`
       Then the guard denies
 
+    @also_guard-bypass-ruleset
     Scenario: label not exact
       Given the transcript holds:
         """
@@ -212,6 +235,7 @@ Feature: guard-bypass-hooks
       When the agent runs `git push --no-verify`
       Then the guard denies
 
+    @also_guard-bypass-ruleset
     Scenario: a dry run needs no approval and spends none
       Given the transcript holds:
         """
@@ -222,6 +246,7 @@ Feature: guard-bypass-hooks
       And the agent runs `git push --no-verify`
       Then the guard is silent
 
+    @also_guard-bypass-ruleset
     Scenario: ask-first's own label approves nothing here
       Given the transcript holds:
         """
@@ -240,6 +265,7 @@ Feature: guard-bypass-hooks
       When the agent runs `<command>`
       Then the guard <verdict>
 
+      @also_guard-bypass-ruleset
       Examples:
         | command                                  | verdict                       |
         | git commit -n -m x && git push --no-verify | denies, naming "2 times"      |
@@ -258,6 +284,7 @@ Feature: guard-bypass-hooks
       When the agent runs `<command>`
       Then the guard is silent
 
+      @also_guard-bypass-ruleset
       Examples:
         | command                                    |
         | git commit -n -m x && git push --no-verify |
@@ -275,15 +302,20 @@ Feature: guard-bypass-hooks
 
       Examples:
         | command                                                      |
+        | while true; do git commit -n -m x; done                      |
+
+      @also_guard-bypass-ruleset
+      Examples:
+        | command                                                      |
         | for r in a b; do git push --no-verify $r; done              |
         | echo a b \| xargs -n1 git push --no-verify                   |
-        | while true; do git commit -n -m x; done                      |
 
     Scenario Outline: with the transcript missing, only a skipped hook is denied
       Given the transcript is missing
       When the agent runs `<command>`
       Then the guard <verdict>
 
+      @also_guard-bypass-ruleset
       Examples:
         | command              | verdict                                       |
         | git push --no-verify | denies, naming "cannot read the session transcript" |

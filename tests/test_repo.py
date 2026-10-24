@@ -2,7 +2,9 @@
 plugin's options, the stdlib-only rule for languette/, the README table."""
 
 import ast
+import importlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -12,7 +14,9 @@ from hamcrest import assert_that, contains_string, empty, equal_to, has_length, 
 
 import readme_table
 from conftest import hooks_json_commands, hooks_json_prompt_command
-from languette.guards import guard_github_issues, guard_private_terms, guard_protected_services
+from languette import run
+from languette.guards import (guard_bypass_labels, guard_duplicate_prs, guard_github_issues, guard_private_terms,
+                              guard_protected_services, guard_signed_comments)
 
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
@@ -20,12 +24,14 @@ GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-ba
           "guard-bypass-labels", "require-well-formed", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
           "guard-permissions", "guard-pipe-to-shell", "guard-disks",
           "guard-host-availability", "guard-protected-services", "guard-scheduled-jobs", "guard-cross-session-send",
-          "guard-secrets"}
+          "guard-secrets", "guard-review-threads", "guard-signed-comments",
+          "guard-duplicate-prs"}
 # Guards that are off unless the user turns them on: their option defaults to false.
-OPT_IN = {"guard_worktrees"}
+OPT_IN = {"guard_worktrees", "guard_review_threads", "guard_signed_comments"}
 # Options that are not a guard's on/off toggle: name -> type.
 OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string",
                  "protected_services": "string", "prose_budget_command": "string",
+                 "signed_comments_opening": "string", "signed_comments_signature": "string",
                  "record_decisions": "boolean", "record_raw_commands": "boolean"}
 # Per-rule switches inside one guard: boolean, on by default.
 RULE_OPTIONS = {f"guard_git_work_loss_{r}" for r in ("blanket_staging", "stash", "force_push", "discard", "branch_delete")} | {
@@ -97,7 +103,7 @@ def prompt_hooks_shape(text):
             if not isinstance(h, dict) or h.get("type") != "command" \
                     or not isinstance(h.get("command"), str) or not h["command"]:
                 bad.append(f'UserPromptSubmit[{i}].hooks[{j}] is not a {{"type": "command", "command": "..."}} object')
-            elif re.search(r'languette/run\.py" --guard guard-github-issues\b', h["command"]):
+            elif re.search(r'languette/run\.py"(?! --guard)|languette/run\.py" --guard guard-github-issues\b', h["command"]):
                 door += 1
     if not door:
         bad.append("no UserPromptSubmit command runs guard-github-issues")
@@ -124,17 +130,49 @@ def test_the_shape_check_rejects(wrong):
     assert_that(hooks_shape(wrong), is_not(empty()))
 
 
+def _pre_matcher():
+    """The matcher of the one PreToolUse entry in hooks/hooks.json."""
+    [e] = json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]["PreToolUse"]
+    return e["matcher"]
+
+
+def _reaches(guard, tool):
+    """Whether a PreToolUse call to `tool` reaches `guard`: the hooks.json matcher fires
+    the one command, and run.py wires the guard for that tool."""
+    return bool(re.fullmatch(_pre_matcher(), tool)) and guard in run.wired("PreToolUse", tool)
+
+
 def test_hooks_json_wires_exactly_the_guards():
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    assert_that([h for e in hj["hooks"]["PreToolUse"] for h in e["hooks"]], has_length(len(GUARDS)))
+    # One entry and one command per event, each running run.py with no --guard, for
+    # every event run.py wires a guard on: a guard is reachable only through it.
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]
+    assert_that(sorted(hj), equal_to(sorted({ev for ev, _, _ in run.GUARDS})))
+    for event, entries in hj.items():
+        [command] = [h["command"] for e in entries for h in e["hooks"]]
+        assert_that(command, contains_string('python3 -I "${CLAUDE_PLUGIN_ROOT}/languette/run.py"'))
+        assert_that("--guard" in command, is_(False))
     assert_that(set(hooks_json_commands()), equal_to(GUARDS))
+    assert_that({g.NAME for _, _, gs in run.GUARDS for g in gs}, equal_to(GUARDS))
+
+
+def test_the_all_off_gate_names_every_guard_option():
+    # Without python3 the PreToolUse command can read no option but these, and every
+    # guard off is silence: a guard missing here fails closed even when all are off.
+    [command] = [h["command"] for e in json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]["PreToolUse"]
+                 for h in e["hooks"]]
+    gate = command[:command.index("; } || { ")]
+    found = re.findall(r'\[ "\$\{CLAUDE_PLUGIN_OPTION_(\w+)-\}" (= false|!= true) \]', gate)
+    assert_that(gate, equal_to("{ " + " && ".join(f'[ "${{CLAUDE_PLUGIN_OPTION_{o}-}}" {t} ]' for o, t in found)))
+    assert_that({o.lower(): t.split()[0] for o, t in found}, equal_to(run.gates()))
 
 
 def test_the_foreign_worktree_guard_matches_the_file_tools_and_enterworktree():
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
     for guard, want in WIDE_MATCHER.items():
-        [e] = [e for e in hj["hooks"]["PreToolUse"] if any(f"--guard {guard};" in h["command"] for h in e["hooks"])]
-        assert_that(e["matcher"], equal_to(want))
+        [g] = [g for _, _, gs in run.GUARDS for g in gs if g.NAME == guard]
+        for tool in want.split("|"):
+            assert_that(_reaches(g, tool), is_(True))
+        for tool in ("Read", "Glob", "SendMessage"):
+            assert_that(_reaches(g, tool), is_(False))
 
 
 def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():
@@ -202,7 +240,8 @@ def test_the_readme_table_is_the_scenarios_table():
 
 def test_the_prompt_hook_has_the_shape_that_opens_the_door():
     assert_that(prompt_hooks_shape((ROOT / "hooks/hooks.json").read_text()), empty())
-    assert_that(hooks_json_prompt_command(), contains_string("--guard guard-github-issues"))
+    assert_that("--guard" in hooks_json_prompt_command(), is_(False))
+    assert_that(run.wired("UserPromptSubmit", None), equal_to([guard_github_issues]))
 
 
 def _prompt_hooks(*hooks):
@@ -233,12 +272,6 @@ def _mcp_suffixes(tools):
     return set(alts.split("|"))
 
 
-def _guard_github_issues_matcher():
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard guard-github-issues;" in h["command"] for h in e["hooks"])]
-    return e["matcher"]
-
-
 def _mcp_tools_the_guard_handles():
     # From the guard's own TOOLS, so a tool added there must be matched here.
     suffixes = _mcp_suffixes(guard_github_issues.TOOLS)
@@ -248,18 +281,12 @@ def _mcp_tools_the_guard_handles():
 
 @pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_handles())
 def test_the_guard_github_issues_matcher_covers_the_tool(tool):
-    assert_that(re.fullmatch(_guard_github_issues_matcher(), tool), is_not(None))
+    assert_that(_reaches(guard_github_issues, tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__add_issue_comment"])
 def test_the_guard_github_issues_matcher_leaves_other_tools_alone(tool):
-    assert_that(re.fullmatch(_guard_github_issues_matcher(), tool), is_(None))
-
-
-def _guard_private_terms_matcher():
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard guard-private-terms;" in h["command"] for h in e["hooks"])]
-    return e["matcher"]
+    assert_that(_reaches(guard_github_issues, tool), is_(False))
 
 
 def _mcp_tools_the_guard_private_terms_handles():
@@ -271,27 +298,74 @@ def _mcp_tools_the_guard_private_terms_handles():
 
 @pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_private_terms_handles())
 def test_the_guard_private_terms_matcher_covers_the_tool(tool):
-    assert_that(re.fullmatch(_guard_private_terms_matcher(), tool), is_not(None))
+    assert_that(_reaches(guard_private_terms, tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__list_pull_requests"])
 def test_the_guard_private_terms_matcher_leaves_other_tools_alone(tool):
-    assert_that(re.fullmatch(_guard_private_terms_matcher(), tool), is_(None))
-
-
-def _guard_bypass_labels_matcher():
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [e] = [e for e in hj["hooks"]["PreToolUse"] if any("--guard guard-bypass-labels" in h["command"] for h in e["hooks"])]
-    return e["matcher"]
+    assert_that(_reaches(guard_private_terms, tool), is_(False))
 
 
 # Any MCP tool may carry a labels field; the guard itself tells writes from reads.
 @pytest.mark.parametrize("tool", ["Bash", "mcp__github__update_issue", "mcp__plugin_github_github__issue_write",
                                   "mcp__gitea__edit_issue"])
 def test_the_guard_bypass_labels_matcher_covers_the_tool(tool):
-    assert_that(re.fullmatch(_guard_bypass_labels_matcher(), tool), is_not(None))
+    assert_that(_reaches(guard_bypass_labels, tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "Write", "Edit"])
 def test_the_guard_bypass_labels_matcher_leaves_other_tools_alone(tool):
-    assert_that(re.fullmatch(_guard_bypass_labels_matcher(), tool), is_(None))
+    assert_that(_reaches(guard_bypass_labels, tool), is_(False))
+
+
+@pytest.mark.parametrize("tool", ["Bash"] + sorted(f"{prefix}{s}" for s in _mcp_suffixes(guard_duplicate_prs.TOOLS)
+                                                   for prefix in ("mcp__github__", "mcp__plugin_github_github__")))
+def test_the_guard_duplicate_pr_matcher_covers_the_tool(tool):
+    assert_that(_reaches(guard_duplicate_prs, tool), is_(True))
+
+
+@pytest.mark.parametrize("tool", ["Read", "mcp__github__update_pull_request", "mcp__github__list_pull_requests"])
+def test_the_guard_duplicate_pr_matcher_leaves_other_tools_alone(tool):
+    assert_that(_reaches(guard_duplicate_prs, tool), is_(False))
+
+
+def _mcp_tools_the_guard_signed_comments_handles():
+    # From the guard's own TOOLS, so a tool added there must be matched here.
+    suffixes = _mcp_suffixes(guard_signed_comments.TOOLS)
+    assert suffixes >= {"add_issue_comment", "add_reply_to_pull_request_comment", "add_comment_to_pending_review",
+                        "pull_request_review_write", "update_issue_comment"}
+    return sorted(f"{prefix}{s}" for s in suffixes for prefix in ("mcp__github__", "mcp__plugin_github_github__"))
+
+
+@pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_signed_comments_handles())
+def test_the_guard_signed_comments_matcher_covers_the_tool(tool):
+    assert_that(_reaches(guard_signed_comments, tool), is_(True))
+
+
+@pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__create_issue"])
+def test_the_guard_signed_comments_matcher_leaves_other_tools_alone(tool):
+    assert_that(_reaches(guard_signed_comments, tool), is_(False))
+
+
+def _gathered(gen):
+    """Drive a guard's gather generator against the real disk, the way world answers
+    the path and read Needs it yields."""
+    answer = None
+    while True:
+        try:
+            need = gen.send(answer)
+        except StopIteration as stop:
+            return stop.value
+        op, path = need.args[0], need.args[-1]
+        answer = Path(path).read_text() if need.kind == "read" else getattr(os.path, op)(path)
+
+
+@pytest.mark.parametrize("rule_file", sorted((ROOT / "languette" / "rules").glob("*.json")), ids=lambda p: p.name)
+def test_every_shipped_rule_file_loads_and_is_packaged(rule_file):
+    # docs/design/guard-rules.md, "Rule sets that do not load": the deny a bad file
+    # gives never greets an install.
+    guard = importlib.import_module(f"languette.guards.{rule_file.stem.replace('-', '_')}")
+    assert_that(Path(guard.RULE_FILE), equal_to(rule_file))
+    got = _gathered(guard.rules(str(rule_file)))
+    assert_that(got[:len(guard.RULES)], equal_to(guard.RULES))
+    assert_that((ROOT / "pyproject.toml").read_text(), contains_string('languette = ["rules/*.json"]'))

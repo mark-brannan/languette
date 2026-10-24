@@ -3,10 +3,15 @@ word of a command to a single absolute path, or say why it cannot be one; the
 agent's own areas. What the disk says about a path is a Need("physical", p),
 which a guard plans and the runner answers. Standard library only."""
 
+import json
+import os
 import re
 
 from languette import scan as sw
-from languette.verdict import Need
+from languette.messages import say
+from languette.verdict import Need, Refuse, context, deny, planned
+
+MAX_READ = 1 << 20                             # bytes a read Need may return
 
 
 class Unresolved(Exception):
@@ -88,7 +93,6 @@ def under(p, roots):
     return any(p == r or p.startswith(r + "/") for r in roots)
 
 
-_CD = re.compile(r"^(?:cd|pushd|popd)\Z")
 _CHDIR_WRAP = re.compile(r"(?:^|/)(?:sudo|doas|env)\Z")
 # env -C, sudo -D and sudo -R (a chroot: `.` is somewhere else there too), in every spelling getopt
 # takes: detached, attached (-C/etc), clustered (-nD /etc), and a long option or any prefix of it.
@@ -129,5 +133,122 @@ def moves_directory(scans):
     """True when some segment of some scanned text is a cd, pushd or popd, or a
     wrapper with a chdir option: every relative path in the command is then
     unresolvable."""
-    return any(a <= b and (sw.cmd_index(s, a, b, _CD, True) is not None or chdir_wrapper(s, a, b))
+    return any(a <= b and (sw.cmd_index(s, a, b, sw.CD, True) is not None or chdir_wrapper(s, a, b))
                for s, _ in scans for a, b in s.segments())
+
+
+def find_starts(s, g, b):
+    """The start paths of the `find` at word g: every word before its first option or test."""
+    i = g + 1
+    while i <= b and not s.w[i].startswith(("-", "!")):
+        i += 1
+    return range(g + 1, i)
+
+
+def judge_segments(judge, scans):
+    """judge.segment on every non-empty segment of every scanned text."""
+    for s, nested in scans:
+        for a, b in s.segments():
+            if a <= b:
+                judge.segment(s, a, b, nested)
+
+
+def parse_targets(doc, name, judge, allow_var):
+    """The parse of a guard that judges target paths: `judge(cwd, home)` walks the
+    command and gathers its targets; `allow_var` names the env var of extra
+    allowed paths. "found" is a finding parse alone comes to."""
+    payload, env = doc.payload, doc.env
+    out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None}
+    if doc.text is None:
+        return out
+    cwd = payload["cwd"]
+    home = env.get("HOME", "")
+    if not home.startswith("/"):
+        out["found"] = deny(say("home_not_absolute", guard=name))
+        return out
+    walker = judge(cwd, home)
+    try:
+        walker.run(doc)
+    except Refuse as e:
+        out["refused"] = str(e)
+    out.update(home=home, allow=env.get(allow_var) or None, targets=walker.targets)
+    return out
+
+
+def plan_targets(parsed, parse_allow):
+    """The physical path of $HOME and each allow entry, when the allow var is set;
+    of the agent's own areas and every target, when there are targets to judge.
+    `parse_allow(value, home, home_p, physical)` reads the allow var."""
+    if parsed["found"] or parsed["home"] is None:
+        return []
+    home, want = parsed["home"], []
+    if parsed["allow"]:
+        want.append(home)
+        parse_allow(parsed["allow"], home, home, lambda p: want.append(p) or p)
+    if parsed["refused"] is None and parsed["targets"]:
+        want += own_bases(home) + [t for t, _, _ in parsed["targets"]]
+    return [Need("physical", p) for p in dict.fromkeys(want)]
+
+
+def judge_targets(parsed, answers, name, parse_allow, malformed, verdict):
+    """The judge of a guard that judges target paths, up to the targets
+    themselves: a malformed allow var (`malformed`, a template its error fills)
+    is context when there is nothing to judge and a deny otherwise; a refused
+    parse is a deny. Past that, `verdict(targets, home, physical, *extras)`
+    judges the targets, extras being what parse_allow found besides its error
+    (none when the allow var is unset)."""
+    if parsed["found"] or parsed["home"] is None:
+        return parsed["found"]
+    home, physical = parsed["home"], physical_of(answers)
+    extras, allow_err = [], None
+    if parsed["allow"]:
+        *extras, allow_err = parse_allow(parsed["allow"], home, physical(home), physical)
+    allow_msg = malformed.format(allow_err) if allow_err else None
+    refused = parsed["refused"]
+    if refused is None and not parsed["targets"]:
+        return context(f"{name}: " + allow_msg) if allow_msg else None
+    if allow_msg:
+        return deny(f"{name}: " + allow_msg)
+    if refused is not None:
+        return deny(refused)
+    return verdict(parsed["targets"], home, physical, *extras)
+
+
+def check_targets(doc, name, judge, allow_var, parse_allow, malformed, verdict):
+    """The whole check of a guard that judges target paths: parse_targets,
+    plan_targets and judge_targets, in planned's order."""
+    return (yield from planned(doc, lambda d: parse_targets(d, name, judge, allow_var),
+                               lambda p: plan_targets(p, parse_allow),
+                               lambda p, a: judge_targets(p, a, name, parse_allow, malformed, verdict)))
+
+
+def project_config(payload, env, name):
+    """The project's `name` file: the nearest at or above cwd, stopping at the repo
+    root, because the agent may have cd'd into another repo; then
+    $CLAUDE_PROJECT_DIR's. Returns (path or None, whether cwd was a usable directory)."""
+    cwd = payload.get("cwd")
+    usable = isinstance(cwd, str) and cwd.startswith("/") and (yield Need("path", "isdir", cwd))
+    if usable:
+        d = yield Need("path", "realpath", cwd)
+        while True:
+            if (yield Need("path", "lexists", os.path.join(d, name))):
+                return os.path.join(d, name), True
+            if (yield Need("path", "lexists", os.path.join(d, ".git"))) or os.path.dirname(d) == d:
+                break
+            d = os.path.dirname(d)
+    proj = env.get("CLAUDE_PROJECT_DIR")
+    if proj and (yield Need("path", "lexists", os.path.join(proj, name))):
+        return os.path.join(proj, name), bool(usable)
+    return None, bool(usable)
+
+
+def read_json(path):
+    """The file at path, parsed as JSON, or Refuse naming why it cannot be."""
+    try:
+        return json.loads((yield Need("read", path)))
+    except ValueError as e:
+        raise Refuse(f"not JSON ({e})")
+    except RecursionError:
+        raise Refuse("not JSON (nested too deep to parse)")
+    except OSError as e:
+        raise Refuse(f"unreadable ({e.strerror})")

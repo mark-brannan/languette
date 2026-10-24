@@ -8,11 +8,11 @@ an interpreter that reads its program from stdin (`curl u | sh`, `| sudo bash
 ...`, `| node -e ...`, `| sh install.sh`) is not reading the download as code.
 """
 
-import json
 import os
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import deny
 
 NAME = "guard-pipe-to-shell"
@@ -27,9 +27,7 @@ _NODE_SCRIPT = ("-e", "--eval", "-p", "--print", "-pe", "-ep", "-c", "--check")
 _VALUE_OPTS = {"sh": ("-o", "-O", "+o", "+O", "--rcfile", "--init-file"), "python": ("-W", "-X"),
                "perl": ("-I",), "ruby": ("-I", "-r"), "node": ("-r", "--require", "--import", "--loader")}
 
-_WAY_OUT = ("Download it to a file, read it, then run the file: `curl -fsSLo install.sh <url>`, read "
-            "install.sh, `sh install.sh`. The same install, one more command, and the script has been "
-            "seen before it ran.")
+_WAY_OUT = say("pipe_to_shell_way_out")
 
 
 def _family(path):
@@ -100,34 +98,27 @@ def _judge(doc, s, nested):
         if g is not None:
             name = os.path.basename(s.w[g])
             if carried and _reads_stdin(s, g, b):
-                return f"a download piped into `{name}`"
+                return say("pipe_into", name=name)
             given, ops = _program(s, g, b)
             if fed and (given or not ops):
-                return f"`{name}` run on a download substituted into its command line"
+                return say("pipe_substituted", name=name)
             if given and any(s.k[i] == "q" and _text_downloads(doc, s.q[i]) for i in range(g + 1, b + 1)):
-                return f"`{name} -c` run on a download substituted into its command line"
+                return say("pipe_substituted_c", name=name)
         if c is not None and s.w[c] == "eval":
             if fed or any(s.k[i] == "q" and _text_downloads(doc, s.q[i]) for i in range(c + 1, b + 1)):
-                return "`eval` of a download"
+                return say("pipe_eval")
         if c is not None and s.w[c] in ("source", ".") and fed and len(s.w[c + 1:b + 1]) == 0:
-            return f"`{s.w[c]}` of a download"
+            return say("pipe_source", name=s.w[c])
         if _has_dl(s, a, b, nested):
             carried = True
     return None
 
 
 def check(doc):
-    payload = doc.payload
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if cmd is None or cmd is False:
-        return None
-    if not isinstance(cmd, str):
-        cmd = json.dumps(cmd)                  # as `jq -r` would print it
-    cmd = cmd.rstrip("\n")                     # as $(...) would leave it
-    if not cmd:
+    if doc.text is None:
         return None
     for text, nested in doc.texts():
         why = _judge(doc, doc.scan(text), nested)
         if why:
-            return deny(f"guard-pipe-to-shell: {why} runs whatever the server sends, unread. {_WAY_OUT}")
+            return deny(say("pipe_to_shell", why=why, way_out=_WAY_OUT))
     return None

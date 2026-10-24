@@ -6,12 +6,21 @@ rung and as "shfmt" on its shfmt rung (skipped without a shfmt new enough,
 except under CI); @hook runs a hooks/hooks.json command by subprocess, the way
 Claude Code runs it (wiring.feature). @shfmt_only narrows a scenario to the
 shfmt rung; @no_shfmt drops the shfmt rung, for a row its
-parse check denies before any guard reads it. The feature's name is the guard's name, except
-require-well-formed, which has its own guard. @python_only narrows a scenario to the
-awk rung. @family marks a feature named for a family of guards, not one guard:
-its scenarios run against every guard. @planned marks verdicts no guard gives
-yet, on a feature or one scenario: it is expected to fail (xfail, not strict),
-and on a feature it runs against every guard.
+parse check denies before any guard reads it. @python_only narrows a scenario to the
+awk rung.
+
+In-process, every scenario runs with every guard on, opt-in guards switched on
+unless the scenario sets their option. A feature's name is the guard it names:
+that guard gives the row's verdict and every other guard is silent, except one
+the row names with an @also_<guard> tag (on the scenario, or on an Examples
+block), which must fire too. @family marks a feature named for a family of
+guards, not one guard, and @planned one whose verdicts no guard gives yet: no
+guard is named, so the silence check is off. @planned on one scenario marks it
+expected to fail (xfail, not strict).
+
+Each push runs a tier of that: the shfmt engine only on @big and @shfmt_only
+scenarios, and no @planned or @full row. `pytest --full` runs everything,
+nightly and on dispatch (.github/workflows/full-sweep.yml).
 """
 
 import builtins
@@ -34,17 +43,18 @@ from pytest_bdd import given, parsers, then, when
 from matchers import Verdict, asks, denies, is_silent, warns_about
 from doctor_steps import *  # noqa: F401,F403  (features/doctor.feature)
 from pipeline_checks import *  # noqa: F401,F403  (the guard pipeline's promises, on every scenario)
+import pipeline_checks
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from languette import run, scan, world  # noqa: E402
+from languette import run, scan, verdict, world  # noqa: E402
 
 ENGINES = ("python", "shfmt", "hook")
 IN_PROCESS = {"python": ("awk",), "shfmt": ("shfmt",)}   # engine -> scan.RUNGS
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "LANGUETTE_PERM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
          "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH", "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND",
-         "CLAUDE_CODE_TMPDIR", "GH_RULES", "GH_PROTECTION", "XDG_CACHE_HOME")
+         "CLAUDE_CODE_TMPDIR", "GH_RULES", "GH_PROTECTION", "GH_TIMELINE", "GH_LOGIN", "GH_THREADS", "XDG_CACHE_HOME")
 
 
 _REAL_HOME = os.environ.get("HOME")
@@ -53,9 +63,44 @@ EVENTS = {"prompt": "UserPromptSubmit", "post": "PostToolUse"}
 
 
 _ELSEWHERE = None                              # the run's root for directories outside $HOME
+GUARD_NAMES = sorted({g.NAME for _, _, gs in run.GUARDS for g in gs})
+# Every opt-in guard's option, switched on for every in-process scenario.
+OPT_INS = sorted({g.OPT_IN for _, _, gs in run.GUARDS for g in gs if getattr(g, "OPT_IN", None)})
 
 
+# The suite runs on a small, fixed number of cores (pytest-xdist): this machine
+# runs many sessions at once, and a run on every core has taken a host down
+# before. The default is min(4, cores); LANGUETTE_TEST_WORKERS sets both the
+# default and the ceiling, and an explicit `-n` above the ceiling is clamped to
+# it. `-n 0` runs serially (and is how LANGUETTE_PIN_IO=update runs).
+_WORKER_CAP = 4
+
+
+def _worker_ceiling():
+    raw = os.environ.get("LANGUETTE_TEST_WORKERS", "")
+    return int(raw) if raw.isdigit() and int(raw) > 0 else _WORKER_CAP
+
+
+def pytest_xdist_auto_num_workers(config):
+    return min(_worker_ceiling(), os.cpu_count() or 1)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_cmdline_main(config):
+    # Before xdist's own pytest_cmdline_main turns numprocesses into the list
+    # of workers to start (config.option.tx); clamping later changes nothing.
+    n = getattr(config.option, "numprocesses", None)
+    if isinstance(n, int) and n > _worker_ceiling():
+        config.option.numprocesses = _worker_ceiling()
+        sys.stderr.write(f"languette: -n {n} clamped to {_worker_ceiling()} workers "
+                         "(raise the ceiling with LANGUETTE_TEST_WORKERS)\n")
+
+
+@pytest.hookimpl(tryfirst=True)
 def pytest_configure(config):
+    refuse_partial_update(config)
+    for g in GUARD_NAMES:
+        config.addinivalue_line("markers", f"also_{g}: the row rightly trips {g} too")
     # A throwaway $HOME for the whole run, so no verdict depends on, and no
     # step can touch, the real one; {HOME}/project for a row that names it.
     # The default cwd and the hook process's own directory are elsewhere (see
@@ -178,18 +223,25 @@ def writes_in_acts(engine, monkeypatch):
 
 class Ctx:
     def __init__(self, engine, seed):
-        self.engine, self.guard = engine, None
+        self.engine = engine
+        self.guard = None                      # the guard the feature names; None for a family
+        self.also = set()                      # guards the row names as rightly firing too
+        self.fired = set()                     # guards other than self.guard that gave a finding
         # The payload's cwd and the hook process's own directory: unrelated
         # to each other and to $HOME, so a guard that assumes otherwise fails.
         self.cwd = self.default_cwd = scattered(seed, "cwd")
         self.process_dir = scattered(seed, "process")
-        self.env = {}                          # name -> value, or None for unset
+        # name -> value, or None for unset. The guard's own default guards no label, so
+        # scenarios that expect guard-bypass-labels to fire start from a configured list.
+        self.env = {"CLAUDE_PLUGIN_OPTION_BYPASS_LABELS": "churn-ok,mixed-loops-ok"}
         self.proj = self.tmp = self.stub_log = self.bare = self.cache = None
         self.project_env = True
         self.stubs = False
         self.hook = None                       # a hooks.json command, for wiring
+        self.wired = None                      # the guard a wiring row is about: the one command runs them all
         self.arg = None                        # the hook event, as Claude Code names it, for the guard to read
-        self.session = "s1"                    # session_id in the payload, for guard-github-issues
+        self.session = "s1"                    # session_id in the payload, for guard-github-issues; None leaves it out
+        self.agent = None                      # agent_id in the payload: a subagent's call, for guard-worktrees
         self.mode = None                       # permission_mode in the payload, for guard-cross-session-send
         self._doordir = None
         self.calls = 0                         # tool_use_id in the payload: one per call, as Claude Code gives
@@ -241,6 +293,10 @@ class Ctx:
     def as_sent(self, p):
         """`p` with what Claude Code puts in every payload: the cwd, and the mode when set."""
         p.setdefault("cwd", self.expand(self.cwd))
+        if self.session is None:
+            p.pop("session_id", None)
+        if self.agent:
+            p["agent_id"] = self.agent
         if self.mode is not None:
             p["permission_mode"] = self.mode
         return p
@@ -263,7 +319,8 @@ class Ctx:
             assert not self.hook, "test setup: a hook command needs the hook engine (@hook)"
             # TMPDIR fresh per scenario, so a guard's per-session file starts
             # empty; PATH and the stub log as the stubs need.
-            env = {"HOME": os.environ["HOME"], "TMPDIR": self.doordir(), **self.scenario_env()}
+            on = {k: "true" for k in OPT_INS if k not in self.env}
+            env = {"HOME": os.environ["HOME"], "TMPDIR": self.doordir(), **on, **self.scenario_env()}
             if self.bare or self.stubs:
                 env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
             if self.stub_log:
@@ -273,10 +330,22 @@ class Ctx:
                 stdin = json.dumps({**json.loads(stdin), "hook_event_name": EVENTS[self.arg]})
             here = os.getcwd()
             os.chdir(self.process_dir)
+            seen = []
             try:
-                self.verdict = Verdict(run.respond(stdin, env, only=self.guard))
+                self.verdict = Verdict(_respond_all(stdin, env, seen))
             finally:
                 os.chdir(here)
+            if self.guard and seen:
+                others = {g: r for g, r, _ in seen if r and g != self.guard}
+                self.fired |= others.keys()
+                stray = {g: r for g, r in others.items() if g not in self.also}
+                assert not stray, (f"every guard but {self.guard} should be silent; tag the row @also_<guard> "
+                                   f"if it rightly trips another: {stray}")
+                # The row's verdict is the named guard's own. With no finding at all, the hook
+                # answered before any guard judged (no cwd, say), and that answer stands.
+                event = json.loads(stdin).get("hook_event_name") or "PreToolUse"
+                fields = verdict.verdict(event, [f for f in seen if f[0] == self.guard])
+                self.verdict = Verdict(run._out(event, fields) if fields else "")
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
         path = env["PATH"]
@@ -304,6 +373,21 @@ class Ctx:
             return []
 
 
+def _respond_all(stdin, env, seen):
+    """run.respond with every guard on; each guard's own finding goes on `seen`."""
+    real = run._respond
+
+    def spy(*a):
+        out, judged = real(*a)
+        seen.extend(judged[2])
+        return out, judged
+    run._respond = spy
+    try:
+        return run.respond(stdin, env)
+    finally:
+        run._respond = real
+
+
 @pytest.fixture
 def ctx(engine, request):
     c = Ctx(engine, request.node.nodeid)
@@ -311,15 +395,44 @@ def ctx(engine, request):
     c.cleanup()
 
 
-def pytest_collection_modifyitems(items):
+def pytest_addoption(parser):
+    parser.addoption("--full", action="store_true",
+                     help="the full sweep: the shfmt engine on every row, @planned and @full rows")
+
+
+def _full_sweep_only(item):
+    if item.get_closest_marker("planned") or item.get_closest_marker("full"):
+        return True
+    on_shfmt = getattr(item, "callspec", None) and item.callspec.params.get("engine") == "shfmt"
+    return bool(on_shfmt) and not (item.get_closest_marker("big") or item.get_closest_marker("shfmt_only"))
+
+
+def pytest_collection_modifyitems(config, items):
+    if not config.getoption("full"):
+        dropped = [i for i in items if _full_sweep_only(i)]
+        if dropped:
+            items[:] = [i for i in items if not _full_sweep_only(i)]
+            config.hook.pytest_deselected(items=dropped)
     for item in items:
         if item.get_closest_marker("planned"):
             item.add_marker(pytest.mark.xfail(reason="planned: no guard gives this verdict yet", strict=False))
+    pipeline_checks.pytest_collection_modifyitems(items)     # this hook shadows its star-imported one
 
 
 def pytest_bdd_before_scenario(request, feature, scenario):
-    every = feature.name == "require-well-formed" or {"planned", "family"} & set(feature.tags)
-    request.getfixturevalue("ctx").guard = None if every else feature.name
+    c = request.getfixturevalue("ctx")
+    named = feature.name in GUARD_NAMES and not {"planned", "family"} & set(feature.tags)
+    c.guard = feature.name if named else None
+    c.also = {m.name.removeprefix("also_") for m in request.node.iter_markers() if m.name.startswith("also_")}
+    unknown = c.also - set(GUARD_NAMES)
+    assert not unknown, f"test setup: @also_ names no guard: {sorted(unknown)}"
+
+
+def pytest_bdd_after_scenario(request, feature, scenario):
+    c = request.getfixturevalue("ctx")
+    if c.guard and c.engine in IN_PROCESS:
+        quiet = c.also - c.fired
+        assert not quiet, f"@also_ names a guard that never fired here: {sorted(quiet)}"
 
 
 # --- Given ---------------------------------------------------------------
@@ -328,6 +441,24 @@ def pytest_bdd_before_scenario(request, feature, scenario):
 @when(parsers.parse('the working directory is "{path}"'))
 def _cwd(ctx, path):
     ctx.cwd = path
+
+
+@given("the payload carries no session id")
+@when("the payload carries no session id")
+def _no_session(ctx):
+    ctx.session = None
+
+
+@given(parsers.parse('the call comes from subagent "{agent}"'))
+@when(parsers.parse('the call comes from subagent "{agent}"'))
+def _from_subagent(ctx, agent):
+    ctx.agent = agent
+
+
+@given("the call comes from the session itself")
+@when("the call comes from the session itself")
+def _from_session(ctx):
+    ctx.agent = None
 
 
 @given(parsers.parse('the session is "{session}"'))
@@ -356,9 +487,11 @@ def _corrupt_index(ctx):
 
 @given(parsers.parse('the file "{rel}" holds:'))
 def _file(ctx, rel, docstring):
-    f = ctx.proj / rel
+    # A path under {HOME} or {TMP} is absolute once expanded; any other is the project's.
+    assert ctx.proj or Path(ctx.expand(rel)).is_absolute(), f"{rel!r} needs a project"
+    f = Path(ctx.proj or "/", ctx.expand(rel))
     f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_text(docstring)
+    f.write_text(ctx.expand(docstring))
 
 
 @given(parsers.parse('the file "{rel}" is committed'))
@@ -395,6 +528,13 @@ def _setenv(ctx, var, value):
     ctx.env[var] = value
 
 
+@given("every guard's option is off")
+def _all_off(ctx):
+    # An ordinary guard's option exactly "false"; an opt-in guard's unset, its default.
+    for g in {g for _, _, gs in run.GUARDS for g in gs}:
+        ctx.env[run.option(g)] = None if hasattr(g, "OPT_IN") else "false"
+
+
 @given("no engine is configured")
 def _no_engine(ctx):
     ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = None
@@ -405,6 +545,29 @@ def _unsetenv(ctx, var):
     ctx.env[var] = None
     if var == "CLAUDE_PROJECT_DIR":
         ctx.project_env = False
+
+
+def _guard_module(guard):
+    return __import__(f"languette.guards.{guard.replace('-', '_')}", fromlist=["RULE_FILE"])
+
+
+@given(parsers.parse('the rule file of "{guard}" is absent'))
+def _rule_file_absent(ctx, guard, monkeypatch):
+    monkeypatch.setattr(_guard_module(guard), "RULE_FILE", str(Path(ctx.mkdtemp()) / f"{guard}.json"))
+
+
+@given(parsers.parse('the rule file of "{guard}" holds:'))
+def _rule_file(ctx, guard, monkeypatch, docstring):
+    f = Path(ctx.mkdtemp()) / f"{guard}.json"
+    f.write_text(docstring + "\n")
+    monkeypatch.setattr(_guard_module(guard), "RULE_FILE", str(f))
+
+
+@given(parsers.parse('the rule file of "{guard}" nests {depth:d} brackets deep'))
+def _rule_file_deep(ctx, guard, depth, monkeypatch):
+    f = Path(ctx.mkdtemp()) / f"{guard}.json"
+    f.write_text("[" * depth)
+    monkeypatch.setattr(_guard_module(guard), "RULE_FILE", str(f))
 
 
 @given(parsers.parse('the directory "{path}"'))
@@ -481,6 +644,22 @@ def _gh_stub_python(ctx):
     ctx.env["LANGUETTE_STUB_LOG"] = ctx.stub_log
 
 
+@given(parsers.parse('review thread "{tid}" holds:'))
+def _review_thread(ctx, tid, datatable):
+    # What the gh stub answers for this thread id, as GitHub's GraphQL shapes
+    # it: an author column, an optional type (User unless it says Bot), a body.
+    # A blank author is a deleted account, which GitHub gives no author.
+    head, *rows = datatable
+    if "GH_THREADS" not in ctx.env:
+        ctx.env["GH_THREADS"] = ctx.mkdtemp()
+    nodes = []
+    for n, row in enumerate(rows):
+        r = dict(zip(head, row))
+        author = {"login": r["author"], "__typename": r.get("type") or "User"} if r["author"] else None
+        nodes.append({"author": author, "body": r["body"], "createdAt": f"2026-10-08T00:00:{n:02d}Z"})
+    Path(ctx.env["GH_THREADS"], f"{tid}.json").write_text(json.dumps({"comments": {"nodes": nodes}}))
+
+
 @given(parsers.parse('a clone of "{url}" at "{path}" on branch "{branch}"'))
 def _clone(ctx, url, path, branch):
     d = ctx.expand(path)
@@ -546,13 +725,12 @@ def _bare_path(ctx, tools, gh):
 
 @given(parsers.parse('the hook is the hooks.json command for "{guard}"'))
 def _hooks_json(ctx, guard):
-    ctx.hook = hooks_json_commands()[guard]
+    ctx.hook, ctx.wired = hooks_json_commands()[guard], guard
 
 
 @given(parsers.parse('the hook is the hooks.json {event} command for "{guard}"'))
 def _hooks_json_event(ctx, event, guard):
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [ctx.hook] = [h["command"] for e in hj["hooks"][event] for h in e["hooks"] if f"--guard {guard}" in h["command"]]
+    ctx.hook = hooks_json_event_command(event)
 
 
 @when(parsers.parse('Claude Code fires {event} for tool "{tool}"'))
@@ -580,22 +758,48 @@ def _crash(ctx, guard):
     ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
 
 
+@given(parsers.parse('the plugin\'s script for "{guard}" prints a deny'))
+def _load_deny(ctx, guard):
+    """run.py's own answer when a guard will not import: a deny, exit 0, before it
+    knows the event, so a state hook must read any output as a failure."""
+    root = Path(ctx.mkdtemp())
+    assert "languette/run.py" in hooks_json_commands()[guard]
+    (root / "languette").mkdir()
+    (root / "languette/run.py").write_text(
+        "print('{\"hookSpecificOutput\": {\"permissionDecision\": \"deny\"}}')\n")
+    ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
+
+
+@given(parsers.parse('the plugin\'s script for "{guard}" fails after reading its payload'))
+def _fails_mid_run(ctx, guard):
+    """The real run.py, whose verdict step raises: a state event then reaches its own
+    failure path (_state_failed), not the hooks.json sh fallback."""
+    root = Path(ctx.mkdtemp())
+    assert "languette/run.py" in hooks_json_commands()[guard]
+    shutil.copytree(ROOT / "languette", root / "languette", ignore=shutil.ignore_patterns("__pycache__"))
+    with open(root / "languette/verdict.py", "a") as f:
+        f.write("\n\ndef verdict(event, findings):\n    raise RuntimeError('boom')\n")
+    ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
+
+
 def hooks_json_commands():
-    """guard name -> its command in hooks/hooks.json."""
+    """guard name -> the PreToolUse command in hooks/hooks.json that judges it: the one
+    command, which names no guard and runs every guard wired for the call."""
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    out = {}
-    for entry in hj["hooks"]["PreToolUse"]:
-        for h in entry["hooks"]:
-            m = re.search(r'languette/run\.py" --guard ([a-z-]+)', h["command"])
-            out[m.group(1)] = h["command"]
-    return out
+    [command] = [h["command"] for e in hj["hooks"]["PreToolUse"] for h in e["hooks"]]
+    return {g.NAME: command for ev, _, gs in run.GUARDS for g in gs if ev == "PreToolUse"}
+
+
+def hooks_json_event_command(event):
+    """The one command hooks/hooks.json runs for `event`."""
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
+    [command] = [h["command"] for e in hj["hooks"][event] for h in e["hooks"]]
+    return command
 
 
 def hooks_json_prompt_command():
     """The UserPromptSubmit command in hooks/hooks.json that opens the guard-github-issues door."""
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [h] = [h for e in hj["hooks"]["UserPromptSubmit"] for h in e["hooks"] if "--guard guard-github-issues" in h["command"]]
-    return h["command"]
+    return hooks_json_event_command("UserPromptSubmit")
 
 
 # --- When ----------------------------------------------------------------
@@ -682,6 +886,18 @@ def _still_holds(ctx, target, content):
     assert Path(ctx.expand(target)).read_text() == content
 
 
+@then("the decision record is empty")
+def _no_record(ctx):
+    assert not (Path(ctx.expand("{TMP}")) / "state/languette/decisions.jsonl").exists()
+
+
+@then(parsers.re(r"the decision record holds the command `(?P<command>.*)`"))
+def _recorded_command(ctx, command):
+    lines = (Path(ctx.expand("{TMP}")) / "state/languette/decisions.jsonl").read_text().splitlines()
+    assert len(lines) == 1, lines
+    assert json.loads(lines[0])["command"] == json.loads(command)
+
+
 @when(parsers.re(r"the agent starts `(?P<command>.*)`", flags=re.S))
 def _starts(ctx, command):
     # PreToolUse ran and the call is still running: no result, no PostToolUse.
@@ -742,7 +958,7 @@ def _open_door_via_hooks_json(ctx):
 
 @when(parsers.re(r'the agent calls MCP tool "(?P<tool>[^"]+)" with input `(?P<inp>.*)`', flags=re.S))
 def _mcp_call(ctx, tool, inp):
-    ctx.run(json.dumps(ctx.as_sent({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(inp)})))
+    ctx.run(json.dumps(ctx.as_sent({"session_id": ctx.session, "tool_name": tool, "tool_input": json.loads(ctx.expand(inp))})))
     _ran(ctx)
 
 
@@ -907,19 +1123,45 @@ def scanned(ctx, mode):
         s = scan.Scan(ctx.scanned)
         assert s.rung == IN_PROCESS[ctx.engine][0], f"the {s.rung} rung read it"
         return s.tokens()
-    return [("1:" if nested else "0:") + t for t, nested in scan.texts_of(scan.strip_heredocs(ctx.scanned + "\n"))]
+    return [("1:" if nested else "0:") + t for t, nested in scan.texts_of_command(ctx.scanned + "\n")]
 
 
 # --- Then ----------------------------------------------------------------
 
+def _from_the_wired_guard(ctx):
+    """A wiring row's verdict is its own guard's, or the hook's fail-closed deny: the one
+    hooks.json command runs every guard, so another's finding could stand in for a guard
+    that never ran. The same call through the command narrowed to that guard must agree."""
+    if not ctx.wired or "fails closed" in (ctx.verdict.reason or ""):
+        return
+    run_py = 'python3 -I "${CLAUDE_PLUGIN_ROOT}/languette/run.py"'
+    assert ctx.hook.count(run_py) == 1, ctx.hook
+    hook, whole = ctx.hook, ctx.verdict
+    ctx.hook = hook.replace(run_py, f"{run_py} --guard {ctx.wired}")
+    try:
+        ctx.run(ctx.stdin)
+        alone = ctx.verdict
+    finally:
+        ctx.hook, ctx.verdict = hook, whole
+    assert (alone.decision, alone.reason) == (whole.decision, whole.reason), \
+        f"want {ctx.wired}'s own verdict ({alone.decision}: {alone.reason}), got {whole.decision}: {whole.reason}"
+
+
 @then("the guard denies")
 def _denies(ctx):
     assert_that(ctx.verdict, denies())
+    _from_the_wired_guard(ctx)
 
 
 @then(parsers.re(r'the guard denies, naming "(?P<text>.*)"'))
 def _denies_naming(ctx, text):
     assert_that(ctx.verdict, denies(naming=ctx.expand(text)))
+
+
+@then(parsers.re(r'the guard denies, not naming "(?P<text>.*)"'))
+def _denies_not_naming(ctx, text):
+    assert_that(ctx.verdict, denies())
+    assert ctx.expand(text) not in ctx.verdict.reason, f"the reason names {text!r}: {ctx.verdict.reason}"
 
 
 @then(parsers.re(r'the guard asks, naming "(?P<text>.*)"'))
@@ -930,6 +1172,7 @@ def _asks_naming(ctx, text):
 @then("the guard asks")
 def _asks(ctx):
     assert_that(ctx.verdict, asks())
+    _from_the_wired_guard(ctx)
 
 
 @then("the guard is silent")
@@ -947,6 +1190,13 @@ def _rewrites(ctx, text):
     assert ctx.verdict.decision == "allow", ctx.verdict.show()
     got = ctx.verdict.out.get("updatedInput", {}).get("command")
     assert got == ctx.expand(text), f"rewritten to {got!r}, want {ctx.expand(text)!r}"
+
+
+@then(parsers.re(r'the guard allows, rewriting the input field "(?P<key>[a-z_]+)" to "(?P<text>.*)"'))
+def _rewrites_field(ctx, key, text):
+    assert ctx.verdict.decision == "allow", ctx.verdict.show()
+    got = ctx.verdict.out.get("updatedInput", {}).get(key)
+    assert got == ctx.expand(text), f"{key} rewritten to {got!r}, want {ctx.expand(text)!r}"
 
 
 @then(parsers.re(r'the stub "(?P<name>[a-z-]+)" was called with "(?P<text>.*)"'))

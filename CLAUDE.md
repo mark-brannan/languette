@@ -1,2 +1,3 @@
 - Name nothing from the mark-brannan/claude setup or its owner's workflow: no workflow state, claim stamps, cards, pickups or curia.
-- A new guard starts as an issue labelled `ready`, and is prototyped outside this repo first. Rulings: `docs/decisions.md`, "New guards".
+- A new guard starts as an issue labelled `ready`, and is prototyped outside this repo first. Decisions: `docs/decisions.md`, "New guards".
+- A new guard builds on Document, scan and verdict; a primitive two guards would share lands there first. Decisions: `docs/decisions.md`, "New guards".

@@ -23,15 +23,12 @@ outright.
 import re
 
 from languette import scan as sw
-from languette.guards.ask_first import LOOP, claim
-from languette.verdict import deny
+from languette.messages import say
+from languette.verdict import claim, deny
 
 NAME = "guard-bypass-hooks"
 APPROVE_LABEL = "Skip hooks once"
 
-GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
-# git's global options that take a value as the next word.
-GLOBAL_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
 # Options that take the next word as a value, so a message that is just
 # `--no-verify` is a message. Short ones are the letters, tried in a cluster.
 VALUE = {
@@ -83,27 +80,21 @@ def _skips(sub, args):
 
 def _runs(doc):
     """(how many times the command skips the hooks, whether any of it is in a loop)."""
-    n, loop = 0, False
-    for t, nested in doc.texts():
-        s = doc.scan(t)
-        loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
-        for a, b in s.segments():
-            if a > b:
-                continue
-            g = sw.cmd_index(s, a, b, GIT, nested)
-            if g is None:
-                continue
-            i, hooks_path = g + 1, False
-            while i <= b and s.k[i] == "w" and s.w[i].startswith("-"):
-                w = s.w[i]
-                v = w[len("--config-env="):] if w.startswith("--config-env=") else (
-                    s.w[i + 1] if w in ("-c", "--config-env") and i < b and s.k[i + 1] == "w" else "")
-                hooks_path = hooks_path or v.split("=", 1)[0].lower() == "core.hookspath"
-                i += 1 + (w in GLOBAL_VALUE)
-            if hooks_path:
-                n += 1
-            elif i <= b and s.k[i] == "w" and s.w[i] in VALUE and _skips(s.w[i], s.w[i + 1:b + 1]):
-                n += 1
+    n, (segs, loop) = 0, sw.segments(doc)
+    for s, a, b, nested in segs:
+        g = sw.cmd_index(s, a, b, sw.GIT, nested)
+        if g is None:
+            continue
+        i, hooks_path = sw.git_subcommand(s, g, b), False
+        for j in sw.git_options(s, g, i):
+            w = s.w[j]
+            v = w[len("--config-env="):] if w.startswith("--config-env=") else (
+                s.w[j + 1] if w in ("-c", "--config-env") and j < b and s.k[j + 1] == "w" else "")
+            hooks_path = hooks_path or v.split("=", 1)[0].lower() == "core.hookspath"
+        if hooks_path:
+            n += 1
+        elif i <= b and s.k[i] == "w" and s.w[i] in VALUE and _skips(s.w[i], s.w[i + 1:b + 1]):
+            n += 1
     return n, loop
 
 
@@ -116,15 +107,12 @@ def check(doc):
     if not runs:
         return None
     if looped:
-        return deny(f"{NAME}: skipping the hooks inside a loop, xargs, parallel or watch skips the hooks an "
-                    "unknown number of times, and each run needs its own approval. Fix what the blocking "
-                    "hook reported, or run it once, on its own, after asking.")
+        return deny(say("loop_hooks", guard=NAME))
     try:
         approved, spent = yield from claim({APPROVE_LABEL: runs})
     except (OSError, ValueError) as e:
-        return deny(f"{NAME}: cannot read the session transcript to look for the user's approval, or "
-                    f"record it as spent ({e}), so `{cmd.strip()}` is denied. Fix what the blocking "
-                    "hook reported, or ask the user to run it themselves.")
+        return deny(say("transcript_unreadable", guard=NAME, err=e, cmd=cmd.strip(),
+                        then="Fix what the blocking hook reported, or ask the user to run it themselves."))
     if spent:
         return None
     have = len(approved[APPROVE_LABEL])

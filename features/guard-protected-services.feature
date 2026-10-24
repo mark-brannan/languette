@@ -11,6 +11,7 @@ Feature: guard-protected-services
     When the agent runs `<command>`
     Then the guard denies
 
+    @also_guard-host-availability
     Examples:
       | command                  | note                |
       | systemctl stop 'post*'   | a glob may match it |
@@ -40,9 +41,13 @@ Feature: guard-protected-services
       | systemctl stop postgresql       |              | unset: nothing is protected               |
       | systemctl stop nginx            | postgresql   |                                            |
       | systemctl status postgresql     | postgresql   | a read, not a stop                         |
-      | systemctl restart sshd          | postgresql   | guard-host-availability's to judge         |
       | systemctl stop wg-quick@wg1     | wg-quick@wg0 | another instance                           |
       | systemctl --user stop postgresql | postgresql  | the user's own manager                     |
       | echo systemctl stop postgresql  | postgresql   | prose that names a command is not it       |
+
+    @also_guard-host-availability
+    Examples:
+      | command                         | setting      | note                                       |
+      | systemctl restart sshd          | postgresql   | guard-host-availability's to judge         |
       | systemctl reboot                | postgresql   | guard-host-availability's to judge         |
       | systemctl stop 'post*'          |              | unset: a glob matches nothing to protect   |

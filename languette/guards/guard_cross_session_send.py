@@ -34,6 +34,7 @@ import os
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Act, Need, ask, deny
 
 NAME = "guard-cross-session-send"
@@ -71,7 +72,7 @@ def _gh_reads(words):
     """Does `gh <words>` read issue, PR, search or API content, or view a run, release, gist, repo or workflow?"""
     i = 0
     while i < len(words) and words[i].startswith("-"):
-        i += 2 if words[i] in ("-R", "--repo") else 1
+        i += 2 if words[i] in sw.GH_REPO_FLAGS else 1
     if i >= len(words):
         return False
     sub, rest = words[i], words[i + 1:]
@@ -79,7 +80,7 @@ def _gh_reads(words):
         return True
     if sub in ("issue", "pr") or sub in _GH_VIEWS:
         verb = next((w for j, w in enumerate(rest) if not w.startswith("-")
-                     and not (j and rest[j - 1] in ("-R", "--repo"))), None)
+                     and not (j and rest[j - 1] in sw.GH_REPO_FLAGS)), None)
         return verb not in _GH_WRITES if sub in ("issue", "pr") else verb in _GH_VIEWS[sub]
     if sub == "api":
         method = None
@@ -270,5 +271,4 @@ def check(doc):
 
 
 def _ask_reason(target, ti):
-    return (f"{NAME}: a message to {target}, which may be another of the user's sessions, "
-            f"leaves this one: {_first_line(ti.get('message'))}")
+    return say("cross_session_ask", guard=NAME, target=target, first_line=_first_line(ti.get("message")))

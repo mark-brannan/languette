@@ -8,12 +8,12 @@ A target this guard cannot resolve to one allowed path is denied on sight,
 with a reason naming what it saw.
 """
 
-import json
 import re
 
 from languette import paths
 from languette import scan as sw
-from languette.verdict import Need, Refuse, context, deny, planned
+from languette.messages import say
+from languette.verdict import Refuse, deny
 
 NAME = "guard-recursive-delete"
 
@@ -27,13 +27,7 @@ GENERATED_NAMES = ("node_modules", "dist", "coverage", ".pio")
 _FIND = re.compile(r"(?:^|/)find\Z")
 _RM = re.compile(r"(?:^|/)rm\Z")
 _RM_PARENTS = re.compile(r"^(?:git|yadm|svn|hg|jj|gsutil)\Z")
-_CD = re.compile(r"^(?:cd|pushd|popd)\Z")
 _ALLOW_CHARS = re.compile(r"[A-Za-z0-9._@+/-]*")
-
-
-def _normalize(p):
-    out = "".join("/" + s for s in p.split("/") if s not in ("", "."))
-    return out or "/"
 
 
 def _parse_allow(value, home, home_p, physical):
@@ -70,7 +64,7 @@ class _Judge:
     in the command and either refuse it on sight or return it resolved."""
 
     def __init__(self, cwd, home):
-        self.cwd, self.home, self.homeN = cwd, home, _normalize(home)
+        self.cwd, self.home, self.homeN = cwd, home, paths.normalize(home)
         self.trig, self.moved, self.targets = "rm", False, []
 
     def lab(self, raw):
@@ -79,53 +73,44 @@ class _Judge:
         return "rm -r" + ("" if raw == "" else " " + raw)
 
     def blocked(self, raw, why):
-        raise Refuse(
-            f"`{self.lab(raw)}` is blocked: {why}. Resolve the target yourself and spell it out: `rm -rf` on "
-            "the absolute path of a generated directory (node_modules, dist, coverage, .pio ...), the "
-            "scratchpad, /tmp or an agent worktree. Anything else in a repo or under $HOME is the user's -- "
-            "`git status --short` / `git clean -n` show what is there; `git rm` tracked files by path and "
-            "hand the rest to the user.")
+        raise Refuse(say("recursive_delete", label=self.lab(raw), why=why))
 
     def target(self, s, idx):
         raw = t = s.w[idx]
         if s.k[idx] == "q":
-            self.blocked(raw, "a quoted string with whitespace in it is not one path this hook can resolve")
+            self.blocked(raw, say("rd_quoted_space"))
         if re.search(r"[*?\[{}]", t):
-            self.blocked(t, "a glob or brace expansion could name anything")
+            self.blocked(t, say("rd_glob"))
         if re.search(r"[$`]", t):
-            self.blocked(t, "a variable or command substitution could expand to anything")
+            self.blocked(t, say("rd_substitution"))
         if re.search(r"[\t\n\r]", t):
-            self.blocked(t, "it contains a tab or newline")
+            self.blocked(t, say("rd_tab_newline"))
         if t == ".." or re.search(r"(?:^|/)\.\.(?:/|\Z)", t):
-            self.blocked(t, "a `..` segment steps out of the directory the name suggests")
+            self.blocked(t, say("rd_dotdot"))
         if "~" in t:
             if t == "~":
                 t = self.home
             elif t.startswith("~/"):
                 t = self.home + t[1:]
             else:
-                self.blocked(t, "only a leading `~/` is understood")
+                self.blocked(t, say("rd_tilde"))
         if not t.startswith("/"):
             if self.moved:
-                self.blocked(t, "a `cd` earlier in this command moves the working directory and the hook "
-                                "cannot follow it; use an absolute path")
+                self.blocked(t, say("rd_cd_moved"))
             t = self.cwd + "/" + t
-        t = _normalize(t)
+        t = paths.normalize(t)
         if t in ("/", self.homeN):
-            self.blocked(raw, "that is " + ("the root of the filesystem" if t == "/" else "$HOME itself"))
+            self.blocked(raw, (say("rd_root") if t == "/" else say("rd_home")))
         self.targets.append((t, self.trig, raw))
 
     def segment(self, s, a, b, nested):
         g = sw.cmd_index(s, a, b, _FIND, nested)
         if g is not None and "-delete" in s.w[g + 1:b + 1]:
-            self.trig, starts = "find", 0
-            i = g + 1
-            while i <= b and not s.w[i].startswith(("-", "!")):
-                starts += 1
-                self.target(s, i)
-                i += 1
+            self.trig, starts = "find", paths.find_starts(s, g, b)
             if not starts:
-                self.blocked("", "with no start path find deletes under the working directory")
+                self.blocked("", say("rd_find_no_start"))
+            for i in starts:
+                self.target(s, i)
             self.trig = "rm"
         g = sw.cmd_index(s, a, b, _RM, nested, _RM_PARENTS)
         if g is None:
@@ -149,85 +134,25 @@ class _Judge:
         if not recursive:
             return
         if not tgt:
-            self.blocked("", "no target is visible to this hook -- find -exec, xargs, brace expansion and "
-                             "quoted lists all look like this. Run rm on the resolved paths directly")
+            self.blocked("", say("rd_no_target"))
         for i in tgt:
             self.target(s, i)
 
     def run(self, doc):
         scans = [(doc.scan(t), nested) for t, nested in doc.texts()]
         # Any cd anywhere makes every relative target in the command unresolvable.
-        self.moved = any(a <= b and sw.cmd_index(s, a, b, _CD, True) is not None
+        self.moved = any(a <= b and sw.cmd_index(s, a, b, sw.CD, True) is not None
                          for s, _ in scans for a, b in s.segments())
-        for s, nested in scans:
-            for a, b in s.segments():
-                if a <= b:
-                    self.segment(s, a, b, nested)
+        paths.judge_segments(self, scans)
 
 
-def parse(doc):
-    """The command read into what plan and judge need; "found" is a finding
-    parse alone comes to."""
-    payload, env = doc.payload, doc.env
-    out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None}
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if cmd is None or cmd is False:
-        return out
-    if not isinstance(cmd, str):
-        cmd = json.dumps(cmd)                  # as `jq -r` would print it
-    cmd = cmd.rstrip("\n")                     # as $(...) would leave it
-    if not cmd:
-        return out
-    cwd = payload["cwd"]
-    home = env.get("HOME", "")
-    if not home.startswith("/"):
-        out["found"] = deny("guard-recursive-delete: $HOME is not an absolute path, cannot resolve targets")
-        return out
-    judge = _Judge(cwd, home)
-    try:
-        judge.run(doc)
-    except Refuse as e:
-        out["refused"] = str(e)
-    out.update(home=home, allow=env.get("LANGUETTE_RM_ALLOW") or None, targets=judge.targets)
-    return out
+_MALFORMED = ("LANGUETTE_RM_ALLOW is malformed ({}). Recursive rm and find -delete are "
+              "blocked until it is fixed or unset; other commands run. It must be a colon-separated "
+              "list of directory names (dist) or absolute paths (/srv/scratch), using only letters, "
+              "digits and . _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.")
 
 
-def plan(parsed):
-    """The physical path of $HOME and each allow entry, when LANGUETTE_RM_ALLOW is set;
-    of the agent's own areas and every target, when there are targets to judge."""
-    if parsed["found"] or parsed["home"] is None:
-        return []
-    home, want = parsed["home"], []
-    if parsed["allow"]:
-        want.append(home)
-        _parse_allow(parsed["allow"], home, home, lambda p: want.append(p) or p)
-    if parsed["refused"] is None and parsed["targets"]:
-        want += paths.own_bases(home) + [t for t, _, _ in parsed["targets"]]
-    return [Need("physical", p) for p in dict.fromkeys(want)]
-
-
-def judge(parsed, answers):
-    if parsed["found"] or parsed["home"] is None:
-        return parsed["found"]
-    home, physical = parsed["home"], paths.physical_of(answers)
-    extra_roots, extra_names, allow_err = [], [], None
-    if parsed["allow"]:
-        extra_roots, extra_names, allow_err = _parse_allow(parsed["allow"], home, physical(home), physical)
-    allow_msg = None
-    if allow_err:
-        allow_msg = (f"LANGUETTE_RM_ALLOW is malformed ({allow_err}). Recursive rm and find -delete are "
-                     "blocked until it is fixed or unset; other commands run. It must be a colon-separated "
-                     "list of directory names (dist) or absolute paths (/srv/scratch), using only letters, "
-                     "digits and . _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.")
-
-    refused = parsed["refused"]
-    if refused is None and not parsed["targets"]:
-        return context("guard-recursive-delete: " + allow_msg) if allow_msg else None
-    if allow_msg:
-        return deny("guard-recursive-delete: " + allow_msg)
-    if refused is not None:
-        return deny(refused)
-
+def _verdict(targets, home, physical, extra_roots=(), extra_names=()):
     names = GENERATED_NAMES + tuple(extra_names)
     roots = paths.own_roots(home, physical, extra_roots)
 
@@ -242,7 +167,7 @@ def judge(parsed, answers):
     def allowed(p):
         return any(p == r or p.startswith(r + "/") for r in roots) or is_generated(p)
 
-    for abs_, kind, raw in parsed["targets"]:
+    for abs_, kind, raw in targets:
         what = f"find {raw} -delete" if kind == "find" else f"rm -r {raw}"
         if not allowed(abs_):
             return deny(
@@ -261,4 +186,5 @@ def judge(parsed, answers):
 
 
 def check(doc):
-    return (yield from planned(doc, parse, plan, judge))
+    return (yield from paths.check_targets(doc, NAME, _Judge, "LANGUETTE_RM_ALLOW", _parse_allow, _MALFORMED,
+                                           _verdict))

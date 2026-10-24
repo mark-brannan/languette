@@ -45,8 +45,8 @@ helmfile, docker, ansible or a database's DROP.
 import re
 
 from languette import scan as sw
-from languette.guards.ask_first import LAUNCH, LOOP, PROSE, claim
-from languette.verdict import deny
+from languette.messages import say
+from languette.verdict import claim, deny
 
 NAME = "guard-infra"
 
@@ -113,8 +113,8 @@ RULES = {
 
 TOOLS = frozenset("terraform tofu terragrunt pulumi cdk aws-cdk aws gcloud az kubectl helm".split())
 _TOOL = re.compile(r"(?:^|/)(?:" + "|".join(sorted(TOOLS)) + r")(?:@[^/]*)?\Z")
-_ANY = re.compile(r"(?:^|/)(?:" + "|".join(sorted(TOOLS | LAUNCH)) + r")(?:@[^/]*)?\Z")
-_LAUNCHER = re.compile(r"(?:^|/)(?:" + "|".join(sorted(LAUNCH)) + r")\Z")
+_ANY = re.compile(r"(?:^|/)(?:" + "|".join(sorted(TOOLS | sw.LAUNCH)) + r")(?:@[^/]*)?\Z")
+_LAUNCHER = re.compile(r"(?:^|/)(?:" + "|".join(sorted(sw.LAUNCH)) + r")\Z")
 HELP = frozenset("-h -help --help".split())
 
 # Options that take the next word as their value, and so must not be
@@ -288,21 +288,16 @@ def _candidates(s, g, b, nested):
 def _runs(doc):
     """({rule: [tool name per run]}, whether the command has a loop word). A
     segment is one run of at most one rule."""
-    found, loop = {}, False
-    for t, nested in doc.texts(PROSE):
-        s = doc.scan(t)
-        loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
-        for a, b in s.segments():
-            if a > b:
-                continue
-            g = sw.cmd_index(s, a, b, _ANY, nested, prose=PROSE)
-            if g is None:
-                continue
-            for i in _candidates(s, g, b, nested):
-                rule = _judge(s.w[i], s.w[i + 1:b + 1])
-                if rule:
-                    found.setdefault(rule, []).append(_name(s.w[i]))
-                    break
+    found, (segs, loop) = {}, sw.segments(doc, sw.PROSE_PROCESS)
+    for s, a, b, nested in segs:
+        g = sw.cmd_index(s, a, b, _ANY, nested, prose=sw.PROSE_PROCESS)
+        if g is None:
+            continue
+        for i in _candidates(s, g, b, nested):
+            rule = _judge(s.w[i], s.w[i + 1:b + 1])
+            if rule:
+                found.setdefault(rule, []).append(_name(s.w[i]))
+                break
     return found, loop
 
 
@@ -315,14 +310,13 @@ def check(doc):
     if not found:
         return None
     if loop:
-        return deny("guard-infra: " + ", ".join(f"`{r}`" for r in found) + " inside a loop, xargs, "
-                    "parallel or watch runs an unknown number of times, and each run needs its own "
-                    "approval. Run it once, on its own, after looking at what it would remove.")
+        return deny(say("loop", guard="guard-infra", what=", ".join(f"`{r}`" for r in found),
+                        then="Run it once, on its own, after looking at what it would remove."))
     try:
         approved, spent = yield from claim({RULES[r][0]: len(found[r]) for r in found})
     except (OSError, ValueError) as e:
-        return deny(f"guard-infra: cannot read the session transcript to look for the user's approval, or "
-                    f"record it as spent ({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
+        return deny(say("transcript_unreadable", guard="guard-infra", err=e, cmd=cmd.strip(),
+                        then="Ask the user to run it themselves."))
     if spent:
         return None
     parts = []

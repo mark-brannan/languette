@@ -34,50 +34,25 @@ approvals; one inside a loop or xargs is denied outright, since no count of
 approvals covers it.
 """
 
-import json
-import os
 import re
 
+from languette import paths
 from languette import scan as sw
-from languette.verdict import Need, Refuse, deny
+from languette.messages import say
+from languette.verdict import Refuse, claim, deny
 
 NAME = "ask-first"
 CONFIG = ".languette/ask-first.json"
 
-PM = frozenset("npm pnpm yarn bun".split())
-LAUNCH = frozenset("npx bunx pnpm yarn bun".split())
-LAUNCH_SUB = frozenset("exec dlx x".split())
-# Process tools name a script to find it, not to run it.
-PROSE = sw.PROSE | frozenset("pkill pgrep killall ps lsof fuser which type".split())
-# npm's aliases for `run`.
-RUN = frozenset("run run-script rum urn".split())
-# Words that run what follows an unknown number of times.
-LOOP = frozenset("for while until select xargs parallel watch -exec -execdir -ok -okdir".split())
-
-
 def _config(payload, env):
-    """The governing config path, or None when no project has one. The nearest
-    at or above cwd wins, because the agent may have cd'd into another repo;
-    then $CLAUDE_PROJECT_DIR's. Raises Refuse when cwd is unusable and the
-    project dir gives no answer either: unknown is not the same as none."""
-    cwd = payload.get("cwd")
-    if isinstance(cwd, str) and cwd.startswith("/") and (yield Need("path", "isdir", cwd)):
-        d = yield Need("path", "realpath", cwd)
-        while True:
-            if (yield Need("path", "lexists", os.path.join(d, CONFIG))):
-                return os.path.join(d, CONFIG)
-            if (yield Need("path", "lexists", os.path.join(d, ".git"))) or os.path.dirname(d) == d:
-                break
-            d = os.path.dirname(d)
-        cwd = None
-    else:
-        cwd = cwd or "(none)"
-    proj = env.get("CLAUDE_PROJECT_DIR")
-    if proj and (yield Need("path", "lexists", os.path.join(proj, CONFIG))):
-        return os.path.join(proj, CONFIG)
-    if cwd:
-        raise Refuse(f"the payload's cwd {cwd!r} is not a directory, so the repo's list cannot be found")
-    return None
+    """The governing config path, or None when no project has one
+    (paths.project_config). Raises Refuse when cwd is unusable and the project
+    dir gives no answer either: unknown is not the same as none."""
+    path, usable = yield from paths.project_config(payload, env, CONFIG)
+    if path is None and not usable:
+        raise Refuse(f"the payload's cwd {payload.get('cwd') or '(none)'!r} is not a directory, "
+                     "so the repo's list cannot be found")
+    return path
 
 
 def _strs(v, what):
@@ -87,12 +62,7 @@ def _strs(v, what):
 
 
 def _load(path):
-    try:
-        cfg = json.loads((yield Need("read", path)))
-    except ValueError as e:
-        raise Refuse(f"not JSON ({e})")
-    except OSError as e:
-        raise Refuse(f"unreadable ({e.strerror})")
+    cfg = yield from paths.read_json(path)
     if not isinstance(cfg, dict) or not isinstance(cfg.get("commands"), list) or not cfg["commands"]:
         raise Refuse('the top level must be {"commands": [...]} with at least one command')
     seen, labels = set(), set()
@@ -127,77 +97,6 @@ def _load(path):
     return cfg["commands"]
 
 
-def _base(w):
-    return w.rsplit("/", 1)[-1]
-
-
-def _run_of(words, a):
-    """Is `a` a contiguous run inside `words`?"""
-    return any(words[i:i + len(a)] == a for i in range(len(words) - len(a) + 1))
-
-
-def _hit(entry, name, rest):
-    """Does entry match command word `name` followed by words `rest`?"""
-    words = [w for w in rest if not w.startswith("-")]
-    cmd = entry["cmd"]
-    if name in PM:
-        words = ["run" if w in RUN else w for w in words]
-    if name != cmd and not (cmd in PM and name in PM):
-        if name in LAUNCH:
-            if words and words[0] in LAUNCH_SUB:
-                words = words[1:]
-            # The first word naming cmd: an option's value (npx -p x cmd) may come first.
-            w = next((w for w in words if _base(w) == cmd), None)
-            if w is not None:
-                return _hit(entry, cmd, rest[rest.index(w) + 1:])
-        return False
-    ok = True
-    if "args" in entry:
-        a = entry["args"]
-        ok = _run_of(words, a) or (name in PM - {"npm"} and a[0] == "run" and len(a) > 1 and _run_of(words, a[1:]))
-    if ok and "script" in entry:
-        sc = entry["script"]
-        while sc.startswith("./"):
-            sc = sc[2:]
-        ok = any(w == sc or w.endswith("/" + sc) for w in rest)
-    return ok
-
-
-def _matches(doc, entry):
-    """(how many times the command runs entry, whether any of it sits in a loop)."""
-    names = {entry["cmd"]} | LAUNCH | (PM if entry["cmd"] in PM else set())
-    rx = re.compile(r"(?:^|/)(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\Z")
-    n, loop = 0, False
-    for t, nested in doc.texts(PROSE):
-        s = doc.scan(t)
-        loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
-        for a, b in s.segments():
-            if a > b:
-                continue
-            g = sw.cmd_index(s, a, b, rx, nested, prose=PROSE)
-            # cmd_index stops at the first launcher; a later word may be the command.
-            while g is not None:
-                if _hit(entry, _base(s.w[g]), s.w[g + 1:b + 1]):
-                    n += 1
-                    break
-                if nested:
-                    break
-                g = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and rx.search(s.w[i])), None)
-    return n, loop
-
-
-def claim(wants):
-    """Spend one of the user's approvals per run; `wants` is {approve_label: runs}.
-    Use as `approved, spent = yield from claim({c["approve_label"]: runs[c["id"]] for c in hits})`: approved is {label:
-    tool_use ids}, spent is whether every label had its runs' worth, now recorded
-    against this tool call. A click comes back when the transcript shows the call
-    never ran (languette.world). The world's OSError or ValueError, for a payload
-    with no transcript or a transcript that can't be read, is raised from here.
-    Shared with guard-infra and guard-bypass-hooks: one click is one run,
-    whichever guard asked."""
-    return (yield Need("claim", dict(wants)))
-
-
 def check(doc):
     payload, env = doc.payload, doc.env
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
@@ -217,7 +116,7 @@ def check(doc):
                      "the Edit tool, or tell the user.")
     runs, looped = {}, []
     for c in commands:
-        m = [_matches(doc, e) for e in c["match"]]
+        m = [sw.matches(doc, e) for e in c["match"]]
         # Entries may describe the same run two ways (npm run x, tsx x.ts); count the widest.
         n = max(k for k, _ in m)
         if n:
@@ -228,15 +127,14 @@ def check(doc):
     if not hits:
         return None
     if looped:
-        return deny("ask-first: " + ", ".join(f"`{c['id']}`" for c in looped) + " inside a loop, xargs, "
-                     "parallel or watch runs an unknown number of times, and each run needs its own "
-                     "approval. Run it once, on its own.")
+        return deny(say("loop", guard="ask-first", what=", ".join(f"`{c['id']}`" for c in looped),
+                        then="Run it once, on its own."))
 
     try:
         approved, spent = yield from claim({c["approve_label"]: runs[c["id"]] for c in hits})
     except (OSError, ValueError) as e:
-        return deny(f"ask-first: cannot read the session transcript to look for the user's approval, or "
-                     f"record it as spent ({e}), so `{cmd.strip()}` is denied. Ask the user to run it themselves.")
+        return deny(say("transcript_unreadable", guard="ask-first", err=e, cmd=cmd.strip(),
+                        then="Ask the user to run it themselves."))
     if spent:
         return None
     parts = []

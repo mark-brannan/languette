@@ -81,7 +81,10 @@ def test_no_bash_command_reads_as_well_formed():
 def test_the_pins_are_counts_of_programs_and_github_calls():
     pins = json.loads(PINS.read_text())
     assert list(pins) == sorted(pins)
+    def counts(v):
+        return bool(v) and all(kind in PIN_KINDS and isinstance(n, int) and n >= 1 for kind, n in v.items())
+    # A row the engines disagree on is pinned per engine.
     bad = {k: v for k, v in pins.items()
-           if not v or any(kind not in PIN_KINDS or not isinstance(n, int) or n < 1 for kind, n in v.items())}
+           if not (counts(v) or (set(v) <= {"python", "shfmt"} and len(v) == 2 and all(map(counts, v.values()))))}
     assert not bad, f"{bad}: rewrite with LANGUETTE_PIN_IO=update"
     assert all(k.startswith("tests/test_features.py::") for k in pins), os.linesep.join(pins)

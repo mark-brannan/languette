@@ -1,6 +1,5 @@
 """guard-worktrees: two controls over where a session's git work lands. The
-specs are features/guard-worktrees-checkout-home.feature and
-features/guard-worktrees-foreign.feature.
+spec is features/guard-worktrees.feature.
 
   checkout-home  a `git`/`yadm` checkout or switch that would move the branch
                  checked out in $HOME, when $HOME is itself a worktree
@@ -21,7 +20,7 @@ $HOME's worktree (`rev-parse --show-toplevel`), following a cd/pushd, chained
 A directory that cannot be resolved (a variable, `cd -`, a stale cwd) is a
 deny. `(cd x); git checkout y` is judged from x: a known false allow.
 
-foreign. A hand-off carries a branch, an issue and a PR, never a directory:
+foreign. Another session's worktree is never a place to work:
 the session that owns a worktree may archive it mid-turn under anyone who
 reached in. Any path-shaped word (or the word after -C, or a cd target) that
 git resolves to a toplevel that is not this session's own and whose `.git` is
@@ -30,8 +29,11 @@ allowed. A session's own: the cwd's toplevel; a linked worktree with a path
 component equal to the payload's session_id (its scratchpad); and toplevels
 recorded in ${TMPDIR:-/tmp}/languette-guard-worktrees.<session>[.<agent>]
 when reached by a route this guard vouches for (the session's first call, the
-call after EnterWorktree(name=...), a cd into a path that did not exist yet).
-Each record line carries the inode of the worktree's `.git`; a record not
+call after EnterWorktree(name=...), a cd into a path that did not exist yet),
+or, at the session's next call, the path of an unconditional `git worktree
+add` this guard allowed while nothing stood there, when a `.git` file made
+since stands there. Each record line carries the inode of the worktree's
+`.git`; a record not
 owned by this user, or a symlink, is ignored. EnterWorktree(path=...) is
 denied outright. Redirection targets are not seen. The deny names a
 one-command recipe for the session's own worktree.
@@ -41,14 +43,14 @@ import os
 import re
 
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Act, Need, Refuse, deny
 
 NAME = "guard-worktrees"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES"
-GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
-CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 MAX_CANDIDATES = 48
 _HOMEISH = re.compile(r"(?:/|~\Z|~/|\$HOME\Z|\$HOME/|\$\{HOME\}\Z|\$\{HOME\}/)")
+_CTRL = re.compile(r"[\x00-\x1f\x7f]")
 _KEYWORD = frozenset("builtin command if then else elif while until do !".split())
 
 
@@ -86,13 +88,13 @@ def _home_events(doc):
         for a, b in s.segments():
             if a > b:
                 continue
-            c = sw.cmd_index(s, a, b, CD, nested)
+            c = sw.cmd_index(s, a, b, sw.CD, nested)
             if c is not None:
                 v = next((s.w[i] for i in range(c + 1, b + 1)
                           if s.k[i] == "w" and (not s.w[i].startswith("-") or s.w[i] == "-")), "")
                 out.append(("CD", "-" if s.w[c] == "popd" else v))
                 continue
-            g = sw.cmd_index(s, a, b, GIT, nested)
+            g = sw.cmd_index(s, a, b, sw.GIT, nested)
             if g is None:
                 for i in range(a, b + 1):
                     if s.k[i] == "w" and s.w[i].startswith("GIT_DIR="):
@@ -175,9 +177,7 @@ def _resolve_all(raw, bases, home):
 
 
 def _generic(prog):
-    return Refuse(f"{NAME}: `checkout`/`switch` in $HOME switches the branch every shell and session on this "
-                  f"machine sees until someone checks the old branch back out. Use a worktree instead:\n"
-                  f"  {prog} worktree add -b <branch> <path> main\nthen cd into it and work there.")
+    return Refuse(say("wt_checkout_home", guard=NAME, prog=prog))
 
 
 def _checkout_home(doc):
@@ -189,8 +189,7 @@ def _checkout_home(doc):
     if not events:
         return
     if not (yield Need("which", "git")):
-        raise Refuse(f"{NAME}: git is missing, so a checkout/switch can't be checked against $HOME. This is a gate "
-                     "and fails closed.")
+        raise Refuse(say("wt_git_missing_checkout", guard=NAME))
     home = (yield from _canon(env.get("HOME") or "")) or ""
     pcwd = payload.get("cwd")
     cwd = (yield from _canon(pcwd)) if isinstance(pcwd, str) and pcwd else None
@@ -231,7 +230,7 @@ def _checkout_home(doc):
                     lost = True
         else:
             if not home:
-                raise Refuse(f"{NAME}: $HOME does not resolve, so a git checkout/switch can't be checked against it.")
+                raise Refuse(say("wt_home_unresolved_checkout", guard=NAME))
             bases, blind, pinned, unpinned = cands, lost, False, False
             for tk, tv in env_targets + ev[1]:
                 if tk == "C":
@@ -247,16 +246,12 @@ def _checkout_home(doc):
                     if (tk == "GITDIR" and (yield from gitdir_is_home(r))) or (tk == "WORKTREE" and r == home):
                         raise _generic("git")
             if unpinned:
-                raise Refuse(f"{NAME}: can't tell which repository or work tree this git checkout/switch runs "
-                             "against (a --git-dir or --work-tree that doesn't resolve), so it can't be checked "
-                             "against $HOME. Use an absolute path.")
+                raise Refuse(say("wt_repo_unclear", guard=NAME))
             # -C, --git-dir or --work-tree pin where the command resolves.
             if pinned:
                 continue
             if blind:
-                raise Refuse(f"{NAME}: can't tell which directory this git checkout/switch runs in (a cd, -C or "
-                             "session cwd that doesn't resolve), so it can't be checked against $HOME. Use an "
-                             "absolute path with git -C.")
+                raise Refuse(say("wt_dir_unclear", guard=NAME))
             for d in bases:
                 if (yield from targets_home(d)):
                     raise _generic("git")
@@ -272,15 +267,60 @@ def _pathish(t):
     return t if "/" in t else ""
 
 
+# `git worktree add` options: flags, and those that take the next word.
+_ADD_FLAGS = frozenset("-f --force -d --detach --checkout --no-checkout --lock -q --quiet --track --no-track "
+                       "--guess-remote --no-guess-remote --orphan --relative-paths --no-relative-paths".split())
+_ADD_VALUE = frozenset("-b -B --reason".split())
+# Words that make what follows run only on a condition, or more than once.
+_CONTROL = frozenset("if then else elif fi while until do done for case select function !".split())
+
+
+def _worktree_add(s, a, b):
+    """(path, [-C values]) for a `git worktree add <path>` in segment a..b, or
+    None. Any option it does not know, a word it can't read, or more than a
+    path and a commit-ish is None: what it can't parse it never records."""
+    g = sw.cmd_index(s, a, b, sw.GIT, False)
+    if g is None or not re.search(r"(?:^|/)git\Z", s.w[g]):
+        return None
+    sub = sw.git_subcommand(s, g, b)
+    if sub + 1 > b or s.w[sub] != "worktree" or s.w[sub + 1] != "add":
+        return None
+    cs = [s.w[i + 1] for i in sw.git_options(s, g, sub) if s.w[i] == "-C"]
+    pos, i, opts = [], sub + 2, True
+    while i <= b:
+        if s.k[i] != "w":
+            return None
+        w = s.w[i]
+        i += 1
+        if not opts or not w.startswith("-") or w == "-":
+            pos.append(w)
+        elif w == "--":
+            opts = False
+        elif w in _ADD_FLAGS or w.startswith("--reason="):
+            pass
+        elif w in _ADD_VALUE:
+            i += 1
+        elif re.fullmatch(r"-[fdq]*[bB].*|-[fdq]+", w):
+            # a bundle: -fq, -fb <branch>, -fbname
+            if re.fullmatch(r"-[fdq]*[bB]", w):
+                i += 1
+        else:
+            return None
+    if i > b + 1 or not 1 <= len(pos) <= 2:
+        return None
+    return pos[0], cs
+
+
 def _foreign_words(doc):
     """("T",) where a text begins (its shell starts in the payload cwd),
     ("C", w) for a cd/pushd target, ("W", w) for any other path-shaped word or
-    the word after -C, in order."""
+    the word after -C, ("A", path, [-C values]) for a `git worktree add`, in
+    order."""
     out = []
     for x, (text, nested) in enumerate(doc.texts()):
         s = doc.scan(text)
         out.append(("T",))
-        ncd, seen = 0, set()
+        ncd, seen, cond = 0, set(), False
         for a, b in s.segments():
             c = a
             while c <= b and s.k[c] == "w" and (sw._ASSIGN.match(s.w[c]) or s.w[c] in _KEYWORD):
@@ -308,6 +348,14 @@ def _foreign_words(doc):
                     continue
                 seen.add((ncd, t))
                 out.append(("W", t))
+            # An add that runs only on a condition (behind &&, ||, a pipe, a
+            # keyword, or in a nested text) may never run: it records nothing.
+            if a > 0 and any(o in s.op[a - 1] for o in ("&&", "||", "|")):
+                cond = True
+            cond = cond or nested or any(s.k[j] == "w" and s.w[j] in _CONTROL for j in range(a, b + 1))
+            add = None if cond else _worktree_add(s, a, b)
+            if add:
+                out.append(("A", *add))
     return out
 
 
@@ -337,7 +385,8 @@ class _Session:
         return (yield Need("worktree", "recorded", self.rec, top))
 
     def leave(self, text):
-        """What the next call may adopt as its own: `enter`, or the arrivals."""
+        """What the next call may adopt as its own: `enter`, the arrivals, or
+        `add<TAB><path>` for a worktree this call's `git worktree add` makes."""
         if self.rec:
             yield Act("worktree-leave", self.rec, text)
 
@@ -366,18 +415,8 @@ def _recipe(sess, d):
 
 def _deny_path(sess, env, word, ft):
     branch = yield from _git("/", "-C", ft, "symbolic-ref", "-q", "--short", "HEAD")
-    head = f"{NAME}: `{word}` is inside {ft}, a git worktree this session does not own."
     recipe = yield from _recipe(sess, ft)
-    raise Refuse(f"{head} A hand-off carries a branch, an issue and a PR -- never a directory; another session may "
-                 "still be running in there, and it may be archived out from under you mid-turn (an agent once lost "
-                 "a worktree that way).\nTo read that branch, stay here: `git log/diff/show <branch>`, "
-                 "`git show <branch>:<path>` -- worktrees of a repo share objects and refs.\n"
-                 f"To work on it, take your own worktree, one command, from anywhere: `{recipe}`, then "
-                 f"`git merge --ff-only {branch or '<branch>'}` inside it. If --ff-only fails, the histories have "
-                 "diverged: report that and stop.\nIf you made this worktree yourself in an earlier call, that is "
-                 "why: a worktree is yours only when the command that creates it also `cd`s into it, or it lives "
-                 "under your scratchpad. The recipe above does both.\nWorktree hygiene is the user's call, not a "
-                 "session's.")
+    raise Refuse(say("wt_foreign", guard=NAME, word=word, ft=ft, recipe=recipe, branch=branch or "<branch>"))
 
 
 def _resolve_dir(raw, base, home):
@@ -405,8 +444,7 @@ def _resolve_dir(raw, base, home):
     if not (yield Need("path", "isdir", r)):
         return "", ""
     if "/../" in f"/{rest}/":
-        raise Refuse(f"{NAME}: `{raw}` has a `..` after a directory that does not exist, so where it lands cannot "
-                     "be resolved. Spell the path without `..`.")
+        raise Refuse(say("wt_dotdot_missing", guard=NAME, raw=raw))
     return (yield Need("path", "realpath", r)), rest
 
 
@@ -415,14 +453,12 @@ def _foreign(doc):
     # git is what every foreignness answer is asked of: without it, every path
     # would read as nobody's worktree.
     if not (yield Need("which", "git")):
-        raise Refuse(f"{NAME}: git is missing, so worktree ownership cannot be checked. This is a gate and fails "
-                     "closed.")
+        raise Refuse(say("wt_git_missing_owner", guard=NAME))
     tool = payload.get("tool_name")
     pcwd = payload["cwd"]
     home = yield from _canon(env.get("HOME") or "")
     if not home:
-        raise Refuse(f"{NAME}: $HOME does not resolve, so worktree ownership cannot be checked. This is a gate "
-                     "and fails closed.")
+        raise Refuse(say("wt_home_unresolved_owner", guard=NAME))
     own_top = (yield from _git("/", "-C", pcwd, "rev-parse", "--show-toplevel")) or ""
     sess = _Session(payload, env, own_top, home)
     yield from sess.arrive(bool(own_top) and (yield Need("path", "isfile", os.path.join(own_top, ".git"))))
@@ -434,14 +470,7 @@ def _foreign(doc):
             yield from sess.leave("enter")
             return
         recipe = yield from _recipe(sess, p)
-        raise Refuse(f"{NAME}: EnterWorktree(path=...) enters a worktree that already exists, with no check on whose "
-                     "it is -- the tool only requires that the path appear in `git worktree list`. That is how an "
-                     "agent once lost a worktree mid-turn: the session that owned it was archived and the directory "
-                     "went away underneath the session that had attached to it.\nTake your own instead, one command, "
-                     f"from anywhere: `{recipe}`, then `git merge --ff-only <branch>` inside it to bring the branch "
-                     "you are resuming into your own directory. If --ff-only fails, the histories have diverged: "
-                     "report that and stop.\nNothing needs the other directory -- worktrees of a repo share objects "
-                     "and refs, so `git log/diff/show <branch>` and `git show <branch>:<path>` read it from here.")
+        raise Refuse(say("wt_enter_existing", guard=NAME, recipe=recipe))
 
     def foreign_top(d):
         t = yield from _git("/", "-C", d, "rev-parse", "--show-toplevel")
@@ -469,10 +498,35 @@ def _foreign(doc):
     cmd = ti.get("command")
     if not isinstance(cmd, str) or not cmd:
         return
-    arrivals, vcwd, n = [], pcwd, 0
+    arrivals, adds, vcwd, n = [], [], pcwd, 0
+
+    def add_target(word, cs):
+        """The canonical path a `git worktree add` will create, or None when it
+        can't be told or something that is a worktree already stands there."""
+        base = vcwd
+        for c in cs:
+            if not base:
+                break
+            d, rest = yield from _resolve_dir(c, base, home)
+            base = "" if rest else d
+        if not base:
+            return None
+        d, rest = yield from _resolve_dir(word, base, home)
+        if not d:
+            return None
+        p = d.rstrip("/") + "/" + os.path.normpath(rest) if rest else d
+        if _CTRL.search(p) or (yield Need("path", "lexists", p + "/.git")) or (rest and (yield Need("path", "lexists", p))):
+            return None
+        return None if sess.under_scratch(p) else p
+
     for ev in _foreign_words(doc):
         if ev[0] == "T":
             vcwd = pcwd
+            continue
+        if ev[0] == "A":
+            p = yield from add_target(ev[1], ev[2])
+            if p:
+                adds.append(p)
             continue
         kind, word = ev
         if not word:
@@ -495,8 +549,8 @@ def _foreign(doc):
         else:
             vcwd = cd_dir
     # Allowed. Leave this command's arrivals for the next call to consume.
-    if arrivals:
-        yield from sess.leave("\n".join(arrivals))
+    if arrivals or adds:
+        yield from sess.leave("\n".join(arrivals + ["add\t" + p for p in adds]))
 
 
 CONTROLS = (("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME", _checkout_home),

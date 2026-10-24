@@ -10,6 +10,10 @@ Refuse is how a guard's internals say "deny, for this reason" from deep inside
 a walk; check catches it and returns deny. Standard library only.
 """
 
+from languette.messages import say
+
+WAY_USER = "That is the user's to run, not an agent's: say what you need and hand them the exact command."
+
 
 class Refuse(Exception):
     pass
@@ -61,6 +65,18 @@ class Need:
         return f"{type(self).__name__}({self.kind!r}{''.join(', ' + repr(a) for a in self.args)})"
 
 
+def claim(wants):
+    """Spend one of the user's approvals per run; `wants` is {approve_label: runs}.
+    Use as `approved, spent = yield from claim({c["approve_label"]: runs[c["id"]] for c in hits})`: approved is {label:
+    tool_use ids}, spent is whether every label had its runs' worth, now recorded
+    against this tool call. A click comes back when the transcript shows the call
+    never ran (languette.world). The world's OSError or ValueError, for a payload
+    with no transcript or a transcript that can't be read, is raised from here.
+    Shared with guard-infra and guard-bypass-hooks: one click is one run,
+    whichever guard asked."""
+    return (yield Need("claim", dict(wants)))
+
+
 class Act(Need):
     """A write a guard asks for. The runner sends None back at once and does
     every Act through languette.world after the verdict, whatever the verdict;
@@ -75,6 +91,15 @@ class Act(Need):
     """
 
     __slots__ = ()
+
+
+def judged(doc, name, judge):
+    """A check for a guard whose judge(doc) gives a deny reason or None: no
+    command is no finding, and a reason is a deny under the guard's name."""
+    if doc.text is None:
+        return None
+    why = judge(doc)
+    return deny(say("judged", guard=name, why=why)) if why else None
 
 
 def planned(doc, parse, plan, judge):

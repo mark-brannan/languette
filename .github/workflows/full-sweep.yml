@@ -1,0 +1,36 @@
+name: Full sweep
+
+# What a push skips (tests/conftest.py): the shfmt engine over every
+# scenario, not only features/big.feature's; the @planned rows; and the
+# @full tests. Not a gate: a red run shows in the Actions tab and the
+# failure email.
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      # shfmt for the Python engine's shfmt rung: noble's is 3.8, past the 3.6 floor.
+      - name: Install shfmt
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q shfmt
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q --full

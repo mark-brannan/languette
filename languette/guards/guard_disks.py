@@ -7,12 +7,12 @@ resolve to one allowed path is denied on sight, with a reason naming what it
 saw.
 """
 
-import json
 import os
 import re
 
 from languette import paths
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Need, Refuse, deny, planned
 
 NAME = "guard-disks"
@@ -27,7 +27,6 @@ _VALUE_OPTS = {
     "mkfs": ("-t", "-L", "-U", "-b", "-i", "-I", "-N", "-m", "-E", "-O", "-d", "-r", "-T", "-C", "-g", "-G", "--type"),
     "wipe": ("-t", "-o", "-n", "-s", "--types", "--offset", "--iterations", "--size", "--random-source"),
 }
-_CD = re.compile(r"(?:cd|pushd|popd)\Z")
 _CD_FLAGS = ("-P", "-L", "-e", "-@", "--")
 
 _WAY_OUT = ("Work on an image file in /tmp or the scratchpad instead; a real disk is the user's to write, so "
@@ -95,7 +94,7 @@ class _Judge:
     def lands_in_dev(self, s, a, b):
         """A cd (or `env -C`, `sudo -D`) in a..b that may leave the working directory under /dev, or
         whose target the hook cannot resolve."""
-        g = sw.cmd_index(s, a, b, _CD, True)
+        g = sw.cmd_index(s, a, b, sw.CD, True)
         if g is not None:
             ops = [i for i in range(g + 1, b + 1) if not (s.k[i] == "w" and s.w[i] in _CD_FLAGS)]
             if not ops:
@@ -196,18 +195,12 @@ class _Judge:
 def parse(doc):
     """The command's targets, or the finding parse alone comes to: (finding, home, targets)."""
     payload, env = doc.payload, doc.env
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if cmd is None or cmd is False:
-        return None, None, []
-    if not isinstance(cmd, str):
-        cmd = json.dumps(cmd)                  # as `jq -r` would print it
-    cmd = cmd.rstrip("\n")                     # as $(...) would leave it
-    if not cmd:
+    if doc.text is None:
         return None, None, []
     cwd = payload["cwd"]
     home = env.get("HOME", "")
     if not home.startswith("/"):
-        return deny("guard-disks: $HOME is not an absolute path, cannot resolve targets"), None, []
+        return deny(say("home_not_absolute", guard="guard-disks")), None, []
 
     judge = _Judge(cwd, home)
     try:
@@ -236,8 +229,8 @@ def judge(parsed, answers):
             return deny(f"guard-disks: `{what} {raw}` is blocked: {abs_} is {kind}. {_WAY_OUT}")
         phys = physical(abs_)
         if phys != abs_ and not paths.under(phys, roots):
-            return deny(f"guard-disks: `{what} {raw}` is blocked: {abs_} resolves through a symlink to {phys}, "
-                        f"which is not the scratchpad, /tmp or an agent worktree. {_WAY_OUT}")
+            return deny("guard-disks: " + say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys,
+                                              way_out=_WAY_OUT))
     return None
 
 

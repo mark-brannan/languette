@@ -7,7 +7,7 @@ Feature: git-gating
 
   Scenarios tagged @planned are verdicts no guard gives yet: they are
   expected to fail, so they never fail CI, and a row that starts passing
-  shows as XPASS. The verdicts there are proposals, not rulings. Every other
+  shows as XPASS. The verdicts there are proposals, not decisions. Every other
   scenario is allowed by design and fails CI when a guard stops allowing it.
 
   Rewrites of commits already pushed (rebase, amend, cherry-pick) are
@@ -50,7 +50,7 @@ Feature: git-gating
       | echo "git checkout -- . throws away edits"                 | echo prints          |
       | grep -n "git add -A" notes.md                              | grep's pattern       |
       | printf '%s\n' "git push -f origin topic"                   |                      |
-      | gh pr comment 12 --body "rebased; git push --force-with-lease next" |             |
+      | gh pr comment 12 --body "🤖 rebased; git push --force-with-lease next\n\n🤖 claude-opus-5-5 · high · 5a74df74" |             |
 
   @planned
   Scenario Outline: local work beyond the reach of a one-path undo

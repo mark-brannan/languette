@@ -316,15 +316,20 @@ def feature_commands(files=None):
         t = f.read_text()
         # A feature's description is prose about the guard, not a command it was given.
         t = re.sub(r"^Feature:.*?(?=^\s*(?:Background:|Scenario(?: Outline)?:|Rule:|@|#))", "", t, count=1, flags=re.S | re.M)
-        out |= set(re.findall(r"`([^`\n]+)`", t))
-        for m in re.finditer(r'"""\n(.*?)\n\s*"""', t, re.S):
+        # A docstring is one command; a backtick inside it (big.feature's
+        # JavaScript) delimits nothing.
+        def docstring(m):
             lines = m.group(1).split("\n")
             ind = min(len(x) - len(x.lstrip(" ")) for x in lines if x.strip())
             out.add("\n".join(x[ind:] for x in lines))
+            return ""
+        t = re.sub(r'"""\n(.*?)\n\s*"""', docstring, t, flags=re.S)
+        out |= set(re.findall(r"`([^`\n]+)`", t))
         out |= {c.strip().replace("\\|", "|") for c in re.findall(r"^\s*\|\s*((?:\\\||[^|])+?)\s*\|", t, re.M)}
     return sorted(c for c in out if not re.search(r"<[a-z]+>", c))   # Outline placeholders
 
 
+@pytest.mark.full
 @needs_shfmt
 def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens_and_operators(monkeypatch):
     refused, differ = [], []
@@ -345,20 +350,24 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens_and_operato
     # lines. Otherwise, a GraphQL query: never run as a command.
     by_design = set(feature_commands([ROOT / "features/require-well-formed.feature"]))
     refused = [c for c in refused if c not in by_design and not re.fullmatch(r"[^\n]*<<'?EOF'?[^\n]*", c)]
-    assert refused == ["mutation { addLabelsToLabelable(input:{labelableId:\"x\",labelIds:[\"y\"]}) "
-                       "{ clientMutationId } }"]
+    assert sorted(refused) == sorted([
+        "mutation { addLabelsToLabelable(input:{labelableId:\"x\",labelIds:[\"y\"]}) { clientMutationId } }",
+        "mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}}",
+        "mutation($id:ID!,$b:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$b})"
+        "{comment{url}}}"])
     # A ' in a heredoc body: the awk lexer, reading the raw command, opens a
     # quote to the end; the shfmt rung resumes at the next Word. Every guard
     # strips heredoc bodies first, so neither reading reaches one. A " inside
     # a $(...) inside double quotes: the awk lexer closes the quote there, the
-    # shfmt rung does not; both queue the substitution's body (texts_of). A
-    # \' in $'...': the awk lexer closes the quote there; heredoc stripping
-    # (_line_end) does not, so every guard reads it as the shell does.
-    assert differ == ["cat <<EOF\n$(echo \"it's\") don't\nEOF\nrm -rf examples",
-                      "cat <<EOF; echo $'it\\'s\nx'; rm -rf examples\nbody\nEOF",
-                      "cat <<\\<<< EOF\n<\necho it's\nEOF\nrm -rf examples",
-                      'echo "$(echo "x"; rm -rf examples)"',
-                      'echo "a $(echo "$(rm -rf examples)") b"']
+    # shfmt rung does not; both queue the substitution's body (texts_of).
+    # big.feature's mk() docstring ends in one: "$(jq -cn --arg c "$c" ...)".
+    long = [c for c in differ if c.startswith("cd /tmp/scratch/fix-hooks;\nmk() {")]
+    assert len(long) == 1
+    assert [c for c in differ if c not in long] == [
+        "cat <<EOF\n$(echo \"it's\") don't\nEOF\nrm -rf examples",
+        "cat <<\\<<< EOF\n<\necho it's\nEOF\nrm -rf examples",
+        'echo "$(echo "x"; rm -rf examples)"',
+        'echo "a $(echo "$(rm -rf examples)") b"']
 
 
 @pytest.mark.parametrize("text, w", [

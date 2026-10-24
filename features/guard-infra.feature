@@ -32,12 +32,16 @@ Feature: guard-infra
         | aws ec2 terminate-instances --instance-ids i-0abc                              | aws ec2 describe-instances         |
         | aws iam delete-user --user-name bob                                            | the matching `describe-*`          |
         | aws rds delete-db-instance --db-instance-identifier prod --skip-final-snapshot | the matching `describe-*`          |
-        | aws s3 rm s3://bucket --recursive                                              | --dryrun                           |
         | aws s3 rb s3://bucket --force                                                  | aws s3 ls s3://<bucket>            |
         | gcloud compute instances delete vm-1                                           | gcloud ... describe                |
         | az group delete --name rg                                                      | az ... show                        |
         | kubectl delete namespace prod                                                  | --dry-run=server                   |
         | helm uninstall web                                                             | helm uninstall <release> --dry-run |
+
+      @also_guard-recursive-delete
+      Examples:
+        | command                                                                        | instead                            |
+        | aws s3 rm s3://bucket --recursive                                              | --dryrun                           |
 
     Scenario Outline: the reason says how the user approves one run
       When the agent runs `<command>`
@@ -53,12 +57,16 @@ Feature: guard-infra
         | cdk deploy --require-approval never               | Run cdk deploy unreviewed       |
         | aws ec2 terminate-instances --instance-ids i-0abc | Run aws ec2 terminate-instances |
         | aws sqs delete-queue --queue-url u                | Run aws delete                  |
-        | aws s3 rm s3://b --recursive                      | Run aws s3 rm --recursive       |
         | aws s3 rb s3://b --force                          | Run aws s3 rb --force           |
         | gcloud projects delete p                          | Run gcloud delete               |
         | az vm delete -n vm -g rg --yes                    | Run az delete                   |
         | kubectl delete pod web-1                          | Run kubectl delete              |
         | helm delete web                                   | Run helm uninstall              |
+
+      @also_guard-recursive-delete
+      Examples:
+        | command                                           | label                           |
+        | aws s3 rm s3://b --recursive                      | Run aws s3 rm --recursive       |
 
     Scenario Outline: the command is denied however it is reached or spelled
       When the agent runs `<command>`
@@ -100,7 +108,6 @@ Feature: guard-infra
         | aws --profile prod ec2 terminate-instances --instance-ids i-1  | a global option's value first                 |
         | aws ec2 delete-security-group --group-id sg-1                  | any delete-*                                  |
         | aws ec2 terminate-instances --no-dry-run                       | --no-dry-run is not a dry run                 |
-        | aws s3 rm s3://b --recursive --exclude "*.txt"                 | with filters                                  |
         | gcloud --project p compute instances delete vm                 | gcloud, a global option first                 |
         | az keyvault secret delete --vault-name v -n s                  | az, a deep subcommand                         |
         | kubectl -n prod delete deploy web                              | a namespace option's value first              |
@@ -111,6 +118,11 @@ Feature: guard-infra
         | helm del web                                                   | del alias                                     |
         | helm un web                                                    | un alias                                      |
         | helm uninstall web --dry-run=false                             | dry-run switched off                          |
+
+      @also_guard-recursive-delete
+      Examples:
+        | command                                                        | note                                          |
+        | aws s3 rm s3://b --recursive --exclude "*.txt"                 | with filters                                  |
 
   Rule: plans, previews, reads and help pass
 
@@ -146,7 +158,6 @@ Feature: guard-infra
         | aws ec2 delete-security-group --group-id sg-1 --dry-run  | dry run                             |
         | aws ec2 describe-instances                               | a read                              |
         | aws s3 ls s3://b --recursive                             | a listing                           |
-        | aws s3 rm s3://b --recursive --dryrun                    | s3's own dry run                    |
         | aws s3 rm s3://b/one-key                                 | one object, not a prefix            |
         | aws s3 rb s3://b                                         | refuses a non-empty bucket          |
         | aws --profile delete-me s3 ls                            | an option's value                   |
@@ -166,6 +177,11 @@ Feature: guard-infra
         | helm uninstall web --dry-run                             | dry run                             |
         | helm plugin uninstall diff                               | a plugin, not a release             |
         | helm list                                                |                                     |
+
+      @also_guard-recursive-delete
+      Examples:
+        | command                                                  | note                                |
+        | aws s3 rm s3://b --recursive --dryrun                    | s3's own dry run                    |
 
     Scenario Outline: prose and process tools that name a destructive command are not running it
       When the agent runs `<command>`

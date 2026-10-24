@@ -3,8 +3,9 @@ registered for its hook event and tool, print one decision.
 
     python3 -I languette/run.py [--guard NAME]
 
---guard restricts the run to one guard (the hooks.json wiring runs each
-Python guard alone this way). Fails closed: an unreadable payload is a deny,
+--guard restricts the run to one guard whatever its option says (hooks/hooks.json
+names none: one run judges every guard wired for the event and tool whose option
+allows it). Fails closed: an unreadable payload is a deny,
 a Bash command the parser refuses is a deny (require-well-formed; the other guards
 skip it), and a guard that raises is a deny naming the guard. No guard
 matched, or none objected, is exit 0 with no output; a deny outranks an ask.
@@ -41,13 +42,16 @@ def _out(event, fields):
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
     from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_bypass_ruleset,
-                                  guard_cross_session_send, guard_disks, guard_git_stacked_base,
+                                  guard_cross_session_send, guard_disks, guard_duplicate_prs, guard_git_stacked_base,
                                   guard_git_work_loss, guard_github_issues, guard_host_availability,
                                   guard_infra, guard_permissions, guard_pipe_to_shell, guard_private_terms,
-                                  guard_protected_services, guard_recursive_delete, guard_scheduled_jobs, guard_secrets,
-                                  require_well_formed, guard_worktrees, prose_budget_commit)
+                                  guard_protected_services, guard_recursive_delete, guard_review_threads,
+                                  guard_scheduled_jobs, guard_secrets, guard_signed_comments, require_well_formed,
+                                  guard_worktrees,
+                                  prose_budget_commit)
     from languette import record
     from languette.document import Document
+    from languette.messages import say
     from languette.verdict import Act, deny, verdict
     from languette.world import ACTS, World
 except Exception as e:  # noqa: BLE001
@@ -58,17 +62,20 @@ except Exception as e:  # noqa: BLE001
 # (hook event, tool name pattern or None for an event with no tool, guards in
 # the order they judge). guard-cross-session-send judges SendMessage; on the
 # other events it only keeps its per-session state, and never objects.
+STATE_EVENTS = frozenset({"PostToolUse", "PostToolUseFailure", "SubagentStart", "SessionStart", "UserPromptSubmit"})
 _SEND_STATE_TOOLS = re.compile(r"(?:WebFetch|WebSearch|Bash|Agent|mcp__.+)\Z")
 GUARDS = (
     ("PreToolUse", re.compile(r"Bash\Z"), (require_well_formed, guard_git_work_loss, guard_recursive_delete, ask_first,
                                            guard_bypass_hooks, guard_infra, guard_bypass_labels,
                                            guard_bypass_ruleset, guard_permissions, guard_pipe_to_shell,
                                            guard_disks, guard_host_availability, guard_protected_services,
-                                           guard_scheduled_jobs, guard_git_stacked_base, guard_secrets,
+                                           guard_scheduled_jobs, guard_git_stacked_base, guard_review_threads, guard_secrets,
                                            prose_budget_commit)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
     ("PreToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
     ("PreToolUse", guard_private_terms.TOOLS, (guard_private_terms,)),
+    ("PreToolUse", guard_duplicate_prs.TOOLS, (guard_duplicate_prs,)),
+    ("PreToolUse", guard_signed_comments.TOOLS, (guard_signed_comments,)),
     ("PreToolUse", re.compile(r"(?:Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree)\Z"), (guard_worktrees,)),
     ("PreToolUse", re.compile(r"SendMessage\Z"), (guard_cross_session_send,)),
     ("PostToolUse", _SEND_STATE_TOOLS, (guard_cross_session_send,)),
@@ -82,9 +89,23 @@ GUARDS = (
 )
 
 
+def option(g):
+    """The environment variable holding guard g's on/off option."""
+    return getattr(g, "OPT_IN", None) or "CLAUDE_PLUGIN_OPTION_" + g.NAME.upper().replace("-", "_")
+
+
 def _on(g, env):
-    opt = getattr(g, "OPT_IN", None)
-    return not opt or env.get(opt) == "true"
+    """Whether g runs when no guard is named: an opt-in guard (OPT_IN) only when its
+    option is exactly "true", any other guard unless its option is exactly "false"."""
+    if hasattr(g, "OPT_IN"):
+        return env.get(g.OPT_IN) == "true"
+    return env.get(option(g)) != "false"
+
+
+def gates():
+    """Option name -> its gate, `=` (on unless false) or `!=` (on only if true), for every guard."""
+    return {option(g)[len("CLAUDE_PLUGIN_OPTION_"):].lower(): "!=" if hasattr(g, "OPT_IN") else "="
+            for _, _, gs in GUARDS for g in gs}
 
 
 def wired(event, tool):
@@ -123,7 +144,7 @@ def _finding(g, doc, world, acts):
     try:
         return _drive(g.check(doc), world, acts), False
     except Exception as e:  # noqa: BLE001
-        return deny(f"{g.NAME}: guard crashed ({type(e).__name__}: {e}), cannot inspect the command"), True
+        return deny(say("guard_crashed", guard=g.NAME, kind=type(e).__name__, err=e)), True
 
 
 def respond(stdin_text, env, only=None):
@@ -169,7 +190,7 @@ def _respond(stdin_text, env, only):
         if not isinstance(payload, dict):
             raise ValueError("payload is not an object")
     except Exception as e:  # noqa: BLE001 -- a gate fails closed on anything
-        return _out("PreToolUse", deny(f"languette: unreadable hook payload ({e})")), (World(env, {}), {}, [], [])
+        return _out("PreToolUse", deny(say("payload_unreadable", err=e))), (World(env, {}), {}, [], [])
     # The shell guards never read the event; a payload without one is judged
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
@@ -178,22 +199,18 @@ def _respond(stdin_text, env, only):
     # state-keeping events read no cwd, and skipping them would fail open.
     cwd = payload.get("cwd")
     if event == "PreToolUse" and (not isinstance(cwd, str) or not cwd.startswith("/")):
-        return _out(event, deny(
-            "languette: the hook payload has no working directory, or only a relative one, so no path in "
-            "the call can be resolved. This is a gate and fails closed.")), (World(env, payload), payload, [], [])
+        return _out(event, deny(say("no_cwd"))), (World(env, payload), payload, [], [])
     tool = payload.get("tool_name")
     # A hook entry that names no guard here, say one renamed since it was
     # copied, would otherwise judge nothing and pass every command.
     if only is not None and only not in {g.NAME for _, _, gs in GUARDS for g in gs}:
-        return _out("PreToolUse", deny(f"languette: no guard is named {only}, so this hook checks nothing. "
-                                       "This is a gate and fails closed: reinstall the plugin, or copy the "
-                                       "entry again from hooks/hooks.json")), (World(env, payload), payload, [], [])
-    # An opt-in guard (OPT_IN names its option) runs alone by name, or with the
-    # rest only when its option is exactly "true", as hooks.json runs it.
+        return _out("PreToolUse", deny(say("unknown_guard", name=only))), (World(env, payload), payload, [], [])
+    # A guard runs alone by name whatever its option says, or with the rest when
+    # its option allows it (_on): the one hooks.json command names no guard.
     guards = [g for g in wired(event, tool) if only == g.NAME or (only is None and _on(g, env))]
     doc = Document(payload, env)
     if (guards and event == "PreToolUse" and doc.command is not None
-            and env.get("CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED") != "false"):
+            and _on(require_well_formed, env)):
         # A command that does not parse is require-well-formed's to deny; the others
         # would only read it again through a weaker parser. With require-well-formed
         # off, nothing would deny it, so the others read it on the awk rung. The
@@ -215,12 +232,49 @@ def _respond(stdin_text, env, only):
     return (_out(event, fields) if fields else ""), judged
 
 
+def _state_failed(payload, env):
+    """A state-keeping hook (PostToolUse and the rest) that crashed or objected leaves
+    guard-cross-session-send's file saying the session has read something unknown, so
+    its door stays shut rather than open on a stale record. With that guard's option
+    off, nothing reads the file, so none is written (hooks.json's sh fallback agrees)."""
+    if not _on(guard_cross_session_send, env):
+        return
+    sid = payload.get("session_id") if isinstance(payload, dict) else None
+    if not isinstance(sid, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", sid):
+        return
+    path = os.path.join(env.get("TMPDIR") or "/tmp", f"languette-guard-cross-session-send.{sid}")
+    try:
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(json.dumps({"subagents": [], "read": "an unknown tool (a state hook failed)"}) + "\n")
+    except OSError:
+        pass
+
+
 def main(argv):
     only = argv[argv.index("--guard") + 1] if "--guard" in argv[:-1] else None
     try:
         stdin_text = sys.stdin.buffer.read()
     except OSError:
         stdin_text = b""                       # judged as an unreadable payload
+    try:
+        payload = json.loads(stdin_text)
+    except ValueError:
+        payload = None
+    event = payload.get("hook_event_name") if isinstance(payload, dict) else None
+    if event in STATE_EVENTS:
+        # These events carry no decision: whatever the guards say is kept off stdout.
+        try:
+            out = respond(stdin_text, os.environ, only)
+        except Exception:  # noqa: BLE001
+            out = "crashed"
+        if out:
+            _state_failed(payload, os.environ)
+        return 0
     sys.stdout.write(respond(stdin_text, os.environ, only))
     return 0
 

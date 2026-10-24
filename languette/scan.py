@@ -31,8 +31,22 @@ _OPENER = re.compile(r"(?<!<)<<-?[ \t]*(?:[A-Za-z_]|" + _DPART + r")(?:[A-Za-z0-
 _ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _WS = re.compile(r"[ \t\n]")
 
+GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
+# A word that is cd, pushd or popd: the builtins that move the working directory.
+CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
+# git's global options that take the next word as their value.
+GIT_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
 PROSE = frozenset("grep egrep fgrep rg ag ack echo printf git yadm gh glab sed awk jq yq "
                   "cat tee test [ diff sort head tail wc tr cut less more".split())
+# Process tools name a script to find it, not to run it.
+PROSE_PROCESS = PROSE | frozenset("pkill pgrep killall ps lsof fuser which type".split())
+LAUNCH = frozenset("npx bunx pnpm yarn bun".split())
+LAUNCH_SUB = frozenset("exec dlx x".split())
+# Package managers that stand in for each other in a command rule, and npm's aliases for `run`.
+PM = frozenset("npm pnpm yarn bun".split())
+RUN = frozenset("run run-script rum urn".split())
+# Words that run what follows an unknown number of times.
+LOOP = frozenset("for while until select xargs parallel watch -exec -execdir -ok -okdir".split())
 EXEC = frozenset("sh bash zsh dash ksh ash busybox eval exec xargs su ssh sudo doas env nohup "
                  "timeout nice time watch parallel script chroot docker podman kubectl".split())
 _FIND_EXECS = frozenset("-exec -execdir -ok -okdir".split())
@@ -42,6 +56,30 @@ WRAP = frozenset("sudo env command exec time nice nohup timeout doas builtin "
                  "if then else elif while until do !".split())
 NESTED_CAP = 64
 _CASE = re.compile(r"(?<![A-Za-z0-9_])case(?![A-Za-z0-9_])")
+
+
+_ANSI_C = re.compile(r"\\(?:([abeEfnrtv\\'\"?])|([0-7]{1,3})|x([0-9A-Fa-f]{1,2})|u([0-9A-Fa-f]{1,4})"
+                     r"|U([0-9A-Fa-f]{1,8})|c(.))", re.S)
+_ANSI_C_CHARS = {"a": "\a", "b": "\b", "e": "\x1b", "E": "\x1b", "f": "\f", "n": "\n", "r": "\r",
+                 "t": "\t", "v": "\v"}
+
+
+def ansi_c(body):
+    r"""The text of $'body': the escapes bash decodes (\n, \', octal, \xHH, \u,
+    \cX ...); an unknown one stays as written. Bash stops at a NUL."""
+    def one(m):
+        simple, octal, hexa, u4, u8, ctl = m.groups()
+        if simple:
+            return _ANSI_C_CHARS.get(simple, simple)
+        if ctl:
+            return chr(ord(ctl) & 0x1f)
+        n = int(octal, 8) & 0xff if octal else int(hexa or u4 or u8, 16)
+        try:
+            # A lone surrogate is not text: bash emits bytes no encoder takes.
+            return chr(n) if not 0xd800 <= n <= 0xdfff else m.group(0)
+        except (ValueError, OverflowError):
+            return m.group(0)
+    return _ANSI_C.sub(one, body).split("\0", 1)[0]
 
 
 def _sub_end(s, j):
@@ -677,7 +715,13 @@ class Scan:
             if t == "Lit":
                 self._lex(dec(s, e))
             elif t in ("SglQuoted", "DblQuoted"):
-                if p.get("Dollar"):                # $'...' and $"..."
+                dollar = p.get("Dollar")
+                if dollar and t == "SglQuoted":    # $'...': ANSI-C quoting, decoded
+                    self._quoted = self._have = True
+                    self._cur += ansi_c(dec(s + 2, e - 1))
+                    at = e
+                    continue
+                if dollar:                         # $"..."
                     self._cur += "$"; self._livecur = True; s += 1
                 self._quoted = self._have = True
                 if t == "SglQuoted":
@@ -811,6 +855,14 @@ class Scan:
                 self._cur += b[i + 1:e]
                 i = e + 1
                 continue
+            if c == "$" and at(i + 1) == "'":      # $'...': ANSI-C quoting, to the next unescaped '
+                self._quoted = self._have = True
+                e = i + 2
+                while e < L and b[e] != "'":
+                    e += 2 if b[e] == "\\" else 1
+                self._cur += ansi_c(b[i + 2:e])
+                i = e + 1
+                continue
             if c == '"':                           # to the next unescaped "
                 self._quoted = self._have = True
                 e = i + 1
@@ -882,6 +934,120 @@ def seg_cmd(s, a, b):
     return None
 
 
+def word(s, i):
+    """The text of word i: q for a quoted word holding whitespace (the w list
+    has $Q there), w for any other."""
+    return s.q[i] if s.k[i] == "q" else s.w[i]
+
+
+# gh command words, as the guards that read a gh command share them: the repo
+# a -R/--repo flag names, and `gh api`'s method, valued flags and endpoint.
+# Each reads one word at a time, so a guard's own walk keeps its own flags.
+
+# The flag that names the repo; its value is the next word unless glued on.
+GH_REPO_FLAGS = ("-R", "--repo")
+
+# `gh api` flags whose value no guard reads.
+GH_API_VALUED = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
+
+
+def _gh_valued(s, i, hi, spaced, long_eq, short, default):
+    """(value, index of the flag's last word) when word i is the flag: `spaced`
+    then its value (`default` when that would pass hi), `long_eq`value, or
+    `short`value glued on. Else None."""
+    t = word(s, i)
+    if t in spaced:
+        return (word(s, i + 1), i + 1) if i < hi else (default, i)
+    if t.startswith(long_eq):
+        return t[len(long_eq):], i
+    if t.startswith(short) and len(t) > len(short):
+        return t[len(short):], i
+    return None
+
+
+def gh_repo_flag(s, i, hi, default=None):
+    """(repo, index of its last word) when word i is -R/--repo in any spelling
+    (-R x, -Rx, --repo x, --repo=x); repo is `default` when its value would
+    pass hi. Else None."""
+    return _gh_valued(s, i, hi, GH_REPO_FLAGS, "--repo=", "-R", default)
+
+
+def gh_method_flag(s, i, hi, default=""):
+    """(method upper-cased, index of its last word) when word i of `gh api` sets
+    the HTTP method (-X M, -XM, --method M, --method=M); method is `default`
+    when its value would pass hi. Else None."""
+    got = _gh_valued(s, i, hi, ("-X", "--method"), "--method=", "-X", None)
+    return got and (default if got[0] is None else got[0].upper(), got[1])
+
+
+def gh_api_word(t, i, path):
+    """(i, path) past `gh api` word t at i, when no guard flag claims it: a flag
+    in GH_API_VALUED takes the next word with it, and the first word that is not a
+    flag is the endpoint path."""
+    if t in GH_API_VALUED:
+        return i + 1, path
+    if not t.startswith("-") and path == "":
+        return i, t
+    return i, path
+
+
+def gh_api_path(path):
+    """The endpoint a `gh api` path argument names: any https://host/ prefix and
+    leading slashes dropped (repos/o/r/issues)."""
+    return re.sub(r"^/+", "", re.sub(r"^https?://[^/]+/", "", path, count=1), count=1)
+
+
+def _unq(t):
+    return t.replace('"', "").replace("'", "")
+
+
+def writes(b, heredoc_only):
+    """The file paths `b` writes with a redirection or `tee`, heredoc bodies
+    skipped; with heredoc_only, only those on a line that opens a heredoc --
+    the paths whose content is the heredoc body. Quotes are stripped; a path
+    built from $VAR comes back unresolved."""
+    out, delim = [], ""
+    for line in b.split("\n"):
+        if delim:
+            if re.fullmatch(r"[ \t]*" + re.escape(delim) + r"[ \t]*", line):
+                delim = ""
+            continue
+        m = re.search(r"""<<-?[ \t]*["']?[A-Za-z_][A-Za-z0-9_]*["']?""", line)
+        if m:
+            delim = _unq(re.sub(r"^<<-?[ \t]*", "", m.group()))
+            pre = line[:m.start()]
+        else:
+            pre = line
+        if heredoc_only and not m:
+            continue
+        pre = re.sub(r"[;|&]", " ; ", pre)
+        pre = re.sub(r">>?", " @redir@ ", pre)
+        t = [x for x in re.split(r"[ \t]+", pre) if x != ""]
+        teeing = False
+        for x, tok in enumerate(t):
+            if tok == ";":
+                teeing = False
+                continue
+            if tok == "@redir@":
+                if x + 1 < len(t) and t[x + 1] not in (";", "@redir@"):
+                    out.append(_unq(t[x + 1]))
+                continue
+            if _unq(tok) == "tee":
+                teeing = True
+                continue
+            if teeing and not tok.startswith("-"):
+                out.append(_unq(tok))
+    return out
+
+
+def norm_repo(r):
+    """owner/name in lower case from any of the spellings gh and git accept."""
+    r = r.lower()
+    for pat in (r"^[a-z]*://[^/]*/", r"^[^@/]*@[^:]*:", r"^github\.com/", r"\.git$", r"/*$"):
+        r = re.sub(pat, "", r, count=1)
+    return r
+
+
 def texts_of(text, prose=PROSE, read=None):
     """[(text, nested)]: the text itself plus, recursively, every quoted string
     in it that holds whitespace and may run. A segment's quoted strings are
@@ -916,6 +1082,44 @@ def texts_of(text, prose=PROSE, read=None):
     return out
 
 
+def _is_shell(word):
+    return word.rsplit("/", 1)[-1] in SHELL
+
+
+def shell_heredocs(text, scan=None):
+    """[body] of the heredocs in `text` that a shell reads: the HEREDOC marker's
+    segment, or one piped on from it, holds a shell word (sh, bash -s), or is
+    an ssh whose quoted remote command holds one ('sudo bash -s'). Heredocs
+    fed to anything else are data and stay dropped."""
+    docs = _heredocs(text)[1]
+    # a literal word HEREDOC in the command must not pass for a marker
+    s = (scan or Scan)(_heredocs(re.sub(r"\bHEREDOC\b", "HEREDOC_", text))[0])
+    out, k = [], 0
+    for a, b in s.segments():
+        e = b
+        while e + 1 in s.pipes:
+            e = next(y for x, y in s.segments() if x == e + 2)
+        ssh = any(s.k[i] == "w" and s.w[i] == "ssh" for i in range(a, e + 1))
+        shell = any((s.k[i] == "w" and _is_shell(s.w[i])) or (ssh and s.k[i] == "q" and any(map(_is_shell, re.split(r"[\s;&|()]+", s.q[i]))))
+                    for i in range(a, e + 1))
+        for j in range(a, b + 1):
+            if s.k[j] == "w" and s.w[j] == "HEREDOC":
+                if shell and k < len(docs):
+                    out.append(docs[k][0])
+                k += 1
+    return out
+
+
+def texts_of_command(text, prose=PROSE, read=None):
+    """texts_of `text` with its heredocs stripped, then each heredoc body a
+    shell reads queued as nested text, by the same rule (a heredoc inside it
+    that a shell reads is queued too)."""
+    out = texts_of(strip_heredocs(text), prose, read)
+    for body in shell_heredocs(text, read):
+        out += [(t, True) for t, _ in texts_of_command(body, prose, read)]
+    return out
+
+
 def cmd_index(s, a, b, cmd, nested, parents=None, prose=PROSE):
     """Index in a..b of the word that is the command `cmd` (a compiled regex)
     describes, or None. Top level: any word counts unless the word before it
@@ -947,3 +1151,209 @@ def cmd_index(s, a, b, cmd, nested, parents=None, prose=PROSE):
         return None
     return None
 
+
+def git_subcommand(s, g, b):
+    """The index of the subcommand word of the git call at g, past its global options;
+    beyond b when the segment ends first."""
+    i = g + 1
+    while i <= b and s.w[i].startswith("-"):
+        i += 1 + (s.w[i] in GIT_VALUE)
+    return i
+
+
+def git_options(s, g, sub):
+    """The index of each global option word of the git call at g, before its subcommand at sub."""
+    i = g + 1
+    while i < sub:
+        yield i
+        i += 1 + (s.w[i] in GIT_VALUE)
+
+
+def segments(doc, prose=PROSE):
+    """([(scan, a, b, nested)] for each non-empty segment of every text the
+    command runs, whether any text holds a LOOP word): what a guard that spends
+    one yes per run walks."""
+    out, loop = [], False
+    for t, nested in doc.texts(prose):
+        s = doc.scan(t)
+        loop = loop or any(k == "w" and w in LOOP for k, w in zip(s.k, s.w))
+        out += [(s, a, b, nested) for a, b in s.segments() if a <= b]
+    return out, loop
+
+
+# Command rules: docs/design/guard-rules.md, "Command rules". A rule's match is
+# a command word (`cmd`, by basename) and any of: `args`, a run of its
+# non-option words; `script`, a later word that is it or ends in `/script`;
+# `flags`, short option letters each present in a short-option cluster.
+_CLUSTER = re.compile(r"-[A-Za-z]+")
+
+
+def _base(w):
+    return w.rsplit("/", 1)[-1]
+
+
+def _run_of(words, a):
+    """Is `a` a contiguous run inside `words`?"""
+    return any(words[i:i + len(a)] == a for i in range(len(words) - len(a) + 1))
+
+
+def _hit(match, name, rest):
+    """Does match fit command word `name` followed by words `rest`?"""
+    words = [w for w in rest if not w.startswith("-")]
+    cmd = match["cmd"]
+    if name in PM:
+        words = ["run" if w in RUN else w for w in words]
+    if name != cmd and not (cmd in PM and name in PM):
+        if name in LAUNCH:
+            if words and words[0] in LAUNCH_SUB:
+                words = words[1:]
+            # The first word naming cmd: an option's value (npx -p x cmd) may come first.
+            w = next((w for w in words if _base(w) == cmd), None)
+            if w is not None:
+                return _hit(match, cmd, rest[rest.index(w) + 1:])
+        return False
+    ok = True
+    if "args" in match:
+        a = match["args"]
+        ok = _run_of(words, a) or (name in PM - {"npm"} and a[0] == "run" and len(a) > 1 and _run_of(words, a[1:]))
+    if ok and "script" in match:
+        sc = match["script"]
+        while sc.startswith("./"):
+            sc = sc[2:]
+        ok = any(w == sc or w.endswith("/" + sc) for w in rest)
+    if ok and "flags" in match:
+        held = {c for w in rest if _CLUSTER.fullmatch(w) for c in w[1:]}
+        ok = all(f in held for f in match["flags"])
+    return ok
+
+
+def matches(doc, match, prose=PROSE_PROCESS, launchers=True):
+    """(how many times the command runs `match`, whether any text holds a LOOP
+    word). `prose` names the commands whose words are not commands; launchers
+    (npx, `pnpm exec`) run `cmd` unless `launchers` is False."""
+    names = {match["cmd"]} | (LAUNCH if launchers else set()) | (PM if match["cmd"] in PM else set())
+    rx = re.compile(r"(?:^|/)(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\Z")
+    n, (segs, loop) = 0, segments(doc, prose)
+    for s, a, b, nested in segs:
+        g = cmd_index(s, a, b, rx, nested, prose=prose)
+        # cmd_index stops at the first launcher; a later word may be the command.
+        while g is not None:
+            if _hit(match, _base(s.w[g]), s.w[g + 1:b + 1]):
+                n += 1
+                break
+            if nested:
+                break
+            g = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and rx.search(s.w[i])), None)
+    return n, loop
+
+
+_CTL = re.compile(r"(?:^|/)systemctl\Z")
+_CTL_OTHER = {"--user", "-H", "--host", "-M", "--machine"}
+_CTL_HOST = {"isolate", "rescue", "emergency", "halt", "poweroff", "reboot", "kexec", "soft-reboot"}
+_CTL_STOP = {"stop", "restart", "try-restart", "reload-or-restart", "try-reload-or-restart", "kill"}
+# Options that take a separate value; the value is not the verb. A missing one only fails closed.
+_CTL_ARG = {"-t", "--type", "-p", "--property", "-s", "--signal", "-n", "--lines", "-o", "--output",
+            "--root", "--state", "--job-mode", "--kill-whom", "--kill-who", "--preset-mode", "--timestamp"}
+# Options that take no value. Any option in neither set, before the verb, means the verb cannot be
+# known, so a read verb after it does not clear the segment.
+_CTL_FLAG = {"-a", "--all", "-l", "--full", "-q", "--quiet", "-r", "--recursive", "-f", "--force", "-i",
+             "-T", "--show-transaction", "--now", "--no-pager", "--no-legend", "--no-block", "--no-wall",
+             "--no-ask-password", "--failed", "--system", "--reverse", "--after", "--before", "--plain",
+             "--value", "--dry-run", "--wait", "--global", "--runtime"}
+# Verbs whose own arguments may be any word, so a later `reboot` is a unit or pattern, not a verb.
+_CTL_READ = {"status", "show", "cat", "help", "list-units", "list-unit-files", "list-sockets", "list-timers",
+             "list-jobs", "list-dependencies", "list-automounts", "list-paths", "list-machines",
+             "is-active", "is-enabled", "is-failed", "is-system-running", "show-environment", "get-default",
+             "start", "reload", "enable", "reenable", "daemon-reload"}
+
+
+def unit_names(u):
+    """The names `u` answers to: as written, without its unit-type suffix, and without its `@instance`."""
+    bare = re.sub(r"\.(?:service|socket|target|scope|slice)\Z", "", u)
+    return {u, bare, bare.split("@")[0]}
+
+
+def service_stop(s, a, b, hit, host_verbs=_CTL_HOST):
+    """`<verb>` or `<verb> <unit>` when the segment's host `systemctl` runs one of `host_verbs`,
+    or stops a unit `hit` accepts; else None."""
+    g = cmd_index(s, a, b, _CTL, True)
+    if g is None:
+        return None
+    words = [s.w[i] for i in range(g + 1, b + 1) if s.k[i] == "w"]
+    pos, skip, known = [], False, True
+    for w in words:
+        if skip:
+            skip = False
+        elif w in _CTL_OTHER or w.startswith(("--host=", "--machine=")):
+            return None                        # tested here, so an option's value (`--root -M`) is not it
+        elif w in _CTL_ARG:
+            skip = True
+        elif w.startswith("-"):
+            known = known and (w in _CTL_FLAG or ("=" in w and w.startswith("--")) or bool(pos))
+        else:
+            pos.append(w)
+    if known and pos and pos[0] in _CTL_READ:
+        return None
+    # The verb is the first word past the options, but an option's value looks like a word too
+    # (`--root /x reboot`), so any down verb in the segment counts unless a read verb leads.
+    for i, w in enumerate(pos):
+        if w in host_verbs:
+            return w
+        if w in _CTL_STOP or (w in ("disable", "mask") and "--now" in words):
+            unit = next((u for u in pos[i + 1:] if hit(u)), None)
+            if unit:
+                return f"{w} {unit}"
+    return None
+
+
+# Commands that may share the call with a gh that reads a file. None writes a
+# byte to stdout that could become labels, so a redirect on one only
+# truncates the file (pushd and popd print the directory stack).
+INERT = frozenset("cd true :".split())
+
+
+def alone(scans, cmd):
+    """One segment is the command `cmd`, and every other is a shell running
+    quoted text the scan already holds (not built at run time) or a command
+    that writes no file."""
+    ghs = 0
+    for s, nested in scans:
+        for a, b in s.segments():
+            if a > b:
+                continue
+            if cmd_index(s, a, b, cmd, nested) is not None:
+                ghs += 1                       # a second gh can download into the file
+                if ghs > 1:
+                    return False
+                continue
+            c = seg_cmd(s, a, b)
+            w = s.w[c].rsplit("/", 1)[-1] if c is not None else None
+            if w not in INERT and not (w in SHELL and runs_quoted(s, c, b, w)):
+                return False
+    return True
+
+
+def runs_quoted(s, c, b, w):
+    """The shell at c runs only quoted text the scan holds: `eval` whose every
+    operand is quoted, or `sh … -c SCRIPT` whose operand to -c is quoted and
+    no other word before it is an operand (a script file the scan never
+    reads). `source` and `.` always run a file."""
+    fixed = lambda j: s.k[j] == "q" and not s.live[j]
+    if w == "eval":
+        return c < b and all(fixed(j) for j in range(c + 1, b + 1))
+    if w in ("source", "."):
+        return False
+    j = c + 1
+    while j <= b:
+        t = s.w[j] if s.k[j] == "w" else ""
+        if t in ("-o", "+o", "-O", "+O"):
+            j += 2
+        elif t.startswith("--"):
+            j += 1
+        elif t[:1] in "-+" and len(t) > 1:
+            if "c" in t:
+                return j < b and fixed(j + 1)
+            j += 1
+        else:
+            return False                       # an operand before -c: a script file
+    return False

@@ -1,11 +1,15 @@
-"""guard-bypass-labels: a label that waives a CI gate is a human's to apply.
+"""guard-bypass-labels: a label named in the bypass_labels option is a human's
+to apply.
 
-`churn-ok` waives the churn gate and `mixed-loops-ok` the mixed-loops gate.
-A gate whose bypass the gated party can apply to its own PR is not a gate, so
-a session may not apply either label, in any repo, public or private. The
-list is the bypass_labels option (CLAUDE_PLUGIN_OPTION_BYPASS_LABELS),
-comma-separated; unset, empty or blank is the default list, so a
-misconfiguration cannot open the gate. Names are compared case-folded, as
+A label that waives a CI gate is the driver's to apply unless the option names
+it. The list is the bypass_labels option (CLAUDE_PLUGIN_OPTION_BYPASS_LABELS),
+comma-separated, and it is empty by default: unset, empty or blank guards no
+label and the guard allows every command. (Until 2026-10-23 the default list
+was churn-ok and mixed-loops-ok, and an empty option meant that list, so a
+misconfiguration could not open the gate; that is reversed.) A deployment that
+wants the gate back names its labels; a gate whose bypass the gated party can
+apply to its own PR is not a gate, so a session may then not apply a named
+label, in any repo, public or private. Names are compared case-folded, as
 GitHub compares label names.
 
 Three routes reach a label, and each is read:
@@ -38,18 +42,18 @@ import json
 import os
 import re
 
+from languette import paths
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Need, Refuse, deny, planned
 
 NAME = "guard-bypass-labels"
 OPTION = "CLAUDE_PLUGIN_OPTION_BYPASS_LABELS"
-DEFAULT = ("churn-ok", "mixed-loops-ok")
+DEFAULT = ()                                   # no label is guarded until the option names one
 
 GH = re.compile(r"(?:^|/)gh\Z")
 WRITES = frozenset("create new edit".split())
 LABEL_FLAGS = frozenset("--label --add-label -l".split())
-# gh api flags whose value is not a field, a method or the path.
-API_VALUED = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 # Paths whose write can carry labels in an --input payload.
 REPO = r"(?:repos/[^/]+/[^/]+|repositories/[^/]+)"
 LABEL_PATH = re.compile(REPO + r"/(?:issues(?:/[^/]+(?:/labels)?)?|labels/[^/]+)/?")
@@ -62,11 +66,6 @@ READS = frozenset("list get search read".split())
 WRITE_WORDS = frozenset("add set create update edit write apply put post patch assign rename replace "
                         "upsert merge modify change toggle attach tag mark link insert append save store "
                         "mutate sync push commit delete remove clear reset move copy and or then".split())
-# Commands that may share the call with a gh that reads a file. None writes a
-# byte to stdout that could become labels, so a redirect on one only
-# truncates the file (pushd and popd print the directory stack).
-INERT = frozenset("cd true :".split())
-MAX_READ = 1 << 20
 WORDS = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")
 
 
@@ -122,10 +121,6 @@ class _Found:
 def _glued(t):
     """The value of a glued short flag: pflag reads -lx and -l=x alike."""
     return t[3:] if t[2:3] == "=" else t[2:]
-
-
-def _wv(s, i):
-    return s.q[i] if s.k[i] == "q" else s.w[i]
 
 
 def _read(path, ctx):
@@ -224,8 +219,8 @@ def _api(f, s, i, b, ctx):
     method, path, fields, inputs = None, None, [], []
     j = i
     while j <= b:
-        t = _wv(s, j)
-        nxt = (_wv(s, j + 1), s.live[j + 1]) if j < b else None
+        t = sw.word(s, j)
+        nxt = (sw.word(s, j + 1), s.live[j + 1]) if j < b else None
         if t in ("-X", "--method"):
             method, j = (nxt[0].upper() if nxt else method), j + 1
         elif t.startswith("--method="):
@@ -244,7 +239,7 @@ def _api(f, s, i, b, ctx):
             j += 1
         elif t.startswith("--input="):
             inputs.append((t[8:], s.live[j]))
-        elif t in API_VALUED:
+        elif t in sw.GH_API_VALUED:
             j += 1
         elif not t.startswith("-") and s.k[j] != ";" and path is None:
             path = t
@@ -302,12 +297,12 @@ def _gh(f, s, g, b, ctx):
     short = next(x for x in flags if len(x) == 2)
     j = g + 3
     while j <= b:
-        t = _wv(s, j)
+        t = sw.word(s, j)
         if t in flags:
             if j == b:
                 f.unseen.append(f"`{t}` has no value the guard can see")
             else:
-                f.value(_wv(s, j + 1), s.live[j + 1])
+                f.value(sw.word(s, j + 1), s.live[j + 1])
             j += 1
         elif t.startswith(glued):
             f.value(t.split("=", 1)[1], s.live[j])
@@ -323,59 +318,12 @@ def _alias(f, s, g, b, act):
     if act == "set":
         for j in range(g + 4, b + 1):
             if s.live[j]:
-                f.unseen.append(f"the alias expansion `{_wv(s, j)}` is built at run time")
+                f.unseen.append(f"the alias expansion `{sw.word(s, j)}` is built at run time")
             else:
-                f.labels.extend(x for x in re.split(r"[\s,=]+", _wv(s, j)) if x)
+                f.labels.extend(x for x in re.split(r"[\s,=]+", sw.word(s, j)) if x)
     elif act == "import":
-        src = _wv(s, g + 3) if g + 3 <= b else "stdin"
+        src = sw.word(s, g + 3) if g + 3 <= b else "stdin"
         f.unseen.append(f"the alias file `{src}` may define an alias that applies a label")
-
-
-def _alone(scans):
-    """One segment is the gh, and every other is a shell running quoted text
-    the scan already holds (not built at run time) or a command that writes
-    no file."""
-    ghs = 0
-    for s, nested in scans:
-        for a, b in s.segments():
-            if a > b:
-                continue
-            if sw.cmd_index(s, a, b, GH, nested) is not None:
-                ghs += 1                       # a second gh can download into the file
-                if ghs > 1:
-                    return False
-                continue
-            c = sw.seg_cmd(s, a, b)
-            w = s.w[c].rsplit("/", 1)[-1] if c is not None else None
-            if w not in INERT and not (w in sw.SHELL and _runs_quoted(s, c, b, w)):
-                return False
-    return True
-
-
-def _runs_quoted(s, c, b, w):
-    """The shell at c runs only quoted text the scan holds: `eval` whose every
-    operand is quoted, or `sh … -c SCRIPT` whose operand to -c is quoted and
-    no other word before it is an operand (a script file the scan never
-    reads). `source` and `.` always run a file."""
-    fixed = lambda j: s.k[j] == "q" and not s.live[j]
-    if w == "eval":
-        return c < b and all(fixed(j) for j in range(c + 1, b + 1))
-    if w in ("source", "."):
-        return False
-    j = c + 1
-    while j <= b:
-        t = s.w[j] if s.k[j] == "w" else ""
-        if t in ("-o", "+o", "-O", "+O"):
-            j += 2
-        elif t.startswith("--"):
-            j += 1
-        elif t[:1] in "-+" and len(t) > 1:
-            if "c" in t:
-                return j < b and fixed(j + 1)
-            j += 1
-        else:
-            return False                       # an operand before -c: a script file
-    return False
 
 
 def _bash(f, doc, cmd, cwd, env, depth=0, alone=True):
@@ -383,7 +331,7 @@ def _bash(f, doc, cmd, cwd, env, depth=0, alone=True):
     bodies = doc.heredocs(cmd)
     ctx = {"cwd": cwd, "env": env, "bodies": bodies, "files": f.files, "wanted": f.wanted,
            "moved": any(k == "w" and w in ("cd", "pushd", "popd") for s, _ in scans for k, w in zip(s.k, s.w)),
-           "alone": alone and _alone(scans)}
+           "alone": alone and sw.alone(scans, GH)}
     for s, nested in scans:
         for a, b in s.segments():
             if a > b:
@@ -456,30 +404,27 @@ def parse(doc):
 
 def plan(parsed):
     """The files the walk could not read."""
-    if parsed is None:
-        return []
-    return [Need("read", p, MAX_READ) for p in dict.fromkeys(parsed[0].wanted)]
+    if parsed is None or not bypass_labels(parsed[2]):
+        return []                              # nothing is guarded: no file is worth reading
+    return [Need("read", p, paths.MAX_READ) for p in dict.fromkeys(parsed[0].wanted)]
 
 
 def judge(parsed, answers):
     if parsed is None:
         return None
     f, rewalk, env = parsed
+    bad = bypass_labels(env)
+    if not bad:
+        return None
     if f.wanted:
         # No file's contents lead to another read: one more walk, with every file, is the last.
-        f = _Found({p: _text(answers[Need("read", p, MAX_READ)]) for p in f.wanted})
+        f = _Found({p: _text(answers[Need("read", p, paths.MAX_READ)]) for p in f.wanted})
         _bash(f, *rewalk, env)
-    bad = bypass_labels(env)
     hit = next((x.casefold() for x in f.labels if x.casefold() in bad), None)
     if hit:
-        return deny(f"{NAME}: the label `{hit}` is a human's to apply, not a session's: it waives a CI gate, "
-                    "and a gate whose bypass the gated party can apply is not a gate. Split the change "
-                    "instead, or say in the PR body why it needs the waiver and leave the label for the "
-                    "user to add by hand.")
+        return deny(say("bypass_label", guard=NAME, label=hit))
     if f.unseen:
-        return deny(f"{NAME}: {f.unseen[0]}, so the guard cannot tell whether it applies a bypass label "
-                    f"({', '.join(bad)}). Write the label literally in the command, or leave it for the "
-                    "user to add.")
+        return deny(say("bypass_label_unseen", guard=NAME, unseen=f.unseen[0], labels=", ".join(bad)))
     return None
 
 

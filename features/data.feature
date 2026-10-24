@@ -6,7 +6,7 @@ Feature: data
 
   Scenarios tagged @planned are verdicts no guard gives yet: they are
   expected to fail, so they never fail CI, and a row that starts passing
-  shows as XPASS. The verdicts there are proposals, not rulings. Every other
+  shows as XPASS. The verdicts there are proposals, not decisions. Every other
   scenario is allowed by design and fails CI when a guard stops allowing it.
 
   Scenario Outline: reading what a forge holds is allowed
@@ -19,7 +19,7 @@ Feature: data
       | gh api repos/someone/project/hooks              | a GET |
       | gh variable list                                |      |
       | glab release view v1.2.0                        |      |
-      | gh issue comment 12 --body "gh repo delete is not something to run" | prose |
+      | gh issue comment 12 --body "🤖 gh repo delete is not something to run\n\n🤖 claude-opus-5-5 · high · 5a74df74" | prose |
 
   @planned
   Scenario Outline: something only GitHub holds is deleted
