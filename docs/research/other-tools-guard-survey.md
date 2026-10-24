@@ -72,7 +72,7 @@ tool above was found citing a specific incident for these rules.
 
 A sandbox (filesystem and network confinement of the process) answers a
 different question from a command guard: it limits what any command can do
-rather than judging this one. It would cover disk, permission and
+instead of judging this one. It would cover disk, permission and
 exfiltration hazards with no list to maintain, at the cost of no per-command
 reason to show the agent. Not surveyed beyond this note; nothing here
 proposes one.
