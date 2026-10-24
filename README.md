@@ -259,7 +259,7 @@ gate is the driver's to apply unless this setting names it, for example
 
 `review_thread_logins` lists the logins, besides the gh login, whose reply
 lets `guard-review-threads` pass a thread's resolve, comma-separated, for
-example `you,your-app`; empty, the default, counts the gh login alone.
+example `you,your-app`; empty, the default, counts the gh login alone. A listed login that also posts review findings has its follow-up findings in its own thread read as replies.
 
 `record_decisions`, off by default, keeps every verdict, with its command and
 secrets masked, in `$XDG_STATE_HOME/languette/decisions.jsonl`, readable only by you.

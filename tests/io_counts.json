@@ -773,6 +773,8 @@
  "tests/test_features.py::test_a_reply_naming_the_fix_or_the_record_lets_the_thread_close[Fixed in 3f2a9c1e0b7d4a6c8e2f1b3d5a7c9e0f2b4d6a8c.-a full sha]": {"git": 1, "run": 1},
  "tests/test_features.py::test_a_reply_naming_the_fix_or_the_record_lets_the_thread_close[Kept: https://github.com/o/r/blob/main/docs/decisions.md#scope-a link to a decision]": {"git": 1, "run": 1},
  "tests/test_features.py::test_a_reply_naming_the_fix_or_the_record_lets_the_thread_close[Out of scope here; tracked in o/r#12.-an owner/repo#n issue]": {"git": 1, "run": 1},
+ "tests/test_features.py::test_a_reply_under_a_login_the_review_thread_logins_option_lists_lets_the_thread_close[-,[bot],-denies, naming \"no reply from me after\"-likewise, among commas]": {"git": 1, "run": 1},
+ "tests/test_features.py::test_a_reply_under_a_login_the_review_thread_logins_option_lists_lets_the_thread_close[-[bot]-denies, naming \"no reply from me after\"-an entry empty once normalised matches no deleted account]": {"git": 1, "run": 1},
  "tests/test_features.py::test_a_reply_under_a_login_the_review_thread_logins_option_lists_lets_the_thread_close[app--denies, naming \"no reply from me after\"-unset: the gh login alone]": {"git": 1, "run": 1},
  "tests/test_features.py::test_a_reply_under_a_login_the_review_thread_logins_option_lists_lets_the_thread_close[app-App[bot]-is silent-case and [bot] are ignored]": {"git": 1, "run": 1},
  "tests/test_features.py::test_a_reply_under_a_login_the_review_thread_logins_option_lists_lets_the_thread_close[app-app, someone-is silent-a listed login]": {"git": 1, "run": 1},

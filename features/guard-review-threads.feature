@@ -27,7 +27,8 @@ Feature: guard-review-threads
   sets up is what it answers for that id; any other id is not found. The
   review_thread_logins option adds comma-separated logins whose comments count
   as the gh login's own replies, except the one that opens the thread, which
-  is a finding whoever wrote it; unset, none. A bot is an author GitHub calls
+  is a finding if a bot wrote it, even from a listed login; unset, none. An
+  entry empty once normalised, such as `[bot]`, is dropped. A bot is an author GitHub calls
   a Bot, a login ending in `[bot]`, or one of coderabbitai, claude,
   copilot-pull-request-reviewer and github-actions; the gh login's own
   comments are replies, even when that login is a bot. The guard checks that a
@@ -102,6 +103,8 @@ Feature: guard-review-threads
       | app      |                | denies, naming "no reply from me after" | unset: the gh login alone    |
       | app      | other          | denies, naming "no reply from me after" | an unlisted login            |
       | someone  | app, someone   | is silent                               | spaces round entries ignored |
+      |          | [bot]          | denies, naming "no reply from me after" | an entry empty once normalised matches no deleted account |
+      |          | ,[bot],        | denies, naming "no reply from me after" | likewise, among commas       |
 
   Scenario Outline: a listed login's opening comment is a finding, whatever it cites
     Given CLAUDE_PLUGIN_OPTION_REVIEW_THREAD_LOGINS is "claude"

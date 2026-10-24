@@ -224,9 +224,10 @@ def _judge(tid, viewer, comments, also=()):
     """deny for one thread, or None. The viewer's comments are replies, even
     when the viewer is itself a bot; so is a comment from a login in the
     review_thread_logins option, unless it opens the thread. The thread's
-    first comment is a finding, whoever wrote it, unless the viewer did."""
+    first comment, if a bot wrote it, is a finding even from a listed
+    login, unless the viewer did."""
     vme = _norm(viewer)
-    me = {vme, *map(_norm, also)}
+    me = {vme, *map(_norm, also)} - {""}
     bots = [i for i, c in enumerate(comments) if _bot(c) and _login(c) != vme and (i == 0 or _login(c) not in me)]
     if not bots:
         return None
