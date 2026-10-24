@@ -153,12 +153,12 @@ def respond(stdin_text, env, only=None):
     guards' Acts are done after the verdict, and with record_decisions on, the
     call is recorded (record.py)."""
     out, judged = _respond(stdin_text, env, only)
-    world, payload, findings, acts = judged
+    world, payload, findings, acts, doc = judged
     for a in acts:
         world.act(a)
     if record.wanted(env):
         try:
-            world.keep(record.build(payload, env, only, findings, _verdict(out), extra=_project_rules(world, payload, env)))
+            world.keep(record.build(payload, env, only, findings, _verdict(out), doc, extra=_project_rules(world, payload, env)))
         except Exception:  # noqa: BLE001 -- a record never changes the verdict
             pass
     return out
@@ -184,13 +184,13 @@ def _verdict(out):
 
 
 def _respond(stdin_text, env, only):
-    """(stdout, (world, payload, [(guard, result, crashed)], [Act]))."""
+    """(stdout, (world, payload, [(guard, result, crashed)], [Act], Document))."""
     try:
         payload = json.loads(stdin_text)
         if not isinstance(payload, dict):
             raise ValueError("payload is not an object")
     except Exception as e:  # noqa: BLE001 -- a gate fails closed on anything
-        return _out("PreToolUse", deny(say("payload_unreadable", err=e))), (World(env, {}), {}, [], [])
+        return _out("PreToolUse", deny(say("payload_unreadable", err=e))), (World(env, {}), {}, [], [], Document({}, env))
     # The shell guards never read the event; a payload without one is judged
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
@@ -199,12 +199,12 @@ def _respond(stdin_text, env, only):
     # state-keeping events read no cwd, and skipping them would fail open.
     cwd = payload.get("cwd")
     if event == "PreToolUse" and (not isinstance(cwd, str) or not cwd.startswith("/")):
-        return _out(event, deny(say("no_cwd"))), (World(env, payload), payload, [], [])
+        return _out(event, deny(say("no_cwd"))), (World(env, payload), payload, [], [], Document(payload, env))
     tool = payload.get("tool_name")
     # A hook entry that names no guard here, say one renamed since it was
     # copied, would otherwise judge nothing and pass every command.
     if only is not None and only not in {g.NAME for _, _, gs in GUARDS for g in gs}:
-        return _out("PreToolUse", deny(say("unknown_guard", name=only))), (World(env, payload), payload, [], [])
+        return _out("PreToolUse", deny(say("unknown_guard", name=only))), (World(env, payload), payload, [], [], Document(payload, env))
     # A guard runs alone by name whatever its option says, or with the rest when
     # its option allows it (_on): the one hooks.json command names no guard.
     guards = [g for g in wired(event, tool) if only == g.NAME or (only is None and _on(g, env))]
@@ -227,7 +227,7 @@ def _respond(stdin_text, env, only):
     for g in guards:
         r, crashed = _finding(g, doc, world, acts)
         findings.append((g.NAME, r, crashed))
-    judged = (world, payload, findings, acts)
+    judged = (world, payload, findings, acts, doc)
     fields = verdict(event, findings)
     return (_out(event, fields) if fields else ""), judged
 
