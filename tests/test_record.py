@@ -244,3 +244,18 @@ def test_a_guard_name_nothing_has_is_a_deny(tmp_path):
     out = json.loads(run.respond(_payload("echo hi"), _env(tmp_path, on=False), "guard-disk"))
     assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
     assert "no guard is named guard-disk" in out["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+def test_the_record_reads_the_runs_one_parse(tmp_path, monkeypatch):
+    from languette import scan
+    calls = []
+    real = scan.parse
+
+    def counting(text, words=False):
+        if not words:
+            calls.append(text)
+        return real(text, words)
+    monkeypatch.setattr(scan, "parse", counting)
+    run.respond(_payload("ls -la"), _env(tmp_path), None)
+    [rec] = _records(tmp_path)
+    assert rec["rung"] and calls == ["ls -la"]
