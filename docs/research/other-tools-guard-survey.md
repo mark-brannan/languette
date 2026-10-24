@@ -35,14 +35,14 @@ tool above was found citing a specific incident for these rules.
 | dcg `system.services` | `guard-protected-services`, `guard-host-availability` |
 | safety-net `curl \| bash` | `guard-pipe-to-shell` |
 | dcg `infrastructure.terraform`, `pulumi`; `cloud.aws`/`gcp`/`azure` deletes; `kubernetes.kubectl`, `helm` | `guard-infra` (per-run approval) |
-| dcg `platform.github` deletes, visibility | `guard-github-issues`, `guard-bypass-*`; repo deletes are planned rows in `infrastructure.feature` |
+| dcg `platform.github` deletes, visibility | `guard-github-issues`, `guard-bypass-*`; repo deletes are rows in `data.feature`, visibility changes in `access.feature` |
 | dcg `containers.*` prune and `down -v` | deliberately allowed on the user's dev host (`files.feature`) |
 
 ## Not covered, and where it stands
 
 | Guard (dcg pack or tool) | Blocks | Hazard (survey's reading) | languette today |
 |---|---|---|---|
-| Reading secret files (safety-net; dcg `secret_disclosure`, opt-in) | agent reads `~/.ssh`, `.env`, `~/.aws`, CLI credentials, or prints secret values | the content lands in the transcript and any later post; a leak is not undoable | values printed from a secret store: `@planned` in `secrets.feature`; files read from disk: no row. `guard-secrets` catches a credential typed into a command, not one read from disk. `guard-protected-paths` is an unwired stub, which would be the home |
+| Reading secret files (safety-net; dcg `secret_disclosure`, opt-in) | agent reads `~/.ssh`, `.env`, `~/.aws`, CLI credentials, or prints secret values | the content lands in the transcript and any later post; a leak is not undoable | values printed from a secret store: `@planned` in `secrets.feature`; files read from disk: no row. `guard-secrets` catches a credential typed into a command, not one read from disk. where such a guard would live is open: `guard-protected-paths` is an unwired stub defined for writes |
 | Database packs (dcg `database.*`) | DROP, TRUNCATE, unfiltered DELETE, `FLUSHALL`, `dropDatabase`, Supabase reset, Snowflake/BigQuery/Databricks drops | production data gone, backups may not exist | `guard-databases` is an unwired stub; rows are `@planned` in `data.feature`; scan feasibility in `sql-ddl-scan.md` |
 | Cloud storage packs (dcg `storage.s3`/`gcs`/`minio`/`azure_blob`) | bucket removal, recursive delete, destructive sync | objects deleted with no trash | `aws s3 rm --recursive` and `rb --force` are in `guard-infra`; `gsutil rsync -d`, minio, azure blob are `@planned` |
 | `rsync --delete` (dcg `remote.rsync`) | destination files absent from source are removed | a swapped argument order empties a tree | `@planned` in `files.feature`, with `--remove-source-files` |
@@ -61,11 +61,12 @@ tool above was found citing a specific incident for these rules.
 - Most gaps are already carried as `@planned` rows. They are a queue, not a
   discovery; the survey adds no new category there.
 - One item looks new: reading secret files from disk. It has the strongest
-  hazard (irreversible disclosure) and an obvious concept:
-  a setting of the stubbed `guard-protected-paths`, not a new guard.
+  hazard (irreversible disclosure), and its concept is
+  an open question of concept: a setting of the stubbed `guard-protected-paths`
+  (defined for writes) or a new guard.
 - Per-service packs (payments, email, monitoring, messaging) show the shape
   dcg chose: many opt-in packs, one regex each. Languette's decisions lean
-  toward a rules engine with few deep special cases, so these would be rows
+  toward a rules engine with few deep special cases, so, on that current thinking, these would more likely be rows
   in an existing guard's table, not guards.
 
 ## Sandbox wrappers
