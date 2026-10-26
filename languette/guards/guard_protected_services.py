@@ -7,8 +7,8 @@ protected_services setting, comma-separated, a trailing `.service` optional,
 `*` globs allowed. Unset or empty, it guards nothing: the user fills it. A
 pattern matches the unit as written, without its type suffix, or without its
 `@instance`. A glob in the unit fails closed, as does a pkill pattern (or a
-`killall -r` one) that could select a listed unit's process, and an operand the
-scan cannot read. The services a session runs on (ssh, the network) are
+`killall -r` one) that could select a listed unit's process, an inverted
+(`pkill -v`) one, and an operand the scan cannot read. The services a session runs on (ssh, the network) are
 guard-host-availability's. Its rules are command rules
 (docs/design/guard-rules.md), each naming its program's description in scan,
 matched by scan's ctl_hit; the setting fills their units.
