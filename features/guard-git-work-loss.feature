@@ -66,6 +66,9 @@ Feature: guard-git-work-loss
       | git add -u --chmod +x src/              | is silent | a path beside --chmod's value     |
       | git add --chmod=+x hooks/foo.sh         | is silent | chmod by path                     |
       | git add -p foo                          | is silent |                                   |
+      | git add -h                              | is silent | usage stages nothing              |
+      | git add --help                          | is silent | the manual stages nothing         |
+      | git add -A --help                       | is silent | help wins over -A                 |
       | git commit -m "add -A everything"       | is silent |                                   |
       | git commit --amend --no-edit            | is silent |                                   |
       | git commit -m 'block git commit -a'     | is silent | a commit message that mentions -a |
@@ -582,6 +585,11 @@ Feature: guard-git-work-loss
         | git add -A --chm=+x src/x.py              | a prefix, glued             |
         | git add -AU 3 src/x.py                    | -U takes the next word      |
         | git add -A --pathspec-file-nul src/x.py   | a flag with no value        |
+        | git add -fA src/x.py                      | -A inside a cluster         |
+        | git add -A --end-of-options src/x.py      | ends the options            |
+        | git add -A --no-chmod +x                  | a negated option takes no value, so +x is a path |
+        | git add --no-all src/x.py                 | not -A                      |
+        | git add --ignore-removal src/x.py         | not -A                      |
 
     Scenario Outline: -A stays denied in a linked worktree when it is blanket or its place is not known
       Given the working directory is "{TMP}/repo/.claude/worktrees/feat"
@@ -603,6 +611,9 @@ Feature: guard-git-work-loss
         | git add -A --inter-hunk-context 3                          | another value option              |
         | git add -A --frobnicate src/x.py                           | an option the guard does not know |
         | git add -A --ign src/x.py                                  | an ambiguous prefix               |
+        | git add -fA                                                | -A inside a cluster, no path      |
+        | git add -A --end-of-options                                | nothing after the options         |
+        | git add --no-ignore-removal                                | git reads it as -A                |
         | git -C {TMP}/repo add -A src/x.py                          | -C names another tree             |
         | cd {TMP}/repo && git add -A src/x.py                       | a cd moves the tree               |
         | git add -A src/x.py && git commit -am y                    | the commit is blanket             |

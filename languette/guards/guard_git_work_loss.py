@@ -125,7 +125,7 @@ def _add_long(t):
         hit = list({forms[f] for f in forms if f.startswith(name)}) if name else []
     if len(hit) != 1:
         raise Refuse(f"`git add {t}` is blocked: the guard does not know that option, so it cannot "
-                     "tell its value from a path. Spell it as `git add --help` does.")
+                     "tell its value from a path. Spell it as `git add -h` lists it.")
     full, negated = hit[0]
     if eq and not _ADD_LONG[full][0]:
         raise Refuse(f"`git add {t}` is blocked: that option takes no value.")
@@ -144,7 +144,9 @@ def _add_options(a):
         if t in ("--", "--end-of-options"):
             specs.extend(a[i:])
             break
-        if t.startswith("--"):
+        if t in ("-h", "--help"):     # git prints usage or the manual and stages nothing
+            opts.append("help")
+        elif t.startswith("--"):
             full, negated, val = _add_long(t)
             if _ADD_LONG[full][0] and not negated and val is None:
                 if i >= n:
@@ -171,6 +173,8 @@ def _add_options(a):
 
 def _add(a):
     opts, names = _add_options(a)
+    if "help" in opts:
+        return
     for t in names:
         if _WHOLE.match(t):
             raise Refuse(f"`git add {t}` is blocked: stage by path, not the whole tree.")
