@@ -422,3 +422,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261026t073852z
 - a pkill literal run hits at three characters held by a name, or sharing all but two of a name's Undo: change the threshold in _may_match ([#263](https://github.com/mark-brannan/languette/pull/263))
+
+### 20261026t100658z
+- guard-worktrees checkout-home lets a directory word it can't read (a variable other than HOME, a $( ), a glob) through with a note from the session's own worktree or scratchpad, so one that expands to another session's worktree is a known false allow (3 of 152 measured denials did that), as is one that expands to $HOME or a main checkout (0 of 152) Undo: make the blind branch of _checkout_home deny again (revert the note path) ([#268](https://github.com/mark-brannan/languette/pull/268))
