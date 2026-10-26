@@ -22,10 +22,13 @@ A directory that cannot be resolved (a variable, `cd -`, a stale cwd) is a
 deny, with one exception: an allow with a note when the session's cwd is its
 own linked worktree (recorded, or under its scratchpad) or lies under its
 scratchpad, and every directory the command resolved before losing track is
-too. $HOME, a main checkout, a cwd that does not resolve, `cd -` and a
+too. A literal path that does not exist yet (after ~ and $HOME expand) is
+judged by the nearest directory above it that does, which must be an own
+place too. $HOME, a main checkout, a cwd that does not resolve, `cd -` and a
 session's first call (nothing recorded yet) keep the deny; a word that
 resolves into another session's worktree is the foreign control's deny. What
-the unresolved word names is unseen, so it may be any directory: a known gap.
+a word the guard can't read names (a variable other than HOME, a `$( )`) is
+unseen, so it may be any directory: a known gap.
 `(cd x); git checkout y` is judged from x: a known false allow.
 
 foreign. Another session's worktree is never a place to work:
@@ -184,6 +187,27 @@ def _resolve_all(raw, bases, home):
     return res, miss
 
 
+def _landings(raw, bases, home):
+    """Where a literal word that does not resolve would land: the nearest
+    existing directory above it, against each base it missed on. A word the
+    guard can't read (a variable other than HOME, a `$( )`, a glob) lands
+    nowhere it can name, so []; a `..` through a part that does not exist yet
+    is None, never judged."""
+    if _HOMEISH.match(raw):
+        bases = ["/"]
+    out = []
+    for base in bases:
+        if (yield from _resolve_arg(raw, base, home)):
+            continue
+        try:
+            d, _ = yield from _resolve_dir(raw, base, home)
+        except Refuse:
+            return None
+        if d:
+            out.append(d)
+    return out
+
+
 def _generic(prog):
     return Refuse(say("wt_checkout_home", guard=NAME, prog=prog))
 
@@ -254,15 +278,19 @@ def _checkout_home(doc):
                     visited = visited and visited + res
                 else:
                     lost = True
+                    # A literal path not made yet is judged where it lands.
+                    land = yield from _landings(v, cands, home)
+                    visited = visited and (None if land is None else visited + land)
         else:
             if not home:
                 raise Refuse(say("wt_home_unresolved_checkout", guard=NAME))
             bases, blind, pinned, unpinned, seen = cands, lost, False, False, visited
             for tk, tv in env_targets + ev[1]:
                 if tk == "C":
+                    land = yield from _landings(tv, bases, home)
                     bases, miss = yield from _resolve_all(tv, bases, home)
                     blind = blind or miss or not bases
-                    seen = seen and seen + bases
+                    seen = seen and (None if land is None else seen + bases + land)
                     continue
                 # --work-tree says where files land, not which repo: git still finds the repo from the directory.
                 pinned = pinned or tk == "GITDIR"

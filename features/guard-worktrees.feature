@@ -972,7 +972,9 @@ Feature: guard-worktrees
         | git -C "$SOMEWHERE" switch some-branch               |
         | git -C "$(pwd)" switch -c probe                      |
         | cd {TMP}/repo/.claude/worktrees/mine && cd "$X" && git checkout some-branch |
-        | cd {TMP}/gone && git checkout some-branch            |
+        | cd {TMP}/repo/.claude/worktrees/mine/not-yet && git checkout -b probe |
+        | git clone x {TMP}/scratch/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/new && cd {TMP}/scratch/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/new && git checkout some-branch |
+        | git -C ~/scratch/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/new switch -c probe |
 
     Scenario Outline: from under the session's own scratchpad, an unresolved directory is allowed with a note
       Given a linked worktree "{TMP}/scratch/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/wt" of the repository at "{TMP}/repo"
@@ -1003,6 +1005,27 @@ Feature: guard-worktrees
       Given the working directory is "{TMP}/gone"
       When the agent runs `cd "$SOMEWHERE" && git checkout some-branch`
       Then the guard denies, naming "can't tell which directory"
+
+    # A literal path that does not exist yet is not unresolved: it lands in
+    # the nearest directory above it that does, and that is judged. Here
+    # HOME is {TMP}, so {TMP}/gone is $HOME's. A `..` through a part that
+    # does not exist yet is never judged.
+    Scenario Outline: from the own worktree, a path not made yet in $HOME, a main checkout or another session's worktree keeps the deny
+      When the agent runs `git status`
+      And the agent runs `<command>`
+      Then the guard denies, naming "can't tell which directory"
+
+      Examples:
+        | command                                                                       |
+        | cd {TMP}/gone && git checkout some-branch                                     |
+        | mkdir -p ~/newdir && cd ~/newdir && git checkout -b probe                     |
+        | git -C $HOME/newdir checkout -b probe                                         |
+        | git -C ~/newdir switch -c probe                                               |
+        | mkdir -p {TMP}/repo/newsub && cd {TMP}/repo/newsub && git checkout -b probe   |
+        | git -C {TMP}/repo/newsub checkout -b probe                                    |
+        | cd {TMP}/repo/.claude/worktrees/theirs/not-yet && git checkout some-branch    |
+        | cd "$X" && cd ~/newdir && git checkout -b probe                               |
+        | cd {TMP}/repo/.claude/worktrees/mine/gone/../.. && git checkout -b probe      |
 
     # A command that passed through $HOME or a main checkout before losing
     # track may have lost it there; `cd -` goes where no word names.
@@ -1037,8 +1060,8 @@ Feature: guard-worktrees
 
     # The three unsafe cases measured: a checkout reaching into another
     # session's worktree, one followed by a force-push. Wherever the path
-    # resolves, even only up to that worktree, the foreign control denies
-    # over the note.
+    # resolves, the foreign control denies over the note; a path not made
+    # yet inside that worktree is checkout-home's deny, above.
     Scenario Outline: a checkout into another session's worktree stays denied from the own worktree
       When the agent runs `git status`
       And the agent runs `<command>`
@@ -1048,7 +1071,6 @@ Feature: guard-worktrees
         | command                                                                         |
         | git -C {TMP}/repo/.claude/worktrees/theirs checkout some-branch                 |
         | cd {TMP}/repo/.claude/worktrees/theirs && git checkout some-branch              |
-        | cd {TMP}/repo/.claude/worktrees/theirs/not-yet && git checkout some-branch      |
         | W={TMP}/repo/.claude/worktrees/theirs; git -C "$W" checkout some-branch         |
 
       @also_guard-git-work-loss
