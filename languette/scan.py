@@ -59,7 +59,7 @@ WRAP = frozenset("sudo env command exec time nice nohup timeout doas builtin "
 # A wrapper's options that take a separate value, so the value is not the command (`sudo -u postgres pkill`).
 _WRAP_VALUED = {"sudo": frozenset("-u -g -h -p -C -D -R -T -U -r -t --user --group --host --prompt --close-from "
                                   "--chdir --chroot --command-timeout --other-user --role --type".split()),
-                "env": frozenset("-u -C -S -P --unset --chdir --split-string --default-signal".split()),
+                "env": frozenset("-u -C -P --unset --chdir --default-signal".split()),  # -S's value is the command
                 "doas": frozenset("-u -C".split()),
                 "timeout": frozenset("-s -k --signal --kill-after".split()),
                 "nice": frozenset("-n --adjustment".split())}

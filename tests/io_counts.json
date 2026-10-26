@@ -2004,6 +2004,7 @@
  "tests/test_features.py::test_taking_the_host_down_or_a_service_the_session_runs_on_with_systemctl_is_denied[/etc/rc.d/init.d/sshd restart-/etc/rc.d/init.d/sshd restart-the RHEL init script path]": {"git": 2},
  "tests/test_features.py::test_taking_the_host_down_or_a_service_the_session_runs_on_with_systemctl_is_denied[/usr/bin/systemctl halt-systemctl halt-by path]": {"git": 2},
  "tests/test_features.py::test_taking_the_host_down_or_a_service_the_session_runs_on_with_systemctl_is_denied[echo done; systemctl stop sshd-systemctl stop sshd-after a ;]": {"git": 1},
+ "tests/test_features.py::test_taking_the_host_down_or_a_service_the_session_runs_on_with_systemctl_is_denied[env -S systemctl stop sshd-systemctl stop sshd-env -S's value is the command]": {"git": 1},
  "tests/test_features.py::test_taking_the_host_down_or_a_service_the_session_runs_on_with_systemctl_is_denied[invoke-rc.d ssh stop-invoke-rc.d ssh stop-the Debian wrapper]": {"git": 1},
  "tests/test_features.py::test_taking_the_host_down_or_a_service_the_session_runs_on_with_systemctl_is_denied[rc-service -v dbus stop-rc-service dbus stop-the OpenRC form with an option]": {"git": 1},
  "tests/test_features.py::test_taking_the_host_down_or_a_service_the_session_runs_on_with_systemctl_is_denied[rc-service sshd restart-rc-service sshd restart-the OpenRC form]": {"git": 1},

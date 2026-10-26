@@ -75,6 +75,7 @@ Feature: guard-host-availability
       | /etc/rc.d/init.d/sshd restart            | /etc/rc.d/init.d/sshd restart  | the RHEL init script path             |
       | sh /etc/init.d/ssh stop                  | /etc/init.d/ssh stop           | the init script through a shell       |
       | sudo -u root systemctl stop sshd         | systemctl stop sshd            | a wrapper option's value is not the command |
+      | env -S systemctl stop sshd               | systemctl stop sshd            | env -S's value is the command         |
 
   Scenario: a fork bomb on a later line is still seen
     When the agent runs:
