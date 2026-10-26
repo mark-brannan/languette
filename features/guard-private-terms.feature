@@ -1118,3 +1118,87 @@ Feature: guard-private-terms
         gh pr create -R o/r -t x --body-file "$SP/notes.md"
         """
       Then the guard denies, naming "Wanderlust"
+
+  Rule: a run-time value is refused with a remedy the guard then accepts
+    The message names what was flagged (the flag or the field), says the text
+    must exist before the call, and says which paths cannot be read. Each
+    remedy it gives is run here as the follow-up command.
+
+    Why. Measured 2026-10-26: 23 of the 44 repeats after a private-terms
+    denial followed the message and were refused again, 18 of them by writing
+    the file in the same command as the post.
+
+    Background:
+      Given the private terms file holds:
+        """
+        Wanderlust
+        """
+
+    Scenario Outline: the message names the flag or field that was flagged
+      When the agent runs `<command>`
+      Then the guard denies, naming "<named>"
+      And the guard denies, naming "exists before this call"
+      And the guard denies, naming "$(mktemp)"
+
+      @also_guard-github-issues
+      Examples:
+        | command                                                  | named              |
+        | gh issue create -R o/r -t x --body "$body"               | the `--body` value |
+        | gh issue create -R o/r -t "$title" -b ok                 | the `-t` value     |
+
+      @also_guard-review-threads
+      Examples:
+        | command                                                                  | named             |
+        | gh api graphql -f query="mutation { addComment(body: $(cat f)) { id } }" | the `query` field |
+
+      Examples:
+        | command                                                                     | named                |
+        | gh api graphql -f query='mutation { addComment { id } }' -f threadId="$tid" | the `threadId` field |
+
+    @also_guard-github-issues
+    Scenario: a file written by an earlier call is the text the follow-up posts
+      Given a project directory
+      And the file "body.md" holds:
+        """
+        nothing private here
+        """
+      When the agent runs `gh issue create -R o/r -t x --body-file {PROJ}/body.md`
+      Then the guard is silent
+      When the agent runs `gh api graphql -f query=@{PROJ}/body.md -f threadId=ok`
+      # the file holds the mutation text, so the field is read from it
+      Then the guard is silent
+
+    @also_guard-github-issues
+    Scenario: a heredoc to a literal path in the same command is the text the follow-up posts
+      Given a project directory
+      When the agent runs:
+        """
+        cat > {PROJ}/fresh.md <<'EOF'
+        nothing private here
+        EOF
+        gh issue create -R o/r -t x --body-file {PROJ}/fresh.md
+        """
+      Then the guard is silent
+
+    @also_guard-github-issues
+    Scenario: a heredoc feeding the value is the text the follow-up posts
+      When the agent runs:
+        """
+        gh issue create -R o/r -t x --body "$(cat <<'EOF'
+        nothing private here
+        EOF
+        )"
+        """
+      Then the guard is silent
+
+    @also_guard-github-issues
+    Scenario: a file this command writes by redirect is not there yet, and a $TMPDIR path cannot be read
+      Given a project directory
+      When the agent runs:
+        """
+        echo ok > {PROJ}/piped.md
+        gh issue create -R o/r -t x --body-file {PROJ}/piped.md
+        """
+      Then the guard denies, naming "piped.md"
+      When the agent runs `gh issue create -R o/r -t x --body-file $TMPDIR/b.md`
+      Then the guard denies
