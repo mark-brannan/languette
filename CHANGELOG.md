@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.0.7](https://github.com/mark-brannan/languette/compare/v0.0.6...v0.0.7) (2026-10-26)
+
+
+### Features
+
+* **guard-git-work-loss:** --force-with-lease to main asks instead of denying ([#258](https://github.com/mark-brannan/languette/issues/258)) ([c5422bb](https://github.com/mark-brannan/languette/commit/c5422bbefc2bb89418560cb5c44744341ada4c2b))
+* **guard-review-threads:** a review_thread_logins setting names the logins whose reply counts ([#256](https://github.com/mark-brannan/languette/issues/256)) ([6b847a4](https://github.com/mark-brannan/languette/commit/6b847a4b422fd4c3747efbf6118b394556f4e2f6))
+* **protected-services:** deny service, pkill and killall stops of a listed unit ([#263](https://github.com/mark-brannan/languette/issues/263)) ([c957187](https://github.com/mark-brannan/languette/commit/c957187b346dcfcc0281ab55fced9ff41dd2280c))
+
+
+### Bug Fixes
+
+* **guards:** --work-tree alone no longer pins; discards pass on a clean tree ([#254](https://github.com/mark-brannan/languette/issues/254)) ([0394a24](https://github.com/mark-brannan/languette/commit/0394a2483526df88267c37a8ab22f4485c82e749))
+* **private-terms:** rewrite a home path in the posted text alone, and ask ([#264](https://github.com/mark-brannan/languette/issues/264)) ([01a75a0](https://github.com/mark-brannan/languette/commit/01a75a0fca15ea6945bdd00fdcbd58b5e663345b))
+* **verdict:** an ask with no one to answer it is a deny that names the guard ([#260](https://github.com/mark-brannan/languette/issues/260)) ([557accc](https://github.com/mark-brannan/languette/commit/557accca6b70295bdaddf41f3e3df6a97c4c7017))
+
+
+### Documentation
+
+* **design:** gather runs guard by guard; verdict takes the mode ([#262](https://github.com/mark-brannan/languette/issues/262)) ([d3c6aea](https://github.com/mark-brannan/languette/commit/d3c6aeaee6919ac60dacfa9d72970192e00a0e92))
+* **features:** restore the why of six guard features ([#257](https://github.com/mark-brannan/languette/issues/257)) ([b9566e8](https://github.com/mark-brannan/languette/commit/b9566e8249db7232f9bcab508548516ff3e246e0))
+* **research:** a cheap cost estimate for a Bash command ([#261](https://github.com/mark-brannan/languette/issues/261)) ([3cd9549](https://github.com/mark-brannan/languette/commit/3cd95497abdf2ddd642bd94912ea19b967e4cc58))
+
 ## [0.0.6](https://github.com/mark-brannan/languette/compare/v0.0.5...v0.0.6) (2026-10-24)
 
 
