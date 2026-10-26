@@ -26,7 +26,7 @@ OPTION = "CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES"
 
 def protected(env):
     """The protected_services patterns; empty when unset."""
-    got = [re.sub(r"\.service\Z", "", p.strip()) for p in (env.get(OPTION) or "").split(",") if p.strip()]
+    got = [re.sub(r"\.service\Z", "", p) for p in sw.listed(env.get(OPTION))]
     return tuple(got)
 
 

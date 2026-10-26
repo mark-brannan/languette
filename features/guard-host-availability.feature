@@ -6,6 +6,9 @@ Feature: guard-host-availability
   or the display manager. No agent area makes them safe. Any other service is
   the agent's to stop.
 
+  Why. These commands take the machine, or the session the agent runs on,
+  down with it.
+
   Scenario Outline: the fork-bomb shape and a power command are denied
     When the agent runs `<command>`
     Then the guard denies, naming "<naming>"

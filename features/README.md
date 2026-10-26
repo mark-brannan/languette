@@ -1,7 +1,7 @@
 # Feature files
 
 Every row runs with every guard on, opt-in guards included, configured once
-in `tests/conftest.py`. A file named for a guard checks that guard's verdict,
+in `tests/harness.py`. A file named for a guard checks that guard's verdict,
 and every other guard must stay silent on the row.
 
 ## `@also_<guard>`

@@ -1051,6 +1051,12 @@ def writes(b, heredoc_only):
     return out
 
 
+def listed(value):
+    """The entries of a comma-separated setting, trimmed and non-empty; none
+    when it is unset."""
+    return [x.strip() for x in (value or "").split(",") if x.strip()]
+
+
 def norm_repo(r):
     """owner/name in lower case from any of the spellings gh and git accept."""
     r = r.lower()

@@ -168,7 +168,7 @@ Feature: guard-worktrees
         | command                                          |
         | yadm checkout .                                  |
 
-    @python_only
+    @awk_only
     Scenario Outline: a branch switch in $HOME follows the guard's option and its checkout-home part
       Given the working directory is "{TMP}"
       And <setting> is "<value>"
@@ -220,6 +220,24 @@ Feature: guard-worktrees
         | /tmp        | GIT_DIR={TMP}/.git GIT_WORK_TREE={TMP} git checkout some-branch  |
         | /tmp        | GIT_WORK_TREE={TMP} git checkout some-branch                     |
         | /tmp        | git --namespace=foo --work-tree={TMP} checkout some-branch       |
+
+    # --work-tree names where files land, not which repo git runs in: the repo
+    # is still found from the directory, so HEAD in $HOME's repo moves.
+    Scenario Outline: --work-tree alone does not pin the repo; the directory still decides
+      Given the working directory is "{TMP}"
+      When the agent runs `<command>`
+      Then the guard denies
+
+      Examples:
+        | command                                     |
+        | git --work-tree=/tmp checkout some-branch   |
+        | git --work-tree /tmp checkout some-branch   |
+        | GIT_WORK_TREE=/tmp git checkout some-branch |
+
+    Scenario: --work-tree alone from outside $HOME is allowed
+      Given the working directory is "{PROJ}"
+      When the agent runs `git --work-tree=/tmp checkout some-branch`
+      Then the guard is silent
 
     # The command can move where git runs before it gets there.
     Scenario Outline: a cd, a chained -C or an exported GIT_DIR that lands in $HOME is denied
@@ -374,7 +392,7 @@ Feature: guard-worktrees
       And a git repository at "{TMP}/other-clone"
       And the working directory is "{TMP}/repo/.claude/worktrees/mine"
 
-    @python_only
+    @awk_only
     Scenario Outline: reaching into another worktree follows the foreign part's setting
       Given CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_FOREIGN is "<value>"
       When the agent runs `git -C ../theirs status`
