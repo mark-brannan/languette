@@ -20,9 +20,7 @@ from languette.verdict import WAY_USER, judged
 NAME = "guard-host-availability"
 
 _POWER = re.compile(r"(?:^|/)(?:shutdown|reboot|halt|poweroff)\Z")
-_SYSV = re.compile(r"(?:^|/)(?:service|invoke-rc\.d|rc-service)\Z")
-_INITD = re.compile(r"(?:^|/)etc/(?:rc\.d/)?init\.d/[^/]+\Z")
-_SERVICE_STOP = {"stop", "restart", "force-reload", "try-restart", "--full-restart"}
+_SERVICE_STOP = {v: [] for v in ("stop", "restart", "force-reload", "try-restart", "--full-restart")}
 # The services a session runs on: stopping one cuts the user off the machine.
 _CORE = {"ssh", "sshd", "systemd-logind", "dbus", "dbus-broker", "NetworkManager", "systemd-networkd", "networking",
          "display-manager", "gdm", "gdm3", "sddm", "lightdm", "getty", "user",
@@ -45,27 +43,6 @@ def _core_unit(u):
     return any(n in _CORE or n.startswith("session-") for n in sw.unit_names(u))
 
 
-def sysv_stop(s, a, b):
-    """`<command> <unit> <verb>` when the segment's SysV `service`, `invoke-rc.d`, `rc-service` or
-    `/etc/init.d/<unit>` stops or restarts a unit the session runs on; else None. The verb is any word
-    of the segment (`service ssh --full-restart`, `service -v ssh stop`), not only the second."""
-    g = sw.cmd_index(s, a, b, _SYSV, True)
-    init = g is None
-    if init:
-        g = sw.cmd_index(s, a, b, _INITD, True)
-        if g is None:
-            return None
-    words = [s.w[i] for i in range(g + 1, b + 1) if s.k[i] == "w"]
-    verb = next((w for w in words if w in _SERVICE_STOP), None)
-    if verb is None:
-        return None
-    units = [os.path.basename(s.w[g])] if init else [w for w in words if not w.startswith("-")]
-    unit = next((u for u in units if u != verb and _core_unit(u)), None)
-    if unit is None:
-        return None
-    return f"{os.path.basename(s.w[g])} {unit} {verb}" if not init else f"{s.w[g]} {verb}"
-
-
 def judge(doc):
     """The deny reason for the command, or None."""
     for t, _ in doc.texts():
@@ -80,7 +57,7 @@ def judge(doc):
             if verb:
                 return say("host_ctl", verb=verb, way_user=WAY_USER)
         for a, b in segs:
-            verb = sysv_stop(s, a, b)
+            verb = sw.sysv_stop(s, a, b, _core_unit, _SERVICE_STOP)
             if verb:
                 return say("host_sysv", verb=verb, way_user=WAY_USER)
         # The fork bomb is raw text, so a commit message that quotes it must not trip it:
