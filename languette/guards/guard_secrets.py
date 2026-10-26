@@ -27,7 +27,6 @@ file is read through the runner (Need), so the guard, like the detector, is a
 pure function.
 """
 
-import json
 import re
 
 try:
@@ -129,13 +128,7 @@ def _scans(doc):
 
 def check(doc):
     payload, env = doc.payload, doc.env
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if cmd is None or cmd is False:
-        return None
-    if not isinstance(cmd, str):
-        cmd = json.dumps(cmd)
-    cmd = cmd.rstrip("\n")
-    if not cmd:
+    if not doc.text:
         return None
     try:
         extra = yield from project_rules(payload, env)

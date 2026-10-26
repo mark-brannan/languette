@@ -464,9 +464,9 @@ def _segment(doc, s, a, b, nested, env):
 
 
 def check(doc):
-    payload, env = doc.payload, doc.env or {}
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if not isinstance(cmd, str) or not cmd:
+    env = doc.env or {}
+    cmd = doc.text
+    if not cmd:
         return None
     asked = None
     try:
