@@ -87,7 +87,7 @@ there until a second guard asks for it; then it earns a name here.
 
 recursive-delete, permissions and worktrees each work out which paths a call
 writes, then resolve them against the payload's cwd and through the
-filesystem. That step is done once, for every guard: the engine lists the
+filesystem. That stage is done once, for every guard: the engine lists the
 paths to resolve, gather resolves them, and a call's targets are a list of
 resolved paths, or a reason one could not be resolved. A rule is a
 list of path patterns and an action. A target that cannot be resolved fails
@@ -95,7 +95,7 @@ closed, as both guards do today.
 
 Command rules say which words are targets (`rm -r <targets>`); file tools name
 theirs in `tool_input`. guard-protected-paths is the first guard built on this
-step alone.
+stage alone.
 
 ## Text rules
 
@@ -115,6 +115,24 @@ guard would judge, naming the file and the fault. That is ask-first's and
 guard-secrets' behaviour today: the guard cannot tell what it was meant to
 cover. A test loads every rule set languette ships, so that deny never greets
 an install.
+
+## Path there
+
+The stages from today's guards to the four engines, in order (#198). A stage
+that lands leaves this list; what it built is then described above.
+
+1. The command engine: one rule loader and one matcher, where ask-first,
+   scheduled-jobs and protected-services each load and match in their own
+   way today. Program descriptions hold every value-taking option table,
+   infra's and the commit guard's beside git's. Those three guards move
+   onto it.
+2. deny-always and guard-sudo, written as rules alone: the measure of what
+   a new guard costs on the engine.
+3. The other command guards move, smallest first.
+4. Write targets, then guard-protected-paths on it; recursive-delete,
+   permissions and worktrees switch to it.
+5. The text engine: `secret_rules`, private-terms' terms and bypass-labels,
+   then guard-databases.
 
 ## Open
 

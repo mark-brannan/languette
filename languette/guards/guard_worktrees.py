@@ -9,7 +9,8 @@ spec is features/guard-worktrees.feature.
 Opt-in: hooks.json runs it only when the option guard_worktrees is exactly
 true, and run.py without --guard skips it unless that option is set. A
 control is skipped when its own option (guard_worktrees_checkout_home,
-guard_worktrees_foreign) is exactly false; the first control to object wins.
+guard_worktrees_foreign) is exactly false; the first control to object wins,
+and a note is given only when neither does.
 
 checkout-home. yadm hardcodes --work-tree=$HOME, so any yadm checkout/switch
 that is not a file restore (`checkout [<ref>] -- <path>`) is denied, from any
@@ -18,7 +19,25 @@ $HOME's worktree (`rev-parse --show-toplevel`), following a cd/pushd, chained
 -C, --git-dir/--work-tree and GIT_DIR=/GIT_WORK_TREE=, exported or inline. A
 --git-dir counts when it is $HOME's repo or any repo whose work tree is $HOME.
 A directory that cannot be resolved (a variable, `cd -`, a stale cwd) is a
-deny. `(cd x); git checkout y` is judged from x: a known false allow.
+deny, with one exception: an allow with a note when the session's cwd is its
+own linked worktree (recorded, or under its scratchpad) or lies under its
+scratchpad, and every directory the command resolved before losing track is
+too. The scratchpad is the directory the harness made for the session, not
+any directory named for it. Tilde forms expand as the shell expands them: ~
+from $HOME, ~user from the user database, ~+ from the directory the word is
+read in. A literal path that does not exist yet (after that expansion) is
+judged by the nearest directory above it that does, which must be an own
+place too. $HOME, a main checkout, a cwd that does not resolve, `cd -`, ~-,
+a directory-stack ~N, a ~user the lookup can't find, and a session's first
+call (nothing recorded yet) keep the deny. So does every cd or -C after a
+command that may make a link or move, copy or unpack something into place
+(ln, mv, cp, rsync, tar, unzip, cpio, git mv): a path it touched need not
+land where it looks. A word that resolves into another session's worktree
+is the foreign control's deny. What a word the guard can't read names (a
+variable other than HOME, a `$( )`, a glob) is unseen, so it may be any
+directory: a known gap. So is a link made by a command the guard does not
+know as one (a script, a clone whose tree holds a symlink).
+`(cd x); git checkout y` is judged from x: a known false allow.
 
 foreign. Another session's worktree is never a place to work:
 the session that owns a worktree may archive it mid-turn under anyone who
@@ -44,12 +63,19 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Act, Need, Refuse, deny
+from languette.verdict import Act, Need, Refuse, context, deny
 
 NAME = "guard-worktrees"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES"
 MAX_CANDIDATES = 48
-_HOMEISH = re.compile(r"(?:/|~\Z|~/|\$HOME\Z|\$HOME/|\$\{HOME\}\Z|\$\{HOME\}/)")
+# A spelling that names the same directory from anywhere: absolute, $HOME, ~ or ~user.
+_HOMEISH = re.compile(r"(?:/|~(?:[^/+\-0-9][^/]*)?(?:/|\Z)|\$HOME(?:/|\Z)|\$\{HOME\}(?:/|\Z))")
+# A tilde the guard can't follow: ~- is $OLDPWD, ~N, ~+N and ~-N the directory stack.
+_TILDE_LOST = re.compile(r"~(?:-|[+-]?[0-9]+)(?:/|\Z)")
+# A command that can make a path land somewhere other than where it looks: a
+# link made, or something moved, copied or unpacked into place.
+_FS_CHANGE = re.compile(r"(?:^|/)(?:ln|link|mv|cp|rsync|tar|unzip|cpio)\Z")
+GETENT_TIMEOUT = 2
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 _KEYWORD = frozenset("builtin command if then else elif while until do !".split())
 
@@ -65,14 +91,40 @@ def _canon(p):
     return None
 
 
-def _expand_home(raw, home):
-    """The literal ~ / $HOME / ${HOME} the shell would expand, or None."""
-    if raw in ("$HOME", "${HOME}", "~"):
-        return home
-    for pre in ("$HOME/", "${HOME}/", "~/"):
-        if raw.startswith(pre):
-            return home + "/" + raw[len(pre):]
-    return None
+def _user_home(name):
+    """A user's home directory from the user database, as the shell's ~user
+    reads it, or None when it can't be had."""
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9._-]*", name):
+        return None
+    try:
+        rc, out, _ = yield Need("run", "/", GETENT_TIMEOUT, "getent", "passwd", name)
+    except Exception:  # noqa: BLE001 -- no getent, or it hung: unfollowed
+        return None
+    f = out.split("\n", 1)[0].split(":")
+    return f[5] if rc == 0 and len(f) == 7 and f[0] == name and f[5].startswith("/") else None
+
+
+def _expand(raw, base, home):
+    """`raw` with what the shell expands at its start: $HOME, ${HOME} and every
+    tilde form (~ and ~/x from $HOME, ~user from the user database, ~+ from
+    the directory it runs in, `base`). None for a tilde the guard can't
+    follow: ~-, a directory-stack ~N, a user the lookup can't find, ~+ with no
+    directory. Any other word as written."""
+    for pre in ("$HOME", "${HOME}"):
+        if raw == pre or raw.startswith(pre + "/"):
+            return home + raw[len(pre):]
+    if not raw.startswith("~"):
+        return raw
+    head, sep, tail = raw[1:].partition("/")
+    if head == "":
+        d = home
+    elif head == "+":
+        d = base
+    elif _TILDE_LOST.match(raw):
+        d = None
+    else:
+        d = yield from _user_home(head)
+    return d + sep + tail if d else None
 
 
 # --- checkout-home --------------------------------------------------------
@@ -80,8 +132,9 @@ def _expand_home(raw, home):
 def _home_events(doc):
     """The command's moves, in order: ("DENY",) for a yadm checkout/switch,
     ("CD", v), ("ENV", kind, v) for a GIT_DIR=/GIT_WORK_TREE= outside a git
-    segment, and ("G", [(kind, v)]) for one git checkout/switch with its
-    -C/GITDIR/WORKTREE targets in order."""
+    segment, ("FS",) for a segment that may make a link or move, copy or
+    unpack one into place (a `git mv` too), and ("G", [(kind, v)]) for one git
+    checkout/switch with its -C/GITDIR/WORKTREE targets in order."""
     out = []
     for text, nested in doc.texts():
         s = doc.scan(text)
@@ -101,9 +154,14 @@ def _home_events(doc):
                         out.append(("ENV", "GITDIR", s.w[i][8:]))
                     if s.k[i] == "w" and s.w[i].startswith("GIT_WORK_TREE="):
                         out.append(("ENV", "WORKTREE", s.w[i][14:]))
+                if sw.cmd_index(s, a, b, _FS_CHANGE, nested) is not None:
+                    out.append(("FS",))
                 continue
             sidx = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and s.w[i] in ("checkout", "switch")), None)
             if sidx is None:
+                sub = sw.git_subcommand(s, g, b)
+                if sub <= b and s.w[sub] == "mv":
+                    out.append(("FS",))
                 continue
             # checkout -- <path> is a file restore; a bare trailing -- is not.
             if s.w[sidx] == "checkout" and any(s.k[i] == "w" and s.w[i] == "--" and s.k[i + 1] == "w"
@@ -143,15 +201,10 @@ def _resolve_arg(raw, base, home):
     """A -C/--git-dir/--work-tree/cd value resolved the way the shell would
     leave it unquoted, canonical; a git dir may be a gitfile, so a file
     resolves through its parent. None when it can't be."""
-    r = _expand_home(raw, home)
-    if r is None:
-        if raw.startswith("/"):
-            r = raw
-        elif not base:
-            return None
-        else:
-            r = base + "/" + raw
-    if not r.startswith("/"):
+    r = yield from _expand(raw, base, home)
+    if r and not r.startswith("/") and base:
+        r = base + "/" + r
+    if not r or not r.startswith("/"):
         return None
     if (yield Need("path", "isdir", r)):
         return (yield Need("path", "realpath", r))
@@ -176,6 +229,33 @@ def _resolve_all(raw, bases, home):
     return res, miss
 
 
+def _landings(raw, bases, home):
+    """Where a literal word that does not resolve would land: the nearest
+    existing directory above it, against each base it missed on. A word the
+    guard can't read (a variable other than HOME, a `$( )`, a glob) lands
+    nowhere it can name, so []; a tilde it can't follow (~-, ~N, an unknown
+    ~user) and a `..` through a part that does not exist yet are None, never
+    judged."""
+    if _TILDE_LOST.match(raw):
+        return None
+    if _HOMEISH.match(raw):
+        bases = ["/"]
+    out = []
+    for base in bases:
+        w = yield from _expand(raw, base, home)
+        if w is None:
+            return None
+        if (yield from _resolve_arg(w, base, home)):
+            continue
+        try:
+            d, _ = yield from _resolve_dir(w, base, home)
+        except Refuse:
+            return None
+        if d:
+            out.append(d)
+    return out
+
+
 def _generic(prog):
     return Refuse(say("wt_checkout_home", guard=NAME, prog=prog))
 
@@ -186,7 +266,7 @@ def _checkout_home(doc):
     if not isinstance(cmd, str) or not cmd:
         return
     events = _home_events(doc)
-    if not events:
+    if all(ev[0] == "FS" for ev in events):
         return
     if not (yield Need("which", "git")):
         raise Refuse(say("wt_git_missing_checkout", guard=NAME))
@@ -206,18 +286,49 @@ def _checkout_home(doc):
     def targets_home(d):
         return d == home or (yield from _git("/", "-C", d, "rev-parse", "--show-toplevel")) == home
 
-    cands, lost, env_targets = ([cwd] if cwd else []), not cwd, []
+    sess = _Session(payload, env, "", home)
+
+    def user_word(v):
+        """A ~user word with the user's home put in, so each is looked up once."""
+        m = re.match(r"~([^/+\-0-9][^/]*)(/.*)?\Z", v, re.S)
+        if not m:
+            return v
+        d = yield from _user_home(m.group(1))
+        return d + (m.group(2) or "") if d else v
+
+    def own_place(d):
+        """Under this session's scratchpad, or in its own linked worktree: one
+        under the scratchpad or recorded. Never $HOME or a main checkout. The
+        scratchpad is the directory itself, found where the harness makes it,
+        not any directory named for the session."""
+        if d == home:
+            return False
+        if (yield from sess.in_pad(d)):
+            return True
+        top = yield from _git("/", "-C", d, "rev-parse", "--show-toplevel")
+        if not top or top == home or not (yield Need("path", "isfile", os.path.join(top, ".git"))):
+            return False
+        return (yield from sess.in_pad(top)) or (yield from sess.recorded(top))
+
+    # visited: every directory the command was known to stand in; None once a
+    # `cd -` took it somewhere no word names. changed: a link, move or copy ran
+    # earlier, so no later directory word lands where it looks; each is lost.
+    cands, lost, env_targets, visited, note = ([cwd] if cwd else []), not cwd, [], ([cwd] if cwd else None), None
+    changed = False
     for ev in events:
         if ev[0] == "DENY":
             raise _generic("yadm")
-        if ev[0] == "ENV":
+        if ev[0] == "FS":
+            changed = True
+        elif ev[0] == "ENV":
             env_targets.append(ev[1:])
         elif ev[0] == "CD":
-            v = ev[1]
+            v = yield from user_word(ev[1])
             if v == "":
                 cands, lost = [home], False
-            elif v == "-":
-                lost = True
+                visited = visited and visited + [home]
+            elif v == "-" or changed or _TILDE_LOST.match(v):
+                lost, visited = True, None
             else:
                 if _HOMEISH.match(v):
                     lost = False
@@ -226,23 +337,30 @@ def _checkout_home(doc):
                 res, miss = yield from _resolve_all(v, cands, home)
                 if not miss and res:
                     cands = res
+                    visited = visited and visited + res
                 else:
                     lost = True
+                    # A literal path not made yet is judged where it lands.
+                    land = yield from _landings(v, cands, home)
+                    visited = visited and (None if land is None else visited + land)
         else:
             if not home:
                 raise Refuse(say("wt_home_unresolved_checkout", guard=NAME))
-            bases, blind, pinned, unpinned = cands, lost, False, False
+            bases, blind, pinned, unpinned, seen = cands, lost, False, False, visited
             for tk, tv in env_targets + ev[1]:
+                tv = yield from user_word(tv)
                 if tk == "C":
+                    land = None if changed else (yield from _landings(tv, bases, home))
                     bases, miss = yield from _resolve_all(tv, bases, home)
-                    blind = blind or miss or not bases
+                    blind = blind or changed or miss or not bases
+                    seen = seen and (None if land is None else seen + bases + land)
                     continue
                 # --work-tree says where files land, not which repo: git still finds the repo from the directory.
                 pinned = pinned or tk == "GITDIR"
                 res, miss = yield from _resolve_all(tv, bases, home)
                 # A value that does not resolve (or is relative to a directory that doesn't) pins nothing.
                 # any miss denies: one candidate base that fails to resolve is enough
-                unpinned = unpinned or miss or not res or (blind and not _HOMEISH.match(tv))
+                unpinned = unpinned or changed or miss or not res or (blind and not _HOMEISH.match(tv))
                 for r in res:
                     if (tk == "GITDIR" and (yield from gitdir_is_home(r))) or (tk == "WORKTREE" and r == home):
                         raise _generic("git")
@@ -252,10 +370,17 @@ def _checkout_home(doc):
             if pinned:
                 continue
             if blind:
-                raise Refuse(say("wt_dir_unclear", guard=NAME))
+                if not seen:
+                    raise Refuse(say("wt_dir_unclear", guard=NAME))
+                for d in dict.fromkeys(seen):
+                    if not (yield from own_place(d)):
+                        raise Refuse(say("wt_dir_unclear", guard=NAME))
+                note = say("wt_dir_unclear_note", guard=NAME)
+                continue
             for d in bases:
                 if (yield from targets_home(d)):
                     raise _generic("git")
+    return note
 
 
 # --- foreign --------------------------------------------------------------
@@ -370,7 +495,7 @@ class _Session:
         self.env, self.own_top, self.home = env, own_top, home
         sid, aid = payload.get("session_id"), payload.get("agent_id")
         self.sid = sid if isinstance(sid, str) else ""
-        self.rec = None
+        self.rec, self.pad = None, None
         if self.sid:
             tag = re.sub(r"[^A-Za-z0-9_-]", "_", self.sid)
             if isinstance(aid, str) and aid:
@@ -379,6 +504,13 @@ class _Session:
 
     def under_scratch(self, d):
         return bool(self.sid) and f"/{self.sid}/" in f"/{d}/"
+
+    def in_pad(self, d):
+        """`d` is the scratchpad the harness made for this session, or under it."""
+        if self.pad is None:
+            p = (yield Need("worktree", "scratchpad", self.sid)) if self.sid else None
+            self.pad = ((yield from _canon(p)) if p else None) or ""
+        return bool(self.pad) and (d == self.pad or d.startswith(self.pad.rstrip("/") + "/"))
 
     def recorded(self, top):
         if not self.rec:
@@ -423,14 +555,11 @@ def _deny_path(sess, env, word, ft):
 def _resolve_dir(raw, base, home):
     """(canonical nearest existing directory, the part below it that does not
     exist yet), or ("", "") when the word can't be judged."""
-    r = _expand_home(raw, home)
-    if r is None:
-        if raw.startswith("/"):
-            r = raw
-        elif not base:
-            return "", ""
-        else:
-            r = base + "/" + raw
+    r = yield from _expand(raw, base, home)
+    if r and not r.startswith("/") and base:
+        r = base + "/" + r
+    if not r or not r.startswith("/"):
+        return "", ""
     # An unexpandable word ($VAR, a brace, a glob): the walk up would answer
     # about a real ancestor instead.
     if any(ch in r for ch in "$*?{"):
@@ -561,11 +690,14 @@ CONTROLS = (("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME", _checkout_hom
 def check(doc):
     if not isinstance(doc.payload, dict):
         return None
+    notes = []
     for option, control in CONTROLS:
         if doc.env.get(option) == "false":
             continue
         try:
-            yield from control(doc)
+            note = yield from control(doc)
         except Refuse as r:
             return deny(str(r))
-    return None
+        if note:
+            notes.append(note)
+    return context("\n\n".join(notes)) if notes else None

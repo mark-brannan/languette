@@ -262,6 +262,7 @@ Feature: prose-budget-commit
     Then the guard is silent
     And the stub "prose-budget" was not called
 
+  @also_guard-git-work-loss
   Scenario: an `add` flag this guard doesn't recognize widens rather than narrows
     Given the file "README.md" holds:
       """

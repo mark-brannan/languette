@@ -48,6 +48,13 @@ Feature: guard-git-work-loss
       | git add :/                              | denies    |                                   |
       | git add -u                              | denies    | with no path                      |
       | git add -Av                             | denies    | a flag cluster                    |
+      | git add -u --chmod +x                   | denies    | +x is --chmod's value, not a path |
+      | git add -u --chm +x                     | denies    | the same, a unique prefix         |
+      | git add -u --chmod=+x                   | denies    | the same, glued                   |
+      | git add --renormalize                   | denies    | it implies -u                     |
+      | git add --frobnicate src/               | denies    | an option the guard does not know |
+      | git add -uz src/                        | denies    | the same, in a cluster            |
+      | git add --ign src/                      | denies    | an ambiguous prefix               |
       | yadm add -A                             | denies    |                                   |
       | cd foo && git add -A && git commit -m x | denies    | in a chain                        |
       | git -C /some/dir add -A                 | denies    | git -C                            |
@@ -56,7 +63,12 @@ Feature: guard-git-work-loss
       | git commit --all -m x                   | denies    |                                   |
       | git add hooks/foo.sh README.md          | is silent | staging by path                   |
       | git add -u src/                         | is silent | with a path                       |
+      | git add -u --chmod +x src/              | is silent | a path beside --chmod's value     |
+      | git add --chmod=+x hooks/foo.sh         | is silent | chmod by path                     |
       | git add -p foo                          | is silent |                                   |
+      | git add -h                              | is silent | usage stages nothing              |
+      | git add --help                          | is silent | the manual stages nothing         |
+      | git add -A --help                       | is silent | help wins over -A                 |
       | git commit -m "add -A everything"       | is silent |                                   |
       | git commit --amend --no-edit            | is silent |                                   |
       | git commit -m 'block git commit -a'     | is silent | a commit message that mentions -a |
@@ -547,3 +559,214 @@ Feature: guard-git-work-loss
       | git --config-env a=B add -A                  | the same, another rule        |
       | git --attr-source HEAD push --force origin x | the same, another rule        |
       | git --config-env=a=B reset --hard            | attached, which already held  |
+
+  # Two relaxations hold only where an agent works: a linked worktree, or the
+  # session's scratchpad. $HOME and a repo's main checkout are where the user
+  # works, and there both stay denied. Each is asked of git in the directory the
+  # session runs in, so a cd or -C in the command leaves the deny standing.
+  Rule: where an agent works, `git add -A <paths>` stages by path
+
+    Background:
+      Given a clone of "https://example.com/r.git" at "{TMP}/repo" on branch "main"
+      And a linked worktree "{TMP}/repo/.claude/worktrees/feat" of the repository at "{TMP}/repo"
+
+    Scenario Outline: -A with paths passes in a linked worktree
+      Given the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `<command>`
+      Then the guard is silent
+
+      Examples:
+        | command                                   | note                        |
+        | git add -A src/x.py docs/                 | paths name what is staged   |
+        | git add -A -- src/x.py                    | after --                    |
+        | git add -A src/x.py && git commit -m y    | then a commit               |
+        | git add --all src/x.py 2>&1               | a redirect is not a path    |
+        | git add -A --chmod +x src/x.py            | --chmod's value is not a path |
+        | git add -A --chm=+x src/x.py              | a prefix, glued             |
+        | git add -AU 3 src/x.py                    | -U takes the next word      |
+        | git add -A --pathspec-file-nul src/x.py   | a flag with no value        |
+        | git add -fA src/x.py                      | -A inside a cluster         |
+        | git add -A --end-of-options src/x.py      | ends the options            |
+        | git add -A --no-chmod +x                  | a negated option takes no value, so +x is a path |
+        | git add --no-all src/x.py                 | not -A                      |
+        | git add --ignore-removal src/x.py         | not -A                      |
+
+    Scenario Outline: -A stays denied in a linked worktree when it is blanket or its place is not known
+      Given the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `<command>`
+      Then the guard denies
+
+      Examples:
+        | command                                                    | note                              |
+        | git add -A                                                 | bare -A is blanket                |
+        | git add -A .                                               | the whole tree                    |
+        | git add -A --pathspec-from-file=list                       | the paths are in a file           |
+        | git add -A --pathspec-from-file list                       | the same, a separate value        |
+        | git add -A --pathspec-from list                            | the same, a prefix                |
+        | git add -A --chmod +x                                      | +x is --chmod's value, not a path |
+        | git add -A --chm +x                                        | the same, a unique prefix         |
+        | git add -A --chmod=+x                                      | the same, glued                   |
+        | git add -AU 3                                              | 3 is -U's value                   |
+        | git add -A --unified 3                                     | the same, long                    |
+        | git add -A --inter-hunk-context 3                          | another value option              |
+        | git add -A --frobnicate src/x.py                           | an option the guard does not know |
+        | git add -A --ign src/x.py                                  | an ambiguous prefix               |
+        | git add -fA                                                | -A inside a cluster, no path      |
+        | git add -A --end-of-options                                | nothing after the options         |
+        | git add --no-ignore-removal                                | git reads it as -A                |
+        | git -C {TMP}/repo add -A src/x.py                          | -C names another tree             |
+        | cd {TMP}/repo && git add -A src/x.py                       | a cd moves the tree               |
+        | git add -A src/x.py && git commit -am y                    | the commit is blanket             |
+
+    Scenario Outline: -A with a path that reaches the whole tree is denied as blanket in a linked worktree
+      Given the directory "{TMP}/repo/.claude/worktrees/feat/src/sub"
+      And the working directory is "<cwd>"
+      When the agent runs `<command>`
+      Then the guard denies, naming "`git add -A` is blocked: stage by path"
+
+      Examples:
+        | cwd                                           | command                                            | note                          |
+        | {TMP}/repo/.claude/worktrees/feat/src         | git add -A ..                                      | up to the toplevel            |
+        | {TMP}/repo/.claude/worktrees/feat/src         | git add -A ../                                     | the same, a slash             |
+        | {TMP}/repo/.claude/worktrees/feat/src/sub     | git add -A ../..                                   | two up                        |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A .//                                     | the toplevel, spelled long    |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A {TMP}/repo/.claude/worktrees/feat       | the toplevel's absolute path  |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A src/x.py {TMP}/repo                     | one path above the toplevel   |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A ':(top)'                                | magic: the toplevel           |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A ':/*'                                   | magic: everything from the top |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A ':!src/x.py'                            | an exclusion: all but one     |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A ':(exclude)src/x.py'                    | the same, long form           |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A '*.py'                                  | a glob over the tree          |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A $PWD                                    | a variable the shell expands  |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A "$(pwd)"                                | a command substitution        |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A ~                                       | a tilde                       |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A {src,..}                                | a brace expansion             |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A src/{x.py,}                             | a brace, one empty            |
+
+    Scenario: -A with a path through a symlink is denied when git's lexical reading leaves the tree
+      Given the directory "{TMP}/repo/.claude/worktrees/feat/src/sub/deep"
+      And the symlink "{TMP}/repo/.claude/worktrees/feat/lnk" to "{TMP}/repo/.claude/worktrees/feat/src/sub/deep"
+      And the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `git add -A lnk/../..`
+      Then the guard denies, naming "`git add -A` is blocked: stage by path"
+
+    Scenario: -A with a path in a subdirectory passes when it stays below the toplevel
+      Given the directory "{TMP}/repo/.claude/worktrees/feat/src/sub"
+      And the working directory is "{TMP}/repo/.claude/worktrees/feat/src/sub"
+      When the agent runs `git add -A .. x.py`
+      Then the guard is silent
+
+    Scenario: -A with paths is denied in a repo's main checkout
+      Given the working directory is "{TMP}/repo"
+      When the agent runs `git add -A src/x.py`
+      Then the guard denies, naming "`git add <paths>` stages the same changes"
+
+    Scenario: -A with paths is denied where $HOME is the linked worktree
+      Given a linked worktree "{TMP}/home" of the repository at "{TMP}/repo"
+      And HOME is "{TMP}/home"
+      And the working directory is "{TMP}/home"
+      When the agent runs `git add -A src/x.py`
+      Then the guard denies
+
+    Scenario: -A with paths passes in a repo in the session's scratchpad
+      Given the session is "aaaaaaaa-1111-4222-8333-444444444444"
+      And CLAUDE_CODE_TMPDIR is "{TMP}/scratch/claude-tmpdir"
+      And a git repository at "{TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/r"
+      And the working directory is "{TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/r"
+      When the agent runs `git add -A src/x.py`
+      Then the guard is silent
+
+    Scenario: -A with paths is denied in another session's scratchpad repo
+      Given the session is "aaaaaaaa-1111-4222-8333-444444444444"
+      And CLAUDE_CODE_TMPDIR is "{TMP}/scratch/claude-tmpdir"
+      And the directory "{TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad"
+      And a git repository at "{TMP}/scratch/claude-tmpdir/claude-1000/proj/bbbbbbbb-1111-4222-8333-444444444444/scratchpad/r"
+      And the working directory is "{TMP}/scratch/claude-tmpdir/claude-1000/proj/bbbbbbbb-1111-4222-8333-444444444444/scratchpad/r"
+      When the agent runs `git add -A src/x.py`
+      Then the guard denies
+
+  # The rebase case: a branch's worktree reset to its own remote head. "Own" is
+  # origin/<the branch checked out>, read from git; a branch whose upstream is
+  # set to another name is not resetting to its own. The tree must be clean, as
+  # for a bare discard, and the reset must run on its own.
+  Rule: where an agent works, `git reset --hard origin/<current branch>` passes on a clean tree
+
+    Background:
+      Given a clone of "https://example.com/r.git" at "{TMP}/repo" on branch "main"
+      And a linked worktree "{TMP}/repo/.claude/worktrees/feat" of the repository at "{TMP}/repo"
+      And the remote HEAD of "{TMP}/repo" points at "feat"
+
+    Scenario Outline: a reset to the branch's own remote passes in a clean linked worktree
+      Given the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `<command>`
+      Then the guard is silent
+
+      Examples:
+        | command                            | note                    |
+        | git reset --hard origin/feat       | no upstream set         |
+        | git reset -q --hard origin/feat    | -q beside it            |
+        | git reset --hard origin/feat -q    | -q after                |
+
+    Scenario: a reset to the branch's own remote passes when the branch tracks it
+      Given the branch "feat" of "{TMP}/repo" tracks "origin/feat"
+      And the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `git reset --hard origin/feat`
+      Then the guard is silent
+
+    Scenario Outline: a reset to a ref stays denied in a clean linked worktree when it is not the branch's own
+      Given the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `<command>`
+      Then the guard denies
+
+      Examples:
+        | command                                         | note                                  |
+        | git reset --hard origin/main                    | another branch's remote               |
+        | git reset --hard origin/feat~1                  | not the remote head itself            |
+        | git reset --hard origin/feat && git log -1      | a second git: not on its own          |
+        | cd {TMP}/repo/.claude/worktrees/feat && git reset --hard origin/feat | a cd moves the tree |
+        | git -C {TMP}/repo reset --hard origin/feat      | -C names another tree                 |
+        | git reset --hard --recurse-submodules origin/feat | an option the guard does not weigh  |
+
+    Scenario: a reset to the branch's own remote is denied when the branch tracks another name
+      Given the branch "feat" of "{TMP}/repo" tracks "origin/main"
+      And the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `git reset --hard origin/feat`
+      Then the guard denies
+
+    Scenario: a reset to the branch's own remote is denied on a dirty tree
+      Given the file "{TMP}/repo/.claude/worktrees/feat/notes.txt" holds:
+        """
+        work in progress
+        """
+      And the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `git reset --hard origin/feat`
+      Then the guard denies, naming "on a clean tree"
+
+    Scenario: a reset to the branch's own remote is denied in a repo's main checkout
+      Given a clone of "https://example.com/r.git" at "{TMP}/main" on branch "feat"
+      And the working directory is "{TMP}/main"
+      When the agent runs `git reset --hard origin/feat`
+      Then the guard denies
+
+    Scenario: a reset to the branch's own remote is denied where $HOME is the linked worktree
+      Given a linked worktree "{TMP}/home" of the repository at "{TMP}/repo"
+      And the remote HEAD of "{TMP}/repo" points at "home"
+      And HOME is "{TMP}/home"
+      And the working directory is "{TMP}/home"
+      When the agent runs `git reset --hard origin/home`
+      Then the guard denies
+
+    Scenario: a reset to the branch's own remote passes in a repo in the session's scratchpad
+      Given the session is "aaaaaaaa-1111-4222-8333-444444444444"
+      And CLAUDE_CODE_TMPDIR is "{TMP}/scratch/claude-tmpdir"
+      And a clone of "https://example.com/r.git" at "{TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/r" on branch "feat"
+      And the working directory is "{TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/r"
+      When the agent runs `git reset --hard origin/feat`
+      Then the guard is silent
+
+  Scenario: a command that is not a string is judged as the JSON text it prints as
+    When the payload is:
+      """
+      {"tool_name": "Bash", "tool_input": {"command": ["git add -A"]}}
+      """
+    Then the guard denies

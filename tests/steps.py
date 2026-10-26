@@ -239,6 +239,13 @@ def _stubs(ctx):
     ctx.stubs, ctx.stub_log = True, ctx.mkdtemp()
 
 
+@given('the stub "getent" is first on PATH')
+def _getent_stub(ctx):
+    # The guard reads ~user through getent; the stub answers for one user whose
+    # home is the scenario's $HOME, so no verdict depends on this machine's users.
+    ctx.env["PATH"] = str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
+
+
 @given('the stub "gh" is first on PATH, for a Python guard')
 def _gh_stub_python(ctx):
     # The Python engine's guards get only the scenario's env, so PATH and the
@@ -286,6 +293,14 @@ def _remote_head(ctx, path, branch):
     subprocess.run(["git", "-C", d, "update-ref", f"refs/remotes/origin/{branch}", "HEAD"], check=True)
     subprocess.run(["git", "-C", d, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{branch}"],
                    check=True)
+
+
+@given(parsers.parse('the branch "{branch}" of "{path}" tracks "{upstream}"'))
+def _tracks(ctx, branch, path, upstream):
+    d = ctx.expand(path)
+    remote, _, name = upstream.partition("/")
+    subprocess.run(["git", "-C", d, "config", f"branch.{branch}.remote", remote], check=True)
+    subprocess.run(["git", "-C", d, "config", f"branch.{branch}.merge", f"refs/heads/{name}"], check=True)
 
 
 def _engine(ctx, command):
