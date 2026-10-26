@@ -38,8 +38,6 @@ AskUserQuestion is denied unseen, the deny says no one can approve it instead
 of sending the agent to ask.
 """
 
-import re
-
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
@@ -47,6 +45,7 @@ from languette.verdict import NO_QUESTION, Refuse, claim, deny
 
 NAME = "ask-first"
 CONFIG = ".languette/ask-first.json"
+
 
 def _config(payload, env):
     """The governing config path, or None when no project has one
@@ -59,46 +58,27 @@ def _config(payload, env):
     return path
 
 
-def _strs(v, what):
-    if not isinstance(v, list) or not v or not all(isinstance(x, str) and x for x in v):
-        raise Refuse(f"{what} must be a non-empty list of non-empty strings")
-    return v
+def _own(c, where):
+    for key in ("cost", "approve_label"):
+        if not isinstance(c.get(key), str) or not c[key].strip():
+            raise sw.BadRules(f"{where}.{key} must be a non-empty string")
+    if "cheaper" in c and not isinstance(c["cheaper"], str):
+        raise sw.BadRules(f"{where}.cheaper must be a string")
 
 
 def _load(path):
     cfg = yield from paths.read_json(path)
-    if not isinstance(cfg, dict) or not isinstance(cfg.get("commands"), list) or not cfg["commands"]:
-        raise Refuse('the top level must be {"commands": [...]} with at least one command')
-    seen, labels = set(), set()
-    for n, c in enumerate(cfg["commands"]):
-        where = f"commands[{n}]"
-        if not isinstance(c, dict):
-            raise Refuse(f"{where} is not an object")
-        for key in ("id", "cost", "approve_label"):
-            if not isinstance(c.get(key), str) or not c[key].strip():
-                raise Refuse(f"{where}.{key} must be a non-empty string")
-        if c["id"] in seen:
-            raise Refuse(f"{where}.id '{c['id']}' is a duplicate")
-        seen.add(c["id"])
+    try:
+        commands = sw.load_rules(cfg, "commands", ("cost", "approve_label", "cheaper"), _own, many=True, nonempty=True)
+    except sw.BadRules as e:
+        raise Refuse(str(e))
+    labels = {}
+    for n, c in enumerate(commands):
         if c["approve_label"] in labels:
-            raise Refuse(f"{where}.approve_label '{c['approve_label']}' is shared with another command; "
-                       "a click must approve exactly one")
-        labels.add(c["approve_label"])
-        if "cheaper" in c and not isinstance(c["cheaper"], str):
-            raise Refuse(f"{where}.cheaper must be a string")
-        if not isinstance(c.get("match"), list) or not c["match"]:
-            raise Refuse(f"{where}.match must be a non-empty list")
-        for m, e in enumerate(c["match"]):
-            w = f"{where}.match[{m}]"
-            if not isinstance(e, dict) or not isinstance(e.get("cmd"), str) or not re.fullmatch(r"[A-Za-z0-9._+-]+", e["cmd"]):
-                raise Refuse(f"{w}.cmd must be a bare command name")
-            if "args" not in e and "script" not in e:
-                raise Refuse(f"{w} needs args or script, or it would match every {e['cmd']}")
-            if "args" in e:
-                _strs(e["args"], f"{w}.args")
-            if "script" in e and (not isinstance(e["script"], str) or not e["script"].strip("./")):
-                raise Refuse(f"{w}.script must be a non-empty path")
-    return cfg["commands"]
+            raise Refuse(f"commands[{n}].approve_label '{c['approve_label']}' is shared with another command; "
+                         "a click must approve exactly one")
+        labels[c["approve_label"]] = c
+    return commands
 
 
 def check(doc):
@@ -118,7 +98,7 @@ def check(doc):
         return deny(say("ask_first_invalid", path=path, err=e))
     runs, looped = {}, []
     for c in commands:
-        m = [sw.matches(doc, e) for e in c["match"]]
+        m = [sw.match_rule(doc, e)[:2] for e in c["match"]]
         # Entries may describe the same run two ways (npm run x, tsx x.ts); count the widest.
         n = max(k for k, _ in m)
         if n:
