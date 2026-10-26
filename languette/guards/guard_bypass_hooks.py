@@ -99,9 +99,8 @@ def _runs(doc):
 
 
 def check(doc):
-    payload = doc.payload
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if not isinstance(cmd, str) or not cmd.strip():
+    cmd = doc.text
+    if not cmd or not cmd.strip():
         return None
     runs, looped = _runs(doc)
     if not runs:

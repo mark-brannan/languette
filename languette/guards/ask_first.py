@@ -103,8 +103,8 @@ def _load(path):
 
 def check(doc):
     payload, env = doc.payload, doc.env
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if not isinstance(cmd, str) or not cmd.strip():
+    cmd = doc.text
+    if not cmd or not cmd.strip():
         return None
     try:
         path = yield from _config(payload, env)

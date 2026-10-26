@@ -133,8 +133,8 @@ def _unreadable(b):
 
 def check(doc):
     payload = doc.payload
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if not isinstance(cmd, str) or not cmd or ("push" not in cmd and "refs/heads/" not in cmd):
+    cmd = doc.text
+    if not cmd or ("push" not in cmd and "refs/heads/" not in cmd):
         return None
     found = deletions(doc)
     if not found:

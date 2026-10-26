@@ -516,11 +516,11 @@ def _judge(p, env):
 
 def check(doc):
     payload, env = doc.payload, doc.env
-    cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
-    if not isinstance(cmd, str) or not cmd.strip():
+    cmd = doc.text
+    if not cmd or not cmd.strip():
         return None
     cwd = payload["cwd"]
-    pushes, admin, refused = _walk(doc, cmd.rstrip("\n"), cwd, env.get("HOME"))
+    pushes, admin, refused = _walk(doc, cmd, cwd, env.get("HOME"))
     if admin:
         return deny(ADMIN)
     asked = None
