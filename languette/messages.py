@@ -139,7 +139,18 @@ MESSAGES = {
     "wt_dir_unclear": (
         "{guard}: can't tell which directory this git checkout/switch runs in (a cd, -C or "
         "session cwd that doesn't resolve), so it can't be checked against $HOME. Use an "
-        "absolute path with git -C."
+        "absolute path with git -C. An unresolved path is let through only from the session's "
+        "own worktree or scratchpad, and only when every directory the command names lands "
+        "there too; a path that doesn't exist yet lands in the nearest directory above it. "
+        "$HOME, a main checkout, an unresolved cwd, `cd -` and `~-` keep the deny, as does any cd "
+        "or -C after a ln, mv or cp in the same command: run that one as a call of its own first."
+    ),
+    "wt_dir_unclear_note": (
+        "{guard}: allowed, but unchecked: can't tell which directory this git checkout/switch "
+        "runs in (a variable, a $( ) or a path that doesn't exist yet). It went through because "
+        "the session stands in its own worktree or scratchpad. Make sure it lands there too: "
+        "never $HOME, a repo's main checkout or another session's worktree. An absolute path "
+        "with git -C lets the guard check it."
     ),
     "wt_foreign": (
         "{guard}: `{word}` is inside {ft}, a git worktree this session does not own. A hand-off "
@@ -223,6 +234,18 @@ MESSAGES = {
     ),
     # A command the user runs, not an agent: the host, the crontab, a protected service.
     "judged": "{guard}: {why}",
+    # guard-git-work-loss's two relaxations, which hold only where an agent works: a linked worktree
+    # or the session's scratchpad, never $HOME or a repo's main checkout.
+    "wl_add_all_paths": (
+        "`git add -A <paths>` is blocked here: it passes only in a linked worktree or the session's "
+        "scratchpad, run from there with no cd or -C. Drop the -A: `git add <paths>` stages the same "
+        "changes, deletions included."
+    ),
+    "wl_reset_upstream": (
+        "{why} `git reset --hard origin/<this branch>` passes only when it runs on its own, from a linked "
+        "worktree or the session's scratchpad with no cd or -C, on a clean tree, and the branch tracks "
+        "that same name or nothing."
+    ),
     "cron_remove": "`crontab -r` is blocked: it deletes the whole crontab with no undo. {way_user}",
     "rule_deny": "`{cmd}` is blocked by rule `{id}` in {file}: {why}. {way_user}",
     "rules_bad": (
