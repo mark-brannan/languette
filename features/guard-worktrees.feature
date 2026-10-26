@@ -959,6 +959,7 @@ Feature: guard-worktrees
       And a linked worktree "{TMP}/repo/.claude/worktrees/theirs" of the repository at "{TMP}/repo"
       And the session is "aaaaaaaa-1111-4222-8333-444444444444"
       And the directory "{TMP}/scratch/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad"
+      And CLAUDE_CODE_TMPDIR is "{TMP}/scratch"
       And the working directory is "{TMP}/repo/.claude/worktrees/mine"
 
     Scenario Outline: from the session's own recorded worktree, an unresolved directory is allowed with a note
@@ -1026,6 +1027,78 @@ Feature: guard-worktrees
         | cd {TMP}/repo/.claude/worktrees/theirs/not-yet && git checkout some-branch    |
         | cd "$X" && cd ~/newdir && git checkout -b probe                               |
         | cd {TMP}/repo/.claude/worktrees/mine/gone/../.. && git checkout -b probe      |
+
+    # Every tilde form is read as the shell reads it: ~user from the user
+    # database (the stub answers for languette-owner, whose home is $HOME),
+    # ~+ from the directory the word is read in. One the guard can't follow
+    # (~- is $OLDPWD, ~N the directory stack, a user the lookup can't find)
+    # is never judged.
+    Scenario Outline: from the own worktree, a tilde form that lands in $HOME or can't be followed keeps the deny
+      Given the stub "getent" is first on PATH
+      When the agent runs `git status`
+      And the agent runs `<command>`
+      Then the guard denies, naming "<why>"
+
+      Examples:
+        | command                                                    | why                             |
+        | cd ~languette-owner && git checkout -b probe               | switches the branch every shell |
+        | cd "$X" && cd ~languette-owner && git checkout -b probe    | switches the branch every shell |
+        | git -C ~languette-owner -C "$X" checkout -b probe          | can't tell which directory      |
+        | cd ~languette-owner/newdir && git checkout -b probe        | can't tell which directory      |
+        | cd ~nobody-by-this-name/new && git checkout -b probe       | can't tell which directory      |
+        | cd ~- && git checkout -b probe                             | can't tell which directory      |
+        | cd "$X" && cd ~- && git checkout -b probe                  | can't tell which directory      |
+        | git -C "$X" -C ~-/new checkout -b probe                    | can't tell which directory      |
+        | cd ~2 && git checkout -b probe                             | can't tell which directory      |
+        | cd ~ && git -C ~+/new checkout -b probe                    | can't tell which directory      |
+
+    Scenario Outline: from the own worktree, a tilde form that lands in the own worktree is allowed with a note
+      Given the stub "getent" is first on PATH
+      When the agent runs `git status`
+      And the agent runs `<command>`
+      Then the guard warns about "allowed, but unchecked"
+
+      Examples:
+        | command                                                                               |
+        | cd ~languette-owner/repo/.claude/worktrees/mine/not-yet && git checkout -b probe      |
+        | git -C ~+/not-yet checkout -b probe                                                   |
+
+    # A path is judged where it lands when the guard looks; a link, move or
+    # copy earlier in the same command can make it land elsewhere by the time
+    # the checkout runs. So every cd or -C after one is never judged. A mkdir
+    # makes only real directories, where the nearest existing one says.
+    Scenario Outline: from the own worktree, a directory after a link, move or copy in the same command keeps the deny
+      When the agent runs `git status`
+      And the agent runs `<command>`
+      Then the guard denies, naming "can't tell which directory"
+
+      Examples:
+        | command                                                              |
+        | ln -s ~ lnk && cd lnk/new && git checkout -b probe                   |
+        | mkdir ~/q && ln -s ~ lnk && cd lnk && git checkout -b probe          |
+        | ln -s ~ lnk && git -C lnk checkout -b probe                          |
+        | mv ../lnk2 lnk && cd lnk && git checkout -b probe                    |
+        | cp -P ../lnk2 lnk && git -C lnk/new checkout -b probe                |
+        | git mv old lnk && cd lnk && git checkout -b probe                    |
+
+    Scenario: from the own worktree, a directory a mkdir makes is judged where it lands
+      When the agent runs `git status`
+      And the agent runs `mkdir -p new/deeper && cd new/deeper && git checkout -b probe`
+      Then the guard warns about "allowed, but unchecked"
+
+    # Own is the scratchpad the harness made, not a directory that only
+    # carries the session's id in its name.
+    Scenario Outline: a directory named for the session outside its scratchpad is not its own
+      Given a linked worktree "{TMP}/repo/.claude/worktrees/aaaaaaaa-1111-4222-8333-444444444444" of the repository at "{TMP}/repo"
+      And the directory "{TMP}/repo/elsewhere/aaaaaaaa-1111-4222-8333-444444444444/w"
+      And the working directory is "<cwd>"
+      When the agent runs `cd "$X" && git checkout some-branch`
+      Then the guard denies, naming "can't tell which directory"
+
+      Examples:
+        | cwd                                                             |
+        | {TMP}/repo/.claude/worktrees/aaaaaaaa-1111-4222-8333-444444444444 |
+        | {TMP}/repo/elsewhere/aaaaaaaa-1111-4222-8333-444444444444/w     |
 
     # A command that passed through $HOME or a main checkout before losing
     # track may have lost it there; `cd -` goes where no word names.

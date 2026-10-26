@@ -1,0 +1,9 @@
+#!/bin/sh
+# A stand-in for getent: `getent passwd languette-owner` answers with $HOME as
+# that user's home, as the user database does for the user who owns $HOME.
+# Every other lookup finds nothing (exit 2).
+if [ "$1" = passwd ] && [ "$2" = languette-owner ]; then
+  printf 'languette-owner:x:1000:1000::%s:/bin/sh\n' "$HOME"
+  exit 0
+fi
+exit 2

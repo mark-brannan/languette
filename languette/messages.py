@@ -142,7 +142,8 @@ MESSAGES = {
         "absolute path with git -C. An unresolved path is let through only from the session's "
         "own worktree or scratchpad, and only when every directory the command names lands "
         "there too; a path that doesn't exist yet lands in the nearest directory above it. "
-        "$HOME, a main checkout, an unresolved cwd and `cd -` keep the deny."
+        "$HOME, a main checkout, an unresolved cwd, `cd -` and `~-` keep the deny, as does any cd "
+        "or -C after a ln, mv or cp in the same command: run that one as a call of its own first."
     ),
     "wt_dir_unclear_note": (
         "{guard}: allowed, but unchecked: can't tell which directory this git checkout/switch "

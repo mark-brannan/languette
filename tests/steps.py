@@ -239,6 +239,13 @@ def _stubs(ctx):
     ctx.stubs, ctx.stub_log = True, ctx.mkdtemp()
 
 
+@given('the stub "getent" is first on PATH')
+def _getent_stub(ctx):
+    # The guard reads ~user through getent; the stub answers for one user whose
+    # home is the scenario's $HOME, so no verdict depends on this machine's users.
+    ctx.env["PATH"] = str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
+
+
 @given('the stub "gh" is first on PATH, for a Python guard')
 def _gh_stub_python(ctx):
     # The Python engine's guards get only the scenario's env, so PATH and the
