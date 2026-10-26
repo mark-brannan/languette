@@ -31,8 +31,10 @@ place too. $HOME, a main checkout, a cwd that does not resolve, `cd -`, ~-,
 a directory-stack ~N, a ~user the lookup can't find, and a session's first
 call (nothing recorded yet) keep the deny. So does every cd or -C after a
 command that may make a link or move, copy or unpack something into place
-(ln, mv, cp, rsync, tar, unzip, cpio, git mv): a path it touched need not
-land where it looks. A word that resolves into another session's worktree
+(ln, mv, cp, rsync, tar, unzip, cpio, git mv) anywhere in the command, a
+nested `bash -c` or `$( )` included: a path it touched need not land where it
+looks. So does a bare relative cd word when CDPATH is set, in the command or
+in the environment, and HOME spelled with an operator (${HOME:-x}). A word that resolves into another session's worktree
 is the foreign control's deny. What a word the guard can't read names (a
 variable other than HOME, a `$( )`, a glob) is unseen, so it may be any
 directory: a known gap. So is a link made by a command the guard does not
@@ -72,6 +74,10 @@ MAX_CANDIDATES = 48
 _HOMEISH = re.compile(r"(?:/|~(?:[^/+\-0-9][^/]*)?(?:/|\Z)|\$HOME(?:/|\Z)|\$\{HOME\}(?:/|\Z))")
 # A tilde the guard can't follow: ~- is $OLDPWD, ~N, ~+N and ~-N the directory stack.
 _TILDE_LOST = re.compile(r"~(?:-|[+-]?[0-9]+)(?:/|\Z)")
+# $HOME spelled with an operator (${HOME:-x}, ${HOME%/}): HOME, but not a form the guard expands.
+_HOME_PARAM = re.compile(r"\$\{HOME(?!\})")
+# A cd word the shell looks up in CDPATH first: not absolute, `./`- or `../`-led, and no tilde or $HOME.
+_CDPATH_SEARCHED = re.compile(r"(?!/|~|\$HOME|\$\{HOME\}|\.\.?(?:/|\Z))")
 # A command that can make a path land somewhere other than where it looks: a
 # link made, or something moved, copied or unpacked into place.
 _FS_CHANGE = re.compile(r"(?:^|/)(?:ln|link|mv|cp|rsync|tar|unzip|cpio)\Z")
@@ -133,7 +139,8 @@ def _home_events(doc):
     """The command's moves, in order: ("DENY",) for a yadm checkout/switch,
     ("CD", v), ("ENV", kind, v) for a GIT_DIR=/GIT_WORK_TREE= outside a git
     segment, ("FS",) for a segment that may make a link or move, copy or
-    unpack one into place (a `git mv` too), and ("G", [(kind, v)]) for one git
+    unpack one into place (a `git mv` too), ("CDPATH",) for a segment that
+    assigns CDPATH, and ("G", [(kind, v)]) for one git
     checkout/switch with its -C/GITDIR/WORKTREE targets in order."""
     out = []
     for text, nested in doc.texts():
@@ -141,6 +148,8 @@ def _home_events(doc):
         for a, b in s.segments():
             if a > b:
                 continue
+            if any(s.k[i] == "w" and s.w[i].startswith("CDPATH=") for i in range(a, b + 1)):
+                out.append(("CDPATH",))
             c = sw.cmd_index(s, a, b, sw.CD, nested)
             if c is not None:
                 v = next((s.w[i] for i in range(c + 1, b + 1)
@@ -234,9 +243,9 @@ def _landings(raw, bases, home):
     existing directory above it, against each base it missed on. A word the
     guard can't read (a variable other than HOME, a `$( )`, a glob) lands
     nowhere it can name, so []; a tilde it can't follow (~-, ~N, an unknown
-    ~user) and a `..` through a part that does not exist yet are None, never
+    ~user), HOME spelled with an operator (${HOME:-x}) and a `..` through a part that does not exist yet are None, never
     judged."""
-    if _TILDE_LOST.match(raw):
+    if _TILDE_LOST.match(raw) or _HOME_PARAM.search(raw):
         return None
     if _HOMEISH.match(raw):
         bases = ["/"]
@@ -266,7 +275,7 @@ def _checkout_home(doc):
     if not isinstance(cmd, str) or not cmd:
         return
     events = _home_events(doc)
-    if all(ev[0] == "FS" for ev in events):
+    if all(ev[0] in ("FS", "CDPATH") for ev in events):
         return
     if not (yield Need("which", "git")):
         raise Refuse(say("wt_git_missing_checkout", guard=NAME))
@@ -312,22 +321,25 @@ def _checkout_home(doc):
 
     # visited: every directory the command was known to stand in; None once a
     # `cd -` took it somewhere no word names. changed: a link, move or copy ran
-    # earlier, so no later directory word lands where it looks; each is lost.
+    # anywhere in the command (a nested text is read after the outer one, so
+    # order is no guide), so no directory word lands where it looks; each is
+    # lost. cdpath: CDPATH is set, so a bare relative cd word may land elsewhere.
     cands, lost, env_targets, visited, note = ([cwd] if cwd else []), not cwd, [], ([cwd] if cwd else None), None
-    changed = False
+    changed = any(ev[0] == "FS" for ev in events)
+    cdpath = bool(env.get("CDPATH")) or any(ev[0] == "CDPATH" for ev in events)
     for ev in events:
         if ev[0] == "DENY":
             raise _generic("yadm")
-        if ev[0] == "FS":
-            changed = True
-        elif ev[0] == "ENV":
+        if ev[0] in ("FS", "CDPATH"):
+            continue
+        if ev[0] == "ENV":
             env_targets.append(ev[1:])
         elif ev[0] == "CD":
             v = yield from user_word(ev[1])
             if v == "":
                 cands, lost = [home], False
                 visited = visited and visited + [home]
-            elif v == "-" or changed or _TILDE_LOST.match(v):
+            elif v == "-" or changed or _TILDE_LOST.match(v) or (cdpath and _CDPATH_SEARCHED.match(v)):
                 lost, visited = True, None
             else:
                 if _HOMEISH.match(v):

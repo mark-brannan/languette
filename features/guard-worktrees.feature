@@ -1065,8 +1065,10 @@ Feature: guard-worktrees
 
     # A path is judged where it lands when the guard looks; a link, move or
     # copy earlier in the same command can make it land elsewhere by the time
-    # the checkout runs. So every cd or -C after one is never judged. A mkdir
-    # makes only real directories, where the nearest existing one says.
+    # the checkout runs. So every cd or -C in a command that holds one, nested
+    # text included, is never judged. A mkdir makes only real directories,
+    # where the nearest existing one says. The same for a bare relative cd word
+    # under CDPATH, and for HOME spelled with an operator.
     Scenario Outline: from the own worktree, a directory after a link, move or copy in the same command keeps the deny
       When the agent runs `git status`
       And the agent runs `<command>`
@@ -1080,6 +1082,14 @@ Feature: guard-worktrees
         | mv ../lnk2 lnk && cd lnk && git checkout -b probe                    |
         | cp -P ../lnk2 lnk && git -C lnk/new checkout -b probe                |
         | git mv old lnk && cd lnk && git checkout -b probe                    |
+        | bash -c 'ln -s ~ lnk'; cd lnk && git checkout -b probe               |
+        | bash -c 'ln -s ~ lnk' && git -C lnk checkout -b probe                |
+        | cd lnk/new && git checkout -b probe $(ln -s ~ lnk)                   |
+        | CDPATH=~/.. cd home >/dev/null && git checkout -b probe              |
+        | export CDPATH=~/..; cd home && git checkout -b probe                 |
+        | cd ${HOME:-x} && git checkout -b probe                               |
+        | git -C ${HOME:-x} checkout -b probe                                  |
+        | git -C ${HOME%/} checkout -b probe                                   |
 
     Scenario: from the own worktree, a directory a mkdir makes is judged where it lands
       When the agent runs `git status`
