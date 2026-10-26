@@ -606,6 +606,15 @@ Feature: guard-git-work-loss
         | {TMP}/repo/.claude/worktrees/feat             | git add -A $PWD                                    | a variable the shell expands  |
         | {TMP}/repo/.claude/worktrees/feat             | git add -A "$(pwd)"                                | a command substitution        |
         | {TMP}/repo/.claude/worktrees/feat             | git add -A ~                                       | a tilde                       |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A {src,..}                                | a brace expansion             |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A src/{x.py,}                             | a brace, one empty            |
+
+    Scenario: -A with a path through a symlink is denied when git's lexical reading leaves the tree
+      Given the directory "{TMP}/repo/.claude/worktrees/feat/src/sub/deep"
+      And the symlink "{TMP}/repo/.claude/worktrees/feat/lnk" to "{TMP}/repo/.claude/worktrees/feat/src/sub/deep"
+      And the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `git add -A lnk/../..`
+      Then the guard denies, naming "`git add -A` is blocked: stage by path"
 
     Scenario: -A with a path in a subdirectory passes when it stays below the toplevel
       Given the directory "{TMP}/repo/.claude/worktrees/feat/src/sub"

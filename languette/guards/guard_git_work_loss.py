@@ -53,8 +53,8 @@ RULE = {"add": "BLANKET_STAGING", "commit": "BLANKET_STAGING", "stash": "STASH",
         "branch": "BRANCH_DELETE"}
 _WHOLE = re.compile(r"(?:\.|\./|\./\*|:/|:/\.|\*)\Z")
 # A pathspec the guard cannot resolve to one place: magic (`:(top)`, `:/`, `:!x`, `:^x`), a glob,
-# or a word the shell expands ($PWD, $(pwd), `pwd`, ~).
-_UNRESOLVED = re.compile(r"\A[:~]|[$`*?\[]")
+# or a word the shell expands ($PWD, $(pwd), `pwd`, ~, {a,b}).
+_UNRESOLVED = re.compile(r"\A[:~]|[$`*?\[{}]")
 _MAIN = re.compile(r"(?:refs/heads/)?(?:main|master)\Z")
 STATUS_TIMEOUT = 5
 # Words that re-aim the tree a discard is judged in, or the config git reads. A git global
@@ -319,7 +319,8 @@ def _nothing_to_lose(doc, sub, args):
 def _staging_where_agents_work(doc, names, msg):
     """`git add -A <paths>` stages only those paths; it passes when no word of the command
     moves or re-aims the tree, the payload's cwd is where agents work, and each path,
-    resolved from the cwd, lies strictly inside the toplevel. A path that resolves to the
+    resolved from the cwd, lies strictly inside the toplevel both as git reads it (lexically,
+    so `link/..` is `.`) and with symlinks followed. A path that resolves to the
     toplevel or above it (`..`, the root's absolute path) is the whole tree: plain blanket
     staging, denied as such."""
     cwd = doc.payload.get("cwd")
@@ -332,8 +333,11 @@ def _staging_where_agents_work(doc, names, msg):
     if not top:
         return False
     try:
+        here = yield Need("path", "realpath", cwd)
         for t in names:
-            if not (yield Need("path", "realpath", os.path.join(cwd, t))).startswith(top + "/"):
+            lexical = os.path.normpath(os.path.join(here, t))
+            real = yield Need("path", "realpath", os.path.join(cwd, t))
+            if not (lexical.startswith(top + "/") and real.startswith(top + "/")):
                 break
         else:
             return True
