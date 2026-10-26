@@ -419,3 +419,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261026t073848z
 - an init script run through sh, bash or dash counts as the init script, in this PR Undo: drop the via key and its stop_of branch ([#263](https://github.com/mark-brannan/languette/pull/263))
+
+### 20261026t073852z
+- a pkill literal run hits at three characters held by a name, or sharing all but two of a name's Undo: change the threshold in _may_match ([#263](https://github.com/mark-brannan/languette/pull/263))
