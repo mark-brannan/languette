@@ -763,3 +763,10 @@ Feature: guard-git-work-loss
       And the working directory is "{TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/r"
       When the agent runs `git reset --hard origin/feat`
       Then the guard is silent
+
+  Scenario: a command that is not a string is judged as the JSON text it prints as
+    When the payload is:
+      """
+      {"tool_name": "Bash", "tool_input": {"command": ["git add -A"]}}
+      """
+    Then the guard denies
