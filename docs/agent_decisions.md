@@ -413,3 +413,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261024t051557z
 - Put the new duplicate-prs deny text in messages.py (dup_body_rewritten, dup_body_not_heredoc), replacing the inline call, once #242 moved the guard onto the catalog Undo: inline the two strings again ([#243](https://github.com/mark-brannan/languette/pull/243))
+
+### 20261026t073845z
+- cmd_index skips a wrapper option's value scan-wide, in this PR not a follow-up Undo: revert the _WRAP_VALUED hunk of a4f6573 and its rows ([#263](https://github.com/mark-brannan/languette/pull/263))
