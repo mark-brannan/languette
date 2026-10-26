@@ -234,6 +234,18 @@ MESSAGES = {
     ),
     # A command the user runs, not an agent: the host, the crontab, a protected service.
     "judged": "{guard}: {why}",
+    # guard-git-work-loss's two relaxations, which hold only where an agent works: a linked worktree
+    # or the session's scratchpad, never $HOME or a repo's main checkout.
+    "wl_add_all_paths": (
+        "`git add -A <paths>` is blocked here: it passes only in a linked worktree or the session's "
+        "scratchpad, run from there with no cd or -C. Drop the -A: `git add <paths>` stages the same "
+        "changes, deletions included."
+    ),
+    "wl_reset_upstream": (
+        "{why} `git reset --hard origin/<this branch>` passes only when it runs on its own, from a linked "
+        "worktree or the session's scratchpad with no cd or -C, on a clean tree, and the branch tracks "
+        "that same name or nothing."
+    ),
     "cron_remove": "`crontab -r` is blocked: it deletes the whole crontab with no undo. {way_user}",
     "rule_deny": "`{cmd}` is blocked by rule `{id}` in {file}: {why}. {way_user}",
     "rules_bad": (
@@ -289,6 +301,11 @@ MESSAGES = {
     "disks_way_out": (
         "Work on an image file in /tmp or the scratchpad instead; a real disk is the user's to write, so "
         "hand them the exact command."
+    ),
+    "disks_cd_moved": (
+        "a `cd` earlier in this command may move the working directory into /dev and the hook cannot "
+        "follow it. Name the target by a literal absolute path (/tmp/out.txt: the hook does not expand "
+        "$VAR, $(...) or ~ here), or write the file with the Write tool instead of a redirect"
     ),
     "disks_refused": "`{what}` is blocked: {why}. {way_out}",
     "disks_blocked": "`{what} {raw}` is blocked: {abs_} is {kind}. {way_out}",
@@ -470,10 +487,16 @@ MESSAGES = {
         "unchecked, which is indistinguishable from a check that ran. Populate it (one term per line, "
         "# for comments) and retry. To post without the check, {to_private}."
     ),
+    "pt_what_body": "the body or title",
+    "pt_what_field": "the `{name}` field",
+    "pt_what_flag": "the `{name}` value",
     "pt_opaque": (
-        "{guard}: the body or title is built at run time ({opaque}) and no heredoc in this command feeds it, "
-        "so its text cannot be checked before it is posted. Write it literally, in a heredoc in the "
-        "same command, or in a file and pass --body-file <path>."
+        "{guard}: {what} is built at run time ({opaque}) and no heredoc in this command feeds it, and the hook "
+        "reads the text before the command runs, so it cannot check it. Give it text it can read: a heredoc inside this command that "
+        "feeds it, or a file that exists before this call (written by an earlier call or the Write tool) "
+        "named by a literal path: --body-file <path>, or -F <name>=@<path> in gh api. $TMPDIR, "
+        "${{TMPDIR:-/tmp}} and $(mktemp) cannot be read, and a file this same command writes with a "
+        "pipe, redirect or sed is not there yet; a heredoc to a literal path in this command counts."
     ),
     "pt_stdin": (
         "{guard}: the body comes from stdin (-F - / --input -) and there is no heredoc in the command, so it "

@@ -62,7 +62,7 @@ class _Meta:
     """The command's records, in command order, as (kind, value):
     R repo (- = the cwd's, ? = unknown) | T posted text | HDTXT heredoc text |
     F / FX file (FX: in nested text) | CDTO dir | CDPUSH / CDPOP | A NAME=VALUE |
-    HFED path a heredoc writes | STDIN | OPAQUE value | HEREDOC | CD | UNSEEN flag."""
+    HFED path a heredoc writes | STDIN | OPAQUE (what, value) | HEREDOC | CD | UNSEEN flag."""
 
     def __init__(self, doc, command):
         self.out = []
@@ -110,17 +110,18 @@ class _Meta:
         name = re.sub(r"[^A-Za-z0-9_].*", "", name, count=1, flags=re.S)
         return name != "" and re.search(r"(?:^|[;&|\s])" + name + r"""=["']?\$\([^)]*<<""", self.orig) is not None
 
-    def val(self, v, live):
-        """A posted value: text, or OPAQUE when built at run time and no heredoc on
-        the value itself feeds it."""
+    def val(self, v, live, what=None):
+        """A posted value: text, or OPAQUE (what it is, the value) when built at run
+        time and no heredoc on the value itself feeds it."""
+        what = what or say("pt_what_body")
         if not live:
             self.add("T", _flat(v))                  # single-quoted: posted verbatim
         elif "$(" in v or "`" in v:
             if "<<" not in v and " HEREDOC " not in v:
-                self.add("OPAQUE", _flat(v))
+                self.add("OPAQUE", (what, _flat(v)))
         elif re.match(r"\$[A-Za-z_{]", v):
             if not self.fed(v):
-                self.add("OPAQUE", _flat(v))
+                self.add("OPAQUE", (what, _flat(v)))
         else:
             self.add("T", _flat(v))
 
@@ -142,7 +143,7 @@ class _Meta:
             return
         if "label" in key:
             self.lab(v)
-        self.val(v, live)
+        self.val(v, live, say("pt_what_field", name=key))
 
     def subshelled(self, lo, hi):
         """A cd in a pipeline, in backticks or backgrounded runs in a subshell."""
@@ -220,11 +221,11 @@ class _Meta:
             elif t in ("--body", "--title", "--comment", "--subject", "-b", "-t", "-c"):
                 if i < hi:
                     i += 1
-                    self.val(sw.word(self.s, i), s.live[i])
+                    self.val(sw.word(self.s, i), s.live[i], say("pt_what_flag", name=t))
             elif re.match(r"--(?:body|title|comment|subject)=", t):
-                self.val(t.split("=", 1)[1], live)
+                self.val(t.split("=", 1)[1], live, say("pt_what_flag", name=t.split("=", 1)[0]))
             elif re.match(r"-[btc].", t):
-                self.val(t[2:], live)
+                self.val(t[2:], live, say("pt_what_flag", name=t[:2]))
             elif t in ("--label", "--add-label", "-l"):
                 if i < hi:
                     i += 1
@@ -401,7 +402,8 @@ def check(doc):
         return deny(say("pt_no_terms", guard=NAME, terms_file=terms_file, to_private=TO_PRIVATE))
     opaque = next((v for k, v in meta if k == "OPAQUE"), None)
     if opaque is not None:
-        return deny(say("pt_opaque", guard=NAME, opaque=opaque))
+        what, value = opaque
+        return deny(say("pt_opaque", guard=NAME, what=what, opaque=value))
     kinds = {k for k, _ in meta}
     if "HEREDOC" not in kinds and "STDIN" in kinds:
         return deny(say("pt_stdin", guard=NAME))
