@@ -175,6 +175,27 @@ def _reset(a):
                      "`git reset --soft`/`--mixed`.")
 
 
+def _short(t, ch):
+    """A single-dash cluster holding `ch` before any glued value: -fde, -fe!* and -e!* hold e."""
+    return re.match(r"-[A-Za-z0-9]*" + ch, t) is not None and not t.startswith("--")
+
+
+def _exclude(t):
+    """clean's --exclude, in any unambiguous prefix, separate or `=` form."""
+    return _pfx(t.split("=", 1)[0], "--exclude")
+
+
+def _own_command(s, a, b, g):
+    """The git at g is the segment's own command: nothing but VAR=x assignments, or `env`
+    and assignments, stand before it. A wrapper (ssh, docker exec, watch, nsenter, ...) runs
+    git elsewhere or later, where the status read here says nothing."""
+    c = sw.seg_cmd(s, a, b)
+    if c == g:
+        return True
+    return (c is not None and s.w[c].rsplit("/", 1)[-1] == "env"
+            and all(s.k[i] == "w" and sw._ASSIGN.match(s.w[i]) for i in range(c + 1, g)))
+
+
 def _nothing_to_lose(doc, sub, args):
     """True when the discard `sub args` cannot lose anything: no word of the command moves
     or re-aims the tree, no other segment of it can run before the discard and dirty the
@@ -187,8 +208,8 @@ def _nothing_to_lose(doc, sub, args):
         return False
     if sub == "reset" and any(not t.startswith("-") and t != "HEAD" for t in args):
         return False
-    if sub == "clean" and any(_has(t, "x") or _has(t, "X") for t in args):
-        return False
+    if sub == "clean" and any(_short(t, "x") or _short(t, "X") or _short(t, "e") or _exclude(t) for t in args):
+        return False  # -x/-X, and -e '!pat' un-ignoring, reach files the status does not list
     scans = [(doc.scan(text), nested) for text, nested in doc.texts()]
     if paths.moves_directory(scans) or not sw.alone(scans, sw.GIT):
         return False
@@ -237,7 +258,7 @@ def _segment(doc, s, a, b, nested, env):
         elif sub == "reset":
             _reset(args)
     except Refuse:
-        if (rule == "DISCARD" and not s.w[g].endswith("yadm")
+        if (rule == "DISCARD" and not s.w[g].endswith("yadm") and _own_command(s, a, b, g)
                 and (yield from _nothing_to_lose(doc, sub, args))):
             return
         raise

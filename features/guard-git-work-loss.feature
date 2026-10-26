@@ -149,6 +149,8 @@ Feature: guard-git-work-loss
       | git reset --hard  | HEAD, so no commit is dropped          |
       | sh -c 'git checkout .'   | sh's own -c is not a git option |
       | bash -c "git restore ."  | sh's own -c is not a git option |
+      | env LC_ALL=C git checkout .     | env with plain assignments is no wrapper |
+      | LC_ALL=C git restore .          | an assignment is no wrapper     |
 
   Scenario Outline: discarding is still denied when the tree is clean but the target is not known
     Given a git repository at "{TMP}/clean"
@@ -172,6 +174,17 @@ Feature: guard-git-work-loss
       | echo x > f && git checkout -- .  | a redirect can dirty the tree         |
       | git apply p && git checkout .    | the patch is the work being discarded |
       | git merge --squash b && git reset --hard | the staged result would go    |
+      | git clean -fd -e '!*'            | a negated exclude un-ignores files    |
+      | git clean -fd --exclude='!*'     | a negated exclude un-ignores files    |
+      | git clean -fde '!*'              | e in a short cluster                  |
+      | ssh host git reset --hard        | a remote wrapper runs git elsewhere   |
+      | docker exec c git reset --hard   | a remote wrapper runs git elsewhere   |
+      | kubectl exec p -- git reset --hard | a remote wrapper runs git elsewhere |
+      | nsenter --wd=/tmp git reset --hard | a wrapper's chdir moves the tree    |
+      | bwrap --chdir /tmp git reset --hard | a wrapper's chdir moves the tree   |
+      | chroot /tmp git reset --hard     | a wrapper's root moves the tree       |
+      | watch -n 60 git reset --hard     | a repeat runs after the status read   |
+      | systemd-run --user --on-active=1h git reset --hard | a delay runs after the status read |
 
   Scenario Outline: discarding is denied when the working tree has changes
     Given a git repository at "{TMP}/dirty"
