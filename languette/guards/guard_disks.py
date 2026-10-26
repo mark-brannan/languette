@@ -111,7 +111,7 @@ class _Judge:
     def is_device(self, raw, what):
         """A written path is a disk device as the filesystem would see it: `..`, `.` and `//` applied."""
         if not raw.startswith("/") and self.dev_moved:
-            self.refuse(f"{what} {raw}", "a `cd` earlier in this command may move the working directory into /dev and the hook cannot follow it; use an absolute path")
+            self.refuse(f"{what} {raw}", say("disks_cd_moved"))
         return bool(_DEVICE.match(paths.lexical(raw if raw.startswith("/") else self.cwd + "/" + raw)))
 
     def target(self, s, idx, what):
@@ -148,7 +148,7 @@ class _Judge:
                     continue
                 v = x[3:]
                 if not v.startswith("/") and self.dev_moved:
-                    self.refuse(f"dd {x}", "a `cd` earlier in this command may move the working directory into /dev and the hook cannot follow it; use an absolute path")
+                    self.refuse(f"dd {x}", say("disks_cd_moved"))
                 if re.search(r"[*?\[{}$`]", v):
                     self.refuse(f"dd {x}", "a glob, brace or variable could name a disk device")
                 p = paths.lexical(v if v.startswith("/") else self.cwd + "/" + v)

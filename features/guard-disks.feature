@@ -146,3 +146,16 @@ Feature: guard-disks
     Given the symlink "{TMP}/escape" to "{HOME}"
     When the agent runs `shred -u {TMP}/escape/secrets.txt`
     Then the guard denies, naming "resolves through a symlink"
+
+  Scenario: the refusal after a cd into /dev names a literal absolute path, and that path passes
+    When the agent runs `cd /dev && cat x > $S/out`
+    Then the guard denies, naming "literal absolute path"
+    And the guard denies, naming "Write tool"
+    When the agent runs `cd /dev && cat x > /tmp/out`
+    Then the guard is silent
+    When the agent runs `cd /dev && dd if=x of=$S/out`
+    Then the guard denies, naming "literal absolute path"
+    When the agent runs `cd /dev && dd if=x of=/tmp/out`
+    Then the guard is silent
+    When the agent runs `cd /dev && echo x | tee /tmp/out`
+    Then the guard is silent
