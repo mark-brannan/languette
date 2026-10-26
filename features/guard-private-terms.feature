@@ -227,6 +227,59 @@ Feature: guard-private-terms
     When the agent runs `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "{HOME}/x"`
     Then the guard denies, naming "{HOME}"
 
+  @also_guard-signed-comments
+  Scenario: a path used by a later command is a denial that says to write ~ by hand
+    Given the private terms file holds:
+      """
+      {HOME}
+      """
+    When the agent runs `gh pr comment 3 -R o/r --body "{HOME}/x"; ls {HOME}/x`
+    Then the guard denies, naming "by hand"
+
+  @also_guard-signed-comments
+  Scenario: a ~ is escaped wherever a bare word has the path, not only at its start
+    Given the private terms file holds:
+      """
+      {HOME}
+      """
+    When the agent runs `gh pr comment 3 -R o/r -b note={HOME}/x`
+    Then the guard asks, rewriting the command to "gh pr comment 3 -R o/r -b note=\~/x"
+
+  @also_guard-github-issues
+  Scenario: a title and a body with the same path are both rewritten
+    Given the private terms file holds:
+      """
+      {HOME}
+      """
+    When the agent runs `gh issue create -R o/r -t {HOME}/x -b {HOME}/x`
+    Then the guard asks, rewriting the command to "gh issue create -R o/r -t \~/x -b \~/x"
+
+  @also_guard-signed-comments
+  Scenario: a multi-line quoted body is rewritten
+    Given the private terms file holds:
+      """
+      {HOME}
+      """
+    When the agent runs:
+      """
+      gh pr comment 3 -R o/r --body "line1
+      see {HOME}/x"
+      """
+    Then the guard asks, naming "home directory"
+
+  @also_guard-signed-comments
+  Scenario: a cd whose path matches a multi-line body once flattened is a denial
+    Given the private terms file holds:
+      """
+      {HOME}
+      """
+    When the agent runs:
+      """
+      cd "{HOME}/x y" && gh pr comment 3 -R o/r --body "{HOME}/x
+      y"
+      """
+    Then the guard denies, naming "by hand"
+
   @also_guard-github-issues
   Scenario: a terms file that is set but cannot be read denies, naming the option
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is "{HOME}/no-such-terms.txt"

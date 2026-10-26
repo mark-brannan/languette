@@ -459,26 +459,68 @@ def check(doc):
         home_re = re.compile(rf"(?<![{_NAME_CHAR}]){re.escape(home)}(?![{_NAME_CHAR}])")
         if not any(t.lower() in home_re.sub("~", text).lower() for t in terms):
             if tool == "Bash":
-                # Only the posted values change; a cd or other use of the path stays. A
-                # text match cannot tell which copy is posted, so a value found other
-                # than once (also used elsewhere, or hidden by quoting) is a denial.
-                new = ti["command"]
-                for k, v in reversed(meta):
-                    if k not in ("T", "HDTXT") or home not in v:
-                        continue
-                    if new.count(v) != 1:
-                        break
-                    i = new.index(v)
-                    # A bare word is not quoted, so a ~ at its start would expand: escape it.
-                    bare = k == "T" and (i == 0 or new[i - 1] in " \t=")
-                    new = new[:i] + home_re.sub("\\~" if bare and v.startswith(home) else "~", v) + new[i + len(v):]
-                else:
-                    return {**ask(say("pt_home", guard=NAME)), "updatedInput": {"command": new.rstrip("\n")}}
+                new = _rewrite_posted(doc, ti["command"], meta, home_re)
+                if new is None:
+                    return deny(say("pt_home_by_hand", guard=NAME, hits=", ".join(t for t in terms if t.lower() in low)))
+                return {**ask(say("pt_home", guard=NAME)), "updatedInput": {"command": new}}
             else:
                 return {**ask(say("pt_home", guard=NAME)), "updatedInput": _walk(ti, lambda v: home_re.sub("~", v))}
 
     hits = [t for t in terms if t.lower() in low]
     return deny(say("pt_hits", guard=NAME, hits=', '.join(hits), to_private=TO_PRIVATE))
+
+
+def _rewrite_posted(doc, cmd, meta, home_re):
+    """cmd with the home path in its posted values (T, HDTXT) written as `~`, or None
+    when that cannot be shown safe. Each distinct posted text is found in cmd (its
+    spaces standing for any whitespace, as the scanner flattens a newline) and must
+    occur exactly as often as it is posted: a copy elsewhere is not ours to touch. The
+    result is scanned again; it must post the home path nowhere and leave every other
+    record as it was. A bare word gets `\\~`, which the shell cannot expand; the
+    first rescan shows which values are bare (the scanner drops the backslash there)."""
+    posted = [(k, v) for k, v in meta if k in ("T", "HDTXT")]
+    texts = {v for _, v in posted if home_re.search(v)}
+    pats = {v: re.compile(r"\s+".join(re.escape(w) for w in v.split(" "))) for v in texts}
+    for v, pat in pats.items():
+        if len(pat.findall(cmd)) != sum(1 for _, x in posted if x == v):
+            return None
+
+    def build(mode):
+        out = cmd
+        for v, pat in pats.items():
+            out = pat.sub(lambda m, r=mode[v]: home_re.sub(lambda _: r, m.group(0)), out)
+        return out
+
+    scanned = {}
+
+    def again(c):
+        if c not in scanned:
+            scanned[c] = rescan(c)
+        return scanned[c]
+
+    def rescan(c):
+        d = type(doc)({**doc.payload, "tool_input": {**doc.payload["tool_input"], "command": c}}, doc.env)
+        m = _Meta(d, c).out
+        return [(k, v) for k, v in m if k in ("T", "HDTXT")], [r for r in m if r[0] not in ("T", "HDTXT")]
+
+    other = [r for r in meta if r[0] not in ("T", "HDTXT")]
+    mode = {v: "\\~" for v in texts}
+    got, rest = again(build(mode))
+    if rest != other or [k for k, _ in got] != [k for k, _ in posted]:
+        return None
+    seen = {}
+    for (_, v), (_, g) in zip(posted, got):
+        if v in texts:
+            bare = g == home_re.sub("~", v)
+            if not bare and g != home_re.sub("\\~", v) or seen.setdefault(v, bare) != bare:
+                return None
+            if not bare:
+                mode[v] = "~"
+    new = build(mode)
+    got, rest = again(new)
+    if rest != other or got != [(k, home_re.sub("~", v) if v in texts else v) for k, v in posted]:
+        return None
+    return new.rstrip("\n")
 
 
 def _strings(v):
