@@ -431,3 +431,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261026t103133z
 - Corrects 20261026t100658z. guard-worktrees checkout-home lets a directory word it can't read through with a note from the session's own worktree or scratchpad: a variable other than HOME, a glob, or a $( ) anywhere but as a cd's whole quoted word (cd $(...) unquoted, cd "$(pwd)/.." and git -C "$(...)" take the note; cd "$(...)" is read as a bare cd to $HOME and denies). One that expands to another session's worktree, $HOME or a main checkout is a known false allow of unmeasured size. The measurement's 3 of 152 denials into another session's worktree are a separate count: each named that worktree in the command text, and the foreign control denies them. Undo: make the blind branch of _checkout_home deny again (revert the note path) ([#268](https://github.com/mark-brannan/languette/pull/268))
+
+### 20261026t183246z
+- A hard reset to origin/<branch> keeps the 'runs on its own' clean-tree check, so a chained cd-then-reset stays denied: the 33 own-upstream resets drop to one rewrite each, not to zero Undo: a follow-up that reads an absolute cd or -C target equal to the payload's toplevel as the same tree ([#267](https://github.com/mark-brannan/languette/pull/267))
