@@ -240,7 +240,7 @@ MESSAGES = {
         "itself in the background, and it freezes the machine. {way_user}"
     ),
     "protected_stop": (
-        "`systemctl {verb}` is blocked: it stops a protected service, one the user's machine "
+        "`{verb}` is blocked: it stops a protected service, one the user's machine "
         "depends on (the protected_services setting). {way_user}"
     ),
     # Pass 5: approval-gated commands, pushes, disks, cross-session sends, duplicate PRs.

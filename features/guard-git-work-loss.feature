@@ -14,7 +14,9 @@ Feature: guard-git-work-loss
   rebasing a session branch, with `--force-with-lease` to that branch, is the
   one legitimate force. `git checkout .`, `git restore .` and `git clean -f`
   throw away uncommitted work, as `reset --hard` does, and `branch -D` throws
-  away unmerged work (`-d` refuses; use that). `yadm`, a git wrapper for
+  away unmerged work (`-d` refuses; use that). On a clean working tree the
+  discards (checkout, restore, clean, `reset --hard`) have nothing to lose and
+  pass. `yadm`, a git wrapper for
   dotfiles, is treated as `git`.
 
   Each rule has its own switch, the plugin options
@@ -128,6 +130,133 @@ Feature: guard-git-work-loss
       | git restore --staged .     | is silent | unstaging is reversible   |
       | git clean -n               | is silent |                           |
       | git clean -fdn             | is silent |                           |
+
+  # Nothing to discard on a clean tree. Asked of git in the directory the
+  # session runs in, so a cd, -C, --git-dir, --work-tree or GIT_DIR in the
+  # command leaves the deny standing: there the guard cannot say which tree.
+  Scenario Outline: discarding is allowed when the working tree is clean
+    Given a git repository at "{TMP}/clean"
+    And the working directory is "{TMP}/clean"
+    When the agent runs `<command>`
+    Then the guard is silent
+
+    Examples:
+      | command           | note                                   |
+      | git checkout .    |                                        |
+      | git checkout -- . |                                        |
+      | git restore .     |                                        |
+      | git clean -fd     |                                        |
+      | git reset --hard  | HEAD, so no commit is dropped          |
+      | sh -c 'git checkout .'   | sh's own -c is not a git option |
+      | bash -c "git restore ."  | sh's own -c is not a git option |
+      | env LC_ALL=C git checkout .     | env with plain assignments is no wrapper |
+      | LC_ALL=C git restore .          | an assignment is no wrapper     |
+
+  Scenario Outline: discarding is still denied when the tree is clean but the target is not known
+    Given a git repository at "{TMP}/clean"
+    And the working directory is "{TMP}/clean"
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | command                          | note                                  |
+      | git reset --hard HEAD~1          | drops a commit                        |
+      | git -C {TMP}/clean checkout .    | -C names the tree; not looked at      |
+      | cd {TMP}/clean && git restore .  | a cd moves the tree                   |
+      | git clean -fdx                   | ignored files are not in the status   |
+      | env --chdir={TMP}/clean git checkout . | a wrapper's chdir moves the tree |
+      | sudo -D {TMP}/clean git checkout .     | a wrapper's chdir moves the tree |
+      | git -c core.worktree={TMP}/clean checkout . | -c can re-aim the work tree |
+      | sh -c 'git -c core.worktree={TMP}/clean checkout .' | git's -c, inside the quoted script |
+      | sh -c 'git -C {TMP}/clean checkout .' | git's -C, inside the quoted script |
+      | GIT_CONFIG_COUNT=0 git checkout .      | config from the environment      |
+      | touch x && git clean -fd         | an earlier segment can dirty the tree |
+      | echo x > f && git checkout -- .  | a redirect can dirty the tree         |
+      | git apply p && git checkout .    | the patch is the work being discarded |
+      | git merge --squash b && git reset --hard | the staged result would go    |
+      | git clean -fd -e '!*'            | a negated exclude un-ignores files    |
+      | git clean -fd --exclude='!*'     | a negated exclude un-ignores files    |
+      | git clean -fde '!*'              | e in a short cluster                  |
+      | ssh host git reset --hard        | a remote wrapper runs git elsewhere   |
+      | docker exec c git reset --hard   | a remote wrapper runs git elsewhere   |
+      | kubectl exec p -- git reset --hard | a remote wrapper runs git elsewhere |
+      | nsenter --wd=/tmp git reset --hard | a wrapper's chdir moves the tree    |
+      | bwrap --chdir /tmp git reset --hard | a wrapper's chdir moves the tree   |
+      | chroot /tmp git reset --hard     | a wrapper's root moves the tree       |
+      | watch -n 60 git reset --hard     | a repeat runs after the status read   |
+      | systemd-run --user --on-active=1h git reset --hard | a delay runs after the status read |
+
+  Scenario Outline: discarding is denied when the working tree has changes
+    Given a git repository at "{TMP}/dirty"
+    And the file "{TMP}/dirty/notes.txt" holds:
+      """
+      work in progress
+      """
+    And the working directory is "{TMP}/dirty"
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | command           |
+      | git checkout .    |
+      | git restore .     |
+      | git clean -fd     |
+      | git reset --hard  |
+
+  # `git status` leaves out a file marked assume-unchanged or skip-worktree, so a tree
+  # can read clean while a discard still throws away that file's edits.
+  Scenario Outline: discarding is denied when a hidden edit sits behind a clean status
+    Given a git repository at "{TMP}/flagged"
+    And the tracked file "{TMP}/flagged/notes.txt" is edited and marked <flag>
+    And the working directory is "{TMP}/flagged"
+    When the agent runs `<command>`
+    Then the guard denies
+
+    Examples:
+      | flag             | command           |
+      | assume-unchanged | git checkout .    |
+      | assume-unchanged | git restore .     |
+      | assume-unchanged | git reset --hard  |
+      | skip-worktree    | git checkout .    |
+      | skip-worktree    | git reset --hard  |
+
+  Scenario: a flagged file elsewhere in the tree still denies a discard of the whole tree
+    Given a git repository at "{TMP}/flagged"
+    And the tracked file "{TMP}/flagged/a/notes.txt" is edited and marked assume-unchanged
+    And the directory "{TMP}/flagged/b"
+    And the working directory is "{TMP}/flagged/b"
+    When the agent runs `git checkout :/`
+    Then the guard denies
+
+  Scenario: a tracked file with no flag does not stop a clean-tree discard
+    Given a git repository at "{TMP}/tracked"
+    And the tracked file "{TMP}/tracked/notes.txt" is committed
+    And the working directory is "{TMP}/tracked"
+    When the agent runs `git checkout .`
+    Then the guard is silent
+
+  Scenario: a repo setting that hides untracked files does not make the tree clean
+    Given a git repository at "{TMP}/hidden"
+    And the file "{TMP}/hidden/notes.txt" holds:
+      """
+      work in progress
+      """
+    And the file "{TMP}/hidden/.git/config" holds:
+      """
+      [core]
+      	repositoryformatversion = 0
+      [status]
+      	showUntrackedFiles = no
+      """
+    And the working directory is "{TMP}/hidden"
+    When the agent runs `git clean -fd`
+    Then the guard denies
+
+  Scenario: discarding is denied in a directory that is not a git repository
+    Given the directory "{TMP}/plain"
+    And the working directory is "{TMP}/plain"
+    When the agent runs `git checkout .`
+    Then the guard denies
 
   Scenario Outline: force-deleting a branch is denied
     When the agent runs `<command>`

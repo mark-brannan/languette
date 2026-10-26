@@ -164,6 +164,28 @@ def _git_init(ctx, path):
     subprocess.run(["git", "init", "-q", "-b", "main", str(d)], check=True)
 
 
+def _commit_file(ctx, path):
+    f = Path(ctx.expand(path))
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text("committed\n")
+    ident = ["-c", "user.email=t@e", "-c", "user.name=t"]
+    subprocess.run(["git", "-C", str(f.parent), "add", f.name], check=True)
+    subprocess.run(["git", "-C", str(f.parent), *ident, "commit", "-q", "-m", "init"], check=True)
+    return f
+
+
+@given(parsers.parse('the tracked file "{path}" is committed'))
+def _tracked_file(ctx, path):
+    _commit_file(ctx, path)
+
+
+@given(parsers.re(r'the tracked file "(?P<path>[^"]+)" is edited and marked (?P<flag>assume-unchanged|skip-worktree)'))
+def _tracked_flagged(ctx, path, flag):
+    f = _commit_file(ctx, path)
+    subprocess.run(["git", "-C", str(f.parent), "update-index", f"--{flag}", f.name], check=True)
+    f.write_text("edit that git status does not show\n")
+
+
 @given(parsers.parse('a yadm-style repository at "{path}" whose work tree is "{wt}"'))
 def _yadm_repo(ctx, path, wt):
     d = Path(ctx.expand(path))
