@@ -139,7 +139,16 @@ MESSAGES = {
     "wt_dir_unclear": (
         "{guard}: can't tell which directory this git checkout/switch runs in (a cd, -C or "
         "session cwd that doesn't resolve), so it can't be checked against $HOME. Use an "
-        "absolute path with git -C."
+        "absolute path with git -C. Only a session standing in its own worktree or scratchpad "
+        "is let through on an unresolved path, and this one is not: $HOME, a main checkout, "
+        "an unresolved cwd and `cd -` keep the deny."
+    ),
+    "wt_dir_unclear_note": (
+        "{guard}: allowed, but unchecked: can't tell which directory this git checkout/switch "
+        "runs in (a variable, a $( ) or a path that doesn't exist yet). It went through because "
+        "the session stands in its own worktree or scratchpad. Make sure it lands there too: "
+        "never $HOME, a repo's main checkout or another session's worktree. An absolute path "
+        "with git -C lets the guard check it."
     ),
     "wt_foreign": (
         "{guard}: `{word}` is inside {ft}, a git worktree this session does not own. A hand-off "

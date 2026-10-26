@@ -9,7 +9,8 @@ spec is features/guard-worktrees.feature.
 Opt-in: hooks.json runs it only when the option guard_worktrees is exactly
 true, and run.py without --guard skips it unless that option is set. A
 control is skipped when its own option (guard_worktrees_checkout_home,
-guard_worktrees_foreign) is exactly false; the first control to object wins.
+guard_worktrees_foreign) is exactly false; the first control to object wins,
+and a note is given only when neither does.
 
 checkout-home. yadm hardcodes --work-tree=$HOME, so any yadm checkout/switch
 that is not a file restore (`checkout [<ref>] -- <path>`) is denied, from any
@@ -18,7 +19,14 @@ $HOME's worktree (`rev-parse --show-toplevel`), following a cd/pushd, chained
 -C, --git-dir/--work-tree and GIT_DIR=/GIT_WORK_TREE=, exported or inline. A
 --git-dir counts when it is $HOME's repo or any repo whose work tree is $HOME.
 A directory that cannot be resolved (a variable, `cd -`, a stale cwd) is a
-deny. `(cd x); git checkout y` is judged from x: a known false allow.
+deny, with one exception: an allow with a note when the session's cwd is its
+own linked worktree (recorded, or under its scratchpad) or lies under its
+scratchpad, and every directory the command resolved before losing track is
+too. $HOME, a main checkout, a cwd that does not resolve, `cd -` and a
+session's first call (nothing recorded yet) keep the deny; a word that
+resolves into another session's worktree is the foreign control's deny. What
+the unresolved word names is unseen, so it may be any directory: a known gap.
+`(cd x); git checkout y` is judged from x: a known false allow.
 
 foreign. Another session's worktree is never a place to work:
 the session that owns a worktree may archive it mid-turn under anyone who
@@ -44,7 +52,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Act, Need, Refuse, deny
+from languette.verdict import Act, Need, Refuse, context, deny
 
 NAME = "guard-worktrees"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES"
@@ -206,7 +214,23 @@ def _checkout_home(doc):
     def targets_home(d):
         return d == home or (yield from _git("/", "-C", d, "rev-parse", "--show-toplevel")) == home
 
-    cands, lost, env_targets = ([cwd] if cwd else []), not cwd, []
+    sess = _Session(payload, env, "", home)
+
+    def own_place(d):
+        """Under this session's scratchpad, or in its own linked worktree: one
+        under the scratchpad or recorded. Never $HOME or a main checkout."""
+        if d == home:
+            return False
+        if sess.under_scratch(d):
+            return True
+        top = yield from _git("/", "-C", d, "rev-parse", "--show-toplevel")
+        if not top or top == home or not (yield Need("path", "isfile", os.path.join(top, ".git"))):
+            return False
+        return sess.under_scratch(top) or (yield from sess.recorded(top))
+
+    # visited: every directory the command was known to stand in; None once a
+    # `cd -` took it somewhere no word names.
+    cands, lost, env_targets, visited, note = ([cwd] if cwd else []), not cwd, [], ([cwd] if cwd else None), None
     for ev in events:
         if ev[0] == "DENY":
             raise _generic("yadm")
@@ -216,8 +240,9 @@ def _checkout_home(doc):
             v = ev[1]
             if v == "":
                 cands, lost = [home], False
+                visited = visited and visited + [home]
             elif v == "-":
-                lost = True
+                lost, visited = True, None
             else:
                 if _HOMEISH.match(v):
                     lost = False
@@ -226,16 +251,18 @@ def _checkout_home(doc):
                 res, miss = yield from _resolve_all(v, cands, home)
                 if not miss and res:
                     cands = res
+                    visited = visited and visited + res
                 else:
                     lost = True
         else:
             if not home:
                 raise Refuse(say("wt_home_unresolved_checkout", guard=NAME))
-            bases, blind, pinned, unpinned = cands, lost, False, False
+            bases, blind, pinned, unpinned, seen = cands, lost, False, False, visited
             for tk, tv in env_targets + ev[1]:
                 if tk == "C":
                     bases, miss = yield from _resolve_all(tv, bases, home)
                     blind = blind or miss or not bases
+                    seen = seen and seen + bases
                     continue
                 # --work-tree says where files land, not which repo: git still finds the repo from the directory.
                 pinned = pinned or tk == "GITDIR"
@@ -252,10 +279,17 @@ def _checkout_home(doc):
             if pinned:
                 continue
             if blind:
-                raise Refuse(say("wt_dir_unclear", guard=NAME))
+                if not seen:
+                    raise Refuse(say("wt_dir_unclear", guard=NAME))
+                for d in dict.fromkeys(seen):
+                    if not (yield from own_place(d)):
+                        raise Refuse(say("wt_dir_unclear", guard=NAME))
+                note = say("wt_dir_unclear_note", guard=NAME)
+                continue
             for d in bases:
                 if (yield from targets_home(d)):
                     raise _generic("git")
+    return note
 
 
 # --- foreign --------------------------------------------------------------
@@ -561,11 +595,14 @@ CONTROLS = (("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME", _checkout_hom
 def check(doc):
     if not isinstance(doc.payload, dict):
         return None
+    notes = []
     for option, control in CONTROLS:
         if doc.env.get(option) == "false":
             continue
         try:
-            yield from control(doc)
+            note = yield from control(doc)
         except Refuse as r:
             return deny(str(r))
-    return None
+        if note:
+            notes.append(note)
+    return context("\n\n".join(notes)) if notes else None
