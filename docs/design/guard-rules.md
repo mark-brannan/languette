@@ -121,11 +121,9 @@ an install.
 The stages from today's guards to the four engines, in order (#198). A stage
 that lands leaves this list; what it built is then described above.
 
-1. The command engine: one rule loader and one matcher, where ask-first,
-   scheduled-jobs and protected-services each load and match in their own
-   way today. Program descriptions hold every value-taking option table,
-   infra's and the commit guard's beside git's. Those three guards move
-   onto it.
+1. Program descriptions: every value-taking option table, infra's and the
+   commit guard's beside git's. Those two guards move onto the command
+   engine, which already has one rule loader and one matcher.
 2. deny-always and guard-sudo, written as rules alone: the measure of what
    a new guard costs on the engine.
 3. The other command guards move, smallest first.

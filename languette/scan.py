@@ -1292,8 +1292,8 @@ def load_rules(cfg, key, keys=(), check=None, many=False, taken=(), nonempty=Fal
         if not isinstance(r.get("id"), str) or not r["id"].strip():
             raise BadRules(f"{where}.id must be a non-empty string")
         if r["id"] in seen:
-            raise BadRules(f"{where}.id '{r['id']}' is a duplicate or a default's; a rule set adds rules, "
-                           "it never replaces one")
+            tail = " is a default's; a rule set adds rules, it never replaces one" if r["id"] in taken else " is a duplicate"
+            raise BadRules(f"{where}.id '{r['id']}'{tail}")
         seen.add(r["id"])
         if check:
             check(r, where)
