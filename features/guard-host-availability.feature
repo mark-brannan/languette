@@ -73,6 +73,8 @@ Feature: guard-host-availability
       | /etc/init.d/ssh stop                     | /etc/init.d/ssh stop           | the init script itself                |
       | sudo /etc/init.d/networking restart      | /etc/init.d/networking restart | the init script behind sudo           |
       | /etc/rc.d/init.d/sshd restart            | /etc/rc.d/init.d/sshd restart  | the RHEL init script path             |
+      | sh /etc/init.d/ssh stop                  | /etc/init.d/ssh stop           | the init script through a shell       |
+      | sudo -u root systemctl stop sshd         | systemctl stop sshd            | a wrapper option's value is not the command |
 
   Scenario: a fork bomb on a later line is still seen
     When the agent runs:
@@ -104,6 +106,7 @@ Feature: guard-host-availability
       | systemctl status nginx                           | a read, not a stop                             |
       | systemctl restart --user foo                     | the user's own manager, not the host           |
       | systemctl --user stop foo                        | the user's own manager, not the host           |
+      | systemctl --host=$H stop sshd                    | another host, named by a variable              |
       | echo systemctl stop nginx                        | prose that names a command is not it           |
       | git commit -m "systemctl restart sshd"           |                                                |
       | echo systemctl reboot                            |                                                |

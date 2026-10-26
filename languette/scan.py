@@ -19,6 +19,7 @@ tokens are the same contract whichever rung read them. Below shfmt the awk
 lexer reads the words; the rung above it only accepts or refuses.
 """
 
+import difflib
 import fnmatch
 import functools
 import json
@@ -55,6 +56,13 @@ _FIND_WRAPPERS = frozenset("sudo doas env nice nohup time command exec ionice xa
 SHELL = frozenset("sh bash zsh dash ksh ash eval source .".split())
 WRAP = frozenset("sudo env command exec time nice nohup timeout doas builtin "
                  "if then else elif while until do !".split())
+# A wrapper's options that take a separate value, so the value is not the command (`sudo -u postgres pkill`).
+_WRAP_VALUED = {"sudo": frozenset("-u -g -h -p -C -D -R -T -U -r -t --user --group --host --prompt --close-from "
+                                  "--chdir --chroot --command-timeout --other-user --role --type".split()),
+                "env": frozenset("-u -C -S -P --unset --chdir --split-string --default-signal".split()),
+                "doas": frozenset("-u -C".split()),
+                "timeout": frozenset("-s -k --signal --kill-after".split()),
+                "nice": frozenset("-n --adjustment".split())}
 NESTED_CAP = 64
 _CASE = re.compile(r"(?<![A-Za-z0-9_])case(?![A-Za-z0-9_])")
 
@@ -1138,18 +1146,22 @@ def cmd_index(s, a, b, cmd, nested, parents=None, prose=PROSE):
             if i == c and s.w[c] in prose and not s.shellseg:
                 return None
         return None
-    wrap = False
+    wrap, skip = None, False
     for i in range(a, b + 1):
         if s.k[i] != "w":
             return None
+        if skip:                               # a wrapper option's value
+            skip = False
+            continue
         if cmd.search(s.w[i]):
             return i
         if _ASSIGN.match(s.w[i]):
             continue
         if s.w[i] in WRAP:
-            wrap = True
+            wrap = s.w[i]
             continue
         if wrap and (s.w[i].startswith("-") or re.fullmatch(r"[0-9]+[smhd]?", s.w[i])):
+            skip = s.w[i] in _WRAP_VALUED.get(wrap, ())
             continue
         return None
     return None
@@ -1285,17 +1297,20 @@ SYSV_CMDS = ("service", "invoke-rc.d", "rc-service")
 # command word that is a unit's own script, its name the unit. `pattern`: what an operand is to
 # the unit test, a "regex" or a "name", and `regex` the options that make a name a regex. `fold`:
 # the options that fold case. `signal`: `-9` and `-KILL` are a signal, not options. `opaque`: an
-# operand the scan cannot read (a substitution, a variable) fails closed.
+# operand the scan cannot read (a substitution, a variable) fails closed. `inverse`: the options
+# that select every process the pattern does not, so they hit. `selects`: options whose value is a
+# file that selects processes (a pidfile), read as a process name.
 PROGRAMS = {
     "systemctl": {"valued": _CTL_ARG, "flags": _CTL_FLAG, "away": _CTL_OTHER, "reads": _CTL_READ, "unit": "after"},
-    "sysv": {"unit": "beside", "script": r"etc/(?:rc\.d/)?init\.d/[^/]+"},
+    "sysv": {"unit": "beside", "script": r"etc/(?:rc\.d/)?init\.d/[^/]+", "via": ("sh", "bash", "dash")},
     "pkill": {"valued": frozenset("-g -G -P -s -t -u -U -F -r -q --pgroup --group --parent --session --terminal "
                                   "--euid --uid --pidfile --runstates --queue --signal --ns --nslist --cgroup "
                                   "--env --older --newer".split()),
               "flags": frozenset("-c -e -f -i -n -o -v -w -x -A -H -L --count --echo --full --ignore-case --newest "
                                  "--oldest --inverse --lightweight --exact --ignore-ancestors --require-handler "
                                  "--logpidfile".split()),
-              "unit": "operand", "pattern": "regex", "fold": {"-i", "--ignore-case"}, "signal": True, "opaque": True},
+              "unit": "operand", "pattern": "regex", "fold": {"-i", "--ignore-case"}, "signal": True, "opaque": True,
+              "inverse": {"-v", "--inverse"}, "selects": {"-F", "--pidfile"}},
     "killall": {"valued": frozenset("-o -y -u -s -Z -n --older-than --younger-than --user --signal --context --ns".split()),
                 "flags": frozenset("-e -g -i -l -q -r -v -V -w -I --exact --process-group --interactive --list "
                                    "--quiet --regexp --verbose --version --wait --ignore-case".split()),
@@ -1315,19 +1330,28 @@ class _Dark(str):
     """An operand the scan cannot read, a substitution or a variable, as written."""
 
 
+class _Path(str):
+    """A file an option names that selects processes (pkill's pidfile): a name, held in its path."""
+
+
 def _read(s, g, b, prog):
     """The words past the command at g, read with program description `prog`: (operands, options,
     words, known), or None when an option sends the call to another manager or host. Quoted text
     is its text; an operand the scan cannot read is _Dark when `prog` is opaque, else as written."""
     valued, flags, away = prog.get("valued", ()), prog.get("flags", ()), prog.get("away", ())
-    ops, opts, words, known, skip, ended = [], [], [], True, False, False
+    selects = prog.get("selects", ())
+    ops, opts, words, known, skip, ended, skip_sel = [], [], [], True, False, False, False
     for i in range(g + 1, b + 1):
         w = s.w[i] if s.k[i] == "w" else s.q[i]
         if skip:
             skip = False
+            if skip_sel:
+                ops.append(_Dark(w) if s.live[i] else _Path(w))
         elif w == "--" and s.k[i] == "w" and not ended:
             words.append(w)
             ended = True                       # past `--`, every word is an operand
+        elif s.k[i] == "w" and not ended and w.startswith("-") and w.split("=", 1)[0] in away:
+            return None                        # a variable host (`--host=$H`) is still another host
         elif s.live[i] or s.k[i] != "w":
             if prog.get("opaque"):
                 ops.append(_Dark(w) if s.live[i] else w)
@@ -1343,8 +1367,10 @@ def _read(s, g, b, prog):
             if name in away:
                 return None                    # tested here, so an option's value (`--root -M`) is not it
             opts.append(name)
+            if name in selects and name != w:
+                ops.append(_Path(w.split("=", 1)[1]))
             if name in valued and name == w:
-                skip = True
+                skip, skip_sel = True, name in selects
             elif name not in valued and name not in flags and name == w:
                 known = known and bool(ops)
         else:                                  # a short option, or a cluster of them
@@ -1359,6 +1385,9 @@ def _read(s, g, b, prog):
                 opts.append(o)
                 if o in valued:
                     skip = j == len(letters) - 1   # a value joined to it (`-upostgres`) ends the cluster
+                    skip_sel = skip and o in selects
+                    if not skip and o in selects:
+                        ops.append(_Path(w[j + 2:]))
                     break
                 if o not in flags:
                     known = known and bool(ops)
@@ -1374,7 +1403,13 @@ def stop_of(s, a, b, match, hit, host_verbs=()):
     g = cmd_index(s, a, b, re.compile(r"(?:^|/)(?:" + "|".join(map(re.escape, names)) + r")\Z"), True)
     own = None
     if g is None and "script" in prog:
-        g = cmd_index(s, a, b, re.compile(r"(?:^|/)" + prog["script"] + r"\Z"), True)
+        script = re.compile(r"(?:^|/)" + prog["script"] + r"\Z")
+        g = cmd_index(s, a, b, script, True)
+        if g is None:                          # `sh /etc/init.d/postgresql stop`
+            sh = cmd_index(s, a, b, re.compile(r"(?:^|/)(?:" + "|".join(prog.get("via", ())) + r")\Z"), True)
+            arg = sh is not None and next((i for i in range(sh + 1, b + 1)
+                                           if s.k[i] != "w" or not s.w[i].startswith("-")), None)
+            g = arg if arg and s.k[arg] == "w" and script.search(s.w[arg]) else None
         own = g is not None and os.path.basename(s.w[g])
     if g is None:
         return None
@@ -1404,10 +1439,23 @@ def stop_of(s, a, b, match, hit, host_verbs=()):
             return (head, verb) if hit(own) else None
         unit = next((u for u in ops if u != verb and not u.startswith("-") and hit(u)), None)
         return (head, f"{unit} {verb}") if unit else None
+    inverse = next((o for o in opts if o in prog.get("inverse", ())), None)
+    if inverse and ops:                        # it selects every process the pattern does not
+        return head, f"{inverse} {ops[-1]}"
+    if prog.get("opaque") and _opens_backtick(s, b) and s.w[b] not in prog.get("valued", ()):
+        ops.append(_Dark("`"))                 # a backtick substitution ends the segment: its words are elsewhere
     how = "regex" if any(o in opts for o in prog.get("regex", ())) else prog["pattern"]
     fold = any(o in opts for o in prog.get("fold", ()))
-    unit = next((u for u in ops if isinstance(u, _Dark) or hit(u, how, fold)), None)
+    unit = next((u for u in ops if isinstance(u, _Dark) or hit(u, "name" if isinstance(u, _Path) else how, fold)),
+                None)
     return None if unit is None else (head, unit)
+
+
+def _opens_backtick(s, b):
+    """The separator past word b opens a backtick substitution (an even count of backticks before it)."""
+    j = b + 1
+    return (j < len(s.w) and s.k[j] == ";" and s.op[j].startswith("`")
+            and sum(op.count("`") for op in s.op[:j]) % 2 == 0)
 
 
 def service_stop(s, a, b, hit, host_verbs=_CTL_HOST, verbs=CTL_STOPS):
@@ -1434,7 +1482,8 @@ def _literals(p):
 
 def _may_match(pat, names, fold):
     """Could process pattern `pat`, a regex, select a process of one of `names`? It does when it,
-    or a word or path part of it, finds one of the names, or holds one. It is tried without its
+    or a word or path part of it, finds one of the names, or holds one, or a literal run of it (three
+    characters or more) is part of a name or shares all but two of one's. It is tried without its
     anchors too, since a process's name or command line is not the unit's name (`^postgres$`
     selects PostgreSQL's daemon); that try only adds hits. One that does not compile fails closed."""
     flags = re.I if fold else 0
@@ -1448,7 +1497,19 @@ def _may_match(pat, names, fold):
     except re.error:
         return True
     low = pat.lower() if fold else pat
-    return any((n.lower() if fold else n) in low for n in names)
+    names = {n.lower() if fold else n for n in names}
+    if any(n in low for n in names):
+        return True
+    # A literal run of the pattern that a name holds, or that holds most of a name (`postgres.*main`,
+    # `-Dpostgres`: a daemon's process is named for its unit's stem).
+    runs = {r for r in re.split(r"(?:\\.|[\W_])+", low) if len(r) >= 3}
+    return any(r in n or _common(r, n) >= max(3, len(n) - 2) for r in runs for n in names)
+
+
+def _common(x, y):
+    """The length of the longest run of characters x and y share."""
+    m = difflib.SequenceMatcher(None, x, y, autojunk=False).find_longest_match(0, len(x), 0, len(y))
+    return m.size
 
 
 # A command rule on a stop: docs/design/guard-rules.md, "Command rules". Its match is

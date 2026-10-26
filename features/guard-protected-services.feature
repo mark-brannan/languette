@@ -50,8 +50,8 @@ Feature: guard-protected-services
       | killall postgresql              |                                      |
       | service postgresql try-restart  | systemctl's other stops              |
       | service postgresql --full-restart | a flag that restarts               |
-      | pkill -f '[p]ostgresql'         | a regex fails closed                 |
-      | pkill 'postgre.ql'              | a regex fails closed                 |
+      | pkill -f '[p]ostgresql'         | a regex that matches the unit        |
+      | pkill 'postgre.ql'              | a regex that matches the unit        |
       | killall -9 postgresql           |                                      |
       | killall -s KILL postgresql      |                                      |
       | /usr/bin/pkill -f postgresql    | by path                              |
@@ -79,6 +79,19 @@ Feature: guard-protected-services
       | pkill '[^x]ostgresql'           | a negated class                      |
       | pkill 'x\$y'                    | stripped of anchors, it does not compile |
       | pkill -f -- -D.*postgresql      | an operand after -- that looks like an option |
+      | pkill -f 'postgres.*main'       | a literal run the unit's name holds  |
+      | pkill -f 'postgres: 16/main'    | a literal run the unit's name holds  |
+      | pkill -f 'postgres:'            | a literal run the unit's name holds  |
+      | pkill -f 'postgres.*checkpointer' | a literal run the unit's name holds  |
+      | pkill -f -- -Dpostgres          | a run that holds the unit's stem     |
+      | sudo -u postgres pkill postgres | a wrapper option's value is not the command |
+      | sudo -u postgres killall postgres | a wrapper option's value is not the command |
+      | pkill `cat x`                   | a backtick substitution fails closed |
+      | pkill -f `cat x`                | a backtick substitution fails closed |
+      | pkill -v nginx                  | an inverted pattern selects the unit |
+      | pkill --inverse nginx           | an inverted pattern selects the unit |
+      | pkill -F /run/postgresql/postmaster.pid | a pidfile under the unit's name      |
+      | sh /etc/init.d/postgresql stop  | the init script through a shell      |
 
   Scenario Outline: a process pattern that could name a protected service is denied
     Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "<setting>"
@@ -121,6 +134,9 @@ Feature: guard-protected-services
       | killall -i postgresql           | nginx        | -i asks before each kill in killall        |
       | invoke-rc.d nginx stop          | postgresql   | another service                            |
       | /etc/init.d/postgresql status   | postgresql   | a read, not a stop                         |
+      | pkill -F /run/nginx.pid         | postgresql   | a pidfile that names no listed unit        |
+      | x=`pkill nginx`                 | postgresql   | a stop of another inside backticks         |
+      | pkill -u `whoami` nginx         | postgresql   | a substitution as an option's value        |
 
     @also_guard-host-availability
     Examples:
