@@ -1,10 +1,10 @@
 """guard-git-work-loss: the git moves that throw work away, and that an agent
-session never has a good reason to make, are denied. The spec is
+session never has a good reason to make, are denied (one is asked about). The spec is
 features/guard-git-work-loss.feature.
 
   blanket staging   git add -A / --all / . / ./ / -u with no path, git commit -a
   stash pop/drop    pop, a bare drop, clear: the stash stack is shared across worktrees
-  force push        bare --force / -f / +refspec; --force-with-lease to main or master;
+  force push        bare --force / -f / +refspec; --force-with-lease to main or master asks;
                     deleting main
   discard           git checkout . / git restore . / git clean -f / git reset --hard
   branch -D         and --delete --force
@@ -21,7 +21,12 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Refuse, deny
+from languette.verdict import Refuse, ask, deny
+
+
+class Ask(Refuse):
+    # Subclasses Refuse only so _segment and its callers carry it up the same path; it asks, not denies.
+    pass
 
 NAME = "guard-git-work-loss"
 RULE = {"add": "BLANKET_STAGING", "commit": "BLANKET_STAGING", "stash": "STASH", "push": "FORCE_PUSH",
@@ -100,8 +105,11 @@ def _push(a):
     if force:
         raise Refuse("bare `git push --force` is blocked. Rebasing a session branch is the one legitimate force: "
                      "use `--force-with-lease origin <branch>`, never to main.")
-    if tomain and (lease or delete):
-        raise Refuse("force-pushing or deleting main is blocked. Main takes rebased branches through a PR.")
+    if tomain and delete:
+        raise Refuse("deleting main is blocked. Main takes rebased branches through a PR.")
+    if tomain and lease:
+        raise Ask("`--force-with-lease` to main rewrites shared history. Main takes rebased branches through a PR; "
+                  "if a force to main is meant, the user confirms it.")
 
 
 def _discard(sub, a):
@@ -180,12 +188,18 @@ def check(doc):
     cmd = (payload.get("tool_input") or {}).get("command") if isinstance(payload, dict) else None
     if not isinstance(cmd, str) or not cmd:
         return None
+    asked = None
     try:
         for text, nested in doc.texts():
             s = doc.scan(text)
             for a, b in s.segments():
                 if a <= b:
-                    _segment(s, a, b, nested, env)
+                    try:
+                        _segment(s, a, b, nested, env)
+                    except Ask as r:
+                        asked = asked or r
     except Refuse as r:
         return deny(say("judged", guard=NAME, why=r))
+    if asked:
+        return ask(say("judged", guard=NAME, why=asked))
     return None

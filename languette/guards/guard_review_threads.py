@@ -3,18 +3,19 @@ record. The spec is features/guard-review-threads.feature.
 
 A Bash call that resolves a review thread (`gh api graphql` whose query, in
 its fields, in a file a field or --input names, or in a heredoc fed to
---input, holds a resolveReviewThread mutation) names each thread by its
-PRRT_ id. The guard reads every such thread from GitHub, through `gh api
-graphql`, and denies unless the current gh login replied after the bot's last
-comment, and that reply names a commit or a link. It checks that a record is
-named, not that the commit exists. A thread no bot commented on passes. A
-query that opens with `{` or `query` is a read whatever it holds, since
-GraphQL runs no mutation from it. A `gh api graphql` whose query it cannot
-read otherwise (a run-time word, a file it cannot open or another command
-could rewrite, stdin with no heredoc), an id it cannot read, or a `gh api`
-whose endpoint is built at run time and could be graphql, is a deny that says
-so; GitHub that cannot answer is an ask. Only gh is read: a POST to the
-GraphQL endpoint by another client (curl, a script) is not.
+--input, holds a resolveReviewThread mutation) names each thread by its PRRT_
+id. The guard reads every such thread from GitHub, through `gh api graphql`,
+and denies unless the current gh login, or a login the review_thread_logins
+setting lists, replied after the bot's last comment, and that reply names a
+commit or a link. A listed login's comment is a reply unless it opens the
+thread. It checks that a record is named, not that the commit exists. A thread
+no bot commented on passes. A query that opens with `{` or `query` is a read
+whatever it holds, since GraphQL runs no mutation from it. A `gh api graphql`
+whose query it cannot read otherwise (a run-time word, a file it cannot open
+or another command could rewrite, stdin with no heredoc), an id it cannot
+read, or a `gh api` whose endpoint is built at run time and could be graphql,
+is a deny that says so; GitHub that cannot answer is an ask. Only gh is read:
+a POST to the GraphQL endpoint by another client (curl, a script) is not.
 """
 
 import json
@@ -27,6 +28,7 @@ from languette.verdict import Need, ask, deny
 
 NAME = "guard-review-threads"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS"
+OPTION = "CLAUDE_PLUGIN_OPTION_REVIEW_THREAD_LOGINS"
 GH = re.compile(r"(?:^|/)gh\Z")
 RESOLVE = re.compile(r"(?<![A-Za-z0-9_])resolveReviewThread(?![A-Za-z0-9_])")
 THREAD = re.compile(r"PRRT_[A-Za-z0-9_-]+")
@@ -218,14 +220,18 @@ def _bot(c):
     return a.get("__typename") == "Bot" or str(a.get("login") or "").endswith("[bot]") or _login(c) in BOTS
 
 
-def _judge(tid, viewer, comments):
-    """deny for one thread, or None. The viewer's own comments are replies,
-    even when the viewer is itself a bot."""
-    me = _norm(viewer)
-    bots = [i for i, c in enumerate(comments) if _bot(c) and _login(c) != me]
+def _judge(tid, viewer, comments, also=()):
+    """deny for one thread, or None. The viewer's comments are replies, even
+    when the viewer is itself a bot; so is a comment from a login in the
+    review_thread_logins option, unless it opens the thread. The thread's
+    first comment, if a bot wrote it, is a finding even from a listed
+    login, unless the viewer did."""
+    vme = _norm(viewer)
+    me = {vme, *map(_norm, also)} - {""}
+    bots = [i for i, c in enumerate(comments) if _bot(c) and _login(c) != vme and (i == 0 or _login(c) not in me)]
     if not bots:
         return None
-    mine = [c for c in comments[bots[-1] + 1:] if _login(c) == me]
+    mine = [c for c in comments[bots[-1] + 1:] if _login(c) in me]
     if not mine:
         return deny(say("rt_no_reply", guard=NAME, tid=tid, viewer=viewer, do=DO))
     if not any(SHA.search(str(c.get("body") or "")) or LINK.search(str(c.get("body") or "")) for c in mine):
@@ -267,7 +273,7 @@ def check(doc):
         got = yield from _thread(cwd, tid)
         if isinstance(got, str):
             return ask(say("rt_unreadable", guard=NAME, tid=tid, got=got))
-        v = _judge(tid, *got)
+        v = _judge(tid, *got, sw.listed((doc.env or {}).get(OPTION)))
         if v:
             return v
     return None
