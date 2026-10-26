@@ -416,3 +416,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261026t073845z
 - cmd_index skips a wrapper option's value scan-wide, in this PR not a follow-up Undo: revert the _WRAP_VALUED hunk of a4f6573 and its rows ([#263](https://github.com/mark-brannan/languette/pull/263))
+
+### 20261026t073848z
+- an init script run through sh, bash or dash counts as the init script, in this PR Undo: drop the via key and its stop_of branch ([#263](https://github.com/mark-brannan/languette/pull/263))
