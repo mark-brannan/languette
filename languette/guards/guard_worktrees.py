@@ -237,7 +237,8 @@ def _checkout_home(doc):
                     bases, miss = yield from _resolve_all(tv, bases, home)
                     blind = blind or miss or not bases
                     continue
-                pinned = True
+                # --work-tree says where files land, not which repo: git still finds the repo from the directory.
+                pinned = pinned or tk == "GITDIR"
                 res, miss = yield from _resolve_all(tv, bases, home)
                 # A value that does not resolve (or is relative to a directory that doesn't) pins nothing.
                 # any miss denies: one candidate base that fails to resolve is enough
@@ -247,7 +248,7 @@ def _checkout_home(doc):
                         raise _generic("git")
             if unpinned:
                 raise Refuse(say("wt_repo_unclear", guard=NAME))
-            # -C, --git-dir or --work-tree pin where the command resolves.
+            # --git-dir pins where the command resolves; -C moved the bases; --work-tree does neither.
             if pinned:
                 continue
             if blind:
