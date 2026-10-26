@@ -110,9 +110,10 @@ class _Meta:
         name = re.sub(r"[^A-Za-z0-9_].*", "", name, count=1, flags=re.S)
         return name != "" and re.search(r"(?:^|[;&|\s])" + name + r"""=["']?\$\([^)]*<<""", self.orig) is not None
 
-    def val(self, v, live, what="the body or title"):
+    def val(self, v, live, what=None):
         """A posted value: text, or OPAQUE (what it is, the value) when built at run
         time and no heredoc on the value itself feeds it."""
+        what = what or say("pt_what_body")
         if not live:
             self.add("T", _flat(v))                  # single-quoted: posted verbatim
         elif "$(" in v or "`" in v:
@@ -142,7 +143,7 @@ class _Meta:
             return
         if "label" in key:
             self.lab(v)
-        self.val(v, live, f"the `{key}` field")
+        self.val(v, live, say("pt_what_field", name=key))
 
     def subshelled(self, lo, hi):
         """A cd in a pipeline, in backticks or backgrounded runs in a subshell."""
@@ -220,11 +221,11 @@ class _Meta:
             elif t in ("--body", "--title", "--comment", "--subject", "-b", "-t", "-c"):
                 if i < hi:
                     i += 1
-                    self.val(sw.word(self.s, i), s.live[i], f"the `{t}` value")
+                    self.val(sw.word(self.s, i), s.live[i], say("pt_what_flag", name=t))
             elif re.match(r"--(?:body|title|comment|subject)=", t):
-                self.val(t.split("=", 1)[1], live, f"the `{t.split('=', 1)[0]}` value")
+                self.val(t.split("=", 1)[1], live, say("pt_what_flag", name=t.split("=", 1)[0]))
             elif re.match(r"-[btc].", t):
-                self.val(t[2:], live, f"the `{t[:2]}` value")
+                self.val(t[2:], live, say("pt_what_flag", name=t[:2]))
             elif t in ("--label", "--add-label", "-l"):
                 if i < hi:
                     i += 1

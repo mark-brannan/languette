@@ -1164,8 +1164,8 @@ Feature: guard-private-terms
         """
       When the agent runs `gh issue create -R o/r -t x --body-file {PROJ}/body.md`
       Then the guard is silent
-      When the agent runs `gh api graphql -f query=@{PROJ}/body.md -f threadId=ok`
-      # the file holds the mutation text, so the field is read from it
+      When the agent runs `gh api graphql -F query=@{PROJ}/body.md -f threadId=ok`
+      # -F reads the field from the file, which holds the mutation text
       Then the guard is silent
 
     @also_guard-github-issues

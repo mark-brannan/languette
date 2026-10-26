@@ -464,6 +464,9 @@ MESSAGES = {
         "unchecked, which is indistinguishable from a check that ran. Populate it (one term per line, "
         "# for comments) and retry. To post without the check, {to_private}."
     ),
+    "pt_what_body": "the body or title",
+    "pt_what_field": "the `{name}` field",
+    "pt_what_flag": "the `{name}` value",
     "pt_opaque": (
         "{guard}: {what} is built at run time ({opaque}) and no heredoc in this command feeds it, and the hook "
         "reads the text before the command runs, so it cannot check it. Give it text it can read: a heredoc inside this command that "
