@@ -584,6 +584,35 @@ Feature: guard-git-work-loss
         | cd {TMP}/repo && git add -A src/x.py                       | a cd moves the tree               |
         | git add -A src/x.py && git commit -am y                    | the commit is blanket             |
 
+    Scenario Outline: -A with a path that reaches the whole tree is denied as blanket in a linked worktree
+      Given the directory "{TMP}/repo/.claude/worktrees/feat/src/sub"
+      And the working directory is "<cwd>"
+      When the agent runs `<command>`
+      Then the guard denies, naming "`git add -A` is blocked: stage by path"
+
+      Examples:
+        | cwd                                           | command                                            | note                          |
+        | {TMP}/repo/.claude/worktrees/feat/src         | git add -A ..                                      | up to the toplevel            |
+        | {TMP}/repo/.claude/worktrees/feat/src         | git add -A ../                                     | the same, a slash             |
+        | {TMP}/repo/.claude/worktrees/feat/src/sub     | git add -A ../..                                   | two up                        |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A .//                                     | the toplevel, spelled long    |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A {TMP}/repo/.claude/worktrees/feat       | the toplevel's absolute path  |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A src/x.py {TMP}/repo                     | one path above the toplevel   |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A ':(top)'                                | magic: the toplevel           |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A ':/*'                                   | magic: everything from the top |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A ':!src/x.py'                            | an exclusion: all but one     |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A ':(exclude)src/x.py'                    | the same, long form           |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A '*.py'                                  | a glob over the tree          |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A $PWD                                    | a variable the shell expands  |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A "$(pwd)"                                | a command substitution        |
+        | {TMP}/repo/.claude/worktrees/feat             | git add -A ~                                       | a tilde                       |
+
+    Scenario: -A with a path in a subdirectory passes when it stays below the toplevel
+      Given the directory "{TMP}/repo/.claude/worktrees/feat/src/sub"
+      And the working directory is "{TMP}/repo/.claude/worktrees/feat/src/sub"
+      When the agent runs `git add -A .. x.py`
+      Then the guard is silent
+
     Scenario: -A with paths is denied in a repo's main checkout
       Given the working directory is "{TMP}/repo"
       When the agent runs `git add -A src/x.py`

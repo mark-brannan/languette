@@ -3,7 +3,8 @@ session never has a good reason to make, are denied (one is asked about). The sp
 features/guard-git-work-loss.feature.
 
   blanket staging   git add -A / --all / . / ./ / -u with no path, git commit -a; -A with paths
-                    is allowed where an agent works (below)
+                    is allowed where an agent works (below), when every path resolves strictly
+                    inside the tree: pathspec magic, globs and shell expansions do not
   stash pop/drop    pop, a bare drop, clear: the stash stack is shared across worktrees
   force push        bare --force / -f / +refspec; --force-with-lease to main or master asks;
                     deleting main
@@ -25,6 +26,7 @@ not the flag. git takes any unambiguous prefix of a long option, so --har is
 --hard.
 """
 
+import os
 import re
 
 from languette import paths
@@ -39,14 +41,20 @@ class Ask(Refuse):
 
 
 class _Placed(Refuse):
-    # `git add -A <paths>`: denied unless _segment finds the command runs where an agent works.
-    pass
+    # `git add -A <paths>`: denied unless _segment finds the command runs where an agent works
+    # and every path lands strictly inside its tree.
+    def __init__(self, msg, names):
+        super().__init__(msg)
+        self.names = names
 
 NAME = "guard-git-work-loss"
 RULE = {"add": "BLANKET_STAGING", "commit": "BLANKET_STAGING", "stash": "STASH", "push": "FORCE_PUSH",
         "checkout": "DISCARD", "restore": "DISCARD", "clean": "DISCARD", "reset": "DISCARD",
         "branch": "BRANCH_DELETE"}
 _WHOLE = re.compile(r"(?:\.|\./|\./\*|:/|:/\.|\*)\Z")
+# A pathspec the guard cannot resolve to one place: magic (`:(top)`, `:/`, `:!x`, `:^x`), a glob,
+# or a word the shell expands ($PWD, $(pwd), `pwd`, ~).
+_UNRESOLVED = re.compile(r"\A[:~]|[$`*?\[]")
 _MAIN = re.compile(r"(?:refs/heads/)?(?:main|master)\Z")
 STATUS_TIMEOUT = 5
 # Words that re-aim the tree a discard is judged in, or the config git reads. A git global
@@ -86,6 +94,7 @@ def _dst(t):
 
 def _add(a):
     paths = upd = every = listed = 0
+    names = []
     for t in a:
         if _WHOLE.match(t):
             raise Refuse(f"`git add {t}` is blocked: stage by path, not the whole tree.")
@@ -97,11 +106,12 @@ def _add(a):
             listed = 1                         # the paths are in a file the guard does not read
         elif not t.startswith("-"):
             paths += 1
+            names.append(t)
     if every:
         msg = ("`git add -A` is blocked: stage by path. Where the worktree is $HOME it stages the home "
                "directory; elsewhere it sweeps in files a parallel session is working on.")
-        if paths and not listed:
-            raise _Placed(msg)
+        if paths and not listed and not any(_UNRESOLVED.search(t) for t in names):
+            raise _Placed(msg, names)
         raise Refuse(msg)
     if upd and not paths:
         raise Refuse("`git add -u` with no path is blocked: stage by path.")
@@ -217,31 +227,31 @@ def _own_command(s, a, b, g):
 
 def _where_agents_work(doc, cwd):
     """True when cwd's toplevel is a linked worktree or inside the session's scratchpad,
-    and is not $HOME's. A repo's main checkout outside the scratchpad, and $HOME, are the
-    user's. Any failure to ask is False."""
+    and is not $HOME's: then the toplevel, else "". A repo's main checkout outside the
+    scratchpad, and $HOME, are the user's. Any failure to ask is "", as is a toplevel of /."""
     home = (doc.env or {}).get("HOME") or ""
     if not home.startswith("/"):
-        return False
+        return ""
     try:
         rc, out, _ = yield Need("run", cwd, STATUS_TIMEOUT, "git", "rev-parse", "--path-format=absolute",
                                 "--show-toplevel", "--git-dir", "--git-common-dir")
         lines = out.splitlines()
         if rc != 0 or len(lines) != 3:
-            return False
+            return ""
         top, gdir, common = lines
         top = yield Need("path", "realpath", top)
-        if top == (yield Need("path", "realpath", home)):
-            return False
+        if top in ("", "/") or top == (yield Need("path", "realpath", home)):
+            return ""
         if (yield Need("path", "realpath", gdir)) != (yield Need("path", "realpath", common)):
-            return True
+            return top
         sid = doc.payload.get("session_id")
         scratch = (yield Need("worktree", "scratchpad", sid)) if isinstance(sid, str) and sid else None
         if not scratch:
-            return False
+            return ""
         scratch = yield Need("path", "realpath", scratch)
     except Exception:  # noqa: BLE001
-        return False
-    return top == scratch or top.startswith(scratch.rstrip("/") + "/")
+        return ""
+    return top if top == scratch or top.startswith(scratch.rstrip("/") + "/") else ""
 
 
 def _upstream_target(args):
@@ -269,13 +279,15 @@ def _own_upstream(cwd, branch):
 
 
 def _nothing_to_lose(doc, sub, args):
-    """True when the discard `sub args` cannot lose anything: no word of the command moves
+    """True when the discard `sub args` loses nothing uncommitted: no word of the command moves
     or re-aims the tree, no other segment of it can run before the discard and dirty the
     tree (the status is read before the command runs), the payload's cwd is a git work
     tree with a clean status and no file marked assume-unchanged or skip-worktree, and
     the discard is not one that reaches past the status (clean -x) or drops a commit
     (reset to a ref). The one reset to a ref that passes is to origin/<current branch>,
-    where agents work (_where_agents_work, _own_upstream). Any failure to ask is False."""
+    where agents work (_where_agents_work, _own_upstream); it drops any commit the branch
+    has ahead of that remote, which this check does not look for (the reflog keeps them).
+    Any failure to ask is False."""
     cwd = doc.payload.get("cwd")
     if not isinstance(cwd, str) or not cwd.startswith("/"):
         return False
@@ -304,16 +316,30 @@ def _nothing_to_lose(doc, sub, args):
     return rc == 0 and not any(e[:1].islower() or e[:1] == "S" for e in out.split("\0") if e)
 
 
-def _staging_where_agents_work(doc):
+def _staging_where_agents_work(doc, names, msg):
     """`git add -A <paths>` stages only those paths; it passes when no word of the command
-    moves or re-aims the tree and the payload's cwd is where agents work."""
+    moves or re-aims the tree, the payload's cwd is where agents work, and each path,
+    resolved from the cwd, lies strictly inside the toplevel. A path that resolves to the
+    toplevel or above it (`..`, the root's absolute path) is the whole tree: plain blanket
+    staging, denied as such."""
     cwd = doc.payload.get("cwd")
     if not isinstance(cwd, str) or not cwd.startswith("/"):
         return False
     scans = [(doc.scan(text), nested) for text, nested in doc.texts()]
     if paths.moves_directory(scans) or _reaimed(scans):
         return False
-    return (yield from _where_agents_work(doc, cwd))
+    top = yield from _where_agents_work(doc, cwd)
+    if not top:
+        return False
+    try:
+        for t in names:
+            if not (yield Need("path", "realpath", os.path.join(cwd, t))).startswith(top + "/"):
+                break
+        else:
+            return True
+    except Exception:  # noqa: BLE001
+        return False
+    raise Refuse(msg)
 
 
 def _segment(doc, s, a, b, nested, env):
@@ -345,8 +371,8 @@ def _segment(doc, s, a, b, nested, env):
             _branch(args)
         elif sub == "reset":
             _reset(args)
-    except _Placed:
-        if not s.w[g].endswith("yadm") and _own_command(s, a, b, g) and (yield from _staging_where_agents_work(doc)):
+    except _Placed as p:
+        if not s.w[g].endswith("yadm") and _own_command(s, a, b, g) and (yield from _staging_where_agents_work(doc, p.names, str(p))):
             return
         raise Refuse(say("wl_add_all_paths"))
     except Refuse as r:
