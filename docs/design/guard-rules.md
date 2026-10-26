@@ -121,19 +121,17 @@ an install.
 The stages from today's guards to the four engines, in order (#198). A stage
 that lands leaves this list; what it built is then described above.
 
-1. Every guard reads the call through Document; none opens the payload
-   itself for the command.
-2. The command engine: one rule loader and one matcher, where ask-first,
+1. The command engine: one rule loader and one matcher, where ask-first,
    scheduled-jobs and protected-services each load and match in their own
    way today. Program descriptions hold every value-taking option table,
    infra's and the commit guard's beside git's. Those three guards move
    onto it.
-3. deny-always and guard-sudo, written as rules alone: the measure of what
+2. deny-always and guard-sudo, written as rules alone: the measure of what
    a new guard costs on the engine.
-4. The other command guards move, smallest first.
-5. Write targets, then guard-protected-paths on it; recursive-delete,
+3. The other command guards move, smallest first.
+4. Write targets, then guard-protected-paths on it; recursive-delete,
    permissions and worktrees switch to it.
-6. The text engine: `secret_rules`, private-terms' terms and bypass-labels,
+5. The text engine: `secret_rules`, private-terms' terms and bypass-labels,
    then guard-databases.
 
 ## Open
