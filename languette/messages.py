@@ -223,6 +223,18 @@ MESSAGES = {
     ),
     # A command the user runs, not an agent: the host, the crontab, a protected service.
     "judged": "{guard}: {why}",
+    # guard-git-work-loss's two relaxations, which hold only where an agent works: a linked worktree
+    # or the session's scratchpad, never $HOME or a repo's main checkout.
+    "wl_add_all_paths": (
+        "`git add -A <paths>` is blocked here: it passes only in a linked worktree or the session's "
+        "scratchpad, run from there with no cd or -C. Drop the -A: `git add <paths>` stages the same "
+        "changes, deletions included."
+    ),
+    "wl_reset_upstream": (
+        "{why} `git reset --hard origin/<this branch>` passes only when it runs on its own, from a linked "
+        "worktree or the session's scratchpad with no cd or -C, on a clean tree, and the branch tracks "
+        "that same name or nothing."
+    ),
     "cron_remove": "`crontab -r` is blocked: it deletes the whole crontab with no undo. {way_user}",
     "rule_deny": "`{cmd}` is blocked by rule `{id}` in {file}: {why}. {way_user}",
     "rules_bad": (
