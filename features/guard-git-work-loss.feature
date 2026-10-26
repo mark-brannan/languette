@@ -48,6 +48,13 @@ Feature: guard-git-work-loss
       | git add :/                              | denies    |                                   |
       | git add -u                              | denies    | with no path                      |
       | git add -Av                             | denies    | a flag cluster                    |
+      | git add -u --chmod +x                   | denies    | +x is --chmod's value, not a path |
+      | git add -u --chm +x                     | denies    | the same, a unique prefix         |
+      | git add -u --chmod=+x                   | denies    | the same, glued                   |
+      | git add --renormalize                   | denies    | it implies -u                     |
+      | git add --frobnicate src/               | denies    | an option the guard does not know |
+      | git add -uz src/                        | denies    | the same, in a cluster            |
+      | git add --ign src/                      | denies    | an ambiguous prefix               |
       | yadm add -A                             | denies    |                                   |
       | cd foo && git add -A && git commit -m x | denies    | in a chain                        |
       | git -C /some/dir add -A                 | denies    | git -C                            |
@@ -56,6 +63,8 @@ Feature: guard-git-work-loss
       | git commit --all -m x                   | denies    |                                   |
       | git add hooks/foo.sh README.md          | is silent | staging by path                   |
       | git add -u src/                         | is silent | with a path                       |
+      | git add -u --chmod +x src/              | is silent | a path beside --chmod's value     |
+      | git add --chmod=+x hooks/foo.sh         | is silent | chmod by path                     |
       | git add -p foo                          | is silent |                                   |
       | git commit -m "add -A everything"       | is silent |                                   |
       | git commit --amend --no-edit            | is silent |                                   |
@@ -569,6 +578,10 @@ Feature: guard-git-work-loss
         | git add -A -- src/x.py                    | after --                    |
         | git add -A src/x.py && git commit -m y    | then a commit               |
         | git add --all src/x.py 2>&1               | a redirect is not a path    |
+        | git add -A --chmod +x src/x.py            | --chmod's value is not a path |
+        | git add -A --chm=+x src/x.py              | a prefix, glued             |
+        | git add -AU 3 src/x.py                    | -U takes the next word      |
+        | git add -A --pathspec-file-nul src/x.py   | a flag with no value        |
 
     Scenario Outline: -A stays denied in a linked worktree when it is blanket or its place is not known
       Given the working directory is "{TMP}/repo/.claude/worktrees/feat"
@@ -580,6 +593,16 @@ Feature: guard-git-work-loss
         | git add -A                                                 | bare -A is blanket                |
         | git add -A .                                               | the whole tree                    |
         | git add -A --pathspec-from-file=list                       | the paths are in a file           |
+        | git add -A --pathspec-from-file list                       | the same, a separate value        |
+        | git add -A --pathspec-from list                            | the same, a prefix                |
+        | git add -A --chmod +x                                      | +x is --chmod's value, not a path |
+        | git add -A --chm +x                                        | the same, a unique prefix         |
+        | git add -A --chmod=+x                                      | the same, glued                   |
+        | git add -AU 3                                              | 3 is -U's value                   |
+        | git add -A --unified 3                                     | the same, long                    |
+        | git add -A --inter-hunk-context 3                          | another value option              |
+        | git add -A --frobnicate src/x.py                           | an option the guard does not know |
+        | git add -A --ign src/x.py                                  | an ambiguous prefix               |
         | git -C {TMP}/repo add -A src/x.py                          | -C names another tree             |
         | cd {TMP}/repo && git add -A src/x.py                       | a cd moves the tree               |
         | git add -A src/x.py && git commit -am y                    | the commit is blanket             |

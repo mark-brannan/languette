@@ -92,21 +92,92 @@ def _dst(t):
     return t.split(":", 1)[1] if ":" in t else t
 
 
+# git add's own option table (builtin/add.c, git 2.53): long name -> (takes a value, negatable).
+# git takes any unambiguous prefix of a long name or of its --no- form, and a value either after
+# `=` or as the next word. An option missing from here is refused rather than guessed at, since a
+# guessed value could be a word git reads as the option's and the guard as a path.
+_ADD_LONG = {
+    "dry-run": (False, True), "verbose": (False, True), "interactive": (False, True),
+    "patch": (False, True), "unified": (True, False), "inter-hunk-context": (True, False),
+    "edit": (False, True), "force": (False, True), "update": (False, True),
+    "renormalize": (False, True), "intent-to-add": (False, True), "all": (False, True),
+    "ignore-removal": (False, True), "refresh": (False, True), "ignore-errors": (False, True),
+    "ignore-missing": (False, True), "sparse": (False, True), "chmod": (True, True),
+    "warn-embedded-repo": (False, True), "pathspec-from-file": (True, True),
+    "pathspec-file-nul": (False, True),
+}
+_ADD_SHORT = {"n": "dry-run", "v": "verbose", "i": "interactive", "p": "patch", "U": "unified",
+              "e": "edit", "f": "force", "u": "update", "N": "intent-to-add", "A": "all"}
+
+
+def _add_long(t):
+    """`--name[=value]` as git reads it: (canonical name, negated, glued value or None). An
+    unknown or ambiguous name raises Refuse."""
+    name, eq, val = t[2:].partition("=")
+    forms = {}
+    for full, (_, neg) in _ADD_LONG.items():
+        forms[full] = (full, False)
+        if neg:
+            forms["no-" + full] = (full, True)
+    if name in forms:
+        hit = [forms[name]]
+    else:
+        hit = list({forms[f] for f in forms if f.startswith(name)}) if name else []
+    if len(hit) != 1:
+        raise Refuse(f"`git add {t}` is blocked: the guard does not know that option, so it cannot "
+                     "tell its value from a path. Spell it as `git add --help` does.")
+    full, negated = hit[0]
+    if eq and not _ADD_LONG[full][0]:
+        raise Refuse(f"`git add {t}` is blocked: that option takes no value.")
+    return full, negated, (val if eq else None)
+
+
+def _add_options(a):
+    """Split git add's words into the options set (canonical names, a negated one as no-<name>)
+    and the pathspecs, from git's own option table. A value option eats the next word when its
+    value is not glued on; `--` and `--end-of-options` end the options."""
+    opts, specs = [], []
+    i, n = 0, len(a)
+    while i < n:
+        t = a[i]
+        i += 1
+        if t in ("--", "--end-of-options"):
+            specs.extend(a[i:])
+            break
+        if t.startswith("--"):
+            full, negated, val = _add_long(t)
+            if _ADD_LONG[full][0] and not negated and val is None:
+                if i >= n:
+                    raise Refuse(f"`git add {t}` is blocked: it wants a value and has none.")
+                i += 1
+            opts.append(("no-" if negated else "") + full)
+        elif t.startswith("-") and t != "-":
+            for j, ch in enumerate(t[1:], 1):
+                full = _ADD_SHORT.get(ch)
+                if full is None:
+                    raise Refuse(f"`git add {t}` is blocked: the guard does not know `-{ch}`, so it cannot "
+                                 "tell its value from a path.")
+                opts.append(full)
+                if _ADD_LONG[full][0]:
+                    if j == len(t) - 1:
+                        if i >= n:
+                            raise Refuse(f"`git add {t}` is blocked: it wants a value and has none.")
+                        i += 1
+                    break
+        else:
+            specs.append(t)
+    return opts, specs
+
+
 def _add(a):
-    paths = upd = every = listed = 0
-    names = []
-    for t in a:
+    opts, names = _add_options(a)
+    for t in names:
         if _WHOLE.match(t):
             raise Refuse(f"`git add {t}` is blocked: stage by path, not the whole tree.")
-        if t == "-A" or _pfx(t, "--all") or _pfx(t, "--no-ignore-removal") or _has(t, "A"):
-            every = 1
-        elif t == "-u" or _pfx(t, "--update") or _has(t, "u"):
-            upd = 1
-        elif _pfx(t.split("=", 1)[0], "--pathspec-from-file"):
-            listed = 1                         # the paths are in a file the guard does not read
-        elif not t.startswith("-"):
-            paths += 1
-            names.append(t)
+    every = "all" in opts or "no-ignore-removal" in opts
+    upd = "update" in opts or "renormalize" in opts
+    listed = "pathspec-from-file" in opts     # the paths are in a file the guard does not read
+    paths = len(names)
     if every:
         msg = ("`git add -A` is blocked: stage by path. Where the worktree is $HOME it stages the home "
                "directory; elsewhere it sweeps in files a parallel session is working on.")
