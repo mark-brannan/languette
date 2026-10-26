@@ -288,6 +288,14 @@ def _remote_head(ctx, path, branch):
                    check=True)
 
 
+@given(parsers.parse('the branch "{branch}" of "{path}" tracks "{upstream}"'))
+def _tracks(ctx, branch, path, upstream):
+    d = ctx.expand(path)
+    remote, _, name = upstream.partition("/")
+    subprocess.run(["git", "-C", d, "config", f"branch.{branch}.remote", remote], check=True)
+    subprocess.run(["git", "-C", d, "config", f"branch.{branch}.merge", f"refs/heads/{name}"], check=True)
+
+
 def _engine(ctx, command):
     # The prose_budget_command option names the engine.
     ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = command
