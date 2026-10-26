@@ -299,7 +299,7 @@ for beyond the command, it declares:
 
 | Guard | Reads |
 |---|---|
-| `guard-git-work-loss` | git, in the session's directory: whether the tree is clean, and whether it is a linked worktree or in the scratchpad |
+| `guard-git-work-loss` | git, in the payload's cwd: whether the tree is clean, and whether it is a linked worktree or in the scratchpad |
 | `require-well-formed` | a shell parser; nothing runs the command |
 | `guard-recursive-delete` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
