@@ -14,9 +14,9 @@ the disk, the network, the clock and other programs into two narrow steps.
 ```
  1. parse    pure*   read the command into its parts
  2. plan     pure    list the facts each guard needs
- 3. gather   I/O     fetch exactly those facts; the only reads
+ 3. gather   I/O     fetch exactly those facts, guard by guard; the only reads
  4. guard    pure    parsed command + facts -> finding
- 5. verdict  pure    findings + configuration -> silent / warn / ask / deny
+ 5. verdict  pure    findings + configuration + mode -> silent / warn / ask / deny
  6. act      I/O     after the verdict only: every write
 ```
 
@@ -30,6 +30,12 @@ the disk, the network, the clock and other programs into two narrow steps.
   but the call's payload and transcript, the clock, its own environment,
   the filesystem, git, GitHub, and records this plugin wrote in act. What a guard cannot learn that way
   stays out of its finding.
+- **Gather** runs guard by guard, each in its own shape (below); all guards
+  share the one parse and run in one process.
+- **Mode** is the hook input's `permission_mode`, never an environment
+  variable. It changes one thing: in a mode where no one can answer, an ask
+  is a deny. A missing or unknown mode leaves the ask standing: a user who is
+  there keeps the yes, and a host with no one to answer refuses it itself.
 - **Act** holds every write: spending an approval, saving the ruleset cache,
   and the simple metrics. It runs at two moments: after the verdict, and
   after the call, for a write that must wait until the command has run
