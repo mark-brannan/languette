@@ -464,3 +464,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261027t193447z
 - GhArg.text is None for a flag with no word after it; each guard keeps its own handling Undo: drop the case ([#284](https://github.com/mark-brannan/languette/pull/284))
+
+### 20261027t193452z
+- guard-github-issues scans for mutations in every word but GhApi.skipped, which exists for that one caller Undo: scan every word ([#284](https://github.com/mark-brannan/languette/pull/284))
