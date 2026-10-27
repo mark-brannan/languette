@@ -452,3 +452,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261027t193432z
 - paths.read_rules lives in paths beside read_json Undo: move it into scan and update two callers ([#279](https://github.com/mark-brannan/languette/pull/279))
+
+### 20261027t193435z
+- the doctor and install test base class is tests/harness.py FakeHome Undo: rename or move ([#280](https://github.com/mark-brannan/languette/pull/280))
