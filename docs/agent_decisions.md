@@ -446,3 +446,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261027t192927z
 - an answer's text counts as said outside messages unless it is a say() call, so a forwarded str(e) or a joined list sits in KNOWN_INLINE_TEXT Undo: exempt Name and Call nodes in _answer_text's caller ([#281](https://github.com/mark-brannan/languette/pull/281))
+
+### 20261027t193429z
+- verdict.approve returns (approved, done) with done a 1-tuple or None, telling a spent claim from a deny from keep-going Undo: change the return shape in one function and four callers ([#279](https://github.com/mark-brannan/languette/pull/279))
