@@ -489,7 +489,9 @@ def _off(env, rule):
 
 
 def _stow(s, a, b, nested, env):
-    """`stow --adopt` asks; a stow call without it, or one that only deletes, does not."""
+    """`stow --adopt` asks; a stow call without it, or one that only deletes, does not.
+
+    A stray ask on a reader such as `man stow --adopt` is accepted: it only asks, never denies."""
     k = sw.cmd_index(s, a, b, STOW, nested)
     if k is None or _off(env, "ADOPT"):
         return

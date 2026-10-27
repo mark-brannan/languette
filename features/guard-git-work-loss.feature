@@ -305,7 +305,7 @@ Feature: guard-git-work-loss
       | stow -d --adopt zsh                   | is silent | the same, with a package: no adopt           |
       | echo stow --adopt zsh                 | is silent | prose                                        |
       | grep stow --adopt notes.txt           | is silent | a search names stow, it does not run it      |
-      | man stow --adopt                      | is silent | a manual page is read, not run               |
+      | man stow --adopt zsh                  | asks      | man is not prose (its pager runs a command)  |
       | stow -t adopt zsh                     | is silent | adopt as a value, not the option             |
       | git commit -m 'stow --adopt zsh'      | is silent | a commit message                             |
 
