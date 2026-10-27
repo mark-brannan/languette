@@ -1,140 +1,135 @@
 # Guard rules
 
 The design behind #198, on [the guard pipeline](guard-pipeline.md). Present
-tense is the aim, not today's code. Field names below are a sketch, not a
-schema.
+tense is the aim, not today's code; the decisions are in
+[decisions.md](../decisions.md). Field names are a sketch, not a schema.
 
 ## Purpose
 
-A new guard should cost a few rules, not a new file of matching code. Most
-guards ask the same three questions in their own words: does this command run
-program P with these options, does this call write to these paths, does this
-text carry this pattern. Each question is answered once, by an engine, and a
-guard becomes a named set of rules for it. Code stays for what rules cannot
-say: state that spans calls, and lookups where one answer picks the next
-question.
+A new guard should cost a few rules, not a file of matching code. Twenty-six
+guards ask thirty-six questions between them, and every one composes named
+tests with all, any and not; none needs an expression. The repetition is in
+how a guard reaches the words it tests and the facts it needs: the `gh api`
+walk is written eight times, cd tracking four, "is this word live" thirteen.
 
-## Four engines
+So there is one engine. A guard is a rule set held as data. Code is the
+engine, the primitives a rule may name, and the messages. A rule says which
+calls, under which conditions, get which verdict; it runs nothing and names
+no program to run. Configuration first: a rule set is readable without
+reading Python, and a guard is tested by its feature file as today, so moving
+it onto the engine changes how it is written, never what it decides.
 
-| Engine | One rule says |
-|---|---|
-| Command rules | program + its options + a condition → deny, or ask once |
-| Write targets | the paths a call writes match a list |
-| Text rules | a pattern or term appears in text the call carries |
-| Code guards | anything else, through Need and Act as today |
-
-Which guard goes where is in #198. A guard may use more than one engine:
-recursive-delete is a command rule that hands its targets to write targets.
-
-Every engine is pure: it plans in step 2, the facts and paths it needs, and
-judges in step 4, guard. Its rules are data, read in gather like any other
-fact. A rule runs no code and names no program to run.
-Each rule that matches is one finding; verdict combines findings as it does
-today. A rule only tightens: its action is `deny` or `ask-once`, never allow, so
-a repo's rule set adds to what languette judges and takes nothing from it.
-
-A guard keeps its name, its settings and its feature file. Moving it onto an
-engine changes how it is written, never what it decides: its feature suite
-passes unchanged.
-
-## Command rules
-
-ask-first's match format is the seed. A rule names a command word and a run of
-its non-option words, and the scanner already sees through wrappers, chains,
-`sh -c` and launchers:
+## A rule
 
 ```json
-{"cmd": "npm", "args": ["run", "e2e"]}
+{"guard": "guard-github-issues",
+ "rules": [{"id": "issue-write", "action": "deny",
+            "match": {"any": [{"cmd": "gh", "args": ["issue", "create"]},
+                              {"cmd": "gh", "args": ["api"], "method": "POST", "path": "repos/*/issues"},
+                              {"tool": "mcp__github*__create_issue"}]},
+            "when": {"all": [{"fact": "door", "is": "open"}, {"not": "in-loop"}]},
+            "why": "issue_door_shut"}],
+ "on": {"UserPromptSubmit": "door-open", "PostToolUse": "door-spend"}}
 ```
 
-The engine adds four things to it.
+- `match` selects calls: a command word and its non-option words, as
+  ask-first writes them today, with flags, a tool name, a path or a text
+  pattern. The scanner sees through wrappers, chains, `sh -c` and launchers.
+- `when` is predicates over the matched words and over facts, under `all`,
+  `any` and `not`. Absent, the match alone decides.
+- `action` and `why`: the verdict, and the message key that explains it.
+- `on` names the event handlers a stateful guard keeps, by name.
 
-- **Options**: a flag present or absent, by long name, short name inside a
-  cluster (`-ir` holds `r`) or prefix (`--har` is `--hard`). A prefix the
-  program would call ambiguous matches every option it could be, so a deny
-  rule still denies and an ask rule still asks.
-- **A program description**: which options take a value, so the value is
-  never read as a subcommand, and where the subcommand sits. git's comes from
-  #197's finder; infra's `VALUED` table is the same thing for six programs.
-- **A condition**: a closed list of tests on the matched words, such as a
-  unit in the protected_services setting. A test that needs a fact names it,
-  and plan turns it into a Need.
-- **An action**: `deny`, or `ask-once`, ask-first's approval spent once per run.
+Each rule that matches is one finding; verdict combines findings as today.
 
-One populated rule, `crontab -r` as guard-scheduled-jobs would write it:
+## Primitives
 
-```json
-{"id": "crontab-wipe", "guard": "guard-scheduled-jobs",
- "match": {"cmd": "crontab", "flags": ["r"]},
- "action": "deny",
- "why": "it deletes the whole crontab with no undo"}
-```
+What a rule may name, each a Python function in languette with a name in a
+closed registry. Three kinds:
 
-deny-always is then ask-first with the action set to deny, and its list is the
-repo's. guard-sudo is one rule whose `cmd` is a list: `sudo`, `su`, `doas`
-and `pkexec`.
+| Kind | Does | Examples |
+|---|---|---|
+| selector | finds the words, paths or text a call carries | `cmd`, `flags`, `path` (a `gh api` path), `text` (literal values, heredocs, a body file, an MCP tool's strings) |
+| predicate | tests words or facts, pure | subcommand-in, word-live, cd-present, flag-in-cluster, option-value-in, text-matches, long-prefix, setting-equals |
+| fact | a Need kind and a pure shaping of its answer | the repo a cwd's origin names, whether a path exists, the door's state |
 
-## Facts a condition may name
+A program description belongs to selectors: which options take a value, so a
+value is never read as a subcommand, and where the subcommand sits. git's
+comes from #197's finder; infra's `VALUED` table is the same thing for six
+programs.
 
-A condition's fact is one of a closed list, each a Need kind and a pure
-shaping of its answer: the repo a cwd's origin names, whether a path exists.
-The list begins with what the moved guards ask today and grows when a rule
-needs a fact, not before. A fact with a shape of its own, such as a PR's
-threads or who wrote a comment, is shaped by one code guard today and stays
-there until a second guard asks for it; then it earns a name here.
+The registry grows when a rule needs a primitive, not before. Seventeen
+predicates serve one guard each today; those are that guard's own logic and
+stay beside it, named, until a second guard asks. A primitive two guards
+share lands in scan or verdict first (decisions: "New guards").
 
-## Write targets
+Sequence is a fact, never a condition: the five guards that would lose
+precision as pure data (git-work-loss relaxations, bypass-ruleset binding,
+private-terms' rewrite, signed-comments tracing, worktrees landings) lose it
+on order within a command, and order is computed per segment in gather.
 
-recursive-delete, permissions and worktrees each work out which paths a call
-writes, then resolve them against the payload's cwd and through the
-filesystem. That stage is done once, for every guard: the engine lists the
-paths to resolve, gather resolves them, and a call's targets are a list of
-resolved paths, or a reason one could not be resolved. A rule is a
-list of path patterns and an action. A target that cannot be resolved fails
-closed, as both guards do today.
+## Actions
 
-Command rules say which words are targets (`rm -r <targets>`); file tools name
-theirs in `tool_input`. guard-protected-paths is the first guard built on this
-stage alone.
+A rule only tightens. Its action is `deny`, `ask` (ask-first's approval,
+spent once per run when the rule says so) or `context`, never allow: a rule
+set adds to what languette judges and takes nothing from it. Whether `ask`
+and `context` belong to every tier, and whether a rewrite is an action, are
+open below.
 
-## Text rules
+## Plan from the rules
 
-secrets, private-terms and bypass-labels each find the text a call carries,
-then test it. The finding is done once: literal flag values, heredoc bodies, a
-body file's contents, an MCP tool's strings. A rule is a pattern or a term,
-where it applies (any repo, or a public one), and an action.
+The engine reads a rule set and knows its facts before gather: every `when`
+names them, and every fact is a Need kind. So plan is a function of the
+configuration and the parse, as the pipeline requires, and the two shapes of
+guard are two shapes of rule set: plan/judge when `when` names facts alone,
+ask-as-it-goes when a fact's argument is another fact's answer. State across
+calls is a fact read in gather and a write made in act by a handler `on`
+names; the handler is code, as the issue door's protocol is today.
 
-`secret_rules` is already this shape: an id, a description, a regex. The
-private-terms list and the bypass-labels list are terms. guard-databases' SQL
-scan is the first new guard on this engine.
+## Trust tiers
+
+| Tier | Lives | May say |
+|---|---|---|
+| shipped | `languette/rules/`, one file per guard | everything above |
+| user | a file the user names in the plugin options | everything above |
+| repo | `.languette/`, agent-writable | data that adds `deny`; the rest open |
+
+Primitives are Python in languette at every tier; no tier loads code. An
+agent writes the repo tier, so what it may say is bounded by what an agent
+could abuse: a rule that loosens, or one that puts code into the process that
+judges it. A plug point for outside code is not designed; it enters by
+request, as an issue.
 
 ## Rule sets that do not load
 
-A rule set that does not parse, or has another shape, denies every call its
-guard would judge, naming the file and the fault. That is ask-first's and
-guard-secrets' behaviour today: the guard cannot tell what it was meant to
-cover. A test loads every rule set languette ships, so that deny never greets
-an install.
+A rule set that does not parse, names an unknown primitive, or has another
+shape, denies every call its guard would judge, naming the file and the
+fault. That is ask-first's and guard-secrets' behaviour today. A test loads
+every rule set languette ships, so that deny never greets an install.
 
 ## Path there
 
-The stages from today's guards to the four engines, in order (#198). A stage
-that lands leaves this list; what it built is then described above.
+From today's guards to the engine, in order. A stage that lands leaves this
+list; what it built is then described above.
 
-1. Program descriptions: every value-taking option table, infra's and the
-   commit guard's beside git's. Those two guards move onto the command
-   engine, which already has one rule loader and one matcher.
-2. deny-always and guard-sudo, written as rules alone: the measure of what
-   a new guard costs on the engine.
-3. The other command guards move, smallest first.
-4. Write targets, then guard-protected-paths on it; recursive-delete,
-   permissions and worktrees switch to it.
-5. The text engine: `secret_rules`, private-terms' terms and bypass-labels,
-   then guard-databases.
+1. The registry: the shared selectors first (the `gh api` walk, cd
+   tracking, word-live, the valued-option tables), each landing with the
+   guards that repeat it moved onto it.
+2. deny-always and guard-sudo as rule sets alone: the measure of what a new
+   guard costs.
+3. The command guards move, smallest first; then the text guards, whose
+   `secret_rules`, term list and label list are already data.
+4. The stateful guards: their rules move, their handlers stay code.
+5. The repo tier, once its bounds are decided.
+
+Lines, from the survey: ~3000 of guard code become data plus engine, ~1500
+stay code, ~2000 are messages and stay where they are.
 
 ## Open
 
-- Shipped rules as JSON beside the code, or as Python data in the guard.
-- How wide a condition's closed list grows before a guard is better as code.
+- A rewrite action, as guard-private-terms rewrites `$HOME` to `~` and asks,
+  or rewriting stays code beside the engine (#198).
+- `ask` and `context` as repo-tier actions; probably yes.
+- A repo rule naming a fact that costs network or a program run.
 - #134's step 3 asks the same question for git and GitHub alone; this design
   is one answer to it, not a decision on it.
