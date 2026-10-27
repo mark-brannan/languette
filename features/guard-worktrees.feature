@@ -431,6 +431,10 @@ Feature: guard-worktrees
         | {TMP}    | echo hi && chezmoi apply --force                 | `chezmoi apply --force`      |
         | {TMP}    | sh -c 'chezmoi apply --force'                    | `chezmoi apply --force`      |
         | {TMP}    | chezmoi apply --force && chezmoi purge           | `chezmoi purge`              |
+        | {TMP}    | chezmoi apply "my dir/x" --force                 | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi -S "my dots" apply --force               | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi apply "$HOME/My Docs/x" --force          | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi destroy "my dir/x"                       | `chezmoi destroy`            |
 
     Scenario Outline: a chezmoi call that changes nothing in $HOME, or only after a prompt, passes
       Given the working directory is "{TMP}"

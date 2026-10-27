@@ -115,9 +115,11 @@ def _chezmoi_hit(s, c, b):
     --apply, or --one-shot, which forces by itself."""
     force, apply, verb = False, None, None
     i = c + 1
-    while i <= b and s.k[i] == "w" and s.w[i] != "--":
+    while i <= b and s.w[i] != "--":
         w = s.w[i]
-        if w in _CHEZMOI_VALUED:
+        if s.k[i] != "w":  # a quoted word with whitespace: never the verb or an option
+            pass
+        elif w in _CHEZMOI_VALUED:
             i += 1
         elif w.startswith("-"):
             f = _chezmoi_flag(w, "force")
