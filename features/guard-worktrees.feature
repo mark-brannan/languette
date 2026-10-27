@@ -392,6 +392,112 @@ Feature: guard-worktrees
         | echo 'yadm checkout some-branch'         |
         | git status                               |
 
+  Rule: chezmoi's forced apply, destroy and purge ask
+
+    Background:
+      Given HOME is "{TMP}"
+      And the directory "{TMP}/subdir"
+      And a project directory
+
+    # chezmoi manages $HOME as files, not as a branch, so the checkout-home part
+    # asks here rather than denies. The command is read by its shape: chezmoi
+    # need not be installed, nor git, and where it runs does not matter.
+    #
+    # --force makes chezmoi overwrite every file changed in $HOME since it last
+    # wrote one, with no prompt; destroy removes a target, its source entry and
+    # its state; purge deletes the source directory, uncommitted edits too.
+    # `init --one-shot` sets force itself. An unforced apply or update passes:
+    # chezmoi prompts before it overwrites a changed target, and with no TTY
+    # that prompt fails the run instead of answering itself.
+    Scenario Outline: a chezmoi call that overwrites or removes in $HOME asks
+      Given the working directory is "<cwd>"
+      When the agent runs `<command>`
+      Then the guard asks, naming "<named>"
+
+      Examples:
+        | cwd      | command                                          | named                        |
+        | {TMP}    | chezmoi apply --force                            | `chezmoi apply --force`      |
+        | {PROJ}   | chezmoi apply --force                            | `chezmoi apply --force`      |
+        | /tmp     | chezmoi apply --force                            | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi --force apply                            | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi apply --force=true                       | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi apply --force --force=false --force=1    | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi apply -v --force ~/.bashrc               | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi -S ~/dots --force apply                  | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi --source=~/dots apply --force            | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi update --force                           | `chezmoi update --force`     |
+        | {TMP}    | chezmoi update --apply=true --force              | `chezmoi update --force`     |
+        | {TMP}    | chezmoi init --apply --force user/dots           | `chezmoi init --force`       |
+        | {TMP}    | chezmoi init -a --force user/dots                | `chezmoi init --force`       |
+        | {TMP}    | chezmoi init --one-shot user/dots                | `chezmoi init --force`       |
+        | {TMP}    | chezmoi destroy ~/.bashrc                        | `chezmoi destroy`            |
+        | {TMP}    | chezmoi destroy --recursive ~/.config            | `chezmoi destroy`            |
+        | {TMP}    | chezmoi destroy --force ~/.bashrc                | `chezmoi destroy`            |
+        | {TMP}    | chezmoi purge                                    | `chezmoi purge`              |
+        | {TMP}    | chezmoi purge --force                            | `chezmoi purge`              |
+        | {TMP}    | /usr/local/bin/chezmoi purge                     | `chezmoi purge`              |
+        | {TMP}    | echo hi && chezmoi apply --force                 | `chezmoi apply --force`      |
+        | {TMP}    | sh -c 'chezmoi apply --force'                    | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi apply --force && chezmoi purge           | `chezmoi purge`              |
+        | {TMP}    | chezmoi apply "my dir/x" --force                 | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi -S "my dots" apply --force               | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi apply "$HOME/My Docs/x" --force          | `chezmoi apply --force`      |
+        | {TMP}    | chezmoi destroy "my dir/x"                       | `chezmoi destroy`            |
+
+    Scenario Outline: a chezmoi call that changes nothing in $HOME, or only after a prompt, passes
+      Given the working directory is "{TMP}"
+      When the agent runs `<command>`
+      Then the guard is silent
+
+      Examples:
+        | command                                          |
+        | chezmoi apply                                    |
+        | chezmoi apply -v ~/.bashrc                       |
+        | chezmoi apply --dry-run --verbose                |
+        | chezmoi apply --force=false                      |
+        | chezmoi apply --force --force=false              |
+        | chezmoi apply -- --force                         |
+        | chezmoi update                                   |
+        | chezmoi update --apply=false --force             |
+        | chezmoi init user/dots                           |
+        | chezmoi init --apply user/dots                   |
+        | chezmoi init --force user/dots                   |
+        | chezmoi diff --force                             |
+        | chezmoi status                                   |
+        | chezmoi add ~/.bashrc                            |
+        | chezmoi managed                                  |
+        | chezmoi cd                                       |
+        | chezmoi data                                     |
+        | echo 'chezmoi apply --force'                     |
+        | echo chezmoi purge                               |
+        | git commit -m 'chezmoi destroy'                  |
+        | notchezmoi apply --force                         |
+
+    Scenario: a chezmoi ask is a deny where the user cannot be asked
+      Given the working directory is "{TMP}"
+      And the permission mode is "dontAsk"
+      When the agent runs `chezmoi apply --force`
+      Then the guard denies
+
+    @awk_only
+    Scenario Outline: a chezmoi ask follows the guard's option and its checkout-home part
+      Given the working directory is "{TMP}"
+      And <setting> is "<value>"
+      When the agent runs `chezmoi purge`
+      Then the guard <verdict>
+
+      Examples:
+        | setting                                            | value | verdict   |
+        | CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME | true  | asks      |
+        | CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME | false | is silent |
+        | CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES               | false | is silent |
+
+    Scenario: a chezmoi ask and a branch switch in one command is the switch's deny
+      Given the working directory is "{TMP}"
+      And a git repository at "{TMP}"
+      When the agent runs `chezmoi purge && git switch some-branch`
+      Then the guard denies
+
   Rule: a session may not reach into a linked worktree that is not its own
 
     Background:

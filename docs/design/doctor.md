@@ -26,7 +26,9 @@ The checks are the install, the dependencies, a probe through the hooks as
 installed, and the version; CI can run them. The dependencies are few and
 each gets its row: `shfmt`, the preferred parser, has top billing, and a
 machine without it is told which rung reads commands instead; `gh` is
-optional, and without it the guards that ask GitHub ask the user instead. The configs are the plugin's options
+optional, and without it the guards that ask GitHub ask the user instead.
+Every other forge client installed gets a row too, a warning when signed in,
+since the agent can act through it where the guards see only part. The configs are the plugin's options
 and every file under `.languette/`. A config its guard would refuse is a ✗
 row naming the file, the entry and why: a key no guard reads, a value of the
 wrong type, a file that does not parse. A config that switches every command
