@@ -7,8 +7,9 @@ a guard keeps that the shared layer already holds, one that two guards keep,
 a call field read from the payload that Document already read, a sentence
 said outside messages.
 
-KNOWN holds today's copies. Each entry is a ceiling, never a floor: a copy
-that goes is pruned here when noticed, and one that appears fails the run.
+KNOWN holds today's copies, exactly: one that appears fails the run, and one
+that goes fails it too, until the PR that removed it prunes the entry here, as
+tests/test_purity.py has its known escapes pruned.
 """
 
 import ast
@@ -45,20 +46,24 @@ KNOWN_TWICE = {
 KNOWN_PAYLOAD_READS = {"guard_bypass_labels": 2, "guard_cross_session_send": 8, "guard_duplicate_prs": 2,
                        "guard_github_issues": 3, "guard_private_terms": 3, "guard_signed_comments": 2,
                        "guard_worktrees": 4, "prose_budget_commit": 2}
-# Answers whose text is a literal or an f-string, not messages.say, per guard.
-KNOWN_INLINE_TEXT = {"ask_first": 2, "guard_bypass_labels": 10, "guard_bypass_ruleset": 9, "guard_duplicate_prs": 3,
-                     "guard_git_work_loss": 18, "guard_permissions": 1, "guard_recursive_delete": 2, "guard_secrets": 9}
+# Answers whose text is anything but a messages.say call, per guard.
+KNOWN_INLINE_TEXT = {"ask_first": 3, "guard_bypass_labels": 12, "guard_bypass_ruleset": 10, "guard_cross_session_send": 2,
+                     "guard_duplicate_prs": 4, "guard_git_work_loss": 20, "guard_permissions": 1,
+                     "guard_recursive_delete": 2, "guard_scheduled_jobs": 1, "guard_secrets": 9, "guard_worktrees": 2,
+                     "prose_budget_commit": 1}
 
 
-IMPORTED = {id(v) for mod in SHARED.values() for v in vars(mod).values()}
+def _imported(tree):
+    """The names a module binds by import: an import is a use of the shared thing, never a copy."""
+    return {a.asname or a.name.split(".")[0] for n in ast.walk(tree)
+            if isinstance(n, (ast.Import, ast.ImportFrom)) for a in n.names}
 
 
-def _constants(mod, own=False):
-    """The module's string sets, string sequences and compiled patterns, by name, as comparable
-    values; with `own`, only the objects it made, not ones it imported from the shared layer."""
+def _constants(mod, skip=()):
+    """The module's string sets, string sequences and compiled patterns, by name, as comparable values."""
     out = {}
     for k, v in vars(mod).items():
-        if k.startswith("__") or (own and id(v) in IMPORTED):
+        if k.startswith("__") or k in skip:
             continue
         if isinstance(v, (frozenset, set)) and v and all(isinstance(x, str) for x in v):
             out[k] = ("set", frozenset(v))
@@ -70,7 +75,10 @@ def _constants(mod, own=False):
 
 
 def _guard_constants():
-    return {f"{g}.{k}": v for g, mod in GUARDS.items() for k, v in _constants(mod, own=True).items()}
+    """guard.NAME -> value, for the constants a guard makes itself (re.compile caches equal
+    patterns, so identity cannot tell a copy from an import; the source can)."""
+    return {f"{g}.{k}": v for g, mod in GUARDS.items()
+            for k, v in _constants(mod, skip=_imported(_source(g))).items()}
 
 
 def _source(g):
@@ -87,18 +95,24 @@ def _key(n):
     return None
 
 
-def _answer(n):
-    """A Refuse/deny/ask/context call, or None."""
+def _answer_text(n):
+    """The text node a Refuse/deny/ask/context call is given, first positional or first keyword, or None."""
     if not isinstance(n, ast.Call):
         return None
     name = n.func.id if isinstance(n.func, ast.Name) else n.func.attr if isinstance(n.func, ast.Attribute) else None
-    return n if name in ANSWERS else None
+    if name not in ANSWERS:
+        return None
+    return n.args[0] if n.args else next((k.value for k in n.keywords), None)
+
+
+def _said(n):
+    return isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "say"
 
 
 def test_no_guard_keeps_a_constant_the_shared_layer_holds():
     shared = {v: f"{m}.{k}" for m, mod in SHARED.items() for k, v in _constants(mod).items()}
     found = {name: shared[v] for name, v in _guard_constants().items() if v in shared}
-    assert_that({k: v for k, v in found.items() if KNOWN_SHARED.get(k) != v}, equal_to({}))
+    assert_that(found, equal_to(KNOWN_SHARED))
 
 
 def test_no_two_guards_keep_the_same_constant():
@@ -106,7 +120,7 @@ def test_no_two_guards_keep_the_same_constant():
     for name, v in _guard_constants().items():
         by_value.setdefault(v, set()).add(name)
     found = {frozenset(names) for names in by_value.values() if len(names) > 1}
-    assert_that(sorted(sorted(s) for s in found if not any(s <= k for k in KNOWN_TWICE)), empty())
+    assert_that(sorted(map(sorted, found)), equal_to(sorted(map(sorted, KNOWN_TWICE))))
 
 
 def test_every_guard_has_its_feature():
@@ -118,15 +132,13 @@ def test_a_guard_reads_the_call_through_the_document():
     found = Counter()
     for g in GUARDS:
         found[g] += sum(_key(n) in DOCUMENT_FIELDS for n in ast.walk(_source(g)))
-    over = {g: n for g, n in found.items() if n > KNOWN_PAYLOAD_READS.get(g, 0)}
-    assert_that(over, equal_to({}))
+    assert_that({g: n for g, n in found.items() if n}, equal_to(KNOWN_PAYLOAD_READS))
 
 
 def test_a_guard_says_its_text_through_messages():
     found = Counter()
     for g in GUARDS:
-        for n in map(_answer, ast.walk(_source(g))):
-            if n is not None and n.args and isinstance(n.args[0], (ast.Constant, ast.JoinedStr, ast.BinOp)):
+        for t in map(_answer_text, ast.walk(_source(g))):
+            if t is not None and not _said(t):
                 found[g] += 1
-    over = {g: n for g, n in found.items() if n > KNOWN_INLINE_TEXT.get(g, 0)}
-    assert_that(over, equal_to({}))
+    assert_that({g: n for g, n in found.items() if n}, equal_to(KNOWN_INLINE_TEXT))
