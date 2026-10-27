@@ -210,14 +210,14 @@ def _symlink(ctx, path, target):
     Path(ctx.expand(path)).symlink_to(ctx.expand(target))
 
 
-@given("the claude plugin's door file is already present")
-def _claude_door_present(ctx):
-    Path(ctx.doordir(), f"claude-issue-door.{ctx.session}").write_text("")
+@given("another plugin's door file is already present")
+def _other_door_present(ctx):
+    Path(ctx.doordir(), f"other-plugin-door.{ctx.session}").write_text("")
 
 
-@then("the claude plugin's door file is still present")
-def _claude_door_still(ctx):
-    assert Path(ctx.doordir(), f"claude-issue-door.{ctx.session}").exists()
+@then("another plugin's door file is still present")
+def _other_door_still(ctx):
+    assert Path(ctx.doordir(), f"other-plugin-door.{ctx.session}").exists()
 
 
 @given(parsers.parse('the door file is a symlink to "{target}"'))

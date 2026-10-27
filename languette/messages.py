@@ -155,8 +155,7 @@ MESSAGES = {
     "wt_foreign": (
         "{guard}: `{word}` is inside {ft}, a git worktree this session does not own. A hand-off "
         "carries a branch, an issue and a PR -- never a directory; another session may still be "
-        "running in there, and it may be archived out from under you mid-turn (an agent once "
-        "lost a worktree that way).\nTo read that branch, stay here: `git log/diff/show "
+        "running in there, and it may be archived out from under you mid-turn.\nTo read that branch, stay here: `git log/diff/show "
         "<branch>`, `git show <branch>:<path>` -- worktrees of a repo share objects and refs.\nTo "
         "work on it, take your own worktree, one command, from anywhere: `{recipe}`, then `git "
         "merge --ff-only {branch}` inside it. If --ff-only fails, the histories have diverged: "
@@ -180,9 +179,8 @@ MESSAGES = {
     "wt_enter_existing": (
         "{guard}: EnterWorktree(path=...) enters a worktree that already exists, with no check "
         "on whose it is -- the tool only requires that the path appear in `git worktree list`. "
-        "That is how an agent once lost a worktree mid-turn: the session that owned it was "
-        "archived and the directory went away underneath the session that had attached to "
-        "it.\nTake your own instead, one command, from anywhere: `{recipe}`, then `git merge "
+        "The session that owns it may be archived mid-turn, and the directory goes away "
+        "underneath the session that attached to it.\nTake your own instead, one command, from anywhere: `{recipe}`, then `git merge "
         "--ff-only <branch>` inside it to bring the branch you are resuming into your own "
         "directory. If --ff-only fails, the histories have diverged: report that and "
         "stop.\nNothing needs the other directory -- worktrees of a repo share objects and refs, "
@@ -229,7 +227,7 @@ MESSAGES = {
         "from a heredoc in the same command."
     ),
     "signature_wrong": (
-        "{guard}: this posts a GitHub comment under the user's login, so it must be signed as an agent's, "
+        "{guard}: this may post a GitHub comment under the user's login, so it must be signed as an agent's, "
         "or a reader takes it for the user's own words. Here {problems}. {shape}"
     ),
     # A command the user runs, not an agent: the host, the crontab, a protected service.
@@ -266,7 +264,6 @@ MESSAGES = {
         "`{verb}` is blocked: it stops a protected service, one the user's machine "
         "depends on (the protected_services setting). {way_user}"
     ),
-    # Pass 5: approval-gated commands, pushes, disks, cross-session sends, duplicate PRs.
     "ask_first_cannot_look": "ask-first: {err}. A gate that cannot look fails closed: retry from the project directory.",
     "ask_first_invalid": (
         "ask-first: {path} is invalid: {err}. Every Bash command is denied until it is fixed, "
@@ -331,8 +328,8 @@ MESSAGES = {
     "ruleset_repo_unknown": (
         "guard-bypass-ruleset: this pushes to `{branch}` through remote `{remote}`, in a repository the "
         "hook can't find (a cd or -C it can't follow, or GIT_DIR), so it can't ask GitHub whether "
-        "`{branch}` requires a pull request. The agent runs on your credentials, so it can use your "
-        "bypass."
+        "`{branch}` requires a pull request. An agent that pushes with your credentials can use "
+        "your bypass."
     ),
     "ruleset_needs_pr": (
         "guard-bypass-ruleset: `{branch}` on {slug} requires a pull request, and this push would go "
@@ -343,11 +340,11 @@ MESSAGES = {
         "guard-bypass-ruleset: this pushes to `{branch}` on {slug}, and GitHub couldn't say "
         "whether `{branch}` requires a pull request (gh missing, signed out, offline or "
         "an error):\n  gh api repos/{slug}/rules/branches/{branch_q}\n"
-        "The agent runs on your credentials, so it can use your bypass."
+        "An agent that pushes with your credentials can use your bypass."
     ),
     "ruleset_refused": (
         "guard-bypass-ruleset: {refused}, so the hook can't check whether it goes around a rule that "
-        "requires a pull request. The agent runs on your credentials, so it can use your bypass."
+        "requires a pull request. An agent that pushes with your credentials can use your bypass."
     ),
     "dup_body_opaque": (
         "the body is built at run time ({v}) and no heredoc in this command feeds it, so its "
@@ -400,7 +397,6 @@ MESSAGES = {
         "{pr} first or say `Supersedes {pr}` in this body. If both "
         "are wanted, drop the closing keyword here and link the issue in prose."
     ),
-    # Pass 6: stacked-branch deletes, issue writes, infra rules, sweeps, private terms, review threads.
     "sb_unreadable": (
         "{guard}: this deletes remote branch `{b}`, but the open-PR list could not be read (no auth, no "
         "network, a 20s timeout, or not a GitHub repo), so PRs stacked on it can't be checked. Confirm by "

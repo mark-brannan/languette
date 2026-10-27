@@ -3,7 +3,7 @@ agent's. The spec is features/guard-signed-comments.feature.
 
 Experimental: the convention is one workflow's; the general shape is issue #194.
 
-An agent posts under the user's own login, so without a mark a review bot and
+An agent may post under the user's own login, and then without a mark a review bot and
 the next agent read its reply as the user's own words. The body's first line
 begins with `🤖 ` and its last non-empty line is `🤖 <model> · <effort> ·
 <eight hex>`; the hex is the payload's session id's, when it has one. Both

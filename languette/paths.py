@@ -124,7 +124,7 @@ def own_roots(home, physical, extra=()):
 
 def physical_of(answers):
     """Path -> its planned Need("physical") answer. One the world could not
-    have is raised, as the runner once threw it into the guard."""
+    have is raised."""
     def physical(p):
         got = answers[Need("physical", p)]
         if isinstance(got, Exception):
