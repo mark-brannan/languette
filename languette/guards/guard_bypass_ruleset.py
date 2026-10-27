@@ -1,7 +1,7 @@
 """guard-bypass-ruleset: a ruleset's bypass is the user's, never the agent's.
 
-An agent runs on the user's credentials, so wherever the user may bypass a
-branch's rules, so may the agent, and GitHub cannot tell them apart. Two
+An agent that runs on the user's credentials may bypass a branch's rules
+wherever the user may, and GitHub cannot tell them apart. Two
 doors are watched:
 
 - a `git push` (or `yadm push`) that lands on the remote's default branch,

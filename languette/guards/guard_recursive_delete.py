@@ -1,7 +1,7 @@
 """guard-recursive-delete: features/guard-recursive-delete.feature is the spec.
 
 Blocks recursive `rm` and `find ... -delete` unless every target, resolved
-against the payload's cwd and then through the filesystem, is Claude's to
+against the payload's cwd and then through the filesystem, is the agent's to
 remove: under the scratchpad, an agent worktree or /tmp, or a generated
 directory (GENERATED_NAMES) that is not a direct child of $HOME or of /.
 A target this guard cannot resolve to one allowed path is denied on sight,
@@ -60,8 +60,8 @@ def _parse_allow(value, home, home_p, physical):
 
 
 class _Judge:
-    """What the awk half of the shell guard does: find every recursive target
-    in the command and either refuse it on sight or return it resolved."""
+    """Find every recursive target in the command and either refuse it on
+    sight or return it resolved."""
 
     def __init__(self, cwd, home):
         self.cwd, self.home, self.homeN = cwd, home, paths.normalize(home)

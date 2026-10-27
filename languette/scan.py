@@ -1,5 +1,4 @@
-"""Shell-text scanner: a port of the retired lib-shell-words.awk, whose
-header was the spec (see git history). Nothing here decides anything; it
+"""Shell-text scanner. Nothing here decides anything; it
 turns the Bash tool's command string into words a guard judges, and every
 ambiguity resolves toward MORE words reaching the guard, never fewer.
 

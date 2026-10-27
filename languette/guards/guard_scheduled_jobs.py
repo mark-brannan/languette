@@ -58,7 +58,7 @@ def check(doc):
         return deny(say("judged", guard=NAME, why=say("rules_bad", file=RULE_FILE, err=e)))
     for rule in found:
         # PROSE, not PROSE_PROCESS, and no launchers: `pkill crontab -r` is denied
-        # and `sh -c "npx crontab -r"` passes, as before the shared matcher.
+        # and `sh -c "npx crontab -r"` passes.
         n = sw.match_rule(doc, rule["match"], prose=sw.PROSE, launchers=False)[0]
         if not n:
             continue

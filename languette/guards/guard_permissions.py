@@ -78,8 +78,8 @@ def _exec_perm(s, g, b):
 
 
 class _Judge:
-    """What the awk half of the shell guard does: find every judged target in
-    the command and either refuse it on sight or return it resolved."""
+    """Find every judged target in the command and either refuse it on sight
+    or return it resolved."""
 
     def __init__(self, cwd, home):
         self.cwd, self.home, self.homeN = cwd, home, paths.normalize(home)

@@ -230,12 +230,12 @@ def _push(a):
             tomain = True
     if force:
         raise Refuse("bare `git push --force` is blocked. Rebasing a session branch is the one legitimate force: "
-                     "use `--force-with-lease origin <branch>`, never to main.")
+                     "use `--force-with-lease origin <branch>`, never to the default branch.")
     if tomain and delete:
-        raise Refuse("deleting main is blocked. Main takes rebased branches through a PR.")
+        raise Refuse("deleting the default branch is blocked. Rebased work reaches it through a pull request.")
     if tomain and lease:
-        raise Ask("`--force-with-lease` to main rewrites shared history. Main takes rebased branches through a PR; "
-                  "if a force to main is meant, the user confirms it.")
+        raise Ask("`--force-with-lease` to the default branch rewrites shared history. Rebased work reaches it "
+                  "through a pull request; if a force to it is meant, the user confirms it.")
 
 
 def _discard(sub, a):
@@ -273,7 +273,7 @@ def _branch(a):
 
 def _reset(a):
     if any(_pfx(t, "--hard") for t in a):
-        raise Refuse("`git reset --hard` is blocked at user scope. It discards uncommitted work, and on a shared "
+        raise Refuse("`git reset --hard` is blocked. It discards uncommitted work, and on a shared "
                      "checkout that work may not be yours. Ask the user to run it themselves, or reach for a "
                      "reversible move: `git revert`, a new branch off the good commit, `git stash`, "
                      "`git reset --soft`/`--mixed`.")
