@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.0.8](https://github.com/mark-brannan/languette/compare/v0.0.7...v0.0.8) (2026-10-27)
+
+
+### Features
+
+* **install:** `languette install` wires Claude Code through its plugin marketplace ([#273](https://github.com/mark-brannan/languette/issues/273)) ([bfedca8](https://github.com/mark-brannan/languette/commit/bfedca8c9abffb525d2046545029ea64a2bec1b1))
+* **worktrees:** a checkout whose directory can't be resolved passes with a note from the session's own worktree ([#268](https://github.com/mark-brannan/languette/issues/268)) ([fb6c39e](https://github.com/mark-brannan/languette/commit/fb6c39e85239f8ecafed83d994a661cb302a9e05))
+
+
+### Bug Fixes
+
+* **guard-git-work-loss:** add -A with paths and reset to own remote, in agent worktrees only ([#267](https://github.com/mark-brannan/languette/issues/267)) ([8fda807](https://github.com/mark-brannan/languette/commit/8fda807535deca72403eb3c019ec0a0a609fd759))
+* **scan:** one command-rule loader and matcher; ask-first rejects unknown keys and accepts flags ([#272](https://github.com/mark-brannan/languette/issues/272)) ([ee8e5ad](https://github.com/mark-brannan/languette/commit/ee8e5ad7cd3167772b66606949feabebcb2a07db))
+
+
+### Documentation
+
+* **design:** guard rules, the path from today's guards to the engines ([#270](https://github.com/mark-brannan/languette/issues/270)) ([f5fe815](https://github.com/mark-brannan/languette/commit/f5fe81514cd6555cc5405eeff1c7813a680dac0f))
+* **design:** the doctor and the install ([#274](https://github.com/mark-brannan/languette/issues/274)) ([75e9c60](https://github.com/mark-brannan/languette/commit/75e9c60e6c61d5298265f58cc62d35f483cd3d99))
+
 ## [0.0.7](https://github.com/mark-brannan/languette/compare/v0.0.6...v0.0.7) (2026-10-26)
 
 
