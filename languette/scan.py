@@ -291,7 +291,7 @@ class TooMany(TooBig):
 LENGTH_MAX = 64 * 1024                         # bytes
 WEIGHT_MAX = 10_000                            # ~450 ms of shfmt on a quarter CPU, 4x under its timeout
 _KEYWORD_CLOSER = {"if": "fi", "case": "esac", "do": "done"}
-_KEYWORD_LEADS = frozenset("if then else elif do while until ! time".split())
+KEYWORD_LEADS = frozenset("if then else elif do while until ! time".split())
 _CODE_TOKEN = re.compile(r"""\\.|\$'(?:[^'\\]|\\.)*'|'[^']*'|"|\$\(\(|\$\(|\$\{|&&|\|\||\|&|;;|"""
                          r"""[|&;\n(){}`]|#|[^\s;|&(){}<>`'"\\$#]+""", re.S)
 _DQ_TOKEN = re.compile(r"""\\.|"|\$\(\(|\$\(|\$\{|`""", re.S)
@@ -360,7 +360,7 @@ def weight(text):
             at_cmd = True
         elif at_cmd and k in _KEYWORD_CLOSER:
             push(_KEYWORD_CLOSER[k])
-        elif not (at_cmd and k in _KEYWORD_LEADS):
+        elif not (at_cmd and k in KEYWORD_LEADS):
             at_cmd = False
 
 
