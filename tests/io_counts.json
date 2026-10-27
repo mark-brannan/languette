@@ -923,6 +923,8 @@
  "tests/test_features.py::test_a_tab_in_a_pr_title_still_makes_a_deny_that_parses": {"git": 2, "pr-list": 1},
  "tests/test_features.py::test_a_target_is_judged_where_it_lands_not_by_its_name[/-rm -rf coverage-the same, reached from /]": {"git": 1},
  "tests/test_features.py::test_a_target_is_judged_where_it_lands_not_by_its_name[/tmp-cd ~/project && rm -rf examples-a cd moves the target out of /tmp]": {"git": 3},
+ "tests/test_features.py::test_a_target_is_judged_where_it_lands_not_by_its_name[/tmp-env -C /tmp/elsewhere rm -r build-env -C moves the target as a cd does]": {"git": 2},
+ "tests/test_features.py::test_a_target_is_judged_where_it_lands_not_by_its_name[/tmp-sudo -D ~/project rm -r x-so does sudo -D]": {"git": 2},
  "tests/test_features.py::test_a_target_is_judged_where_it_lands_not_by_its_name[{HOME}-rm -rf .-the cwd is $HOME]": {"git": 1},
  "tests/test_features.py::test_a_target_is_judged_where_it_lands_not_by_its_name[{HOME}-rm -rf coverage-the same, reached from $HOME]": {"git": 1},
  "tests/test_features.py::test_a_target_is_judged_where_it_lands_not_by_its_name[{HOME}/.local/state/claude-tmpdir/x-cd ~/project; rm -rf examples-a cd moves the target out of the scratchpad]": {"git": 3},

@@ -92,8 +92,7 @@ class _Judge:
     def run(self, doc):
         scans = [(doc.scan(t), nested) for t, nested in doc.texts()]
         # Any cd anywhere makes every relative target in the command unresolvable.
-        self.moved = any(a <= b and sw.cmd_index(s, a, b, sw.CD, True) is not None
-                         for s, _ in scans for a, b in s.segments())
+        self.moved = paths.moves_directory(scans)
         paths.judge_segments(self, scans)
 
 

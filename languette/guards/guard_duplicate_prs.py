@@ -337,8 +337,6 @@ def check(doc):
         return None
     if not any(p.parts for p in found):
         return None
-    if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = yield Need("cwd")
     writes = {}
     for w in written:
         k = _abs(w, cwd, cd, env) or w

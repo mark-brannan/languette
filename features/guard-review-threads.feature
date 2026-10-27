@@ -454,3 +454,8 @@ Feature: guard-review-threads
       | command                                                                                         | verdict                                          | note                       |
       | cd sub && gh api graphql -F query=@../resolve.graphql -f id=PRRT_t1                            | denies, naming "cannot tell which review thread" | a cd moves the file        |
       | echo x > resolve.graphql; gh api graphql -F query=@resolve.graphql -f id=PRRT_t1               | denies, naming "cannot tell which review thread" | another command could rewrite it |
+
+  Scenario: a payload without an absolute working directory is denied before the guard judges
+    Given the working directory is "relative/dir"
+    When the agent runs `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=PRRT_t1`
+    Then the guard denies, naming "no working directory"
