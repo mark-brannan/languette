@@ -1,5 +1,5 @@
 """Steps for features/doctor.feature: `python3 -m languette doctor` run by
-subprocess against a fake HOME of its own, with `claude` and `gh` stubbed
+subprocess against a fake HOME of its own, with `claude` and the forge clients stubbed
 first on PATH and this repo as the plugin's install path. conftest.py
 imports these, so pytest-bdd finds them."""
 
@@ -14,6 +14,7 @@ from hamcrest import assert_that, contains_string, equal_to, is_not
 from pytest_bdd import given, parsers, then, when
 
 from harness import FakeHome
+from languette.doctor import FORGES
 
 ROOT = Path(__file__).resolve().parent.parent
 PLUGIN_ID = "languette@languette"
@@ -24,7 +25,7 @@ class Doctor(FakeHome):
         super().__init__("doctor", ("project/sub", ".claude/plugins"))
         self.installs = []
         self.claude_ok = True
-        self.gh_ok = True
+        self.signed = {"gh": True}         # forge client -> signed in; absent ones get no stub
         self.overrides = {}                    # path -> text, written over what the install steps wrote
 
     def expand(self, s):
@@ -60,7 +61,10 @@ class Doctor(FakeHome):
         self.write_installs()
         for path, text in self.overrides.items():
             Path(path).write_text(text)
-        self.stub("gh", f'[ "$1 $2" = "auth status" ] && exit {0 if self.gh_ok else 1}\nexit 2')
+        for name, signed in self.signed.items():
+            args, lists, _ = FORGES[name]
+            out = ("echo a-host" if lists else "") if signed else "echo 'No logins.' >&2" if lists else "exit 1"
+            self.stub(name, f'[ "$*" = "{" ".join(args)}" ] || exit 2\n{out}')
         self.invoke(["doctor"], cwd, os.environ["PATH"])
 
 
@@ -76,14 +80,10 @@ def _fake_home(doctor):
     pass
 
 
-@given("gh is signed in")
-def _gh_in(doctor):
-    doctor.gh_ok = True
-
-
-@given("gh is signed out")
-def _gh_out(doctor):
-    doctor.gh_ok = False
+@given(parsers.re(r"(?P<name>[\w-]+) is signed (?P<state>in|out)"))
+def _forge_signed(doctor, name, state):
+    assert name in FORGES, f"{name} is not a forge client the doctor knows"
+    doctor.signed[name] = state == "in"
 
 
 @given("claude plugin list fails")
@@ -221,6 +221,11 @@ def _runs_in(doctor, path):
 @then(parsers.re(r'the "(?P<label>[^"]+)" row is (?P<mark>[✓!✗]) "(?P<text>.*)"'))
 def _row(doctor, label, mark, text):
     doctor.assert_row(label, mark, text)
+
+
+@then(parsers.re(r'the "(?P<label>[^"]+)" row is (?P<mark>[✓!✗]) "(?P<state>[^"]*)" and its note'))
+def _row_noted(doctor, label, mark, state):
+    doctor.assert_row(label, mark, f"{state}; {FORGES[label][2]}")
 
 
 @then(parsers.re(r'the "(?P<label>[^"]+)" row is (?P<mark>[✓!✗]) matching "(?P<pattern>.*)"'))

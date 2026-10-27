@@ -33,6 +33,14 @@ PROBES = (PARSE, CANARY)
 REASON_MAX = 100                   # characters of a deny reason the parse check row shows
 HOOK_TIMEOUT = 600                 # seconds: Claude Code's default for a command hook
 WAIT_MAX = 60                      # seconds the doctor waits on a probe, whatever the hook's limit
+# Forge clients, gh first: name -> (sign-in probe, whether it must list a login, note). gh's
+# note shows when the guards cannot read through it; another client's when the agent can act through it.
+FORGES = {
+    "gh": (("auth", "status"), False, "some guards ask instead"),
+    "glab": (("auth", "status"), False, "partly guarded (see issue #288)"),
+    "tea": (("whoami",), False, "not yet guarded (see issue #288)"),
+    "fj": (("auth", "list"), True, "not yet guarded (see issue #288)"),
+}
 BY_HAND = re.compile(r"languette/run\.py")
 SHA = re.compile(r"[0-9a-f]{7,40}")
 # A deny that came from the wrapper, the loader or a crash, not the guard: run.py is
@@ -151,15 +159,14 @@ def shfmt_version(path):
     return f"{m[1]}.{m[2]}" if m else None
 
 
-def gh_signed_in():
-    """True, False, or None when gh is not installed or did not answer."""
-    gh = shutil.which("gh")
-    if not gh:
-        return None
+def signed_in(path, args, lists):
+    """True, False, or None when the client did not answer. `args` exits 0 when signed in;
+    when `lists`, it exits 0 either way and prints a login only when there is one."""
     try:
-        return subprocess.run([gh, "auth", "status"], capture_output=True, timeout=15).returncode == 0
+        r = subprocess.run([path, *args], capture_output=True, text=True, timeout=15)
     except (OSError, subprocess.SubprocessError):
         return None
+    return r.returncode == 0 and not (lists and not r.stdout.strip())
 
 
 def one_line(reason):
@@ -381,12 +388,16 @@ def check(cwd):
             else:
                 rows.append((FAIL, label, f"`{sent}` was not denied {how}: {what}"))
 
-    signed = gh_signed_in()
-    if signed:
-        rows.append((OK, "gh", "signed in"))
-    else:
-        rows.append((WARN, "gh", f"{'not signed in' if signed is False else 'not installed or not answering'}; the "
-                                 "stacked-base and ruleset guards will ask instead of deciding"))
+    for name, (args, lists, note) in FORGES.items():
+        path = shutil.which(name)
+        if not path:
+            if name == "gh":
+                rows.append((WARN, name, f"not installed; {note}"))
+            continue
+        signed = signed_in(path, args, lists)
+        state = {True: "signed in", False: "installed, not signed in", None: "installed, not answering"}[signed]
+        quiet = signed is True if name == "gh" else signed is False
+        rows.append((OK, name, state) if quiet else (WARN, name, f"{state}; {note}"))
     return rows
 
 
