@@ -467,3 +467,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261027t193452z
 - guard-github-issues scans for mutations in every word but GhApi.skipped, which exists for that one caller Undo: scan every word ([#284](https://github.com/mark-brannan/languette/pull/284))
+
+### 20261027t193457z
+- guard-bypass-labels reads operands[0], not GhApi.path, keeping its fixed-position verb read Undo: use api.path ([#284](https://github.com/mark-brannan/languette/pull/284))
