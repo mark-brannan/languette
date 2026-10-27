@@ -1,6 +1,6 @@
 @python
 Feature: guard-bypass-labels
-  A label that waives a CI gate is the driver's to apply unless the
+  A label that waives a CI gate is the user's to apply unless the
   bypass_labels option names it. The option is comma-separated and empty by
   default, so by default the guard allows every command; the scenarios
   below, unless one says otherwise, run with it set to churn-ok (the churn

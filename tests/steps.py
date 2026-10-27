@@ -157,20 +157,26 @@ def _mkdir(ctx, path):
     Path(ctx.expand(path)).mkdir(parents=True, exist_ok=True)
 
 
+GIT_IDENT = ["-c", "user.email=t@e", "-c", "user.name=t"]
+
+
+def _init_main(d):
+    subprocess.run(["git", "init", "-q", "-b", "main", str(d)], check=True)
+
+
 @given(parsers.parse('a git repository at "{path}"'))
 def _git_init(ctx, path):
     d = Path(ctx.expand(path))
     d.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["git", "init", "-q", "-b", "main", str(d)], check=True)
+    _init_main(d)
 
 
 def _commit_file(ctx, path):
     f = Path(ctx.expand(path))
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text("committed\n")
-    ident = ["-c", "user.email=t@e", "-c", "user.name=t"]
     subprocess.run(["git", "-C", str(f.parent), "add", f.name], check=True)
-    subprocess.run(["git", "-C", str(f.parent), *ident, "commit", "-q", "-m", "init"], check=True)
+    subprocess.run(["git", "-C", str(f.parent), *GIT_IDENT, "commit", "-q", "-m", "init"], check=True)
     return f
 
 
@@ -198,9 +204,8 @@ def _yadm_repo(ctx, path, wt):
 @given(parsers.parse('a linked worktree "{path}" of the repository at "{repo}"'))
 def _linked_worktree(ctx, path, repo):
     r, d = ctx.expand(repo), ctx.expand(path)
-    ident = ["-c", "user.email=t@e", "-c", "user.name=t"]
     if subprocess.run(["git", "-C", r, "rev-parse", "-q", "--verify", "HEAD"], capture_output=True).returncode:
-        subprocess.run(["git", "-C", r, *ident, "commit", "-q", "--allow-empty", "-m", "init"], check=True)
+        subprocess.run(["git", "-C", r, *GIT_IDENT, "commit", "-q", "--allow-empty", "-m", "init"], check=True)
     Path(d).parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "-C", r, "worktree", "add", "-q", "-b", Path(d).name, d], check=True)
 
@@ -210,14 +215,14 @@ def _symlink(ctx, path, target):
     Path(ctx.expand(path)).symlink_to(ctx.expand(target))
 
 
-@given("the claude plugin's door file is already present")
-def _claude_door_present(ctx):
-    Path(ctx.doordir(), f"claude-issue-door.{ctx.session}").write_text("")
+@given("another plugin's door file is already present")
+def _other_door_present(ctx):
+    Path(ctx.doordir(), f"other-plugin-door.{ctx.session}").write_text("")
 
 
-@then("the claude plugin's door file is still present")
-def _claude_door_still(ctx):
-    assert Path(ctx.doordir(), f"claude-issue-door.{ctx.session}").exists()
+@then("another plugin's door file is still present")
+def _other_door_still(ctx):
+    assert Path(ctx.doordir(), f"other-plugin-door.{ctx.session}").exists()
 
 
 @given(parsers.parse('the door file is a symlink to "{target}"'))
@@ -274,8 +279,8 @@ def _review_thread(ctx, tid, datatable):
 @given(parsers.parse('a clone of "{url}" at "{path}" on branch "{branch}"'))
 def _clone(ctx, url, path, branch):
     d = ctx.expand(path)
-    git = ["git", "-C", d, "-c", "user.email=t@e", "-c", "user.name=t"]
-    subprocess.run(["git", "init", "-q", "-b", "main", d], check=True)
+    git = ["git", "-C", d, *GIT_IDENT]
+    _init_main(d)
     subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "init"], check=True)
     subprocess.run([*git, "remote", "add", "origin", url], check=True)
     if branch != "main":

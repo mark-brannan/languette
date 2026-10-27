@@ -470,8 +470,8 @@ Feature: guard-worktrees
       When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
       Then the guard denies, naming "git --git-dir={TMP}/repo/.git worktree add {TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/<name>"
 
-    # Scar: a session that ran one cd into another repo was denied every
-    # call naming its own worktree, even the cd back.
+    # One cd into another repo must not deny every later
+    # call naming the session's own worktree, even the cd back.
     Scenario: a cd elsewhere does not lock the session out of its own worktree
       Given the session is "s455"
       When the agent runs `git status`

@@ -24,12 +24,13 @@ GitHub that cannot answer (gh missing, signed out, offline, an error), a
 timeline page filled with no open PR on it (an older one may sit past it),
 or a repo that cannot be told asks, as the other guards that ask GitHub do. A
 body the guard cannot read (built at run time, a file it cannot open or
-past MAX_READ, stdin with no heredoc) is a deny that says why.
+past paths.MAX_READ, stdin with no heredoc) is a deny that says why.
 """
 
 import os
 import re
 
+from languette import paths
 from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Need, Refuse, ask, deny
@@ -38,7 +39,6 @@ NAME = "guard-duplicate-prs"
 # The tools hooks.json wires this guard to; the MCP one by its name's tail.
 TOOLS = re.compile(r"(?:Bash|mcp__.*__(?:create_pull_request))\Z")
 _MCP = re.compile(r"mcp__.*__create_pull_request\Z")
-MAX_READ = 1 << 20
 PAGE = 100                                     # timeline events per lookup; one page is read
 _CREATE = frozenset("create new".split())
 # gh pr create's flags that take a value, so the value is never read as a flag.
@@ -174,7 +174,7 @@ def posts(doc):
 def _fetch(p):
     """The text of the file `p`, as the runner reads it, or the Refuse it comes to."""
     try:
-        return (yield Need("read", p, MAX_READ))
+        return (yield Need("read", p, paths.MAX_READ))
     except UnicodeDecodeError as e:
         return Refuse(f"cannot be read ({e})")
     except OSError as e:
@@ -311,8 +311,6 @@ def check(doc):
         return None
     if not any(p.parts for p in found):
         return None
-    if not isinstance(cwd, str) or not cwd.startswith("/"):
-        cwd = yield Need("cwd")
     writes = {}
     for w in written:
         k = _abs(w, cwd, cd, env) or w

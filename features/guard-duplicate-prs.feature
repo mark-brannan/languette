@@ -286,3 +286,8 @@ Feature: guard-duplicate-prs
     Given the working directory is "{HOME}"
     When the agent runs `gh pr create -t t -b "Closes #114"`
     Then the guard asks, naming "can't tell which repo"
+
+  Scenario: a payload without an absolute working directory is denied before the guard judges
+    Given the working directory is "relative/dir"
+    When the agent runs `gh pr create -t t -b "Closes #114"`
+    Then the guard denies, naming "no working directory"
