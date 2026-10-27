@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from languette import run, verdict  # noqa: E402
+from hamcrest import assert_that, equal_to, has_length
 from matchers import Verdict
 
 ENGINES = ("python", "shfmt", "hook")
@@ -238,3 +239,50 @@ def hooks_json_event_command(event):
 def hooks_json_prompt_command():
     """The UserPromptSubmit command in hooks/hooks.json that opens the guard-github-issues door."""
     return hooks_json_event_command("UserPromptSubmit")
+
+
+class FakeHome:
+    """What the doctor and install steps share: a fake HOME and a directory
+    beside it for stubs, run `python3 -m languette <command>` by subprocess,
+    and the rows it prints. A subclass adds its own stubs and steps."""
+
+    def __init__(self, kind, subdirs=()):
+        # Not under /tmp: guard-recursive-delete allows all of /tmp.
+        self.home = Path(tempfile.mkdtemp(prefix=f"languette-{kind}-home-", dir="/var/tmp"))
+        for d in subdirs:
+            (self.home / d).mkdir(parents=True)
+        self.aside = Path(tempfile.mkdtemp(prefix=f"languette-{kind}-"))   # stubs and copies, outside HOME
+        self.bin = self.aside / "bin"
+        self.bin.mkdir()
+        self.out = self.err = self.code = self.before = None
+
+    def snapshot(self):
+        return sorted((str(p.relative_to(self.home)), p.stat().st_size) for p in self.home.rglob("*"))
+
+    def invoke(self, args, cwd, path):
+        """Run `python3 -m languette *args` in `cwd` with `path` after the stubs' directory on PATH."""
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "LANGUETTE_"))}
+        env.update(HOME=str(self.home), PATH=f"{self.bin}{os.pathsep}{path}", TMPDIR=str(self.aside),
+                   PYTHONPATH=str(ROOT))
+        self.before = self.snapshot()
+        r = subprocess.run([sys.executable, "-m", "languette", *args], cwd=cwd, env=env, capture_output=True,
+                           text=True, timeout=60)
+        self.out, self.err, self.code = r.stdout, r.stderr, r.returncode
+
+    def row(self, label):
+        rows = [ln for ln in self.out.splitlines() if ln[2:].startswith(label + " ")]
+        assert_that(rows, has_length(1), f"one {label!r} row in:\n{self.out}{self.err}")
+        return rows[0][0], rows[0][2:][len(label):].strip()
+
+    def assert_row(self, label, mark, text):
+        assert_that(self.row(label), equal_to((mark, text)))
+
+    def assert_exit(self, code):
+        assert_that(self.code, equal_to(code), self.out + self.err)
+
+    def assert_untouched(self):
+        assert_that(self.snapshot(), equal_to(self.before))
+
+    def cleanup(self):
+        for d in (self.home, self.aside):
+            shutil.rmtree(d, ignore_errors=True)

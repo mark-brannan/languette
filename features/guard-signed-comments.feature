@@ -10,7 +10,7 @@ Feature: guard-signed-comments
 
       🤖 claude-opus-5-5 · high · 5a74df74
 
-  Why. An agent posts under the user's own GitHub login, so a review bot and
+  Why. Where an agent posts under the user's login, a review bot and
   the next agent read an agent's reply as the user's own words. Scar: #116,
   where an agent's reply on a review thread was taken as the user's, and a
   reversal of the user's instruction was merged into the PR.
@@ -385,3 +385,8 @@ Feature: guard-signed-comments
       Then the guard is silent
       When the agent runs `gh pr comment 1 -b "Replacement is the intent"`
       Then the guard denies, naming "🤖 claude-opus-5-5 · high ·"
+
+  Scenario: a payload without an absolute working directory is denied before the guard judges
+    Given the working directory is "relative/dir"
+    When the agent runs `gh pr comment 1 -b "no signature"`
+    Then the guard denies, naming "no working directory"

@@ -1,6 +1,6 @@
 @python
 Feature: guard-bypass-ruleset
-  An agent runs on the user's credentials, so it can use the user's bypass
+  An agent that runs on the user's credentials can use the user's bypass
   of a branch's rules. A push that lands on the default branch, when GitHub
   says that branch requires a pull request, is denied, and so is
   `gh pr merge --admin`. When GitHub can't answer, the guard asks. gh is a

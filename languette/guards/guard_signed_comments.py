@@ -3,7 +3,7 @@ agent's. The spec is features/guard-signed-comments.feature.
 
 Experimental: the convention is one workflow's; the general shape is issue #194.
 
-An agent posts under the user's own login, so without a mark a review bot and
+An agent may post under the user's own login, and then without a mark a review bot and
 the next agent read its reply as the user's own words. The body's first line
 begins with `🤖 ` and its last non-empty line is `🤖 <model> · <effort> ·
 <eight hex>`; the hex is the payload's session id's, when it has one. Both
@@ -288,8 +288,6 @@ def check(doc):
                  + (", where {session} is the first 8 hex of the session id." if "{session}" in pattern else "."))
         signed = "A signed body, as the settings have it: " + shape[0].lower() + shape[1:]
     cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd:
-        cwd = yield Need("cwd")
     home = env.get("HOME") or ""
     files = {}
 

@@ -212,7 +212,8 @@ def _stash(a):
 
 
 def _push(a):
-    force = lease = tomain = delete = False
+    force = lease = delete = False
+    protected_branch = ""  # the main/master branch this push targets, or "" if none
     for t in a:
         if t.startswith("--force-with-lease=") or (t.startswith("--force-") and (
                 _pfx(t, "--force-with-lease") or _pfx(t, "--force-if-includes"))):
@@ -225,17 +226,18 @@ def _push(a):
         elif t.startswith("+"):
             force = True
         elif t.startswith(":") and _MAIN.match(_dst(t)):
-            delete = tomain = True
+            delete = True
+            protected_branch = _dst(t).removeprefix("refs/heads/")
         elif not t.startswith("-") and _MAIN.match(_dst(t)):
-            tomain = True
+            protected_branch = _dst(t).removeprefix("refs/heads/")
     if force:
         raise Refuse("bare `git push --force` is blocked. Rebasing a session branch is the one legitimate force: "
-                     "use `--force-with-lease origin <branch>`, never to main.")
-    if tomain and delete:
-        raise Refuse("deleting main is blocked. Main takes rebased branches through a PR.")
-    if tomain and lease:
-        raise Ask("`--force-with-lease` to main rewrites shared history. Main takes rebased branches through a PR; "
-                  "if a force to main is meant, the user confirms it.")
+                     "use `--force-with-lease origin <branch>`, never to `main` or `master`.")
+    if protected_branch and delete:
+        raise Refuse(f"`{protected_branch}` is protected: deleting it is blocked. Rebased work reaches it through a pull request.")
+    if protected_branch and lease:
+        raise Ask(f"`{protected_branch}` is protected: `--force-with-lease` to it rewrites shared history. Rebased work "
+                  "reaches it through a pull request; if a force to it is meant, the user confirms it.")
 
 
 def _discard(sub, a):
@@ -273,7 +275,7 @@ def _branch(a):
 
 def _reset(a):
     if any(_pfx(t, "--hard") for t in a):
-        raise Refuse("`git reset --hard` is blocked at user scope. It discards uncommitted work, and on a shared "
+        raise Refuse("`git reset --hard` is blocked. It discards uncommitted work, and on a shared "
                      "checkout that work may not be yours. Ask the user to run it themselves, or reach for a "
                      "reversible move: `git revert`, a new branch off the good commit, `git stash`, "
                      "`git reset --soft`/`--mixed`.")
