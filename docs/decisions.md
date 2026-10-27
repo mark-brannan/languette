@@ -131,20 +131,6 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 - Every release bumps the patch number only, until the maintainer says otherwise. No
   semver; a review that asks for a minor or major bump is out of scope.
 
-## Install: 2026-10-27
-
-- Installing languette and its doctor is one simple, self-contained command
-  per platform, the way other tools install: `brew install` or
-  `pipx install`, then `languette install && languette doctor`. No interpreter
-  path, plugin-cache path or virtual environment appears in the README; a
-  command of that shape puts off the less technical reader it is for.
-- The package and the Claude Code plugin are complementary, not rivals: the
-  package puts `languette` on PATH, and `languette install` wires Claude
-  Code through its own plugin marketplace, writing nothing itself.
-  [docs/design/install.md](design/install.md)
-- Cross-platform, easy install comes before the next host (the curia,
-  2026-10-10).
-
 ## Releases and titles: 2026-10-10
 
 - The maintainer ships when ready, by merging the standing release pull request.
@@ -153,12 +139,6 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
   type with the area as its scope: `fix(doctor): …`, not `doctor: …`.
 - Docs changes count toward a release, so a README fix can open the
   release pull request. Opening it obliges nothing.
-
-## The doctor: 2026-10-27
-
-- The doctor exists to make configuration simple: it diagnoses a bad
-  config, offers to fix it (interactively where it must), and assists with
-  writing one. [docs/design/doctor.md](design/doctor.md)
 
 ## Trust and licence riders: 2026-10-09
 

@@ -10,7 +10,7 @@ guard pipeline](guard-pipeline.md), [guard rules](guard-rules.md),
 One command installs languette the way the platform installs tools, one more
 wires every coding agent it protects, and the doctor says whether it worked.
 A reader skims the README for the block with their platform's heading and
-pastes it. No block names an interpreter, a cache path or a virtual
+pastes it. Easy, cross-platform install comes before the next host. No block names an interpreter, a cache path or a virtual
 environment, and none pipes a download into a shell: languette denies that
 shape, and its own install does not ask for an exception.
 

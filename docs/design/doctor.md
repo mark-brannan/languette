@@ -7,7 +7,9 @@ pipeline](guard-pipeline.md), [guard rules](guard-rules.md),
 
 ## Purpose
 
-The doctor exists to make languette simple to configure. A guard that fails
+The doctor says whether languette protects the agent at all: the install,
+its dependencies, the hooks as wired, the version. Beyond that it exists to
+make languette simple to configure. A guard that fails
 closed on a bad config is right to stop the agent, and wrong to leave the
 user to work out why. The doctor is where that why gets answered and the
 config gets mended: one command that says what is wrong, offers the fix, and
