@@ -1,7 +1,7 @@
 """guard-worktrees: two controls over where a session's git work lands. The
 spec is features/guard-worktrees.feature.
 
-  checkout-home  a `git`/`yadm` checkout or switch that would move the branch
+  checkout-home  a `git`/`yadm`/`vcsh` checkout or switch that would move the branch
                  checked out in $HOME, when $HOME is itself a worktree; and
                  chezmoi's forced apply, destroy and purge
   foreign        a reach into a linked worktree that is not this session's own,
@@ -13,7 +13,7 @@ control is skipped when its own option (guard_worktrees_checkout_home,
 guard_worktrees_foreign) is exactly false; the first control to object wins,
 and a note is given only when neither does.
 
-checkout-home. yadm hardcodes --work-tree=$HOME, so any yadm checkout/switch
+checkout-home. yadm and vcsh hardcode --work-tree=$HOME, so any such checkout/switch
 that is not a file restore (`checkout [<ref>] -- <path>`) is denied, from any
 directory. Plain git is denied only when git itself resolves the target to
 $HOME's worktree (`rev-parse --show-toplevel`), following a cd/pushd, chained
@@ -190,7 +190,8 @@ def _expand(raw, base, home):
 # --- checkout-home --------------------------------------------------------
 
 def _home_events(doc):
-    """The command's moves, in order: ("DENY",) for a yadm checkout/switch,
+    """The command's moves, in order: ("DENY", the wrapper as it is typed) for a
+    checkout/switch by a wrapper whose work tree is always $HOME,
     ("ASK", spelling) for a chezmoi call that overwrites or removes in $HOME,
     ("CD", v), ("ENV", kind, v) for a GIT_DIR=/GIT_WORK_TREE= outside a git
     segment, ("FS",) for a segment that may make a link or move, copy or
@@ -232,8 +233,9 @@ def _home_events(doc):
             if s.w[sidx] == "checkout" and any(s.k[i] == "w" and s.w[i] == "--" and s.k[i + 1] == "w"
                                                for i in range(sidx + 1, b)):
                 continue
-            if re.search(r"(?:^|/)yadm\Z", s.w[g]):
-                out.append(("DENY",))
+            name, row = sw.git_wrapper(s.w[g])
+            if row.home:
+                out.append(("DENY", name + " <repo>" * row.repo))
                 continue
             targets = []
             for i in range(a, b + 1):
@@ -391,7 +393,7 @@ def _checkout_home(doc):
     changed = False
     for ev in events:
         if ev[0] == "DENY":
-            raise _generic("yadm")
+            raise _generic(ev[1])
         if ev[0] == "FS":
             changed = True
         elif ev[0] == "ENV":
@@ -482,7 +484,7 @@ def _worktree_add(s, a, b):
     None. Any option it does not know, a word it can't read, or more than a
     path and a commit-ish is None: what it can't parse it never records."""
     g = sw.cmd_index(s, a, b, sw.GIT, False)
-    if g is None or not re.search(r"(?:^|/)git\Z", s.w[g]):
+    if g is None or sw.git_wrapper(s.w[g])[1].home:
         return None
     sub = sw.git_subcommand(s, g, b)
     if sub + 1 > b or s.w[sub] != "worktree" or s.w[sub + 1] != "add":

@@ -29,8 +29,8 @@ Feature: prose-budget-commit
   `*`) or an interactive commit can also pick up a brand new untracked file,
   which a tracked-only diff cannot see. A relative engine path means relative
   to the commit's own cwd, resolved before any `cd`; a bare name is a command
-  looked up on PATH. `yadm` is recognised as git's wrapper word only, as in
-  the other guards, and is never called unless the command named it; the
+  looked up on PATH. `yadm` and `vcsh` are recognised as git's wrapper words only, as
+  in the other guards, and are never called unless the command named it; the
   wrapper word is read for which CLI it names and never executed, being as
   attacker-controlled as the rest of the command.
 
@@ -49,6 +49,7 @@ Feature: prose-budget-commit
       | git commit -m "docs: more"                | plain commit             |
       | git add README.md && git commit -m x      | after a separator        |
       | yadm commit -m x                           | yadm is git              |
+      | vcsh dots commit -m x                      | vcsh is git              |
       | git -C {PROJ} commit -m x                   | -C dir                   |
       | cd {PROJ} && git commit -m x                | cd dir && commit         |
       | git merge --continue                        | finishing a merge        |

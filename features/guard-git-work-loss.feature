@@ -16,7 +16,7 @@ Feature: guard-git-work-loss
   throw away uncommitted work, as `reset --hard` does, and `branch -D` throws
   away unmerged work (`-d` refuses; use that). On a clean working tree the
   discards (checkout, restore, clean, `reset --hard`) have nothing to lose and
-  pass. A git wrapper such as `yadm` is treated as `git`. `stow --adopt` asks:
+  pass. A git wrapper such as `yadm` or `vcsh` is treated as `git`. `stow --adopt` asks:
   it moves each conflicting file from the target directory into the package,
   overwriting the repo's copy, which survives only if committed. `stow -D` and
   `-R` alone only remove or replace links and pass; so does a dry run (`-n`).
@@ -60,6 +60,7 @@ Feature: guard-git-work-loss
       | git add -uz src/                        | denies    | the same, in a cluster            |
       | git add --ign src/                      | denies    | an ambiguous prefix               |
       | yadm add -A                             | denies    |                                   |
+      | vcsh dots add -A                        | denies    | vcsh names its repository first   |
       | cd foo && git add -A && git commit -m x | denies    | in a chain                        |
       | git -C /some/dir add -A                 | denies    | git -C                            |
       | git commit -a -m "x"                    | denies    |                                   |

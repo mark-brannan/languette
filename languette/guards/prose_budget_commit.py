@@ -16,8 +16,8 @@ no retry to show the second.
 Silent on what it cannot resolve: a `cd`/`-C` target, a pathspec word, a
 directory pathspec, a second commit in a different directory. A failed
 `rev-parse`/`diff`/`ls-files` adds no files to the `--file` run; the files
-already gathered are still checked. `yadm` is recognised as git's wrapper
-word, and is run only when the command named it.
+already gathered are still checked. `yadm` and `vcsh` are recognised as git's wrappers
+(vcsh itself is never run: its repository is read through plain git against its git dir), and run only when the command named them.
 """
 
 import re
@@ -56,7 +56,7 @@ def _wide(p):
 
 
 class _Commits:
-    """The git/yadm commits in a command: the first one's cd, -C dir and wrapper
+    """The git/yadm/vcsh commits in a command: the first one's cd, -C dir and wrapper
     word; the pathspecs it reaches past the index with; whether it reaches every
     unstaged tracked change (allflag) or untracked files too (allnew); whether a
     pathspec cannot be resolved (bad); whether a second commit runs elsewhere (multi)."""
@@ -64,7 +64,8 @@ class _Commits:
     def __init__(self, doc):
         self.seen = self.multi = self.allflag = self.allnew = self.bad = self.addseen = False
         self.paths, self.cd, self.ctx = [], "", None
-        self.ccd = self.cdir = self.cbin = self.addctx = None
+        self.ccd = self.cdir = self.cbin = self.crepo = self.addctx = None
+        self.repo = None
         for text, nested in doc.texts():
             s = self.s = doc.scan(text)
             for a, b in s.segments():
@@ -154,7 +155,8 @@ class _Commits:
         if g is None:
             return
         self.bin = s.w[g]
-        i, d = sw.git_subcommand(s, g, hi), ""
+        self.repo, i = sw.git_call(s, g, hi)
+        d = ""
         for j in sw.git_options(s, g, i):
             if s.w[j] == "-C":
                 d = _join(d, self._w(j + 1))
@@ -169,11 +171,11 @@ class _Commits:
 
     def _seen(self, d):
         """A commit (or a merge --continue) in its context; a later one elsewhere is multi."""
-        ctx = (self.cd, d, "yadm" if re.search(r"(?:^|/)yadm\Z", self.bin) else "git")
+        ctx = (self.cd, d, sw.git_wrapper(self.bin)[0], self.repo)
         if self.addseen and self.addctx != (self.cd, d):
             self.allflag = self.allnew = True
         if not self.seen:
-            self.seen, self.ctx, self.ccd, self.cdir, self.cbin = True, ctx, self.cd, d, self.bin
+            self.seen, self.ctx, self.ccd, self.cdir, self.cbin, self.crepo = True, ctx, self.cd, d, self.bin, self.repo
         elif ctx != self.ctx:
             self.multi = True
 
@@ -236,7 +238,7 @@ def check(doc):
 
     files = list(c.paths)
     if c.allflag or c.allnew:
-        files += yield from _unstaged(c, d)
+        files += yield from _unstaged(c, d, env)
     files = ["./" + f if f.startswith("-") else f for f in files if f]
     if not files:
         return _done(notes)
@@ -254,17 +256,20 @@ def check(doc):
     return _done(notes)
 
 
-def _unstaged(c, d):
+def _unstaged(c, d, env):
     """The files a commit that reaches past the index would add, as far as git can
     list them: a step that fails ends the listing, and what it had gathered stands."""
     # -a and a pattern add stage repo-wide, so these listings are anchored to the
     # repo root. The wrapper word is the command's own and may be anyone's: only
     # which CLI it names is trusted, found fresh on PATH.
-    binary = yield Need("which", "yadm" if re.search(r"(?:^|/)yadm\Z", c.cbin) else "git")
+    run = sw.wrapper_git(c.cbin, c.crepo, env)
+    if run is None:                    # vcsh on every repository, or on a name that is not one
+        return []
+    binary = yield Need("which", run[0])
     if not binary:
         return []
     try:
-        rc, out, _ = yield Need("run", d, GIT_TIMEOUT, binary, "rev-parse", "--show-toplevel")
+        rc, out, _ = yield Need("run", d, GIT_TIMEOUT, binary, *run[1], "rev-parse", "--show-toplevel")
     except Exception:  # noqa: BLE001
         rc, out = None, ""
     if rc != 0:
@@ -278,7 +283,7 @@ def _unstaged(c, d):
     found = []
     for argv in listings:
         try:
-            rc, out, _ = yield Need("run", root, GIT_TIMEOUT, binary, *argv)
+            rc, out, _ = yield Need("run", root, GIT_TIMEOUT, binary, *run[1], *argv)
         except Exception:  # noqa: BLE001
             rc, out = None, ""
         if rc != 0 or "\n" in out:    # a failed listing, or a name with a newline that cannot reach the engine

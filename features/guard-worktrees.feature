@@ -19,9 +19,10 @@ Feature: guard-worktrees
   worktree. Editing files in $HOME is not touched: the guard fires only on a
   `checkout` or `switch`.
 
-  `yadm` and `git` are not symmetric. yadm hardcodes `--work-tree=$HOME` into
-  every invocation, so `yadm checkout <branch>` is dangerous from any
-  directory, a worktree under $HOME included; any `yadm checkout` or `switch`
+  `yadm`, `vcsh` and `git` are not symmetric. yadm and vcsh hardcode
+  `--work-tree=$HOME` into every invocation, so `yadm checkout <branch>` is
+  dangerous from any directory, a worktree under $HOME included; any `yadm`
+  or `vcsh` `checkout` or `switch`
   that is not a file-restore is a hit, cwd ignored. Plain git touches $HOME's
   worktree only if the repo it discovers from the cwd (or a `-C`, `--git-dir`
   or `--work-tree` target, flag or inline `GIT_DIR=`/`GIT_WORK_TREE=`)
@@ -33,8 +34,8 @@ Feature: guard-worktrees
   <file>`) stay allowed; `-b` and `-B` count as a branch switch; `checkout .`
   is denied too, since it is no pathspec-restore the guard can single out.
 
-  `checkout` or `switch` is looked for anywhere after the git or yadm command
-  word, and `-C`, `--git-dir` and `--work-tree` anywhere in the segment, so
+  `checkout` or `switch` is looked for anywhere after the git, yadm or vcsh
+  command word, and `-C`, `--git-dir` and `--work-tree` anywhere in the segment, so
   an unparsed leading option can never push the subcommand out of reach. The
   cost is a false deny on a bare word "checkout" passed as a value to another
   flag, never a false allow; likewise a quoted path value the shell would not
@@ -151,6 +152,9 @@ Feature: guard-worktrees
         | yadm checkout some-branch                        |
         | git checkout some-branch                         |
         | yadm checkout -b new-branch                      |
+        | vcsh dots checkout some-branch                   |
+        | vcsh dots switch -c new-branch                   |
+        | /usr/bin/vcsh dots checkout some-branch          |
         | yadm checkout -B new-branch                      |
         | echo hi && yadm checkout some-branch             |
         | git switch some-branch                           |
@@ -195,6 +199,8 @@ Feature: guard-worktrees
         | {PROJ} | yadm checkout some-branch        |
         | /tmp   | yadm checkout some-branch        |
         | {PROJ} | yadm switch some-branch          |
+        | /tmp   | vcsh dots checkout some-branch   |
+        | {PROJ} | vcsh dots switch some-branch     |
         | /tmp   | sh -c 'yadm checkout some-branch' |
 
       @also_ask-first
@@ -343,6 +349,7 @@ Feature: guard-worktrees
         | yadm checkout -- .npmrc                     |
         | yadm checkout main -- .npmrc                |
         | yadm checkout -- .npmrc && ls               |
+        | vcsh dots checkout -- .npmrc                |
 
     Scenario Outline: git outside $HOME, and nothing pointing back at it, is allowed
       Given the working directory is "<cwd>"
@@ -381,6 +388,7 @@ Feature: guard-worktrees
       Examples:
         | command                                  |
         | yadm status                              |
+        | vcsh dots status                         |
         | echo 'yadm checkout some-branch'         |
         | git status                               |
 

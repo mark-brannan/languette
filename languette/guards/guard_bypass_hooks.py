@@ -6,7 +6,7 @@ AskUserQuestion; with no approval they are denied.
 A hook that blocks a commit or push is telling the agent something, and
 skipping the repo's hooks is the user's call, never the agent's. On push -n
 is --dry-run, and on merge, pull and rebase it is --no-stat; those pass.
-`yadm` counts as git. Not seen: a git alias that adds the flag, and
+`yadm` and `vcsh` count as git. Not seen: a git alias that adds the flag, and
 core.hooksPath set by `git config` or the GIT_CONFIG_* environment. The command is
 read the way the other guards read one: through wrappers, `sh -c "..."`, env
 prefixes and git's global options, and a message or heredoc that merely names
@@ -93,7 +93,7 @@ def _runs(doc):
             hooks_path = hooks_path or v.split("=", 1)[0].lower() == "core.hookspath"
         if hooks_path:
             n += 1
-        elif i <= b and s.k[i] == "w" and s.w[i] in VALUE and _skips(s.w[i], s.w[i + 1:b + 1]):
+        elif i <= b and s.k[i] == "w" and sw.git_verb(s.w[g], s.w[i]) in VALUE and _skips(sw.git_verb(s.w[g], s.w[i]), s.w[i + 1:b + 1]):
             n += 1
     return n, loop
 

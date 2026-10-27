@@ -211,6 +211,9 @@ Feature: guard-bypass-ruleset
       | gh -R o/r $p merge 5              | a run-time group behind a repo flag   |
       | gh --repo o/r pr $v 5             | a run-time verb behind a repo flag    |
       | export GIT_DIR=/x; git push origin main | another repository, exported       |
+      | vcsh push                         | vcsh push pushes every repository, which cannot be read |
+      | vcsh pus origin feature           | the same, abbreviated, whatever follows |
+      | vcsh dots push origin main        | a vcsh repository that has no git dir here |
 
     @also_guard-review-threads
     Examples:
