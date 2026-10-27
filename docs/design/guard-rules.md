@@ -70,10 +70,10 @@ on order within a command, and order is computed per segment in gather.
 
 ## Actions
 
-A rule only tightens. Its action is `deny`, `ask` (ask-first's approval,
-spent once per run when the rule says so), `context` or `rewrite`; allow only
-follows a redaction: a rule set adds to what languette judges and takes nothing from it.
-Whether `ask` and `context` belong to every tier is open below.
+A verdict only tightens. A rule's action is `deny`, `ask` (ask-first's
+approval, spent once per run when the rule says so), `context` or `rewrite`;
+allow only follows a redaction. A rewrite transforms data, so a repo rule may
+loosen one a wider tier applies; what each tier may say is open below.
 
 `rewrite` replaces inside the text a call carries, never its words or flags.
 The rule names what to find, a term, a secret shape or the value of an
@@ -85,8 +85,7 @@ that still matches a deny is a deny. A redaction is then allowed, Verdict
 carrying the rewrite; any other rewrite is asked about, before and after in
 the reason. guard-private-terms' pairs, `$HOME` to `~` shipped and the user's
 rewrites file, are the first rules on it; secret redaction and host, user and
-address shapes are others. Shipped and user tiers only: a replacement runs
-with the agent's privileges, so the tier an agent writes never carries one.
+address shapes are others.
 
 ## Plan from the rules
 
@@ -118,6 +117,7 @@ A rule set that does not parse, names an unknown primitive, or has another
 shape, denies every call its guard would judge, naming the file and the
 fault. That is ask-first's and guard-secrets' behaviour today. A test loads
 every rule set languette ships, so that deny never greets an install.
+guard-private-terms' lists are the exception: one that does not load warns.
 
 ## Path there
 
@@ -143,7 +143,8 @@ stay code, ~2000 are messages and stay where they are.
   safer flag (`--force` to `--force-with-lease`). It would keep an unattended
   session going where an ask is a deny, as a redaction's allow does; the
   user never sees the bytes. Today a safer flag is a deny with the fix in the reason.
-- `ask` and `context` as repo-tier actions; probably yes.
+- Repo-tier actions: `ask` and `context`, probably yes; `rewrite`, at least
+  dropping a wider tier's pair so a hostname or path goes out as written.
 - A repo rule naming a fact that costs network or a program run.
 - #134's step 3 asks the same question for git and GitHub alone; this design
   is one answer to it, not a decision on it.

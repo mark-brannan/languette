@@ -73,13 +73,14 @@ Feature: guard-private-terms
   would be unusable for anyone who has none. No rewrites file means the
   shipped pairs alone.
 
-  A file that is found must load. Once a blocked terms file is found the
-  hard block is load-bearing, and the guard is a gate: a body it cannot see,
-  a gh write whose flag shape it does not recognise as carrying text, or a
-  file that is set but unreadable or empty while a target is not a private
-  repo is a deny, with the fix in the reason. A rewrites file that is set but
-  unreadable, or found but not JSON in that shape, is a deny too: a redaction
-  asked for and silently skipped is the leak. Current thinking.
+  A file that does not load never fails a call. Set but missing or
+  unreadable, empty of terms, or not in shape, it is no file: the call goes
+  on, with a warning naming the option, and the shipped pairs still run. A
+  cloud session or CI job holds no copy of a private list, and its posts must
+  go through. Once a blocked terms file loads, the hard block is
+  load-bearing and the guard is a gate: a body it cannot see, or a gh write
+  whose flag shape it does not recognise as carrying text, while a target is
+  not a private repo, is a deny with the fix in the reason.
 
   The scenarios still spell the option private_terms_file: the implementation
   renames the option, the step and the messages in one change.
@@ -313,9 +314,8 @@ Feature: guard-private-terms
       | {HOME}/pt-rewrites.json                | $HOME/pt-rewrites.json |
       | {HOME}/.config/languette/rewrites.json |                        |
 
-  # A redaction asked for and silently skipped is the leak, so a file that is
-  # named must load; one absent from the default path is no file.
-  Scenario Outline: a rewrites file that is set but unreadable, or found but not in that shape, denies, naming the option
+  # A cloud session holds no copy of a private list; its posts must go through.
+  Scenario Outline: a rewrites file that is set but unreadable, or found but not in that shape, warns, naming the option
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
     And the file "{HOME}/pt-bad.json" holds:
       """
@@ -323,7 +323,7 @@ Feature: guard-private-terms
       """
     And CLAUDE_PLUGIN_OPTION_REWRITES_FILE is "<option>"
     When the agent runs `gh issue comment 3 -R o/r -b "all public"`
-    Then the guard denies, naming "rewrites_file"
+    Then the guard warns about "rewrites_file"
 
     @also_guard-signed-comments
     Examples:
@@ -403,20 +403,20 @@ Feature: guard-private-terms
   # --- the hard block: a term denies the whole post -----------------------------
 
   @also_guard-github-issues
-  Scenario: a terms file that is set but cannot be read denies, naming the option
+  Scenario: a terms file that is set but cannot be read warns, naming the option
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is "{HOME}/no-such-terms.txt"
     When the agent runs `gh issue create -R o/r -t t -b "all public"`
-    Then the guard denies, naming "private_terms_file"
+    Then the guard warns about "private_terms_file"
 
   @also_guard-github-issues
-  Scenario: a terms file with no terms in it denies
+  Scenario: a terms file with no terms in it warns
     Given the private terms file holds:
       """
       # comments only
 
       """
     When the agent runs `gh issue create -R o/r -t t -b "all public"`
-    Then the guard denies, naming "no terms in it"
+    Then the guard warns about "no terms in it"
 
   # Current thinking: Claude Code does not expand a plugin option, so the
   # guard does, and settings need no machine-specific absolute path.
@@ -836,19 +836,20 @@ Feature: guard-private-terms
     # --- the terms file -----------------------------------------------------------
 
     @also_guard-github-issues
-    Scenario: a terms file that cannot be read says so, and a private repo or a read needs none
+    Scenario: a terms file that cannot be read says so, lets the post through, and a private repo or a read needs none
       Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is "{HOME}/no-such-terms.txt"
       When the agent runs `gh issue create -R o/r -t x -b "all public"`
-      Then the guard denies, naming "is unreadable"
-      And the guard denies, naming "private_terms_file"
-      And the guard denies, naming "private_repos"
+      Then the guard warns about "is unreadable"
+      And the guard warns about "private_terms_file"
+      When the agent runs `gh issue create -R o/r -t x -b "seen on Wanderlust"`
+      Then the guard warns about "private_terms_file"
       When the agent runs `gh issue create --repo you/notes -t x -b Wanderlust`
       Then the guard is silent
       When the agent runs `gh issue list -R o/r`
       Then the guard is silent
 
     @also_guard-github-issues
-    Scenario: a terms file with no terms in it denies everywhere but a private repo
+    Scenario: a terms file with no terms in it warns everywhere but a private repo
       Given the private terms file holds:
         """
         # comments only
@@ -856,7 +857,7 @@ Feature: guard-private-terms
 
         """
       When the agent runs `gh issue create -R o/r -t x -b "all public"`
-      Then the guard denies, naming "no terms in it"
+      Then the guard warns about "no terms in it"
       When the agent runs `gh issue create --repo you/notes -t x -b Wanderlust`
       Then the guard is silent
 

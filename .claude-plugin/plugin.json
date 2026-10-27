@@ -176,13 +176,13 @@
     "blocked_terms_file": {
       "type": "file",
       "title": "Blocked terms file",
-      "description": "A text file of terms so sensitive that a post naming one is denied whole: one per line, matched case-insensitively as plain text, # for comments. A leading ~ or $HOME is expanded. Unset, ~/.config/languette/blocked-terms.txt is read if it exists; with neither, no term is blocked, and the rewrites still run. A file set here but unreadable, or found but empty, denies every public post.",
+      "description": "A text file of terms so sensitive that a post naming one is denied whole: one per line, matched case-insensitively as plain text, # for comments. A leading ~ or $HOME is expanded. Unset, ~/.config/languette/blocked-terms.txt is read if it exists; with neither, no term is blocked, and the rewrites still run. A file set here but unreadable, or found but empty, blocks nothing and warns.",
       "required": false
     },
     "rewrites_file": {
       "type": "file",
       "title": "Rewrites file",
-      "description": "A JSON file of pairs rewritten in a post before it leaves: {\"rewrite\": [[\"find\", \"put\"], ...]}, matched case-insensitively; a find spelled $NAME is that variable's value, and a pair with no put puts <redacted>. A leading ~ or $HOME is expanded. Unset, ~/.config/languette/rewrites.json is read if it exists; with neither, only the home directory is rewritten. A file set here but unreadable, or found but not in that shape, denies every public post.",
+      "description": "A JSON file of pairs rewritten in a post before it leaves: {\"rewrite\": [[\"find\", \"put\"], ...]}, matched case-insensitively; a find spelled $NAME is that variable's value, and a pair with no put puts <redacted>. A leading ~ or $HOME is expanded. Unset, ~/.config/languette/rewrites.json is read if it exists; with neither, only the home directory is rewritten. A file set here but unreadable, or found but not in that shape, rewrites nothing and warns.",
       "required": false
     },
     "private_repos": {

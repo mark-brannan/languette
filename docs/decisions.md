@@ -186,8 +186,16 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
   the `rewrite` rule's own find and put, so it reads unchanged as the user
   tier's first rule set when the engine lands. A find `$NAME` is that
   variable's value; a pair with no put puts `<redacted>`. Current thinking.
-- A file that is found must load, or the post is denied naming the option;
-  a file absent from the default path is no file. Current thinking.
+- A cloud session or CI job with no copy of a private list runs unhindered:
+  a list that is missing or unreadable never fails a call.
+  ([thread](https://github.com/mark-brannan/languette/pull/290#discussion_r4395050677))
+- So a file that does not load, missing, unreadable, empty or not in shape,
+  is no file: the call goes on, with a warning naming the option. Current
+  thinking.
+- A rewrite is a transform of data, not a verdict, so "a rule only
+  tightens" does not bind it: a per-repo rule may loosen a rewrite a wider
+  tier applies, letting a hostname or path through as written. Current thinking.
+  ([thread](https://github.com/mark-brannan/languette/pull/290#discussion_r4395034528))
 - Anonymize never denies for text it cannot read, such as a body built at
   run time or an unreadable file: it cannot help there, so the call goes
   through. Fail-closed denials for unreadable text apply only when

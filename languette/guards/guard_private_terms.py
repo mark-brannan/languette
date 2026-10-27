@@ -20,7 +20,8 @@ reason names the terms that hit. No file, no hard block.
 
 Either option expands a leading `~` or `$HOME`; unset or empty, the guard reads
 ~/.config/languette/blocked-terms.txt or rewrites.json if it exists. A file that
-is found must load: set but unreadable, empty of terms, or not in shape -> deny.
+does not load (missing, unreadable, empty of terms, not in shape) is no file:
+the call goes on with a warning naming the option. Cloud sessions hold no copy.
 
 Fires on Bash `gh issue|pr create|comment|edit|review|close|reopen|merge`,
 `gh api` writing to repos/*/*/issues|pulls or a graphql mutation that comments
