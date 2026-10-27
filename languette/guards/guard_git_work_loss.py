@@ -12,6 +12,8 @@ features/guard-git-work-loss.feature.
                     (allowed when `git status --porcelain` (config-proof) in the payload's cwd is empty;
                     reset --hard to origin/<current branch> too, where an agent works)
   branch -D         and --delete --force
+  stow --adopt      asks: it moves each conflicting file from the target into the package,
+                    overwriting the repo's copy; -D and -R alone only touch links
 
 Where an agent works: the payload's cwd is in a linked worktree (git's own
 --git-dir differs from --git-common-dir) or the session's scratchpad, and its
@@ -23,7 +25,11 @@ and is skipped only when it is exactly `false`. `yadm` is git. The command is
 read through languette.scan: heredoc bodies dropped, quotes removed, git found
 behind wrappers and in `sh -c` bodies, a quoted message that names a flag is
 not the flag. git takes any unambiguous prefix of a long option, so --har is
---hard.
+--hard. stow is recognised by the shape of the command, installed or not; it reads
+options with Getopt::Long, so --adopt is any prefix of it (--ado), the options
+bundle (-nvd dir), and --adopt may stand before, between or after the package names.
+A package under -D is only unlinked; --adopt asks when some package is stowed (the
+default) or restowed, and not on a dry run (-n, --simulate).
 """
 
 import os
@@ -57,6 +63,15 @@ _WHOLE = re.compile(r"(?:\.|\./|\./\*|:/|:/\.|\*)\Z")
 _UNRESOLVED = re.compile(r"\A[:~]|[$`*?\[{}]")
 _MAIN = re.compile(r"(?:refs/heads/)?(?:main|master)\Z")
 STATUS_TIMEOUT = 5
+STOW = re.compile(r"(?:^|/)stow\Z")
+# stow's own option table (its Getopt::Long spec): long name -> takes a value. Like git, stow
+# takes any unambiguous prefix of a long name, and a value either after `=` or as the next word.
+_STOW_LONG = {"adopt": False, "compat": False, "dotfiles": False, "no-folding": False, "simulate": False,
+              "no": False, "verbose": False, "help": False, "version": False, "stow": False,
+              "delete": False, "restow": False, "dir": True, "target": True, "ignore": True,
+              "defer": True, "override": True}
+_STOW_SHORT = {"n": "simulate", "v": "verbose", "p": "compat", "S": "stow", "D": "delete", "R": "restow",
+               "V": "version", "h": "help", "d": "dir", "t": "target"}
 # Words that re-aim the tree a discard is judged in, or the config git reads. A git global
 # option naming a tree or config counts only as one of git's own (`sh -c` is not git's -c);
 # the environment's spelling and any config naming a work tree count in any word. A cd,
@@ -423,6 +438,65 @@ def _staging_where_agents_work(doc, names, msg):
     raise Refuse(msg)
 
 
+def _stow_long(t):
+    """The stow long option `--name[=value]` names, or None when it names none or several."""
+    name = t[2:].partition("=")[0]
+    if name in _STOW_LONG:
+        return name
+    hit = [f for f in _STOW_LONG if f.startswith(name)] if name else []
+    return hit[0] if len(hit) == 1 else None
+
+
+def _stow_adopts(a):
+    """True when the stow words `a` run --adopt on some package that is stowed or restowed.
+    An action option (-S, -D, -R) holds for the package names after it, the default being
+    stow. An unknown option is skipped as flag-only, so it cannot hide an --adopt after it."""
+    adopt, action, stowed, i, n = False, "stow", False, 0, len(a)
+    while i < n:
+        t = a[i]
+        i += 1
+        if t in ("--", "--end-of-options"):
+            stowed = stowed or (i < n and action != "delete")
+            break
+        if t.startswith("--"):
+            name = _stow_long(t)
+            if name in ("help", "version", "simulate", "no"):
+                return False
+            if name == "adopt":
+                adopt = True
+            elif name in ("stow", "delete", "restow"):
+                action = name
+            elif _STOW_LONG.get(name) and "=" not in t:
+                i += 1
+        elif t.startswith("-") and t != "-":
+            for j, ch in enumerate(t[1:], 1):
+                name = _STOW_SHORT.get(ch)
+                if name in ("help", "version", "simulate"):
+                    return False
+                if name in ("stow", "delete", "restow"):
+                    action = name
+                elif _STOW_LONG.get(name):
+                    i += j == len(t) - 1
+                    break
+        else:
+            stowed = stowed or action != "delete"
+    return adopt and stowed
+
+
+def _off(env, rule):
+    """The rule's own switch is exactly `false`."""
+    return env.get(f"CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_{rule}") == "false"
+
+
+def _stow(s, a, b, nested, env):
+    """`stow --adopt` asks; a stow call without it, or one that only deletes, does not."""
+    k = sw.cmd_index(s, a, b, STOW, nested)
+    if k is None or _off(env, "ADOPT"):
+        return
+    if _stow_adopts(s.w[k + 1:b + 1]):
+        raise Ask(say("wl_stow_adopt"))
+
+
 def _segment(doc, s, a, b, nested, env):
     g = sw.cmd_index(s, a, b, sw.GIT, nested)
     if g is None:
@@ -432,7 +506,7 @@ def _segment(doc, s, a, b, nested, env):
         return
     sub = s.w[i]
     rule = RULE.get(sub)
-    if rule and env.get(f"CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_{rule}") == "false":
+    if rule and _off(env, rule):
         return
     args = s.w[i + 1:b + 1]
     try:
@@ -478,6 +552,7 @@ def check(doc):
                 if a <= b:
                     try:
                         yield from _segment(doc, s, a, b, nested, env)
+                        _stow(s, a, b, nested, env)
                     except Ask as r:
                         asked = asked or r
     except Refuse as r:

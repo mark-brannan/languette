@@ -52,6 +52,12 @@
       "description": "Deny git branch -D and --delete --force. Leave on unless you want this git command through unchecked. Has no effect while guard_git_work_loss is false.",
       "default": true
     },
+    "guard_git_work_loss_adopt": {
+      "type": "boolean",
+      "title": "Ask before stow --adopt",
+      "description": "Ask before stow --adopt, which overwrites the package's files with the copies in the target. Leave on unless you want this command through unchecked. Has no effect while guard_git_work_loss is false.",
+      "default": true
+    },
     "require_well_formed": {
       "type": "boolean",
       "title": "Deny a command that does not parse",
