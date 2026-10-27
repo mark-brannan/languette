@@ -51,7 +51,6 @@ NAME = "guard-bypass-labels"
 OPTION = "CLAUDE_PLUGIN_OPTION_BYPASS_LABELS"
 DEFAULT = ()                                   # no label is guarded until the option names one
 
-GH = re.compile(r"(?:^|/)gh\Z")
 WRITES = frozenset("create new edit".split())
 LABEL_FLAGS = frozenset("--label --add-label -l".split())
 # Paths whose write can carry labels in an --input payload.
@@ -212,37 +211,13 @@ def _parses(t):
 
 
 def _api(f, s, i, b, ctx):
-    method, path, fields, inputs = None, None, [], []
-    j = i
-    while j <= b:
-        t = sw.word(s, j)
-        nxt = (sw.word(s, j + 1), s.live[j + 1]) if j < b else None
-        if t in ("-X", "--method"):
-            method, j = (nxt[0].upper() if nxt else method), j + 1
-        elif t.startswith("--method="):
-            method = t[9:].upper()
-        elif t.startswith("-X") and len(t) > 2:
-            method = _glued(t).upper()
-        elif t in ("-f", "-F", "--field", "--raw-field"):
-            fields.append((t, *nxt) if nxt else (t, "", False))
-            j += 1
-        elif t[:2] in ("-f", "-F") and len(t) > 2:
-            fields.append((t[:2], _glued(t), s.live[j]))
-        elif t.startswith(("--field=", "--raw-field=")):
-            fields.append((t.split("=", 1)[0], t.split("=", 1)[1], s.live[j]))
-        elif t == "--input":
-            inputs.append(nxt or ("", False))
-            j += 1
-        elif t.startswith("--input="):
-            inputs.append((t[8:], s.live[j]))
-        elif t in sw.GH_API_VALUED:
-            j += 1
-        elif not t.startswith("-") and s.k[j] != ";" and path is None:
-            path = t
-        j += 1
-    if method in ("GET", "HEAD") or (method is None and not fields and not inputs):
+    api = sw.gh_api(s, i, b)
+    if api.method in ("GET", "HEAD") or (api.method == "" and not api.sends):
         return
-    p = re.sub(r"^https?://[^/]+/", "", path or "").lstrip("/").split("?", 1)[0]
+    fields = [(a.flag, a.text or "", a.live) for a in api.args if a.flag != "--input"]
+    inputs = [(a.text or "", a.live) for a in api.args if a.flag == "--input"]
+    # The first operand, even an empty one, where gh_api.path skips it.
+    p = sw.gh_api_path(api.operands[0]) if api.operands else ""
     if p == "graphql":
         for flag, kv, live in fields:
             v = kv.split("=", 1)[1] if "=" in kv else kv
@@ -327,12 +302,12 @@ def _bash(f, doc, cmd, cwd, env, depth=0, alone=True):
     bodies = doc.heredocs(cmd)
     ctx = {"cwd": cwd, "env": env, "bodies": bodies, "files": f.files, "wanted": f.wanted,
            "moved": any(k == "w" and w in ("cd", "pushd", "popd") for s, _ in scans for k, w in zip(s.k, s.w)),
-           "alone": alone and sw.alone(scans, GH)}
+           "alone": alone and sw.alone(scans, sw.GH)}
     for s, nested in scans:
         for a, b in s.segments():
             if a > b:
                 continue
-            g = sw.cmd_index(s, a, b, GH, nested)
+            g = sw.cmd_index(s, a, b, sw.GH, nested)
             if g is not None:
                 _gh(f, s, g, b, ctx)
     # A heredoc fed to a shell (`sh <<EOF`, `cat <<EOF | sh`) is a command of
@@ -380,9 +355,7 @@ def parse(doc):
     """One walk of the call with no file read yet: (what it found, the
     document, Bash command and cwd to walk again once its files are read, or
     None; env)."""
-    payload, env = doc.payload, doc.env
-    tool = payload.get("tool_name")
-    inp = payload.get("tool_input")
+    payload, env, tool, inp = doc.payload, doc.env, doc.tool, doc.tool_input
     f = _Found({})
     if tool == "Bash":
         cmd = inp.get("command") if isinstance(inp, dict) else None

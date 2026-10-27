@@ -42,7 +42,6 @@ NAME = "guard-cross-session-send"
 FIRST_LINE = 80
 _FETCH = re.compile(r"(?:^|/)fetch\Z")      # BSD fetch, at command position only: never `git fetch`
 _FETCHERS = frozenset({"curl", "wget"})
-_GH = re.compile(r"(?:^|/)gh\Z")
 # gh issue and gh pr subcommands that only write; every other one reads.
 _GH_WRITES = frozenset("create new edit close reopen delete transfer comment merge review ready lock unlock pin "
                        "unpin develop".split())
@@ -51,7 +50,7 @@ _GH_WRITES = frozenset("create new edit close reopen delete transfer comment mer
 _GH_VIEWS = {"run": ("view", "download"), "release": ("view", "download"), "gist": ("view",),
              "repo": ("view",), "workflow": ("view",)}
 _API_METHOD = re.compile(r"(?:-X|--method=?)(.*)")
-_API_FIELDS = frozenset("-f -F --field --raw-field --input".split())
+_API_FIELDS = frozenset(sw.GH_API_FIELDS + ("--input",))
 _API_FIELDS_GLUED = ("-f", "-F", "--field=", "--raw-field=", "--input=")
 # An MCP tool is a read unless its name is clearly a write: a write verb and no read verb.
 _MCP_READ = frozenset("read get list search fetch query find view download export retrieve".split())
@@ -98,8 +97,7 @@ def _gh_reads(words):
     return False
 
 
-_VALUED = frozenset("-R --repo -X --method -H --header -f -F --field --raw-field --input -q --jq -t --template "
-                    "-p --preview --hostname --cache".split())
+_VALUED = frozenset(sw.GH_REPO_FLAGS + sw.GH_METHOD_FLAGS) | _API_FIELDS | sw.GH_API_VALUED
 
 
 def _operands(words):
@@ -126,10 +124,10 @@ def bash_read(doc):
         for a, b in s.segments():
             if a <= b and sw.cmd_index(s, a, b, _FETCH, True) is not None:
                 return "`fetch`"
-            g = sw.cmd_index(s, a, b, _GH, nested) if a <= b else None
+            g = sw.cmd_index(s, a, b, sw.GH, nested) if a <= b else None
             if g is None:
                 continue
-            words = [s.q[i] if s.k[i] == "q" else s.w[i] for i in range(g + 1, b + 1)]
+            words = [sw.word(s, i) for i in range(g + 1, b + 1)]
             if _gh_reads(words):
                 return "`gh " + " ".join(_operands(words)[:2]) + "`"
     return None
@@ -142,8 +140,7 @@ def _mcp_reads(tool):
 
 def untrusted_read(doc):
     """The tool that read untrusted content, as the deny names it, or None."""
-    payload = doc.payload
-    tool = payload.get("tool_name")
+    tool = doc.tool
     if not isinstance(tool, str):
         return None
     if tool in ("WebFetch", "WebSearch"):
@@ -152,7 +149,7 @@ def untrusted_read(doc):
         return tool if _mcp_reads(tool) else None
     if tool != "Bash":
         return None
-    ti = payload.get("tool_input")
+    ti = doc.tool_input
     cmd = ti.get("command") if isinstance(ti, dict) else None
     if not isinstance(cmd, str):
         return None
@@ -163,9 +160,9 @@ def untrusted_read(doc):
     return f"Bash {what}" if what else None
 
 
-def spawned(payload):
+def spawned(doc):
     """The names and ids an Agent call's PostToolUse shows for the subagent it started."""
-    ti, tr = payload.get("tool_input"), payload.get("tool_response")
+    ti, tr = doc.tool_input, doc.payload.get("tool_response")
     out = [ti.get("name")] if isinstance(ti, dict) else []
     if isinstance(tr, dict):
         out += [tr.get("agentId"), tr.get("agent_id")]
@@ -211,8 +208,8 @@ def _record(doc, event):
     if event == "SubagentStart":
         aid = payload.get("agent_id")
         return ("names", [aid]) if isinstance(aid, str) and aid else None
-    if payload.get("tool_name") == "Agent":
-        names = spawned(payload)
+    if doc.tool == "Agent":
+        names = spawned(doc)
         return ("names", names) if names else None
     what = untrusted_read(doc)
     return ("read", what) if what else None
@@ -232,9 +229,9 @@ def check(doc):
         return None
 
     # --- the send -------------------------------------------------------------
-    if payload.get("tool_name") != "SendMessage":
+    if doc.tool != "SendMessage":
         return None
-    ti = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
+    ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
     to = ti.get("to") if isinstance(ti.get("to"), str) else ""
     if to == "main":
         return None

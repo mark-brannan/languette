@@ -110,6 +110,7 @@ Feature: guard-signed-comments
         | gh pr review 4 --request-changes --body=Nope                                                                                |
         | gh api repos/o/r/pulls/116/comments/9/replies -f body="Replacement is the intent"                                           |
         | gh api repos/o/r/issues/116/comments -F body=Done                                                                           |
+        | gh api repos/o/r/issues/116/comments -f=body=Done                                                                           |
         | gh api -X PATCH repos/o/r/issues/comments/5 -f body=Edited                                                                  |
         | gh api repos/o/r/pulls/4/reviews -f event=COMMENT -f body=Done                                                              |
         | gh api repos/o/r/pulls/4/reviews -f event=COMMENT -F 'comments[][path]=a.py' -F 'comments[][body]=Nit'                      |

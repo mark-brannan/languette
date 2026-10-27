@@ -38,7 +38,6 @@ NAME = "guard-duplicate-prs"
 # The tools hooks.json wires this guard to; the MCP one by its name's tail.
 TOOLS = re.compile(r"(?:Bash|mcp__.*__(?:create_pull_request))\Z")
 _MCP = re.compile(r"mcp__.*__create_pull_request\Z")
-GH = re.compile(r"(?:^|/)gh\Z")
 MAX_READ = 1 << 20
 PAGE = 100                                     # timeline events per lookup; one page is read
 _CREATE = frozenset("create new".split())
@@ -133,38 +132,15 @@ def _pr_create(s, g, hi, repo):
 
 
 def _api(s, g, hi):
-    path, method, post = "", "", _Post()
-    fields = False
-    i = g + 2
-    while i <= hi:
-        t, live = sw.word(s, i), s.live[i]
-        if m := sw.gh_method_flag(s, i, hi, method):
-            method, i = m
-        elif t in ("-f", "-F", "--field", "--raw-field") or re.match(r"-[fF].|--(?:field|raw-field)=", t):
-            fields = True
-            if t in ("-f", "-F", "--field", "--raw-field"):
-                if i >= hi:
-                    break
-                i += 1
-                kv, live = sw.word(s, i), s.live[i]
+    api, post = sw.gh_api(s, g + 2, hi), _Post()
+    for a in api.args:
+        if a.key == "body":
+            if a.value.startswith("@") and a.typed:
+                _file(post, a.value[1:], a.live)
             else:
-                kv = t.split("=", 1)[1] if t.startswith("--") else t[2:]
-            key, _, v = kv.partition("=")
-            if key == "body":
-                if v.startswith("@") and not t.startswith(("-f", "--raw-field")):
-                    _file(post, v[1:], live)
-                else:
-                    _value(post, v, live)
-        elif t == "--input" or t.startswith("--input="):
-            fields = True
-            if t == "--input":
-                i += 1
-        else:
-            i, path = sw.gh_api_word(t, i, path)
-        i += 1
-    p = sw.gh_api_path(path)
-    m = re.fullmatch(rf"repos/({_NAME}|\{{owner\}})/({_NAME}|\{{repo\}})/pulls", p)
-    if not m or method in ("GET", "HEAD") or (method == "" and not fields):
+                _value(post, a.value, a.live)
+    m = re.fullmatch(rf"repos/({_NAME}|\{{owner\}})/({_NAME}|\{{repo\}})/pulls", api.path)
+    if not m or api.method in ("GET", "HEAD") or (api.method == "" and not api.sends):
         return None
     # gh fills {owner}/{repo} from the cwd's repo: None sends _slug to git.
     post.repo = None if "{" in m.group(1) + m.group(2) else f"{m.group(1)}/{m.group(2)}"
@@ -182,7 +158,7 @@ def posts(doc):
         for a, b in s.segments():
             if a > b:
                 continue
-            g = sw.cmd_index(s, a, b, GH, nested)
+            g = sw.cmd_index(s, a, b, sw.GH, nested)
             if g is None or g + 2 > b:
                 continue
             repo = next((s.w[i][8:] for i in range(a, g) if s.k[i] == "w" and s.w[i].startswith("GH_REPO=")), None)
@@ -312,12 +288,10 @@ def _judge(text, slug):
 
 
 def check(doc):
-    payload, env = doc.payload, doc.env
-    tool = payload.get("tool_name")
+    payload, env, tool = doc.payload, doc.env, doc.tool
     if not isinstance(tool, str):
         return None
-    ti = payload.get("tool_input")
-    ti = ti if isinstance(ti, dict) else {}
+    ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
     cwd = payload.get("cwd")
     if tool == "Bash":
         cmd = ti.get("command")

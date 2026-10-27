@@ -29,7 +29,6 @@ from languette.verdict import Need, ask, deny
 NAME = "guard-review-threads"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS"
 OPTION = "CLAUDE_PLUGIN_OPTION_REVIEW_THREAD_LOGINS"
-GH = re.compile(r"(?:^|/)gh\Z")
 RESOLVE = re.compile(r"(?<![A-Za-z0-9_])resolveReviewThread(?![A-Za-z0-9_])")
 THREAD = re.compile(r"PRRT_[A-Za-z0-9_-]+")
 BOTS = frozenset("coderabbitai claude copilot-pull-request-reviewer github-actions".split())
@@ -40,7 +39,6 @@ VAR = re.compile(r"\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])|\$\([^)]*
 # A query GraphQL can only run as a read: the shorthand `{` must be the lone
 # operation, and a named `query` takes a second operation only by operationName.
 READ = re.compile(r"\s*(?:\{|query(?![A-Za-z0-9_]))")
-FLAGS = {"-f": False, "-F": True, "--field": True, "--raw-field": False}   # flag -> reads @file
 TIMEOUT = 10
 # The last 100 comments: the bot's last word and every reply after it.
 QUERY = ("query($id: ID!) { viewer { login } node(id: $id) { ... on PullRequestReviewThread { "
@@ -74,34 +72,22 @@ def _decoded(body):
 
 def _args(s, g, b):
     """gh's words in g..b as (fields, inputs, words): fields are (reads @file,
-    name, value, live); inputs are (source, live)."""
+    name, value, live); inputs are (source, live). Every word is read, not only
+    those after `api`, and no flag's value is passed over."""
     fields, inputs, words = [], [], []
-    idx = [i for i in range(g + 1, b + 1) if s.k[i] in ("w", "q")]
-    j = 0
-    while j < len(idx):
-        i = idx[j]
+    i = g + 1
+    while i <= b:
         t = sw.word(s, i)
         words.append(t)
-        nxt = (sw.word(s, idx[j + 1]), s.live[idx[j + 1]]) if j + 1 < len(idx) else ("", False)
-        kv = None
-        if t in FLAGS:
-            (kv, live), typed = nxt, FLAGS[t]
-            words.append(kv)
-            j += 1
-        elif t[:2] in ("-f", "-F") and len(t) > 2:
-            kv, live, typed = t[3:] if t[2:3] == "=" else t[2:], s.live[i], t[1] == "F"
-        elif t.startswith(("--field=", "--raw-field=")):
-            kv, live, typed = t.split("=", 1)[1], s.live[i], t.startswith("--field=")
-        elif t == "--input":
-            inputs.append(nxt)
-            words.append(nxt[0])
-            j += 1
-        elif t.startswith("--input="):
-            inputs.append((t[len("--input="):], s.live[i]))
-        if kv is not None:
-            name, _, value = kv.partition("=")
-            fields.append((typed, name, value, live))
-        j += 1
+        if got := sw.gh_api_arg(s, i, b):
+            a, i = got
+            if t == a.flag:
+                words.append(a.text or "")
+            if a.flag == "--input":
+                inputs.append((a.text or "", a.live))
+            else:
+                fields.append((a.typed, a.key, a.value, a.live))
+        i += 1
     return fields, inputs, words
 
 
@@ -113,11 +99,11 @@ def _calls(doc, command, cwd, home):
     buf = command.replace("HEREDOC", "HEREDOC_") + "\n"      # a typed HEREDOC must not pass for scan's mark
     hd = "\n".join(_decoded(b) for b in doc.heredoc_bodies(buf))
     scans = [(doc.scan(t), nested) for t, nested in doc.texts(text=buf)]
-    alone, moved = sw.alone(scans, GH), paths.moves_directory(scans)
+    alone, moved = sw.alone(scans, sw.GH), paths.moves_directory(scans)
     out = []
     for s, nested in scans:
         for a, b in s.segments():
-            g = sw.cmd_index(s, a, b, GH, nested) if a <= b else None
+            g = sw.cmd_index(s, a, b, sw.GH, nested) if a <= b else None
             if g is None:
                 continue
             fields, inputs, words = _args(s, g, b)

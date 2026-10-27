@@ -38,7 +38,6 @@ NAME = "guard-github-issues"
 TOOLS = re.compile(r"(?:Bash|mcp__.*__(?:create_issue|issue_write|transfer_issue|delete_issue))\Z")
 _MCP_WRITE = re.compile(r"mcp__.*__(?:create_issue|transfer_issue|delete_issue)\Z")
 _MCP_ISSUE_WRITE = re.compile(r"mcp__.*__issue_write\Z")
-GH = re.compile(r"(?:^|/)gh\Z")
 _REPEATS = re.compile(r"(?:^|/)(?:xargs|parallel|find)\Z")
 _LOOP = frozenset("for while until select".split())
 _LEAD = frozenset("do then else elif ! time { (".split())
@@ -66,21 +65,6 @@ def _repo_flag(s, lo, hi):
             repo, i = r
         i += 1
     return repo
-
-
-def _skip_r(s, lo, hi):
-    """The first word at or after lo that is not a flag, -R/--repo taking its value; or None."""
-    i = lo
-    while i <= hi:
-        t = sw.word(s, i)
-        if t in sw.GH_REPO_FLAGS:
-            i += 2
-            continue
-        if t.startswith("-"):
-            i += 1
-            continue
-        return i
-    return None
 
 
 class _Writes:
@@ -117,19 +101,19 @@ class _Writes:
             i += 1
         if s.k[lo] == "w" and s.w[lo] == "done" and self.depth > 0:
             self.depth -= 1
-        g = sw.cmd_index(s, lo, hi, GH, nested)
+        g = sw.cmd_index(s, lo, hi, sw.GH, nested)
         if g is None or g + 1 > hi:
             return
         rep = any(s.k[i] == "w" and _REPEATS.search(s.w[i]) for i in range(lo, g))
-        sub1 = _skip_r(s, g + 1, hi)
+        sub1 = sw.gh_verb(s, g + 1, hi)
         if sub1 is None:
             return
         if s.w[sub1] == "issue":
-            sub2 = _skip_r(s, sub1 + 1, hi)
+            sub2 = sw.gh_verb(s, sub1 + 1, hi)
             if sub2 is not None and s.w[sub2] in ("create", "new"):
                 self._emit(rep, "create")
             elif sub2 is not None and s.w[sub2] in ("transfer", "delete"):
-                arg = _skip_r(s, sub2 + 1, hi)
+                arg = sw.gh_verb(s, sub2 + 1, hi)
                 hit = _NUMBER.fullmatch(sw.word(s, arg)) if arg is not None else None
                 number = hit and (hit[1] or hit[3])
                 repo = number and ((hit[2] if hit else None) or _repo_flag(s, g + 1, hi))
@@ -137,27 +121,12 @@ class _Writes:
             return
         if s.w[sub1] != "api":
             return
-        path, method, fields, m = "", "", False, []
-        i = sub1 + 1
-        while i <= hi:
-            t = sw.word(s, i)
-            m += _MUTATION.findall(t)
-            if mf := sw.gh_method_flag(s, i, hi, method):
-                method, i = mf
-            elif t in ("-f", "-F", "--field", "--raw-field", "--input"):
-                fields = True
-                if i < hi:
-                    i += 1
-                    m += _MUTATION.findall(sw.word(s, i))
-            elif re.match(r"-[fF].|--(?:field|raw-field|input)=", t):
-                fields = True
-            else:
-                i, path = sw.gh_api_word(t, i, path)
-            i += 1
-        path = sw.gh_api_path(path)
-        if re.fullmatch(r"repos/[^/]+/[^/]+/issues", path) and (method == "POST" or (method == "" and fields)):
+        api = sw.gh_api(s, sub1 + 1, hi)
+        m = [x for i in range(sub1 + 1, hi + 1) if i not in api.skipped for x in _MUTATION.findall(sw.word(s, i))]
+        if re.fullmatch(r"repos/[^/]+/[^/]+/issues", api.path) and (
+                api.method == "POST" or (api.method == "" and api.sends)):
             self._emit(rep, "create")
-        if path == "graphql":
+        if api.path == "graphql":
             m += _MUTATION.findall(self.hd)
             self.hd = ""
             for verb in m:
@@ -166,10 +135,8 @@ class _Writes:
 
 def _writes(doc):
     """([(verb, issue number or None, repo or None)] for this call's identifier writes, whether one is in a loop)."""
-    payload = doc.payload
-    tool = payload.get("tool_name")
-    ti = payload.get("tool_input")
-    ti = ti if isinstance(ti, dict) else {}
+    tool = doc.tool
+    ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
     if tool == "Bash":
         command = ti.get("command")
         if not isinstance(command, str):

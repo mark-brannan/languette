@@ -42,7 +42,6 @@ _MCP = ("add_issue_comment|add_reply_to_pull_request_comment|add_comment_to_pend
 # The tools hooks.json wires this guard to; the MCP ones by their name's tail.
 TOOLS = re.compile(rf"(?:Bash|mcp__.*__(?:{_MCP}))\Z")
 _MCP_TOOL = re.compile(rf"mcp__.*__(?:{_MCP})\Z")
-GH = re.compile(r"(?:^|/)gh\Z")
 OPENING = "CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING"
 SIGNATURE = "CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE"
 FIRST = "🤖 "
@@ -143,7 +142,7 @@ class _Read:
 
     def segment(self, lo, hi, nested):
         s = self.s
-        g = sw.cmd_index(s, lo, hi, GH, nested)
+        g = sw.cmd_index(s, lo, hi, sw.GH, nested)
         if g is None or g + 1 > hi:
             return
         if s.w[g + 1] == "api":
@@ -187,46 +186,29 @@ class _Read:
             self.posts.append(bodies)
 
     def api(self, g, hi):
-        s = self.s
-        path, method, fields, inp, i = "", "", [], None, g + 2
-        while i <= hi:
-            t = sw.word(self.s, i)
-            if m := sw.gh_method_flag(s, i, hi, method):
-                method, i = m
-            elif t in ("-f", "-F", "--field", "--raw-field") and i < hi:
-                i += 1
-                fields.append(self.field(sw.word(self.s, i), s.live[i], t in ("-F", "--field"), g, hi))
-            elif re.match(r"-[fF].", t):
-                fields.append(self.field(t[2:], s.live[i], t[1] == "F", g, hi))
-            elif re.match(r"--(?:field|raw-field)=", t):
-                fields.append(self.field(t.split("=", 1)[1], s.live[i], t.startswith("--field="), g, hi))
-            elif t == "--input" and i < hi:
-                i += 1
-                inp = self.file(sw.word(self.s, i), g, hi)
-            elif t.startswith("--input="):
-                inp = self.file(t[8:], g, hi)
+        api, fields, inp = sw.gh_api(self.s, g + 2, hi), [], None
+        for a in api.args:
+            if a.text is None:
+                continue
+            if a.flag == "--input":
+                inp = self.file(a.text, g, hi)
+            elif a.typed and a.value.startswith("@"):
+                fields.append((a.key, self.file(a.value[1:], g, hi)))
             else:
-                i, path = sw.gh_api_word(t, i, path)
-            i += 1
-        p = sw.gh_api_path(path)
+                fields.append((a.key, self.val(a.value, a.live)))
+        p = api.path
         if p == "graphql":
             query = next((src for key, src in fields if key == "query"), None)
             if query is not None or inp is not None:
                 self.posts.append([("graphql", query, dict(fields), inp)])
             return
-        if not _COMMENTS.search(p) or method in ("GET", "HEAD") or (not fields and inp is None):
+        if not _COMMENTS.search(p) or api.method in ("GET", "HEAD") or (not fields and inp is None):
             return
         bodies = [src for key, src in fields if key == "body" or key.endswith("[body]")]
         if inp is not None:
             bodies.append(("json", inp))
         if bodies:
             self.posts.append(bodies)
-
-    def field(self, v, live, typed, lo, hi):
-        key, _, v = v.partition("=")
-        if typed and v.startswith("@"):
-            return key, self.file(v[1:], lo, hi)
-        return key, self.val(v, live)
 
 
 def _json_bodies(v):
@@ -253,10 +235,8 @@ def _graphql_string(t):
 
 
 def check(doc):
-    payload, env = doc.payload, doc.env or {}
-    tool = payload.get("tool_name")
-    ti = payload.get("tool_input")
-    ti = ti if isinstance(ti, dict) else {}
+    payload, env, tool = doc.payload, doc.env or {}, doc.tool
+    ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
     if tool == "Bash":
         cmd = ti.get("command")
         if not isinstance(cmd, str) or "gh" not in cmd:

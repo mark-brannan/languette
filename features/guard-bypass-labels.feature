@@ -261,6 +261,7 @@ Feature: guard-bypass-labels
         | gh api graphql -f query='mutation { updateLabel(input:{id:"x",name:"churn-ok"}) { label { id } } }'        | label IDs   |
         | gh api graphql -F query=@mut.graphql                                                                        | label IDs   |
         | gh api graphql --input mut.json                                                                             | label IDs   |
+        | gh api 'graphql#x' -F query=@mut.graphql                                                                    | label IDs   |
 
       @also_guard-review-threads
       Examples:
