@@ -449,3 +449,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261027t193429z
 - verdict.approve returns (approved, done) with done a 1-tuple or None, telling a spent claim from a deny from keep-going Undo: change the return shape in one function and four callers ([#279](https://github.com/mark-brannan/languette/pull/279))
+
+### 20261027t193432z
+- paths.read_rules lives in paths beside read_json Undo: move it into scan and update two callers ([#279](https://github.com/mark-brannan/languette/pull/279))
