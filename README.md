@@ -47,7 +47,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 It needs `python3`, standard library only. `shfmt` (the parser it trusts
 most) and `gh` (for the guards that ask GitHub) are optional.
 
-### macOS (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
+### macOS
 
 ```
 brew install mark-brannan/tap/languette
