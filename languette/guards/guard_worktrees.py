@@ -2,7 +2,8 @@
 spec is features/guard-worktrees.feature.
 
   checkout-home  a `git`/`yadm` checkout or switch that would move the branch
-                 checked out in $HOME, when $HOME is itself a worktree
+                 checked out in $HOME, when $HOME is itself a worktree; and
+                 chezmoi's forced apply, destroy and purge
   foreign        a reach into a linked worktree that is not this session's own,
                  by a Bash word, a file tool's path, or EnterWorktree(path=...)
 
@@ -39,6 +40,14 @@ directory: a known gap. So is a link made by a command the guard does not
 know as one (a script, a clone whose tree holds a symlink).
 `(cd x); git checkout y` is judged from x: a known false allow.
 
+chezmoi, also checkout-home, asks rather than denies, and needs neither git nor
+chezmoi installed: it reads the shape of the command. `apply`, `update` or
+`init --apply` with --force (anywhere on the line, the last --force=<bool>
+standing), `init --one-shot` (which forces), `destroy` and `purge` ask; an
+unforced apply or update passes, since chezmoi prompts before it overwrites a
+target changed since it last wrote one, and with no TTY the prompt errors
+rather than answering itself.
+
 foreign. Another session's worktree is never a place to work:
 the session that owns a worktree may archive it mid-turn under anyone who
 reached in. Any path-shaped word (or the word after -C, or a cd target) that
@@ -63,7 +72,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Act, Need, Refuse, context, deny
+from languette.verdict import Act, Need, Refuse, ask, context, deny
 
 NAME = "guard-worktrees"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES"
@@ -75,9 +84,58 @@ _TILDE_LOST = re.compile(r"~(?:-|[+-]?[0-9]+)(?:/|\Z)")
 # A command that can make a path land somewhere other than where it looks: a
 # link made, or something moved, copied or unpacked into place.
 _FS_CHANGE = re.compile(r"(?:^|/)(?:ln|link|mv|cp|rsync|tar|unzip|cpio)\Z")
+# chezmoi: its global options that take a value as the next word (-R/--refresh-externals
+# takes one only glued on); past them the first word that is no option is the verb.
+_CHEZMOI = re.compile(r"(?:^|/)chezmoi\Z")
+_CHEZMOI_VALUED = frozenset("-c --config --config-format -D --destination -S --source -W --working-tree "
+                            "-o --output --cache --persistent-state --age-recipient --age-recipient-file "
+                            "--mode --override-data --override-data-file --color --progress "
+                            "--use-builtin-age --use-builtin-git".split())
 GETENT_TIMEOUT = 2
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 _KEYWORD = frozenset("builtin command if then else elif while until do !".split())
+
+
+def _chezmoi_flag(w, name, short=""):
+    """True/False when word w sets the bool flag --name (or -short) as pflag
+    reads it (--name, --name=true, --name=0), else None."""
+    if w == "--" + name or (short and w == "-" + short):
+        return True
+    for lead in ("--" + name + "=", short and "-" + short + "="):
+        if lead and w.startswith(lead):
+            return w[len(lead):] not in ("0", "f", "F", "false", "False", "FALSE")
+    return None
+
+
+def _chezmoi_hit(s, c, b):
+    """What the chezmoi call at c in segment c..b would do to $HOME, spelled
+    as chezmoi's own words (`apply --force`, `destroy`, `purge`), or None for
+    any other call. --force counts anywhere before a bare --, the last one set
+    standing. `update` applies unless --apply is off; `init` only with
+    --apply, or --one-shot, which forces by itself."""
+    force, apply, verb = False, None, None
+    i = c + 1
+    while i <= b and s.k[i] == "w" and s.w[i] != "--":
+        w = s.w[i]
+        if w in _CHEZMOI_VALUED:
+            i += 1
+        elif w.startswith("-"):
+            f = _chezmoi_flag(w, "force")
+            force = force if f is None else f
+            f = _chezmoi_flag(w, "apply", "a")
+            apply = apply if f is None else f
+            if re.fullmatch(r"-[A-Za-z]*a[A-Za-z]*", w):
+                apply = True
+            if _chezmoi_flag(w, "one-shot"):
+                force, apply = True, True
+        elif verb is None:
+            verb = w
+        i += 1
+    if verb in ("destroy", "purge"):
+        return verb
+    if force and (verb == "apply" or (verb == "update" and apply is not False) or (verb == "init" and apply)):
+        return verb + " --force"
+    return None
 
 
 def _git(cwd, *argv):
@@ -131,6 +189,7 @@ def _expand(raw, base, home):
 
 def _home_events(doc):
     """The command's moves, in order: ("DENY",) for a yadm checkout/switch,
+    ("ASK", spelling) for a chezmoi call that overwrites or removes in $HOME,
     ("CD", v), ("ENV", kind, v) for a GIT_DIR=/GIT_WORK_TREE= outside a git
     segment, ("FS",) for a segment that may make a link or move, copy or
     unpack one into place (a `git mv` too), and ("G", [(kind, v)]) for one git
@@ -149,6 +208,10 @@ def _home_events(doc):
                 continue
             g = sw.cmd_index(s, a, b, sw.GIT, nested)
             if g is None:
+                z = sw.cmd_index(s, a, b, _CHEZMOI, nested)
+                if z is not None and (hit := _chezmoi_hit(s, z, b)):
+                    out.append(("ASK", hit))
+                    continue
                 for i in range(a, b + 1):
                     if s.k[i] == "w" and s.w[i].startswith("GIT_DIR="):
                         out.append(("ENV", "GITDIR", s.w[i][8:]))
@@ -256,6 +319,11 @@ def _landings(raw, bases, home):
     return out
 
 
+class _Ask(Exception):
+    """A control's question to the user, not a refusal: the chezmoi spellings it
+    asks about. A later control's deny still outranks it."""
+
+
 def _generic(prog):
     return Refuse(say("wt_checkout_home", guard=NAME, prog=prog))
 
@@ -266,7 +334,11 @@ def _checkout_home(doc):
     if not isinstance(cmd, str) or not cmd:
         return
     events = _home_events(doc)
+    asks = list(dict.fromkeys(ev[1] for ev in events if ev[0] == "ASK"))
+    events = [ev for ev in events if ev[0] != "ASK"]
     if all(ev[0] == "FS" for ev in events):
+        if asks:
+            raise _Ask(asks)
         return
     if not (yield Need("which", "git")):
         raise Refuse(say("wt_git_missing_checkout", guard=NAME))
@@ -380,6 +452,8 @@ def _checkout_home(doc):
             for d in bases:
                 if (yield from targets_home(d)):
                     raise _generic("git")
+    if asks:
+        raise _Ask(asks)
     return note
 
 
@@ -690,14 +764,19 @@ CONTROLS = (("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME", _checkout_hom
 def check(doc):
     if not isinstance(doc.payload, dict):
         return None
-    notes = []
+    notes, asked = [], []
     for option, control in CONTROLS:
         if doc.env.get(option) == "false":
             continue
         try:
             note = yield from control(doc)
+        except _Ask as q:
+            asked += q.args[0]
+            continue
         except Refuse as r:
             return deny(str(r))
         if note:
             notes.append(note)
+    if asked:
+        return ask(say("wt_chezmoi", guard=NAME, hits=", ".join(f"`chezmoi {h}`" for h in dict.fromkeys(asked))))
     return context("\n\n".join(notes)) if notes else None
