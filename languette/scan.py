@@ -1302,8 +1302,8 @@ def _git_walk(s, g, b):
     """(repository, subcommand index, indexes of the global option words) of the git call at g.
     A wrapper that takes a repository names it before the git arguments, or after `run`;
     `vcsh <verb>` is not a git call (the subcommand is beyond b) except the verbs that run
-    git: `commit`, `pull` and `push` in every repository (repository None), `foreach git ...`
-    likewise, and `run <repo> git ...`."""
+    git: `commit`, `pull` and `push` in every repository (repository None), `foreach [-p] <git
+    arguments>` likewise (`foreach -g <command>` only when the command is git), and `run <repo> git ...`."""
     opts = []
 
     def take(i):
@@ -1321,9 +1321,20 @@ def _git_walk(s, g, b):
     if verb in VCSH_ALL:
         return None, i, opts
     repo, j = None, i + 1
-    if verb == "run":
+    if verb == "foreach":
+        # vcsh's getopts "gp": -g and -p flags (clustered too), then the command. Without -g
+        # vcsh puts `git` before it, so the next word is the subcommand, in every repository.
+        general = False
+        while j <= b and s.k[j] == "w" and re.fullmatch(r"-[gp]+", s.w[j]):
+            general = general or "g" in s.w[j]
+            j += 1
+        if j <= b and s.w[j] == "--":
+            j += 1
+        if not general:
+            return None, j, opts
+    elif verb == "run":
         repo, j = (s.w[j] if j <= b else None), j + 1
-    elif verb != "foreach":
+    else:
         return None, b + 1, opts
     if j <= b and s.k[j] == "w" and _base(s.w[j]) == "git":
         return repo, take(j + 1), opts

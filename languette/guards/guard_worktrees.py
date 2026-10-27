@@ -1,14 +1,9 @@
 """guard-worktrees: two controls over where a session's git work lands. The
 spec is features/guard-worktrees.feature.
 
-<<<<<<< HEAD
   checkout-home  a `git`/`yadm`/`vcsh` checkout or switch that would move the branch
-                 checked out in $HOME, when $HOME is itself a worktree
-=======
-  checkout-home  a `git`/`yadm` checkout or switch that would move the branch
                  checked out in $HOME, when $HOME is itself a worktree; and
                  chezmoi's forced apply, destroy and purge
->>>>>>> origin/main
   foreign        a reach into a linked worktree that is not this session's own,
                  by a Bash word, a file tool's path, or EnterWorktree(path=...)
 
@@ -195,14 +190,10 @@ def _expand(raw, base, home):
 # --- checkout-home --------------------------------------------------------
 
 def _home_events(doc):
-<<<<<<< HEAD
     """The command's moves, in order: ("DENY", the wrapper as it is typed) for a
-    checkout/switch by a wrapper whose work tree is always $HOME, ("CD", v), ("ENV", kind, v) for a GIT_DIR=/GIT_WORK_TREE= outside a git
-=======
-    """The command's moves, in order: ("DENY",) for a yadm checkout/switch,
+    checkout/switch by a wrapper whose work tree is always $HOME,
     ("ASK", spelling) for a chezmoi call that overwrites or removes in $HOME,
     ("CD", v), ("ENV", kind, v) for a GIT_DIR=/GIT_WORK_TREE= outside a git
->>>>>>> origin/main
     segment, ("FS",) for a segment that may make a link or move, copy or
     unpack one into place (a `git mv` too), and ("G", [(kind, v)]) for one git
     checkout/switch with its -C/GITDIR/WORKTREE targets in order."""

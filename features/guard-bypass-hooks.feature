@@ -46,7 +46,10 @@ Feature: guard-bypass-hooks
       | vcsh dots -c core.hooksPath=x commit -m x    | git options after the repository      |
       | vcsh commit --no-verify                      | vcsh commit runs git commit in every repository |
       | vcsh ci -n -m x                              | ci is vcsh's abbreviation of commit    |
-      | vcsh foreach git commit -n -m x              | foreach runs git in every repository  |
+      | vcsh foreach commit --no-verify              | foreach puts git before its arguments, in every repository |
+      | vcsh foreach -p commit -n -m x               | -p only prefixes the repository name  |
+      | vcsh foreach -g git commit --no-verify       | -g runs the command as it is, here git |
+      | vcsh foreach -gp git commit -n -m x          | clustered flags                       |
       | bash -c "git commit -n -m x"                 | bash -c nests                         |
       | sudo git commit -n -m x                      | sudo                                  |
       | git add f && git commit -n -m x              | later in a chain                      |
@@ -116,6 +119,8 @@ Feature: guard-bypass-hooks
       | vcsh run dots ls -n                                 | vcsh run of a command that is not git |
       | vcsh pull -n                                        | vcsh pull takes no arguments for git |
       | vcsh init commit --no-verify                        | init is a vcsh verb, not a repository |
+      | vcsh foreach git commit -n -m x                     | foreach adds git itself: git git is no commit |
+      | vcsh foreach -g ls -n                               | foreach -g of a command that is not git |
       | git commit -F msg.txt                               | message from a file                 |
       | git commit --message=--no-verify                    | attached message                    |
       | git commit --amend --no-edit                        | --no-edit is not --no-verify        |
