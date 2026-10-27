@@ -186,8 +186,8 @@ def _tracked_flagged(ctx, path, flag):
     f.write_text("edit that git status does not show\n")
 
 
-@given(parsers.parse('a yadm-style repository at "{path}" whose work tree is "{wt}"'))
-def _yadm_repo(ctx, path, wt):
+@given(parsers.parse('a bare repository at "{path}" whose work tree is "{wt}"'))
+def _bare_repo_with_work_tree(ctx, path, wt):
     d = Path(ctx.expand(path))
     d.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(d)], check=True)
@@ -210,14 +210,14 @@ def _symlink(ctx, path, target):
     Path(ctx.expand(path)).symlink_to(ctx.expand(target))
 
 
-@given("the claude plugin's door file is already present")
-def _claude_door_present(ctx):
-    Path(ctx.doordir(), f"claude-issue-door.{ctx.session}").write_text("")
+@given("another plugin's door file is already present")
+def _other_door_present(ctx):
+    Path(ctx.doordir(), f"other-plugin-door.{ctx.session}").write_text("")
 
 
-@then("the claude plugin's door file is still present")
-def _claude_door_still(ctx):
-    assert Path(ctx.doordir(), f"claude-issue-door.{ctx.session}").exists()
+@then("another plugin's door file is still present")
+def _other_door_still(ctx):
+    assert Path(ctx.doordir(), f"other-plugin-door.{ctx.session}").exists()
 
 
 @given(parsers.parse('the door file is a symlink to "{target}"'))

@@ -7,8 +7,9 @@ Feature: guard-worktrees
   session. Which worktrees count as a session's own is decided by a record
   the guard keeps per session.
 
-  A branch switch in $HOME. For a $HOME that is itself a worktree (yadm, a
-  bare-repo setup), a checkout or switch there changes the branch every
+  A branch switch in $HOME. For a $HOME that is itself a worktree (a dotfile
+  manager that pins its work tree to $HOME, yadm today, or a bare-repo
+  setup), a checkout or switch there changes the branch every
   shell and session on the machine sees. Every scenario in that Rule runs
   against a fake $HOME that holds a real .git, so the verdict does not
   depend on the machine's own.
@@ -19,8 +20,9 @@ Feature: guard-worktrees
   worktree. Editing files in $HOME is not touched: the guard fires only on a
   `checkout` or `switch`.
 
-  `yadm` and `git` are not symmetric. yadm hardcodes `--work-tree=$HOME` into
-  every invocation, so `yadm checkout <branch>` is dangerous from any
+  Such a manager and plain `git` are not symmetric. yadm, the example in
+  every row below, hardcodes `--work-tree=$HOME` into every invocation, so
+  `yadm checkout <branch>` is dangerous from any
   directory, a worktree under $HOME included; any `yadm checkout` or `switch`
   that is not a file-restore is a hit, cwd ignored. Plain git touches $HOME's
   worktree only if the repo it discovers from the cwd (or a `-C`, `--git-dir`
@@ -256,11 +258,12 @@ Feature: guard-worktrees
         | export GIT_DIR={TMP}/.git; git checkout some-branch                        |
         | git -C {TMP}/.claude/worktrees/fake-task -C ../../.. checkout some-branch  |
 
-    # yadm keeps its repo outside $HOME, with core.worktree pointing back at it.
+    # A dotfile manager may keep its repo outside $HOME, with core.worktree
+    # pointing back at it (yadm does).
     Scenario: --git-dir to a repo whose work tree is $HOME is denied
-      Given a yadm-style repository at "{TMP}/.local/share/yadm/repo.git" whose work tree is "{TMP}"
+      Given a bare repository at "{TMP}/dots/repo.git" whose work tree is "{TMP}"
       And the working directory is "/tmp"
-      When the agent runs `git --git-dir={TMP}/.local/share/yadm/repo.git checkout some-branch`
+      When the agent runs `git --git-dir={TMP}/dots/repo.git checkout some-branch`
       Then the guard denies
 
     # Fails closed: where the guard can't tell which directory git runs in,
@@ -470,8 +473,8 @@ Feature: guard-worktrees
       When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
       Then the guard denies, naming "git --git-dir={TMP}/repo/.git worktree add {TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/<name>"
 
-    # Scar: a session that ran one cd into another repo was denied every
-    # call naming its own worktree, even the cd back.
+    # One cd into another repo must not deny every later
+    # call naming the session's own worktree, even the cd back.
     Scenario: a cd elsewhere does not lock the session out of its own worktree
       Given the session is "s455"
       When the agent runs `git status`
@@ -722,7 +725,7 @@ Feature: guard-worktrees
       And the directory "{TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad"
       And CLAUDE_CODE_TMPDIR is "{TMP}/scratch/claude-tmpdir"
       And the directory "{TMP}/yhome"
-      And a yadm-style repository at "{TMP}/yadm/repo.git" whose work tree is "{TMP}/yhome"
+      And a bare repository at "{TMP}/yadm/repo.git" whose work tree is "{TMP}/yhome"
       And a linked worktree "{TMP}/ywt/theirs" of the repository at "{TMP}/yadm/repo.git"
       When the agent runs `git -C {TMP}/ywt/theirs status`
       Then the guard denies, naming "git --git-dir={TMP}/yadm/repo.git worktree add {TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/<name>"

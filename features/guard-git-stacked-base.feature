@@ -2,8 +2,8 @@
 Feature: guard-git-stacked-base
   Deleting a remote branch an open PR uses is denied. gh and timeout are
   stubs throughout, so no scenario reaches the network: the stub lists three
-  open PRs, #1 stacked on claude/base-branch (the head of #2), and #3 headed
-  by claude/lonely, the base of nothing.
+  open PRs, #1 stacked on feat/base-branch (the head of #2), and #3 headed
+  by feat/lonely, the base of nothing.
 
   Why. GitHub retargets a stacked PR only when its base branch disappears
   because the base PR merged. A base branch deleted any other way (by hand,
@@ -15,7 +15,7 @@ Feature: guard-git-stacked-base
   branch as base or head. The safe path is never blocked: `gh pr merge
   --delete-branch` names no branch, and a local `git branch -d` takes nothing
   from a PR. Not a stack? Then there is nothing here to hit; small changes in
-  flight belong on parallel branches off main.
+  flight belong on parallel branches off the default branch.
 
   The verdicts are not symmetric. An open PR found is a deny: destructive and
   known, not guessed. GitHub unreachable (no gh, no auth, an API error), a
@@ -42,13 +42,13 @@ Feature: guard-git-stacked-base
 
     Examples:
       | command                                                  | note                          |
-      | git push -d origin claude/base-branch                    | -d                            |
-      | git push origin :claude/base-branch                      | a colon refspec               |
-      | git push origin :refs/heads/claude/base-branch           | a colon refspec, qualified    |
-      | git push origin --delete refs/heads/claude/base-branch   | refs/heads/ prefix stripped   |
-      | git push --delete origin claude/base-branch              | --delete before the remote    |
-      | git push origin --delete claude/spare claude/base-branch | one of several refs is a base |
-      | yadm push origin --delete claude/base-branch             | yadm is git                   |
+      | git push -d origin feat/base-branch                    | -d                            |
+      | git push origin :feat/base-branch                      | a colon refspec               |
+      | git push origin :refs/heads/feat/base-branch           | a colon refspec, qualified    |
+      | git push origin --delete refs/heads/feat/base-branch   | refs/heads/ prefix stripped   |
+      | git push --delete origin feat/base-branch              | --delete before the remote    |
+      | git push origin --delete feat/spare feat/base-branch | one of several refs is a base |
+      | yadm push origin --delete feat/base-branch             | yadm is git                   |
 
   Scenario Outline: deleting the head branch of an open PR is denied
     When the agent runs `<command>`
@@ -56,8 +56,8 @@ Feature: guard-git-stacked-base
 
     Examples:
       | command                                     | note                                    |
-      | git push origin --delete claude/stacked-one | the head of #1                          |
-      | git push origin --delete claude/lonely      | the head of #3, which is nothing's base |
+      | git push origin --delete feat/stacked-one | the head of #1                          |
+      | git push origin --delete feat/lonely      | the head of #3, which is nothing's base |
 
   Scenario Outline: the REST spelling of a delete is denied too
     When the agent runs `<command>`
@@ -65,9 +65,9 @@ Feature: guard-git-stacked-base
 
     Examples:
       | command                                                            |
-      | gh api --method DELETE repos/o/r/git/refs/heads/claude/base-branch |
-      | gh api -XDELETE repos/o/r/git/refs/heads/claude/base-branch        |
-      | gh api --method=DELETE repos/o/r/git/refs/heads/claude/base-branch |
+      | gh api --method DELETE repos/o/r/git/refs/heads/feat/base-branch |
+      | gh api -XDELETE repos/o/r/git/refs/heads/feat/base-branch        |
+      | gh api --method=DELETE repos/o/r/git/refs/heads/feat/base-branch |
 
   Scenario Outline: the bypasses the shared scanner exists to close stay closed
     When the agent runs `<command>`
@@ -75,11 +75,11 @@ Feature: guard-git-stacked-base
 
     Examples:
       | command                                                | note                       |
-      | sh -c 'git push origin --delete claude/base-branch'    | nested in sh -c            |
-      | git push origin --delete claude/base-branch # harmless | trailing shell comment     |
-      | /usr/bin/git push origin --delete claude/base-branch   | absolute-path invocation   |
-      | echo hi && git push origin --delete claude/base-branch | after a compound separator |
-      | git   push   origin   --delete   claude/base-branch    | unusual whitespace         |
+      | sh -c 'git push origin --delete feat/base-branch'    | nested in sh -c            |
+      | git push origin --delete feat/base-branch # harmless | trailing shell comment     |
+      | /usr/bin/git push origin --delete feat/base-branch   | absolute-path invocation   |
+      | echo hi && git push origin --delete feat/base-branch | after a compound separator |
+      | git   push   origin   --delete   feat/base-branch    | unusual whitespace         |
 
   Scenario Outline: a branch or a PR list that cannot be resolved is asked about
     Given GH_FAIL is <gh_fail>
@@ -89,18 +89,18 @@ Feature: guard-git-stacked-base
     Examples:
       | gh_fail | command                                                 | verdict | note                                                  |
       | unset   | git push origin --delete "$b"                           | asks    | a variable branch cannot be looked up: ask, not allow |
-      | unset   | git push origin --delete claude/old-*                   | asks    | a glob cannot be looked up                            |
-      | "1"     | git push origin --delete claude/base-branch             | asks    | gh cannot answer                                      |
-      | unset   | git push origin --delete claude/base-branch pr merge -d | denies  | pr, merge and -d after a real delete do not excuse it |
+      | unset   | git push origin --delete feat/old-*                   | asks    | a glob cannot be looked up                            |
+      | "1"     | git push origin --delete feat/base-branch             | asks    | gh cannot answer                                      |
+      | unset   | git push origin --delete feat/base-branch pr merge -d | denies  | pr, merge and -d after a real delete do not excuse it |
 
   Scenario: a live PR is looked up under timeout 20, and denies
-    When the agent runs `git push origin --delete claude/base-branch`
+    When the agent runs `git push origin --delete feat/base-branch`
     Then the guard denies
     And the stub "timeout" was called with "20 gh pr list"
 
   Scenario: a gh pr list that outlives its timeout asks
     Given TIMEOUT_HANG is "1"
-    When the agent runs `git push origin --delete claude/base-branch`
+    When the agent runs `git push origin --delete feat/base-branch`
     Then the guard asks
 
   # The runner's rule for every guard's ask, shown on this one.
@@ -130,13 +130,13 @@ Feature: guard-git-stacked-base
     # The --base lookup is the first gh call and finds nothing for this
     # branch; the --head lookup is the second, and it is the one that hangs.
     Given TIMEOUT_HANG is "2"
-    When the agent runs `git push origin --delete claude/lonely`
+    When the agent runs `git push origin --delete feat/lonely`
     Then the guard asks
     And the stub "timeout" was called 2 times
 
   Scenario: the gh api spelling runs gh under the same bound
     Given TIMEOUT_HANG is "1"
-    When the agent runs `gh api -X DELETE repos/o/r/git/refs/heads/claude/base-branch`
+    When the agent runs `gh api -X DELETE repos/o/r/git/refs/heads/feat/base-branch`
     Then the guard asks
 
   Scenario Outline: with no timeout or gtimeout on PATH it asks, and never runs gh unbounded
@@ -148,8 +148,8 @@ Feature: guard-git-stacked-base
     @also_guard-worktrees
     Examples:
       | command                                        | note                            |
-      | git push origin --delete claude/already-merged | a branch no open PR names       |
-      | git push origin --delete claude/base-branch    | a branch an open PR is based on |
+      | git push origin --delete feat/already-merged | a branch no open PR names       |
+      | git push origin --delete feat/base-branch    | a branch an open PR is based on |
 
   Scenario Outline: git pointed at another repository is asked about
     When the agent runs `<command>`
@@ -157,28 +157,28 @@ Feature: guard-git-stacked-base
 
     Examples:
       | command                                                                 | verdict | note                                                 |
-      | git -C /elsewhere push origin --delete claude/base-branch               | asks    |                                                      |
-      | git --git-dir=/elsewhere/.git push origin --delete claude/base-branch   | asks    | git --git-dir                                        |
-      | GIT_DIR=/elsewhere/.git git push origin --delete claude/base-branch     | asks    | GIT_DIR in the environment                           |
-      | git -C /elsewhere status && git push origin --delete claude/base-branch | denies  | git -C on another command does not excuse the delete |
+      | git -C /elsewhere push origin --delete feat/base-branch               | asks    |                                                      |
+      | git --git-dir=/elsewhere/.git push origin --delete feat/base-branch   | asks    | git --git-dir                                        |
+      | GIT_DIR=/elsewhere/.git git push origin --delete feat/base-branch     | asks    | GIT_DIR in the environment                           |
+      | git -C /elsewhere status && git push origin --delete feat/base-branch | denies  | git -C on another command does not excuse the delete |
 
   Scenario: the REST endpoint names the repository the PR list is read from
-    When the agent runs `gh api -X DELETE repos/o/r/git/refs/heads/claude/base-branch`
+    When the agent runs `gh api -X DELETE repos/o/r/git/refs/heads/feat/base-branch`
     Then the guard denies
     And the stub "gh" was called with "-R o/r"
 
   Scenario: a {owner}/{repo} placeholder means the cwd's repository
-    When the agent runs `gh api -X DELETE repos/{owner}/{repo}/git/refs/heads/claude/base-branch`
+    When the agent runs `gh api -X DELETE repos/{owner}/{repo}/git/refs/heads/feat/base-branch`
     Then the guard denies
     And the stub "gh" was not called with "-R"
 
   Scenario: an endpoint whose repository cannot be resolved asks
-    When the agent runs `gh api -X DELETE "repos/$OWNER/r/git/refs/heads/claude/base-branch"`
+    When the agent runs `gh api -X DELETE "repos/$OWNER/r/git/refs/heads/feat/base-branch"`
     Then the guard asks
 
   Scenario: a tab in a PR title still makes a deny that parses
     Given GH_TAB is "1"
-    When the agent runs `git push origin --delete claude/base-branch`
+    When the agent runs `git push origin --delete feat/base-branch`
     Then the guard denies
 
   # A push option's separate value is no remote and no ref: read as either, it
@@ -190,19 +190,19 @@ Feature: guard-git-stacked-base
 
     Examples:
       | command                                                                | verdict   | ghost         | note                |
-      | git push -o ci.skip origin --delete claude/already-merged              | is silent | --base origin | -o                  |
-      | git push --push-option ci.skip origin --delete claude/already-merged   | is silent | --base origin | --push-option       |
-      | git push --repo origin origin --delete claude/already-merged           | is silent | --base origin | --repo              |
-      | git push --receive-pack /bin/x origin --delete claude/already-merged   | is silent | --base /bin/x | --receive-pack      |
-      | git push --exec /bin/x origin --delete claude/already-merged           | is silent | --base /bin/x | --exec, its alias   |
-      | git push --push-opt x origin --delete claude/already-merged            | is silent | --base x      | an unambiguous prefix |
-      | git push origin --delete claude/already-merged -o claude/base-branch   | is silent | --base claude/base-branch | the value after the ref |
-      | git push -o ci.skip origin --delete claude/base-branch                 | denies    | --base origin | a real base still denies |
+      | git push -o ci.skip origin --delete feat/already-merged              | is silent | --base origin | -o                  |
+      | git push --push-option ci.skip origin --delete feat/already-merged   | is silent | --base origin | --push-option       |
+      | git push --repo origin origin --delete feat/already-merged           | is silent | --base origin | --repo              |
+      | git push --receive-pack /bin/x origin --delete feat/already-merged   | is silent | --base /bin/x | --receive-pack      |
+      | git push --exec /bin/x origin --delete feat/already-merged           | is silent | --base /bin/x | --exec, its alias   |
+      | git push --push-opt x origin --delete feat/already-merged            | is silent | --base x      | an unambiguous prefix |
+      | git push origin --delete feat/already-merged -o feat/base-branch   | is silent | --base feat/base-branch | the value after the ref |
+      | git push -o ci.skip origin --delete feat/base-branch                 | denies    | --base origin | a real base still denies |
 
     @also_guard-git-work-loss
     Examples:
       | command                                                                | verdict   | ghost         | note                |
-      | git push -fo ci.skip origin --delete claude/already-merged           | is silent | --base origin | -o ending a cluster |
+      | git push -fo ci.skip origin --delete feat/already-merged           | is silent | --base origin | -o ending a cluster |
 
   Scenario Outline: the safe deletions and the non-deletions pass silently
     When the agent runs `<command>`
@@ -210,15 +210,15 @@ Feature: guard-git-stacked-base
 
     Examples:
       | command                                               | note                                 |
-      | git push origin --delete claude/already-merged        | no open PR names it                  |
-      | git push --force-with-lease origin claude/stacked-one | force-push of a stacked branch       |
-      | git branch -d claude/base-branch                      |                                      |
+      | git push origin --delete feat/already-merged        | no open PR names it                  |
+      | git push --force-with-lease origin feat/stacked-one | force-push of a stacked branch       |
+      | git branch -d feat/base-branch                      |                                      |
       | gh pr merge 2 --delete-branch                         | the safe deletion names no branch    |
       | gh pr merge 2 -d                                      |                                      |
       | gh pr merge 2 --delete-branch && echo done            |                                      |
       | git status                                            | unrelated                            |
-      | gh api repos/o/r/git/refs/heads/claude/base-branch    | a GET                                |
-      | echo 'git push origin --delete claude/base-branch'    | a deletion quoted into prose         |
+      | gh api repos/o/r/git/refs/heads/feat/base-branch    | a GET                                |
+      | echo 'git push origin --delete feat/base-branch'    | a deletion quoted into prose         |
 
     @also_guard-bypass-ruleset
     Examples:
@@ -229,4 +229,4 @@ Feature: guard-git-stacked-base
     @also_guard-git-work-loss
     Examples:
       | command                                               | note                                 |
-      | git branch -D claude/base-branch                      | local delete takes nothing from a PR |
+      | git branch -D feat/base-branch                      | local delete takes nothing from a PR |

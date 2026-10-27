@@ -1,6 +1,6 @@
 @python @family @big
 Feature: big
-  The biggest commands agents have really run on the maintainer's machine,
+  The biggest commands agents have really run,
   anonymized: paths, hosts and project names changed, the structure kept as
   it ran (heredocs, `sh -c` inside ssh, shell functions, quote switching,
   loops and pipes). A row with a step added is a real shape with one

@@ -16,7 +16,7 @@ Feature: wiring
       """
     And the private terms file holds:
       """
-      Wanderlust
+      Zephyr
       """
     And the file ".languette/secrets.json" holds:
       """
@@ -48,14 +48,14 @@ Feature: wiring
       | guard-infra         | terraform destroy             | denies    |
       | guard-github-issues             | gh issue create -t t -b b     | denies    |
       | prose-budget-commit    | git commit -m x               | warns about "CI fails on this" |
-      | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | gh issue comment 3 -R o/r -b Zephyr | denies  |
       | guard-duplicate-prs | gh pr create -t t -b "Closes #1" | asks |
-      | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
+      | guard-bypass-labels       | gh pr edit 4 --add-label waive-review | denies    |
       | guard-bypass-ruleset      | git push origin HEAD:$b       | asks      |
 
   Scenario: the hooks.json command for guard-bypass-labels judges an MCP call
     Given the hook is the hooks.json command for "guard-bypass-labels"
-    When the agent calls MCP tool "mcp__github__update_issue" with input `{"owner":"o","repo":"r","issue_number":3,"labels":["churn-ok"]}`
+    When the agent calls MCP tool "mcp__github__update_issue" with input `{"owner":"o","repo":"r","issue_number":3,"labels":["waive-review"]}`
     Then the guard denies
 
 
@@ -88,9 +88,9 @@ Feature: wiring
       | guard-bypass-hooks | git merge --no-verify topic |
       | guard-infra         | terraform destroy             |
       | guard-github-issues             | gh issue create -t t -b b     |
-      | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
+      | guard-private-terms     | gh issue comment 3 -R o/r -b Zephyr |
       | guard-duplicate-prs | gh pr create -t t -b "Closes #1" |
-      | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
+      | guard-bypass-labels       | gh pr edit 4 --add-label waive-review |
       | prose-budget-commit    | git commit -m x               |
 
   # One command runs every guard, so with python3 absent it denies every call
@@ -159,9 +159,9 @@ Feature: wiring
       | guard-bypass-hooks | git merge --no-verify topic |
       | guard-infra         | terraform destroy             |
       | guard-github-issues             | gh issue create -t t -b b     |
-      | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
+      | guard-private-terms     | gh issue comment 3 -R o/r -b Zephyr |
       | guard-duplicate-prs | gh pr create -t t -b "Closes #1" |
-      | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
+      | guard-bypass-labels       | gh pr edit 4 --add-label waive-review |
       | prose-budget-commit    | git commit -m x               |
 
   Scenario Outline: the option set to false skips the guard
@@ -185,9 +185,9 @@ Feature: wiring
       | guard-bypass-hooks | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_HOOKS | git merge --no-verify topic |
       | guard-infra         | CLAUDE_PLUGIN_OPTION_GUARD_INFRA         | terraform destroy             |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | gh issue create -t t -b b     |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | gh issue comment 3 -R o/r -b Wanderlust |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | gh issue comment 3 -R o/r -b Zephyr |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | gh pr create -t t -b "Closes #1" |
-      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | gh pr edit 4 --add-label churn-ok |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | gh pr edit 4 --add-label waive-review |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | git commit -m x               |
       | require-well-formed | CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED | echo "unterminated |
       | guard-secrets | CLAUDE_PLUGIN_OPTION_GUARD_SECRETS | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 |
@@ -281,30 +281,30 @@ Feature: wiring
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | no    | gh issue create -t t -b b     | denies  |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | true  | gh issue create -t t -b b     | denies  |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | 1     | gh issue create -t t -b b     | denies  |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     |       | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     |       | gh issue comment 3 -R o/r -b Zephyr | denies  |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS |  | gh pr create -t t -b "Closes #1" | asks |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 0     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 0     | gh issue comment 3 -R o/r -b Zephyr | denies  |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 0 | gh pr create -t t -b "Closes #1" | asks |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | False | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | False | gh issue comment 3 -R o/r -b Zephyr | denies  |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | False | gh pr create -t t -b "Closes #1" | asks |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | no    | gh issue comment 3 -R o/r -b Zephyr | denies  |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | no | gh pr create -t t -b "Closes #1" | asks |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | true  | gh issue comment 3 -R o/r -b Zephyr | denies  |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | true | gh pr create -t t -b "Closes #1" | asks |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 1 | gh pr create -t t -b "Closes #1" | asks |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 1     | gh issue comment 3 -R o/r -b Zephyr | denies  |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | warns about "CI fails on this" |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | warns about "CI fails on this" |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | False | git commit -m x               | warns about "CI fails on this" |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | no    | git commit -m x               | warns about "CI fails on this" |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | true  | git commit -m x               | warns about "CI fails on this" |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 1     | git commit -m x               | warns about "CI fails on this" |
-      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       |       | gh pr edit 4 --add-label churn-ok | denies  |
-      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | 0     | gh pr edit 4 --add-label churn-ok | denies  |
-      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | False | gh pr edit 4 --add-label churn-ok | denies  |
-      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | no    | gh pr edit 4 --add-label churn-ok | denies  |
-      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | true  | gh pr edit 4 --add-label churn-ok | denies  |
-      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | 1     | gh pr edit 4 --add-label churn-ok | denies  |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       |       | gh pr edit 4 --add-label waive-review | denies  |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | 0     | gh pr edit 4 --add-label waive-review | denies  |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | False | gh pr edit 4 --add-label waive-review | denies  |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | no    | gh pr edit 4 --add-label waive-review | denies  |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | true  | gh pr edit 4 --add-label waive-review | denies  |
+      | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | 1     | gh pr edit 4 --add-label waive-review | denies  |
       | require-well-formed | CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED | true | echo "unterminated | denies |
       | guard-secrets | CLAUDE_PLUGIN_OPTION_GUARD_SECRETS | true | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 | denies |
       | guard-bypass-ruleset | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_RULESET | true | git push origin HEAD:$b | asks |

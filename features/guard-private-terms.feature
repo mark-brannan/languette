@@ -57,7 +57,7 @@ Feature: guard-private-terms
     Given the private terms file holds:
       """
       # one term per line
-      Wanderlust
+      Zephyr
       gateway.home.example
       """
 
@@ -73,10 +73,10 @@ Feature: guard-private-terms
     @also_guard-github-issues
     Examples:
       | command                                                         | term                 |
-      | gh issue create -R o/r -t t -b "seen on Wanderlust last night"  | Wanderlust           |
-      | gh issue create -R o/r -t "WANDERLUST: AIS drops" -b b          | Wanderlust           |
-      | sh -c 'gh issue create -R o/r -t t -b "on Wanderlust"'          | Wanderlust           |
-      | gh api repos/o/r/issues -f title=t -f body=Wanderlust           | Wanderlust           |
+      | gh issue create -R o/r -t t -b "seen on Zephyr last night"  | Zephyr           |
+      | gh issue create -R o/r -t "ZEPHYR: sync drops" -b b          | Zephyr           |
+      | sh -c 'gh issue create -R o/r -t t -b "on Zephyr"'          | Zephyr           |
+      | gh api repos/o/r/issues -f title=t -f body=Zephyr           | Zephyr           |
 
   Scenario Outline: text with no term, a read, or a command that posts nothing is silent
     When the agent runs `<command>`
@@ -84,9 +84,9 @@ Feature: guard-private-terms
 
     Examples:
       | command                                                    |
-      | gh issue list -R o/r --search Wanderlust                   |
+      | gh issue list -R o/r --search Zephyr                   |
       | gh issue view 3 -R o/r                                     |
-      | echo Wanderlust > note.md                                  |
+      | echo Zephyr > note.md                                  |
 
     @also_guard-signed-comments
     Examples:
@@ -113,41 +113,41 @@ Feature: guard-private-terms
     Given a project directory
     And the file "body.md" holds:
       """
-      reproduced aboard Wanderlust
+      reproduced aboard Zephyr
       """
-    And the file "Wanderlust/clean.md" holds:
+    And the file "Zephyr/clean.md" holds:
       """
       nothing private here
       """
     When the agent runs `gh issue create -R o/r -t t --body-file {PROJ}/body.md`
-    Then the guard denies, naming "Wanderlust"
-    When the agent runs `gh issue create -R o/r -t t --body-file {PROJ}/Wanderlust/clean.md`
+    Then the guard denies, naming "Zephyr"
+    When the agent runs `gh issue create -R o/r -t t --body-file {PROJ}/Zephyr/clean.md`
     Then the guard is silent
 
   @also_guard-github-issues @also_guard-signed-comments
   Scenario: a repo listed in private_repos is never scanned
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS is "you/notes,you/scratch"
-    When the agent runs `gh issue create -R you/scratch -t t -b "Wanderlust"`
+    When the agent runs `gh issue create -R you/scratch -t t -b "Zephyr"`
     Then the guard is silent
-    When the agent runs `gh issue comment https://github.com/you/notes/issues/1 -b "Wanderlust"`
+    When the agent runs `gh issue comment https://github.com/you/notes/issues/1 -b "Zephyr"`
     Then the guard is silent
 
   @also_guard-github-issues
   Scenario: with private_repos unset, every repo is scanned
-    When the agent runs `gh issue create -R you/notes -t t -b "Wanderlust"`
-    Then the guard denies, naming "Wanderlust"
+    When the agent runs `gh issue create -R you/notes -t t -b "Zephyr"`
+    Then the guard denies, naming "Zephyr"
 
   Scenario Outline: a positional target or a graphql mutation is scanned against its own repo
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS is "you/notes"
     When the agent runs `<command>`
-    Then the guard denies, naming "Wanderlust"
+    Then the guard denies, naming "Zephyr"
 
     @also_guard-signed-comments
     Examples:
       | command                                                                  |
-      | gh issue comment https://github.com/o/r/issues/1 -b Wanderlust           |
-      | gh pr comment o/r#1 -b Wanderlust                                        |
-      | gh api graphql -f query='mutation { addComment(input:{body:"Wanderlust"}) { clientMutationId } }' |
+      | gh issue comment https://github.com/o/r/issues/1 -b Zephyr           |
+      | gh pr comment o/r#1 -b Zephyr                                        |
+      | gh api graphql -f query='mutation { addComment(input:{body:"Zephyr"}) { clientMutationId } }' |
 
   @also_guard-github-issues
   Scenario: a body built at run time that no heredoc feeds cannot be seen, so it is denied
@@ -162,7 +162,7 @@ Feature: guard-private-terms
       | command                                                                     | verdict   |
       | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id=$id           | is silent |
       | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id=${id}         | is silent |
-      | work-item brief c1 'gh api repos/o/r/issues/1/sub_issues -F sub_issue_id=$id' | is silent |
+      | some-tool note c1 'gh api repos/o/r/issues/1/sub_issues -F sub_issue_id=$id' | is silent |
       | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id="$(cat f)"    | denies    |
 
     @also_guard-signed-comments
@@ -176,19 +176,19 @@ Feature: guard-private-terms
 
     Examples:
       | tool                                           | input                                                                     | verdict   |
-      | mcp__github__get_issue                         | {"owner":"o","repo":"r","body":"Wanderlust"}                              | is silent |
+      | mcp__github__get_issue                         | {"owner":"o","repo":"r","body":"Zephyr"}                              | is silent |
 
     @also_guard-signed-comments
     Examples:
       | tool                                           | input                                                                     | verdict   |
       | mcp__plugin_github_github__add_issue_comment   | {"owner":"o","repo":"r","body":"on gateway.home.example"}                 | denies    |
-      | mcp__github__add_reply_to_pull_request_comment | {"owner":"o","repo":"r","pullNumber":1,"commentId":9,"body":"Wanderlust"} | denies    |
+      | mcp__github__add_reply_to_pull_request_comment | {"owner":"o","repo":"r","pullNumber":1,"commentId":9,"body":"Zephyr"} | denies    |
       | mcp__github__update_issue_comment              | {"owner":"o","repo":"r","commentId":9,"body":"on gateway.home.example"}   | denies    |
 
     @also_guard-github-issues
     Examples:
       | tool                                           | input                                                                     | verdict   |
-      | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"Wanderlust"}                  | denies    |
+      | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"Zephyr"}                  | denies    |
       | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"clean"}                       | is silent |
 
   @also_guard-signed-comments
@@ -299,13 +299,13 @@ Feature: guard-private-terms
   @also_guard-github-issues
   Scenario: with the option unset the guard is inert
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
-    When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`
+    When the agent runs `gh issue create -R o/r -t t -b "seen on Zephyr"`
     Then the guard is silent
 
   @also_guard-github-issues
   Scenario: with the option empty the guard is inert
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is ""
-    When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`
+    When the agent runs `gh issue create -R o/r -t t -b "seen on Zephyr"`
     Then the guard is silent
 
   Rule: the long tail of shapes a post takes
@@ -320,7 +320,7 @@ Feature: guard-private-terms
         """
         # private terms -- lines starting with # are comments
 
-        Wanderlust
+        Zephyr
         gateway.home.example
           acct-4471
         """
@@ -330,8 +330,8 @@ Feature: guard-private-terms
 
     @also_guard-github-issues
     Scenario: the deny names the term and nothing around it
-      When the agent runs `gh issue create -R o/r -t "Log rotation" --body "seen on Wanderlust last night"`
-      Then the guard denies, naming "Wanderlust"
+      When the agent runs `gh issue create -R o/r -t "Log rotation" --body "seen on Zephyr last night"`
+      Then the guard denies, naming "Zephyr"
       And the guard denies, not naming "last night"
       And the guard denies, naming "private_repos"
       And the guard denies, naming "rewrite the body"
@@ -343,39 +343,39 @@ Feature: guard-private-terms
       Examples:
         | command                                                              | term                 |
         | gh issue edit 3 -R o/r --body="host is gateway.home.example"         | gateway.home.example |
-        | make build && gh pr create -R o/r --title x --body "cf Wanderlust"   | Wanderlust           |
+        | make build && gh pr create -R o/r --title x --body "cf Zephyr"   | Zephyr           |
 
       @also_guard-signed-comments
       Examples:
         | command                                                              | term                 |
-        | gh pr comment 12 -R o/r -b"tested on Wanderlust"                     | Wanderlust           |
+        | gh pr comment 12 -R o/r -b"tested on Zephyr"                     | Zephyr           |
         | gh pr review 9 -R o/r --approve --body "ok from acct-4471"           | acct-4471            |
-        | gh issue close 3 -R o/r -c "moved to Wanderlust log"                 | Wanderlust           |
+        | gh issue close 3 -R o/r -c "moved to Zephyr log"                 | Zephyr           |
 
       @also_guard-bypass-ruleset
       Examples:
         | command                                                              | term                 |
-        | gh pr merge 5 -R o/r --squash -b "tested on wanderlust"              | Wanderlust           |
+        | gh pr merge 5 -R o/r --squash -b "tested on zephyr"              | Zephyr           |
 
       @also_guard-github-issues
       Examples:
         | command                                                              | term                 |
-        | gh issue create -R o/r -t x -b Wander\\lust                          | Wanderlust           |
-        | gh issue create -R o/r -t x -b 'Wander'"lust"                        | Wanderlust           |
+        | gh issue create -R o/r -t x -b Zeph\\yr                          | Zephyr           |
+        | gh issue create -R o/r -t x -b 'Zeph'"yr"                        | Zephyr           |
         | gh issue create -R o/r -t x -b "ACCT-4471 again"                     | acct-4471            |
-        | gh issue create -R o/r -t x -b "WANDERLUST"                          | Wanderlust           |
+        | gh issue create -R o/r -t x -b "ZEPHYR"                          | Zephyr           |
 
     @also_guard-github-issues
     Scenario: a term is found in the body a variable carries out of a heredoc
       When the agent runs:
         """
         body=$(cat <<EOF
-        crew of Wanderlust
+        crew of Zephyr
         EOF
         )
         gh issue create -R o/r -t x -b "$body"
         """
-      Then the guard denies, naming "Wanderlust"
+      Then the guard denies, naming "Zephyr"
 
     @also_guard-github-issues
     Scenario: a dot in a term is a dot, not any character
@@ -391,8 +391,8 @@ Feature: guard-private-terms
       @also_guard-github-issues
       Examples:
         | tool                                  | input                                                                                              | verdict   |
-        | mcp__github__issue_write              | {"method":"create","owner":"o","repo":"r","title":"Wanderlust AIS"}                                | denies    |
-        | mcp__github__create_issue             | {"owner":"you","repo":"notes","title":"x","body":"Wanderlust"}                                      | is silent |
+        | mcp__github__issue_write              | {"method":"create","owner":"o","repo":"r","title":"Zephyr sync"}                                | denies    |
+        | mcp__github__create_issue             | {"owner":"you","repo":"notes","title":"x","body":"Zephyr"}                                      | is silent |
 
       @also_guard-signed-comments
       Examples:
@@ -428,7 +428,7 @@ Feature: guard-private-terms
       @also_guard-github-issues
       Examples:
         | command                                                                                   | verdict   |
-        | gh api repos/you/notes/issues -f title=x -f body=Wanderlust                               | is silent |
+        | gh api repos/you/notes/issues -f title=x -f body=Zephyr                               | is silent |
 
     # --- which repo a post targets ------------------------------------------------
 
@@ -439,20 +439,20 @@ Feature: guard-private-terms
       @also_guard-github-issues
       Examples:
         | command                                                                 |
-        | gh issue create --repo you/notes -t x -b 'aboard Wanderlust'            |
-        | gh issue create -R You/Notes -t x -b Wanderlust                         |
-        | GH_REPO=you/notes gh issue create -t x -b Wanderlust                    |
+        | gh issue create --repo you/notes -t x -b 'aboard Zephyr'            |
+        | gh issue create -R You/Notes -t x -b Zephyr                         |
+        | GH_REPO=you/notes gh issue create -t x -b Zephyr                    |
 
       @also_guard-signed-comments
       Examples:
         | command                                                                 |
-        | gh issue comment 3 --repo=https://github.com/you/notes -b Wanderlust    |
+        | gh issue comment 3 --repo=https://github.com/you/notes -b Zephyr    |
 
     @also_guard-github-issues
     Scenario: with private_repos empty, nothing is private
       Given CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS is ""
-      When the agent runs `gh issue create -R you/notes -t x -b Wanderlust`
-      Then the guard denies, naming "Wanderlust"
+      When the agent runs `gh issue create -R you/notes -t x -b Zephyr`
+      Then the guard denies, naming "Zephyr"
 
     Scenario Outline: with no repo named, the origin of the working directory decides, unless the command moves
       Given a clone of "git@github.com:you/notes.git" at "{TMP}/private" on branch "main"
@@ -465,23 +465,23 @@ Feature: guard-private-terms
       @also_guard-github-issues
       Examples:
         | cwd              | command                                                                                                              | verdict   |
-        | {TMP}/private    | gh issue create -t x -b "aboard Wanderlust"                                                                          | is silent |
-        | {TMP}/public     | gh issue create -t x -b Wanderlust                                                                                   | denies    |
-        | {TMP}/nogit      | gh issue create -t x -b Wanderlust                                                                                   | denies    |
-        | {TMP}/private    | cd {TMP}/public && gh issue create -t x -b Wanderlust                                                                | denies    |
+        | {TMP}/private    | gh issue create -t x -b "aboard Zephyr"                                                                          | is silent |
+        | {TMP}/public     | gh issue create -t x -b Zephyr                                                                                   | denies    |
+        | {TMP}/nogit      | gh issue create -t x -b Zephyr                                                                                   | denies    |
+        | {TMP}/private    | cd {TMP}/public && gh issue create -t x -b Zephyr                                                                | denies    |
 
       @also_guard-signed-comments
       Examples:
         | cwd              | command                                                                                                              | verdict   |
-        | {TMP}/private    | gh issue comment https://github.com/o/r/issues/1 -b Wanderlust                                                      | denies    |
-        | {TMP}/private    | gh pr comment o/r#1 -b Wanderlust                                                                                    | denies    |
-        | {TMP}/public     | gh issue comment https://github.com/you/notes/issues/1 -b Wanderlust                                                 | is silent |
-        | {TMP}/private    | gh api graphql -f query='mutation { addComment(input:{subjectId:"I_1", body:"from Wanderlust"}) { clientMutationId } }' | denies    |
+        | {TMP}/private    | gh issue comment https://github.com/o/r/issues/1 -b Zephyr                                                      | denies    |
+        | {TMP}/private    | gh pr comment o/r#1 -b Zephyr                                                                                    | denies    |
+        | {TMP}/public     | gh issue comment https://github.com/you/notes/issues/1 -b Zephyr                                                 | is silent |
+        | {TMP}/private    | gh api graphql -f query='mutation { addComment(input:{subjectId:"I_1", body:"from Zephyr"}) { clientMutationId } }' | denies    |
 
       @also_guard-github-issues @also_guard-signed-comments
       Examples:
         | cwd              | command                                                                                                              | verdict   |
-        | {TMP}/public     | gh issue create --repo you/notes -t x -b Wanderlust && gh issue comment 3 --repo o/r -b Wanderlust                   | denies    |
+        | {TMP}/public     | gh issue create --repo you/notes -t x -b Zephyr && gh issue comment 3 --repo o/r -b Zephyr                   | denies    |
 
     # --- reads and clean text pass ------------------------------------------------
 
@@ -501,7 +501,7 @@ Feature: guard-private-terms
       @also_guard-github-issues
       Examples:
         | command                                                                                                                                                     |
-        | gh issue create -R o/r -t "Ruling: Q-14" -b "Argument in o/r requirements.md; see https://github.com/o/r-engine/pull/25 and o/state#3" |
+        | gh issue create -R o/r -t "Design note" -b "Argument in o/r requirements.md; see https://github.com/o/r-engine/pull/25 and o/r#3" |
 
     Scenario: a Bash call with no command, and a tool this guard does not gate, are silent
       When the agent calls tool "Bash" with input `{}`
@@ -545,11 +545,11 @@ Feature: guard-private-terms
       When the agent runs:
         """
         gh pr create -R o/r -t x --body "$(cat <<'EOF'
-        seen aboard Wanderlust
+        seen aboard Zephyr
         EOF
         )"
         """
-      Then the guard denies, naming "Wanderlust"
+      Then the guard denies, naming "Zephyr"
 
     @also_guard-github-issues @also_guard-signed-comments
     Scenario: a variable fed by a clean heredoc is read, one fed by anything else is not
@@ -587,7 +587,7 @@ Feature: guard-private-terms
         | command                                                      | verdict                      |
         | gh pr comment 3 -R o/r -b 'Fixed in `abc123`, see `prose-budget`.' | is silent             |
         | gh pr comment 3 -R o/r -b "Fixed in `git rev-parse HEAD`"    | denies                       |
-        | gh pr comment 3 -R o/r -b 'Fixed on `Wanderlust`.'           | denies, naming "Wanderlust"  |
+        | gh pr comment 3 -R o/r -b 'Fixed on `Zephyr`.'           | denies, naming "Zephyr"  |
 
       @also_guard-github-issues
       Examples:
@@ -650,10 +650,10 @@ Feature: guard-private-terms
       Given a project directory
       And the file "comment-term.md" holds:
         """
-        seen aboard Wanderlust
+        seen aboard Zephyr
         """
       When the agent runs `gh issue comment 3 -R o/r --comment-file {PROJ}/comment-term.md`
-      Then the guard denies, naming "Wanderlust"
+      Then the guard denies, naming "Zephyr"
 
     # --- the home directory: a sanitization job, until it is not one --------------
 
@@ -693,10 +693,10 @@ Feature: guard-private-terms
       Given the private terms file holds:
         """
         {HOME}
-        Wanderlust
+        Zephyr
         """
-      When the agent runs `gh issue comment 3 -R o/r -b 'seen aboard Wanderlust, path {HOME}/x'`
-      Then the guard denies, naming "Wanderlust"
+      When the agent runs `gh issue comment 3 -R o/r -b 'seen aboard Zephyr, path {HOME}/x'`
+      Then the guard denies, naming "Zephyr"
 
     # --- the terms file -----------------------------------------------------------
 
@@ -707,7 +707,7 @@ Feature: guard-private-terms
       Then the guard denies, naming "is unreadable"
       And the guard denies, naming "private_terms_file"
       And the guard denies, naming "private_repos"
-      When the agent runs `gh issue create --repo you/notes -t x -b Wanderlust`
+      When the agent runs `gh issue create --repo you/notes -t x -b Zephyr`
       Then the guard is silent
       When the agent runs `gh issue list -R o/r`
       Then the guard is silent
@@ -722,21 +722,21 @@ Feature: guard-private-terms
         """
       When the agent runs `gh issue create -R o/r -t x -b "all public"`
       Then the guard denies, naming "no terms in it"
-      When the agent runs `gh issue create --repo you/notes -t x -b Wanderlust`
+      When the agent runs `gh issue create --repo you/notes -t x -b Zephyr`
       Then the guard is silent
 
     @also_guard-github-issues @also_guard-worktrees
     Scenario: with the option unset the guard needs nothing on PATH
       Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
       And PATH holds only ""
-      When the agent runs `gh issue create -R o/r -t x -b "seen on Wanderlust"`
+      When the agent runs `gh issue create -R o/r -t x -b "seen on Zephyr"`
       Then the guard is silent
 
     @also_guard-github-issues @also_guard-worktrees
     Scenario: with the option empty the guard needs nothing on PATH
       Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is ""
       And PATH holds only ""
-      When the agent runs `gh issue create -R o/r -t x -b "seen on Wanderlust"`
+      When the agent runs `gh issue create -R o/r -t x -b "seen on Zephyr"`
       Then the guard is silent
 
   Rule: a --body-file path is found as the shell will read it
@@ -756,7 +756,7 @@ Feature: guard-private-terms
     Background:
       Given the private terms file holds:
         """
-        Wanderlust
+        Zephyr
         gateway.home.example
         """
       And CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS is "someone/else, you/notes"
@@ -767,7 +767,7 @@ Feature: guard-private-terms
         """
       And the file "body.md" holds:
         """
-        reproduced aboard Wanderlust
+        reproduced aboard Zephyr
         """
       And the file "proj/clean.md" holds:
         """
@@ -775,7 +775,7 @@ Feature: guard-private-terms
         """
       And the file "proj/body.md" holds:
         """
-        reproduced aboard Wanderlust
+        reproduced aboard Zephyr
         """
       And the directory "{PROJ}/proj/sub"
       And the file "sp/clean.md" holds:
@@ -784,7 +784,7 @@ Feature: guard-private-terms
         """
       And the file "sp/body.md" holds:
         """
-        reproduced aboard Wanderlust
+        reproduced aboard Zephyr
         """
       And the file "{HOME}/pt-clean.md" holds:
         """
@@ -792,7 +792,7 @@ Feature: guard-private-terms
         """
       And the file "{HOME}/pt-term.md" holds:
         """
-        reproduced aboard Wanderlust
+        reproduced aboard Zephyr
         """
       And the directory "{HOME}/pt-d"
 
@@ -805,13 +805,13 @@ Feature: guard-private-terms
 
       Examples:
         | cwd    | command                                                                     | verdict                     |
-        | {PROJ} | gh pr create -R o/r -t x -F body.md                                         | denies, naming "Wanderlust" |
+        | {PROJ} | gh pr create -R o/r -t x -F body.md                                         | denies, naming "Zephyr" |
 
       @also_guard-signed-comments
       Examples:
         | cwd    | command                                                                     | verdict                     |
-        | {PROJ} | gh issue comment 4 -R o/r --body-file=~/pt-term.md                          | denies, naming "Wanderlust" |
-        | {PROJ} | gh api repos/o/r/issues/3/comments -F body=@{PROJ}/body.md                  | denies, naming "Wanderlust" |
+        | {PROJ} | gh issue comment 4 -R o/r --body-file=~/pt-term.md                          | denies, naming "Zephyr" |
+        | {PROJ} | gh api repos/o/r/issues/3/comments -F body=@{PROJ}/body.md                  | denies, naming "Zephyr" |
 
       @also_guard-github-issues
       Examples:
@@ -819,13 +819,13 @@ Feature: guard-private-terms
         | {PROJ} | gh issue create -R o/r -t x -F {PROJ}/clean.md                              | is silent                   |
 
     Scenario Outline: a term in the directory name is not a hit, a term in the file under it is
-      Given the file "Wanderlust/clean.md" holds:
+      Given the file "Zephyr/clean.md" holds:
         """
         nothing private here
         """
-      And the file "Wanderlust/body.md" holds:
+      And the file "Zephyr/body.md" holds:
         """
-        reproduced aboard Wanderlust
+        reproduced aboard Zephyr
         """
       When the agent runs `<command>`
       Then the guard <verdict>
@@ -833,14 +833,14 @@ Feature: guard-private-terms
       @also_guard-github-issues
       Examples:
         | command                                                                         | verdict                     |
-        | gh api repos/o/r/issues -f title=x -F body=@{PROJ}/Wanderlust/clean.md          | is silent                   |
-        | gh issue create -R o/r -t x --body-file {PROJ}/Wanderlust/body.md               | denies, naming "Wanderlust" |
-        | gh issue create -R o/r -t Wanderlust --body-file {PROJ}/Wanderlust/clean.md     | denies, naming "Wanderlust" |
+        | gh api repos/o/r/issues -f title=x -F body=@{PROJ}/Zephyr/clean.md          | is silent                   |
+        | gh issue create -R o/r -t x --body-file {PROJ}/Zephyr/body.md               | denies, naming "Zephyr" |
+        | gh issue create -R o/r -t Zephyr --body-file {PROJ}/Zephyr/clean.md     | denies, naming "Zephyr" |
 
       @also_guard-signed-comments
       Examples:
         | command                                                                         | verdict                     |
-        | gh pr comment 4 -R o/r --body-file={PROJ}/Wanderlust/clean.md                   | is silent                   |
+        | gh pr comment 4 -R o/r --body-file={PROJ}/Zephyr/clean.md                   | is silent                   |
 
     @also_guard-github-issues
     Scenario: a file that is not there is denied, naming it, unless the repo is private
@@ -867,11 +867,11 @@ Feature: guard-private-terms
       When the agent runs:
         """
         cat > {PROJ}/later2.md <<'EOF'
-        hello from Wanderlust
+        hello from Zephyr
         EOF
         gh api -X POST repos/o/r/pulls/1/comments -F body=@{PROJ}/later2.md
         """
-      Then the guard denies, naming "Wanderlust"
+      Then the guard denies, naming "Zephyr"
 
     @also_guard-github-issues
     Scenario: tee counts as writing the file
@@ -902,7 +902,7 @@ Feature: guard-private-terms
         cat > {PROJ}/dummy.txt <<'EOF'
         noop > {PROJ}/payload.md <<X
         EOF
-        printf 'aboard Wanderlust' > {PROJ}/payload.md
+        printf 'aboard Zephyr' > {PROJ}/payload.md
         gh issue create -R o/r -t test --body-file {PROJ}/payload.md
         """
       Then the guard denies, naming "payload.md"
@@ -914,7 +914,7 @@ Feature: guard-private-terms
         cat > {PROJ}/mut.md <<'EOF'
         public safe text
         EOF
-        echo 'seen on Wanderlust' >> {PROJ}/mut.md
+        echo 'seen on Zephyr' >> {PROJ}/mut.md
         gh pr comment 5 -R o/r --body-file {PROJ}/mut.md
         """
       Then the guard denies, naming "mut.md"
@@ -941,7 +941,7 @@ Feature: guard-private-terms
       Examples:
         | command                                                              | verdict                     |
         | gh pr comment 3 -R o/r --body-file ./../clean.md                     | is silent                   |
-        | gh pr comment 3 -R o/r --body-file ../body.md                        | denies, naming "Wanderlust" |
+        | gh pr comment 3 -R o/r --body-file ../body.md                        | denies, naming "Zephyr" |
         | gh pr comment 3 -R o/r --body-file {PROJ}/proj/sub/../clean.md       | is silent                   |
 
     # --- a cd or pushd before the gh ----------------------------------------------
@@ -955,7 +955,7 @@ Feature: guard-private-terms
       Examples:
         | command                                                                  | verdict                              |
         | cd {PROJ}/proj && gh pr comment 3 -R o/r --body-file ./clean.md          | is silent                            |
-        | cd {PROJ}/proj/sub && gh pr comment 3 -R o/r --body-file ../body.md      | denies, naming "Wanderlust"          |
+        | cd {PROJ}/proj/sub && gh pr comment 3 -R o/r --body-file ../body.md      | denies, naming "Zephyr"          |
         | cd; gh pr comment 3 -R o/r -F pt-clean.md                                | is silent                            |
         | cd ~ && gh pr comment 3 -R o/r -F ./pt-clean.md                          | is silent                            |
         | cd ~/pt-d; gh pr comment 3 -R o/r -F ../pt-clean.md                      | is silent                            |
@@ -1036,7 +1036,7 @@ Feature: guard-private-terms
       Examples:
         | command                                                                        | verdict                     |
         | SP={PROJ}/sp; gh pr create -R o/r -t x --body-file "$SP/clean.md"              | is silent                   |
-        | SP={PROJ}/sp; gh pr create -R o/r -t x --body-file "$SP/body.md"               | denies, naming "Wanderlust" |
+        | SP={PROJ}/sp; gh pr create -R o/r -t x --body-file "$SP/body.md"               | denies, naming "Zephyr" |
 
       Examples:
         | command                                                                        | verdict                     |
@@ -1078,7 +1078,7 @@ Feature: guard-private-terms
       Given the working directory is "{PROJ}"
       And the file "~/b.md" holds:
         """
-        reproduced aboard Wanderlust
+        reproduced aboard Zephyr
         """
       And the file "{HOME}/b.md" holds:
         """
@@ -1109,7 +1109,7 @@ Feature: guard-private-terms
         """
       And the file "sp/notes.md" holds:
         """
-        reproduced aboard Wanderlust
+        reproduced aboard Zephyr
         """
       When the agent runs:
         """
@@ -1117,7 +1117,7 @@ Feature: guard-private-terms
         "touch x" SP={PROJ}/decoy
         gh pr create -R o/r -t x --body-file "$SP/notes.md"
         """
-      Then the guard denies, naming "Wanderlust"
+      Then the guard denies, naming "Zephyr"
 
   Rule: a run-time value is refused with a remedy the guard then accepts
     The message names what was flagged (the flag or the field), says the text
@@ -1131,7 +1131,7 @@ Feature: guard-private-terms
     Background:
       Given the private terms file holds:
         """
-        Wanderlust
+        Zephyr
         """
 
     Scenario Outline: the message names the flag or field that was flagged
