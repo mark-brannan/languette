@@ -47,14 +47,14 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 It needs `python3`, standard library only. `shfmt` (the parser it trusts
 most) and `gh` (for the guards that ask GitHub) are optional.
 
-### macOS (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
+### macOS
 
 ```
 brew install mark-brannan/tap/languette
 languette install && languette doctor
 ```
 
-### Linux and WSL (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
+### Linux and WSL
 
 ```
 sudo apt install python3 pipx shfmt gh
@@ -176,6 +176,9 @@ one run: a command that runs it twice needs two, and one in a loop or `xargs`
 is denied whatever you approved. Only your click counts, never what the agent
 wrote in the question.
 
+A match may also name `"flags"`, single option letters the command must carry
+(`{"cmd": "rm", "flags": ["r"]}` matches `rm -rf x`).
+
 Matching sees through wrappers: `timeout 3h npm run e2e`, `sh -c "..."`,
 `pnpm exec node ./scripts/e2e.mjs` and `yarn e2e` all count, while `grep`,
 `git commit -m`, `cat` and `pkill -f` that merely name the script do not. A
@@ -185,8 +188,9 @@ seen.
 The guard reads the nearest `.languette/ask-first.json` at or above the
 command's working directory, stopping at the repo root, else the one in
 `$CLAUDE_PROJECT_DIR`. With no file, it stays silent. A file that doesn't
-parse, or that gives two commands the same `approve_label`, denies every
-command until it is fixed, because the guard can no longer tell what the repo
+parse, that has a key a command does not (only `id`, `match`, `cost`,
+`approve_label` and `cheaper` are read), or that gives two commands the same
+`id` or `approve_label`, denies every command until it is fixed, because the guard can no longer tell what the repo
 meant. Spent approvals are kept beside the session transcript, in
 `<transcript>.languette-ask`.
 

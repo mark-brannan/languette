@@ -1248,10 +1248,68 @@ def _hit(match, name, rest):
     return ok
 
 
-def matches(doc, match, prose=PROSE_PROCESS, launchers=True):
-    """(how many times the command runs `match`, whether any text holds a LOOP
-    word). `prose` names the commands whose words are not commands; launchers
-    (npx, `pnpm exec`) run `cmd` unless `launchers` is False."""
+class BadRules(ValueError):
+    """A rule set that does not load; the message names the fault."""
+
+
+_MATCH_KEYS = ("args", "cmd", "flags", "script")
+
+
+def _listed(v, what, each=r".+", of="non-empty strings"):
+    if not isinstance(v, list) or not v or not all(isinstance(x, str) and re.fullmatch(each, x) for x in v):
+        raise BadRules(f"{what} must be a non-empty list of {of}")
+
+
+def _check_match(m, w):
+    if not isinstance(m, dict) or set(m) - set(_MATCH_KEYS):
+        raise BadRules(f"{w} must be an object holding only {', '.join(_MATCH_KEYS)}")
+    if not isinstance(m.get("cmd"), str) or not re.fullmatch(r"[A-Za-z0-9._+-]+", m["cmd"]):
+        raise BadRules(f"{w}.cmd must be a bare command name")
+    if not {"args", "script", "flags"} & set(m):
+        raise BadRules(f"{w} needs args or script (or flags), or it would match every {m['cmd']}")
+    if "args" in m:
+        _listed(m["args"], f"{w}.args")
+    if "flags" in m:
+        _listed(m["flags"], f"{w}.flags", r"[A-Za-z]", "single option letters")
+    if "script" in m and (not isinstance(m["script"], str) or not m["script"].strip("./")):
+        raise BadRules(f"{w}.script must be a non-empty path")
+
+
+def load_rules(cfg, key, keys=(), check=None, many=False, taken=(), nonempty=False):
+    """The one loader of command rules: the rules of `cfg[key]`, a read rule file, or BadRules
+    naming the fault. A rule is an object with an `id` (unique, and not one of `taken`), a
+    `match` and the other `keys` the guard names; `check(rule, where)` is the guard's own test
+    of one rule. `match` is one entry, or with `many` a list of them; an entry is checked here."""
+    if not isinstance(cfg, dict) or set(cfg) != {key} or not isinstance(cfg[key], list) or (nonempty and not cfg[key]):
+        raise BadRules(f'the top level must be {{"{key}": [...]}}' + (" with at least one rule" if nonempty else ""))
+    seen = set(taken)
+    for n, r in enumerate(cfg[key]):
+        where = f"{key}[{n}]"
+        if not isinstance(r, dict):
+            raise BadRules(f"{where} is not an object")
+        if set(r) - {"id", "match", *keys}:
+            raise BadRules(f"{where} has keys a rule does not: {', '.join(sorted(set(r) - {'id', 'match', *keys}))}")
+        if not isinstance(r.get("id"), str) or not r["id"].strip():
+            raise BadRules(f"{where}.id must be a non-empty string")
+        if r["id"] in seen:
+            tail = " is a default's; a rule set adds rules, it never replaces one" if r["id"] in taken else " is a duplicate"
+            raise BadRules(f"{where}.id '{r['id']}'{tail}")
+        seen.add(r["id"])
+        if check:
+            check(r, where)
+        m = r.get("match")
+        if not many:
+            _check_match(m, f"{where}.match")
+        elif not isinstance(m, list) or not m:
+            raise BadRules(f"{where}.match must be a non-empty list")
+        else:
+            for i, e in enumerate(m):
+                _check_match(e, f"{where}.match[{i}]")
+    return cfg[key]
+
+
+def _word_hit(doc, match, prose, launchers):
+    """(how many times the command runs `match`, whether any text holds a LOOP word)."""
     names = {match["cmd"]} | (LAUNCH if launchers else set()) | (PM if match["cmd"] in PM else set())
     rx = re.compile(r"(?:^|/)(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\Z")
     n, (segs, loop) = 0, segments(doc, prose)
@@ -1266,6 +1324,19 @@ def matches(doc, match, prose=PROSE_PROCESS, launchers=True):
                 break
             g = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and rx.search(s.w[i])), None)
     return n, loop
+
+
+def match_rule(doc, match, prose=PROSE_PROCESS, launchers=True):
+    """The one matcher of command rules: (how many times the command runs `match`, whether any
+    text holds a LOOP word, what it did, as the segment reads: `<command> <stop>`, or None). A
+    match with a `unit` is a stop on a unit the condition accepts (stop_of), counted once;
+    any other is a command word and its words (_hit). `prose` names the commands whose words
+    are not commands; launchers (npx, `pnpm exec`) run `cmd` unless `launchers` is False."""
+    if "unit" in match:
+        said = _stop_hit(doc, match, prose)
+        return (1 if said else 0), False, said
+    n, loop = _word_hit(doc, match, prose, launchers)
+    return n, loop, None
 
 
 _CTL_OTHER = {"--user", "-H", "--host", "-M", "--machine"}
@@ -1545,7 +1616,7 @@ def unit_test(cond):
     return hit
 
 
-def ctl_hit(doc, match, prose=PROSE):
+def _stop_hit(doc, match, prose):
     """`<command> <stop>` for the first command in the text that `match` fits, or None."""
     hit = unit_test(match["unit"])
     if hit is None:
