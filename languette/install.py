@@ -23,7 +23,8 @@ OK, FAIL = doctor.OK, doctor.FAIL
 HOSTS = ("claude",)
 MARKETPLACE = "languette"                  # the name in .claude-plugin/marketplace.json
 HOME_PAGE = "https://github.com/mark-brannan/languette"
-SOURCE = HOME_PAGE.removeprefix("https://github.com/") + "#release"   # owner/repo#ref, as `claude` reads it
+REPO = HOME_PAGE.removeprefix("https://github.com/")
+SOURCE = REPO + "#release"                 # owner/repo#ref, as `claude` reads it
 PLUGIN = "languette@languette"
 STEP_TIMEOUT = 120                         # seconds for each `claude plugin` command
 
@@ -46,13 +47,35 @@ def _claude(claude, *args):
         return None, f"`claude {' '.join(args)}` could not start ({e.strerror or e})"
 
 
-def _marketplace_added(claude):
+def _source(m):
+    """Where a listed marketplace comes from: owner/repo for GitHub, else its url or path."""
+    for key in ("repo", "url", "path"):
+        if isinstance(m.get(key), str) and m[key]:
+            return m[key]
+    return str(m.get("source") or "an unknown source")
+
+
+def _ours(source):
+    """`source` names this repo: owner/repo, or a GitHub URL of it, any case, with or without .git."""
+    s = source.lower().split("#")[0].rstrip("/").removesuffix(".git")
+    return s == REPO.lower() or s.endswith("github.com/" + REPO.lower()) or s.endswith("github.com:" + REPO.lower())
+
+
+def _marketplace(claude):
+    """The source of the marketplace named languette, or None when none is listed."""
     r, _ = _claude(claude, "plugin", "marketplace", "list", "--json")
     try:
         listed = json.loads(r.stdout) if r and r.returncode == 0 else []
     except ValueError:
-        return False
-    return isinstance(listed, list) and any(isinstance(m, dict) and m.get("name") == MARKETPLACE for m in listed)
+        return None
+    found = [m for m in listed if isinstance(m, dict) and m.get("name") == MARKETPLACE] \
+        if isinstance(listed, list) else []
+    return _source(found[0]) if found else None
+
+
+def _foreign(source):
+    return (FAIL, "marketplace", f"{MARKETPLACE} is added from {source}, not {REPO}; remove it with claude plugin "
+                                 f"marketplace remove {MARKETPLACE}, then run languette install again")
 
 
 def claude_rows(cwd):
@@ -72,14 +95,22 @@ def claude_rows(cwd):
     if inst:
         return [(OK, "Claude Code", f"plugin {doctor._version(inst)} already installed, "
                                     f"{inst.get('scope', '?')} scope; nothing written")]
-    rows = []
-    if _marketplace_added(claude):
-        rows.append((OK, "marketplace", f"{SOURCE} already added"))
-    else:
+    # A marketplace of the same name from elsewhere would serve its own languette@languette.
+    rows, source = [], _marketplace(claude)
+    if source is None:
         r, problem = _claude(claude, "plugin", "marketplace", "add", SOURCE)
         if problem or (r.returncode != 0 and "already" not in (r.stdout + r.stderr).lower()):
-            return rows + [(FAIL, "marketplace", problem or _first_line(r))]
-        rows.append((OK, "marketplace", f"{SOURCE} {'added' if r.returncode == 0 else 'already added'}"))
+            return [(FAIL, "marketplace", problem or _first_line(r))]
+        if r.returncode == 0:
+            rows.append((OK, "marketplace", f"{SOURCE} added"))
+        else:
+            source = _marketplace(claude)
+            if source is None:
+                return [(FAIL, "marketplace", _first_line(r))]
+    if source is not None and not _ours(source):
+        return [_foreign(source)]
+    if source is not None:
+        rows.append((OK, "marketplace", f"{SOURCE} already added"))
     r, problem = _claude(claude, "plugin", "install", PLUGIN)
     if problem or r.returncode != 0:
         return rows + [(FAIL, "Claude Code", problem or _first_line(r))]

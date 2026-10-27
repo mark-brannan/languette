@@ -4,7 +4,7 @@ Feature: install
   only Claude Code writes. Rows in the doctor's format, a non-zero exit on
   any ✗. Each scenario runs it in "{HOME}/project" against a fake HOME, with
   a stub `claude` first on PATH that records every command it is asked.
-  {SOURCE} is the marketplace's source, this repo's release branch.
+  {SOURCE} is the marketplace's source, {REPO} on its release branch.
 
   Background:
     Given a fake HOME and a stub claude
@@ -68,6 +68,31 @@ Feature: install
     Then the install "marketplace" row is ✓ "{SOURCE} already added"
     And the install "Claude Code" row is ✓ "plugin installed, user scope; run languette doctor"
     And install exits 0
+
+  Scenario: a marketplace of the same name from another repo fails, naming the command that removes it
+    Given claude lists a languette marketplace from "someone/fork"
+    When install runs
+    Then the install "marketplace" row is ✗ "languette is added from someone/fork, not {REPO}; remove it with claude plugin marketplace remove languette, then run languette install again"
+    And claude was asked only:
+      """
+      plugin list --json
+      plugin marketplace list --json
+      """
+    And install exits 1
+
+  Scenario: an add that answers "already exists" is checked against the source too
+    Given claude plugin marketplace add fails with "Marketplace 'languette' already exists"
+    And after an add, claude lists a languette marketplace from "someone/fork"
+    When install runs
+    Then the install "marketplace" row is ✗ "languette is added from someone/fork, not {REPO}; remove it with claude plugin marketplace remove languette, then run languette install again"
+    And claude was asked only:
+      """
+      plugin list --json
+      plugin marketplace list --json
+      plugin marketplace add {SOURCE}
+      plugin marketplace list --json
+      """
+    And install exits 1
 
   Scenario: a failed marketplace add stops before the plugin install
     Given claude plugin marketplace add fails with "Failed to clone repository"

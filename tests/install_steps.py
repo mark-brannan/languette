@@ -16,7 +16,7 @@ import pytest
 from hamcrest import assert_that, contains_string, equal_to, has_length
 from pytest_bdd import given, parsers, then, when
 
-from languette.install import SOURCE
+from languette.install import REPO, SOURCE
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -33,18 +33,25 @@ class Install:
         self.claude = True
         self.plugins, self.marketplaces = [], []
         self.add = (0, "")                     # exit code and stderr of `claude plugin marketplace add`
+        self.after_add = [{"name": "languette", "source": "github", "repo": REPO}]   # what list shows after an add
         self.out = self.err = self.code = self.before = None
 
     def snapshot(self):
         return sorted((str(p.relative_to(self.home)), p.stat().st_size) for p in self.home.rglob("*"))
 
     def stub(self):
-        answers = {"plugin list --json": (0, json.dumps(self.plugins), ""),
-                   "plugin marketplace list --json": (0, json.dumps(self.marketplaces), ""),
-                   f"plugin marketplace add {SOURCE}": (self.add[0], "", self.add[1]),
-                   "plugin install languette@languette": (0, "Installed languette", "")}
-        cases = "".join(f"  {shlex.quote(asked)}) printf '%s' {shlex.quote(out)}; printf '%s' {shlex.quote(err)} >&2;"
-                        f" exit {code};;\n" for asked, (code, out, err) in answers.items())
+        listed, after = self.aside / "marketplaces.json", self.aside / "after-add.json"
+        listed.write_text(json.dumps(self.marketplaces))
+        after.write_text(json.dumps(self.after_add))
+        # An add, even one that answers "already", leaves the list as after_add says.
+        answers = {"plugin list --json": (0, json.dumps(self.plugins), "", ""),
+                   "plugin marketplace list --json": (0, "", "", f"cat {shlex.quote(str(listed))};"),
+                   f"plugin marketplace add {SOURCE}": (self.add[0], "", self.add[1],
+                                                        f"cp {shlex.quote(str(after))} {shlex.quote(str(listed))};"),
+                   "plugin install languette@languette": (0, "Installed languette", "", "")}
+        cases = "".join(f"  {shlex.quote(asked)}) {run} printf '%s' {shlex.quote(out)}; "
+                        f"printf '%s' {shlex.quote(err)} >&2; exit {code};;\n"
+                        for asked, (code, out, err, run) in answers.items())
         f = self.bin / "claude"
         f.write_text(f'#!/bin/sh\nprintf \'%s\\n\' "$*" >> {shlex.quote(str(self.log))}\ncase "$*" in\n{cases}'
                      "  *) exit 2;;\nesac\n")
@@ -73,6 +80,10 @@ class Install:
             shutil.rmtree(d, ignore_errors=True)
 
 
+def _expand(text):
+    return text.replace("{SOURCE}", SOURCE).replace("{REPO}", REPO)
+
+
 @pytest.fixture
 def installer():
     i = Install()
@@ -98,7 +109,17 @@ def _listed(installer, version, off):
 
 @given("claude lists the languette marketplace")
 def _marketplace(installer):
-    installer.marketplaces.append({"name": "languette", "source": "github"})
+    installer.marketplaces.append({"name": "languette", "source": "github", "repo": REPO})
+
+
+@given(parsers.parse('claude lists a languette marketplace from "{repo}"'))
+def _foreign_marketplace(installer, repo):
+    installer.marketplaces.append({"name": "languette", "source": "github", "repo": repo})
+
+
+@given(parsers.parse('after an add, claude lists a languette marketplace from "{repo}"'))
+def _foreign_after_add(installer, repo):
+    installer.after_add = [{"name": "languette", "source": "github", "repo": repo}]
 
 
 @given(parsers.parse('claude plugin marketplace add fails with "{err}"'))
@@ -118,12 +139,12 @@ def _runs_for(installer, host):
 
 @then(parsers.re(r'the install "(?P<label>[^"]+)" row is (?P<mark>[✓!✗]) "(?P<text>.*)"'))
 def _row(installer, label, mark, text):
-    assert_that(installer.row(label), equal_to((mark, text.replace("{SOURCE}", SOURCE))))
+    assert_that(installer.row(label), equal_to((mark, _expand(text))))
 
 
 @then("claude was asked only:")
 def _asked(installer, docstring):
-    assert_that(installer.log.read_text().splitlines(), equal_to(docstring.replace("{SOURCE}", SOURCE).splitlines()))
+    assert_that(installer.log.read_text().splitlines(), equal_to(_expand(docstring).splitlines()))
 
 
 @then("claude was asked nothing")
