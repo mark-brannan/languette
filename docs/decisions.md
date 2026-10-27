@@ -140,6 +140,12 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 - Docs changes count toward a release, so a README fix can open the
   release pull request. Opening it obliges nothing.
 
+## The doctor: 2026-10-27
+
+- The doctor exists to make configuration simple: it diagnoses a bad
+  config, offers to fix it (interactively where it must), and assists with
+  writing one. [docs/design/doctor.md](design/doctor.md)
+
 ## Trust and licence riders: 2026-10-09
 
 - No licence rider against AI companies: AGPL answers hosting, and no licence
