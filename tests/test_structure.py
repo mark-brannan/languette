@@ -7,9 +7,10 @@ a guard keeps that the shared layer already holds, one that two guards keep,
 a call field read from the payload that Document already read, a sentence
 said outside messages.
 
-KNOWN holds today's copies, exactly: one that appears fails the run, and one
-that goes fails it too, until the PR that removed it prunes the entry here, as
-tests/test_purity.py has its known escapes pruned.
+The KNOWN tables hold today's copies as ceilings, as tests/test_purity.py
+holds its known escapes: a copy beyond them fails the run, and one that goes
+passes, so a refactor elsewhere never turns this test red. An entry is pruned
+by whoever notices it is stale.
 """
 
 import ast
@@ -30,9 +31,8 @@ DOCUMENT_FIELDS = {"tool_name", "tool_input", "hook_event_name", "permission_mod
 # What a guard answers with; its text comes from messages.say.
 ANSWERS = {"Refuse", "deny", "ask", "context"}
 
-# A constant a guard keeps that the shared layer holds: {guard.NAME: shared.NAME}.
-KNOWN_SHARED = {"guard_bypass_ruleset._LEADS": "scan._KEYWORD_LEADS"}
-# A constant two or more guards keep: the names, as one set each.
+# A constant two or more guards keep: the names, as one set each; a found set
+# must fall inside one of these.
 KNOWN_TWICE = {
     frozenset({"guard_bypass_labels.GH", "guard_bypass_ruleset._GH", "guard_cross_session_send._GH",
                "guard_duplicate_prs.GH", "guard_github_issues.GH", "guard_private_terms.GH",
@@ -40,16 +40,15 @@ KNOWN_TWICE = {
     frozenset({"guard_bypass_ruleset._GITHUB", "guard_duplicate_prs._GITHUB"}),
     frozenset({"guard_bypass_ruleset._VAR", "guard_signed_comments._VAR"}),
     frozenset({"guard_permissions._FIND", "guard_recursive_delete._FIND"}),
-    frozenset({"guard_permissions._ALLOW_CHARS", "guard_recursive_delete._ALLOW_CHARS"}),
 }
-# Reads of a DOCUMENT_FIELDS key from the payload, per guard.
+# Reads of a DOCUMENT_FIELDS key from the payload, at most, per guard.
 KNOWN_PAYLOAD_READS = {"guard_bypass_labels": 2, "guard_cross_session_send": 8, "guard_duplicate_prs": 2,
                        "guard_github_issues": 3, "guard_private_terms": 3, "guard_signed_comments": 2,
                        "guard_worktrees": 4, "prose_budget_commit": 2}
-# Answers whose text is anything but a messages.say call, per guard.
-KNOWN_INLINE_TEXT = {"ask_first": 3, "guard_bypass_labels": 12, "guard_bypass_ruleset": 10, "guard_cross_session_send": 2,
+# Answers whose text is anything but a messages.say call, at most, per guard.
+KNOWN_INLINE_TEXT = {"ask_first": 2, "guard_bypass_labels": 12, "guard_bypass_ruleset": 10, "guard_cross_session_send": 2,
                      "guard_duplicate_prs": 4, "guard_git_work_loss": 20, "guard_permissions": 1,
-                     "guard_recursive_delete": 2, "guard_scheduled_jobs": 1, "guard_secrets": 9, "guard_worktrees": 2,
+                     "guard_recursive_delete": 2, "guard_secrets": 9, "guard_worktrees": 2,
                      "prose_budget_commit": 1}
 
 
@@ -105,6 +104,11 @@ def _answer_text(n):
     return n.args[0] if n.args else next((k.value for k in n.keywords), None)
 
 
+def _over(found, ceilings):
+    """The guards past their ceiling, with what was found."""
+    return {g: n for g, n in found.items() if n > ceilings.get(g, 0)}
+
+
 def _said(n):
     return isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "say"
 
@@ -112,15 +116,15 @@ def _said(n):
 def test_no_guard_keeps_a_constant_the_shared_layer_holds():
     shared = {v: f"{m}.{k}" for m, mod in SHARED.items() for k, v in _constants(mod).items()}
     found = {name: shared[v] for name, v in _guard_constants().items() if v in shared}
-    assert_that(found, equal_to(KNOWN_SHARED))
+    assert_that(found, equal_to({}))
 
 
 def test_no_two_guards_keep_the_same_constant():
     by_value = {}
     for name, v in _guard_constants().items():
         by_value.setdefault(v, set()).add(name)
-    found = {frozenset(names) for names in by_value.values() if len(names) > 1}
-    assert_that(sorted(map(sorted, found)), equal_to(sorted(map(sorted, KNOWN_TWICE))))
+    found = [names for names in by_value.values() if len(names) > 1]
+    assert_that(sorted(sorted(n) for n in found if not any(n <= k for k in KNOWN_TWICE)), empty())
 
 
 def test_every_guard_has_its_feature():
@@ -132,7 +136,7 @@ def test_a_guard_reads_the_call_through_the_document():
     found = Counter()
     for g in GUARDS:
         found[g] += sum(_key(n) in DOCUMENT_FIELDS for n in ast.walk(_source(g)))
-    assert_that({g: n for g, n in found.items() if n}, equal_to(KNOWN_PAYLOAD_READS))
+    assert_that(_over(found, KNOWN_PAYLOAD_READS), equal_to({}))
 
 
 def test_a_guard_says_its_text_through_messages():
@@ -141,4 +145,4 @@ def test_a_guard_says_its_text_through_messages():
         for t in map(_answer_text, ast.walk(_source(g))):
             if t is not None and not _said(t):
                 found[g] += 1
-    assert_that({g: n for g, n in found.items() if n}, equal_to(KNOWN_INLINE_TEXT))
+    assert_that(_over(found, KNOWN_INLINE_TEXT), equal_to({}))
