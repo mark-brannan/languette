@@ -15,23 +15,25 @@ helps write a config that works.
 
 ## What it does
 
-1. **Says whether languette protects this machine.** One row per check, each
-   ✓, ! or ✗, and a non-zero exit on any ✗, so CI can run it: the install,
-   the shell parser, a probe through the hooks as installed, `gh`.
-2. **Diagnoses every config.** Each config languette reads — the plugin's
-   options and every file under `.languette/` — is loaded through the same
-   loader the guard uses, and a config that guard would refuse is a ✗ row
-   naming the file, the entry and why: a key no guard reads, a value of the
-   wrong type, a file that does not parse. A config that switches every
-   command to deny is the first thing the doctor reports. (planned)
-3. **Offers to fix a bad config.** For each ✗ it can mend, the doctor shows
-   the change as a diff and applies it on a yes: interactively at a
-   terminal, through a flag where there is none. Where the right fix is the
-   user's call — an entry that could be a typo for either of two keys — it
-   asks, with the choices. It writes nothing without that yes. (planned)
-4. **Assists with configuration.** It helps write a config, not only repair
-   one: what each guard's options are, what a given choice would ask or
-   deny, and a starting file for a guard that has none. (planned)
+1. **Checks protection:** one ✓, ! or ✗ row per check; any ✗ exits non-zero.
+2. **Diagnoses every config** through the guard's own loader. (planned)
+3. **Offers the fix** as a diff, applied only on a yes. (planned)
+4. **Assists with configuration,** not only repair. (planned)
+
+The checks are the install, the shell parser, a probe through the hooks as
+installed, and `gh`; CI can run them. The configs are the plugin's options
+and every file under `.languette/`. A config its guard would refuse is a ✗
+row naming the file, the entry and why: a key no guard reads, a value of the
+wrong type, a file that does not parse. A config that switches every command
+to deny is reported first.
+
+The fix is offered interactively at a terminal, or through a flag where
+there is none. Where the right fix is the user's call, such as an entry that
+could be a typo for either of two keys, the doctor asks with the choices. It
+writes nothing without a yes.
+
+Assisting means saying what each guard's options are and what a given choice
+would ask or deny, and writing a starting file for a guard that has none.
 
 ## Limits
 
