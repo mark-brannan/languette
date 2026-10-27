@@ -96,11 +96,11 @@ Feature: guard-git-work-loss
       | git push -f origin foo                                            | denies    |                          |
       | git push -fu origin foo                                           | denies    |                          |
       | git push origin +foo                                              | denies    | a + refspec forces       |
-      | git push --force-with-lease origin feat/foo                     | is silent | the one legitimate force |
-      | git push --force-with-lease origin HEAD:feat/foo                | is silent | HEAD:branch              |
+      | git push --force-with-lease origin claude/foo                     | is silent | the one legitimate force |
+      | git push --force-with-lease origin HEAD:claude/foo                | is silent | HEAD:branch              |
       | git push --force-with-lease origin main:backup                    | is silent | from main, to a branch   |
-      | git push -u origin feat/foo                                     | is silent |                          |
-      | git push --force-with-lease --force-if-includes origin feat/foo | is silent |                          |
+      | git push -u origin claude/foo                                     | is silent |                          |
+      | git push --force-with-lease --force-if-includes origin claude/foo | is silent |                          |
 
     @also_guard-bypass-ruleset
     Examples:
@@ -324,8 +324,8 @@ Feature: guard-git-work-loss
       | git push --delete origin main       | denies    |                                    |
       | git push -d origin main             | denies    |                                    |
       | git push origin :main               | denies    |                                    |
-      | git push --delete origin feat/foo | is silent | deleting a branch that is not main |
-      | git push origin :feat/foo         | is silent | the same, by refspec               |
+      | git push --delete origin claude/foo | is silent | deleting a branch that is not main |
+      | git push origin :claude/foo         | is silent | the same, by refspec               |
 
   Scenario: a footgun after a heredoc is still run
     When the agent runs:

@@ -343,7 +343,7 @@ def check(cwd):
 
     if inst:
         v = str(inst.get("version") or "")
-        rows.append((WARN, "version", f"plugin at commit {v[:7]}, from a git ref; not a release" if SHA.fullmatch(v) else
+        rows.append((WARN, "version", f"plugin at commit {v[:7]}, from main; not a release" if SHA.fullmatch(v) else
                      f"plugin at {v or 'an unknown version'}; not checked against the latest release"))
     elif hand:
         rows.append((WARN, "version", "installed by hand; not checked"))

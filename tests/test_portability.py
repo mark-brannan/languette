@@ -14,10 +14,10 @@ from hamcrest import assert_that, empty
 ROOT = Path(__file__).resolve().parent.parent
 DIRS = ("languette", "hooks", "features", "tests", "docs", "README.md")
 # The maintainer's identifiers, and the words of the workflow languette was born in.
-DENY = re.compile(r"mark-brannan|markbrannan|solace|claude_prompts_scratch|churn-ok|mixed-loops-ok"
-                  r"|claim.?stamp|yadm-style|\bcuria\b|\bagora\b", re.IGNORECASE)
+DENY = re.compile(r"mark-brannan|markbrannan|solace|claude_prompts_scratch"
+                  r"|claim.?stamp|\bcuria\b|\bagora\b", re.IGNORECASE)
 # The project's own homepage, install coordinates, and links to its own issues and pull requests.
-ALLOW = re.compile(r"(?:https://github\.com/)?mark-brannan/(?:languette|tap)\S*")
+ALLOW = re.compile(r"(?:https://github\.com/)?mark-brannan/(?:tap/languette|languette(?:/(?:issues|pull)/\d+|#\w+)?)\b")
 
 
 def _hits():

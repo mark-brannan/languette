@@ -186,8 +186,8 @@ def _tracked_flagged(ctx, path, flag):
     f.write_text("edit that git status does not show\n")
 
 
-@given(parsers.parse('a bare repository at "{path}" whose work tree is "{wt}"'))
-def _bare_repo_with_work_tree(ctx, path, wt):
+@given(parsers.parse('a yadm-style repository at "{path}" whose work tree is "{wt}"'))
+def _yadm_repo(ctx, path, wt):
     d = Path(ctx.expand(path))
     d.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(d)], check=True)

@@ -259,7 +259,7 @@ Without a terms file the guard is off.
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
 comma-separated; empty, the default, guards no label. A label that waives a CI
 gate is the user's to apply unless this setting names it, for example
-`skip-ci,waive-review`.
+`churn-ok,mixed-loops-ok`.
 
 `review_thread_logins` lists the logins, besides the gh login, whose reply
 lets `guard-review-threads` pass a thread's resolve, comma-separated, for

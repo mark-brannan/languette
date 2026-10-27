@@ -20,7 +20,7 @@ Feature: guard-duplicate-prs
 
   Background:
     Given the stub "gh" is first on PATH, for a Python guard
-    And a clone of "https://github.com/o/r.git" at "{TMP}/r" on branch "feat/topic"
+    And a clone of "https://github.com/o/r.git" at "{TMP}/r" on branch "claude/topic"
     And the working directory is "{TMP}/r"
 
   Scenario Outline: an open PR already on the issue denies, naming it
