@@ -461,3 +461,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261027t193442z
 - scan.GhArg and GhApi are namedtuples with properties beside the gh_* readers Undo: inline back into the guards ([#284](https://github.com/mark-brannan/languette/pull/284))
+
+### 20261027t193447z
+- GhArg.text is None for a flag with no word after it; each guard keeps its own handling Undo: drop the case ([#284](https://github.com/mark-brannan/languette/pull/284))
