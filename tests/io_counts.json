@@ -2231,6 +2231,8 @@
  "tests/test_features.py::test_stopping_the_agents_own_processes_units_and_dev_containers_is_allowed[systemctl --user stop dev-watch.service-the user's own manager]": {"git": 1},
  "tests/test_features.py::test_stow_adopt_asks_stow_without_it_or_only_deleting_does_not[echo stow --adopt zsh-is silent-prose]": {"git": 1},
  "tests/test_features.py::test_stow_adopt_asks_stow_without_it_or_only_deleting_does_not[git commit -m 'stow --adopt zsh'-is silent-a commit message]": {"git": 1},
+ "tests/test_features.py::test_stow_adopt_asks_stow_without_it_or_only_deleting_does_not[grep stow --adopt notes.txt-is silent-a search names stow, it does not run it]": {"git": 1},
+ "tests/test_features.py::test_stow_adopt_asks_stow_without_it_or_only_deleting_does_not[man stow --adopt-is silent-a manual page is read, not run]": {"git": 1},
  "tests/test_features.py::test_stow_adopt_asks_stow_without_it_or_only_deleting_does_not[sh -c 'stow --adopt zsh'-asks-in a shell body]": {"git": 1},
  "tests/test_features.py::test_stow_adopt_asks_stow_without_it_or_only_deleting_does_not[stow --ado zsh-asks-a unique prefix]": {"git": 1},
  "tests/test_features.py::test_stow_adopt_asks_stow_without_it_or_only_deleting_does_not[stow --adopt -- zsh-asks-packages after --]": {"git": 1},

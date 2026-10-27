@@ -24,7 +24,7 @@ Feature: guard-git-work-loss
   being any prefix of it (`--ado`), wherever it stands among the package names.
 
   Each rule has its own switch, the plugin options
-  guard_git_work_loss_blanket_staging, _stash, _force_push, _discard and
+  guard_git_work_loss_blanket_staging, _stash, _force_push, _discard,
   _branch_delete and _adopt; a rule is skipped only when its option is exactly `false`.
   The whole-guard option guard_git_work_loss=false skips all six. git takes
   any unambiguous prefix of a long option (`--har` is `--hard`), so the guard
@@ -304,6 +304,8 @@ Feature: guard-git-work-loss
       | stow -d --adopt                       | is silent | --adopt is -d's value, not the option        |
       | stow -d --adopt zsh                   | is silent | the same, with a package: no adopt           |
       | echo stow --adopt zsh                 | is silent | prose                                        |
+      | grep stow --adopt notes.txt           | is silent | a search names stow, it does not run it      |
+      | man stow --adopt                      | is silent | a manual page is read, not run               |
       | stow -t adopt zsh                     | is silent | adopt as a value, not the option             |
       | git commit -m 'stow --adopt zsh'      | is silent | a commit message                             |
 

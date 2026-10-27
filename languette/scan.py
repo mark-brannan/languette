@@ -40,7 +40,7 @@ CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 # git's global options that take the next word as their value.
 GIT_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
 PROSE = frozenset("grep egrep fgrep rg ag ack echo printf git yadm gh glab sed awk jq yq "
-                  "cat tee test [ diff sort head tail wc tr cut less more".split())
+                  "cat tee test [ diff sort head tail wc tr cut less more man".split())
 # Process tools name a script to find it, not to run it.
 PROSE_PROCESS = PROSE | frozenset("pkill pgrep killall ps lsof fuser which type".split())
 LAUNCH = frozenset("npx bunx pnpm yarn bun".split())
