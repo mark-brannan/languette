@@ -78,12 +78,15 @@ Whether `ask` and `context` belong to every tier is open below.
 `rewrite` replaces inside the text a call carries, never its words or flags.
 The rule names what to find, a term, a secret shape or the value of an
 environment variable such as `HOME`, and what to put there: `~`, the literal
-`$HOME`, a placeholder. The rewritten call is judged again by every rule,
-then asked about, with before and after in the reason; a rewrite that still
-matches a deny is a deny. guard-private-terms' `$HOME` to `~` is the first
-rule on it; secret redaction and host, user and address shapes are others.
-Shipped and user tiers only: a replacement runs with the agent's privileges,
-so the tier an agent writes never carries one.
+`$HOME`, a placeholder. The replacement is spliced as data into the matched
+literal span, never across a quote boundary; a find that would cross one is
+a deny. The new bytes are parsed and judged again by every rule, then asked
+about, with before and after in the reason; a rewrite that still matches a
+deny is a deny. Verdict carries the rewrite with the ask, as it does today.
+guard-private-terms' `$HOME` to `~` is the first rule on it; secret
+redaction and host, user and address shapes are others. Shipped and user
+tiers only: a replacement runs with the agent's privileges, so the tier an
+agent writes never carries one.
 
 ## Plan from the rules
 
@@ -138,8 +141,8 @@ stay code, ~2000 are messages and stay where they are.
 
 - `rewrite` then allow, with a note to the agent after the call runs, for a
   safer flag (`--force` to `--force-with-lease`). It would keep an unattended
-  session going where an ask is a deny; the user never sees the bytes. Today
-  a safer flag is a deny with the fix in the reason.
+  session going where an ask is a deny, and break "never allow" above; the
+  user never sees the bytes. Today a safer flag is a deny with the fix in the reason.
 - `ask` and `context` as repo-tier actions; probably yes.
 - A repo rule naming a fact that costs network or a program run.
 - #134's step 3 asks the same question for git and GitHub alone; this design
