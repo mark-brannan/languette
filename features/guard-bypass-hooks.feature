@@ -6,7 +6,7 @@ Feature: guard-bypass-hooks
   am, and `git -c core.hooksPath=...` are denied, and run only after the user
   answered an AskUserQuestion with the label "Skip hooks once". One answer
   allows one run. On push -n is --dry-run, and on merge, pull and rebase it is
-  --no-stat; those pass. A git wrapper such as yadm counts as git. A git alias, and core.hooksPath
+  --no-stat; those pass. A git wrapper such as yadm or vcsh counts as git. A git alias, and core.hooksPath
   set by `git config`, are not seen. Each
   scenario runs in a fresh git repo with CLAUDE_PROJECT_DIR set to it and an
   empty transcript, unless it says otherwise.
@@ -38,6 +38,7 @@ Feature: guard-bypass-hooks
       | git --config-env core.hooksPath=X commit --no-verify | global option with a separate value |
       | git --attr-source HEAD commit -n -m x        | global option with a separate value   |
       | yadm commit -n -m x                          | yadm is git                           |
+      | vcsh dots commit -n -m x                     | vcsh is git                           |
       | bash -c "git commit -n -m x"                 | bash -c nests                         |
       | sudo git commit -n -m x                      | sudo                                  |
       | git add f && git commit -n -m x              | later in a chain                      |
@@ -57,6 +58,7 @@ Feature: guard-bypass-hooks
       | git -C /tmp/r -c core.hooksPath=h commit -m x | after -C                             |
       | git --config-env=core.hooksPath=HP commit -m x | --config-env, attached              |
       | yadm -c core.hooksPath=x commit -m x         | yadm is git                           |
+      | vcsh -c core.hooksPath=x dots commit -m x   | vcsh is git                           |
 
     @also_guard-bypass-ruleset
     Examples:
@@ -68,6 +70,7 @@ Feature: guard-bypass-hooks
       | git -c user.name=x push --no-verify          | global -c                             |
       | git --git-dir=/x/.git push --no-verify       | global option with an attached value  |
       | yadm push --no-verify                        | yadm is git                           |
+      | vcsh dots push --no-verify                   | vcsh is git                           |
       | /usr/bin/git push --no-verify                | git by path                           |
       | sh -c 'git push --no-verify'                 | sh -c nests                           |
       | env X=1 git push --no-verify                 | env prefix                            |

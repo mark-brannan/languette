@@ -19,7 +19,7 @@ toplevel is not $HOME. $HOME and a repo's main checkout are where the user
 works, so neither relaxation holds there.
 
 Each rule has its own switch, CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_<RULE>,
-and is skipped only when it is exactly `false`. `yadm` is git. The command is
+and is skipped only when it is exactly `false`. `yadm` and `vcsh` are git. The command is
 read through languette.scan: heredoc bodies dropped, quotes removed, git found
 behind wrappers and in `sh -c` bodies, a quoted message that names a flag is
 not the flag. git takes any unambiguous prefix of a long option, so --har is
@@ -453,11 +453,11 @@ def _segment(doc, s, a, b, nested, env):
         elif sub == "reset":
             _reset(args)
     except _Placed as p:
-        if not s.w[g].endswith("yadm") and _own_command(s, a, b, g) and (yield from _staging_where_agents_work(doc, p.names, str(p))):
+        if not sw.git_wrapper(s.w[g])[1].home and _own_command(s, a, b, g) and (yield from _staging_where_agents_work(doc, p.names, str(p))):
             return
         raise Refuse(say("wl_add_all_paths"))
     except Refuse as r:
-        if (rule == "DISCARD" and not s.w[g].endswith("yadm") and _own_command(s, a, b, g)
+        if (rule == "DISCARD" and not sw.git_wrapper(s.w[g])[1].home and _own_command(s, a, b, g)
                 and (yield from _nothing_to_lose(doc, sub, args))):
             return
         if sub == "reset" and _upstream_target(args):

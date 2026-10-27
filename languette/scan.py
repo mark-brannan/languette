@@ -33,14 +33,18 @@ _OPENER = re.compile(r"(?<!<)<<-?[ \t]*(?:[A-Za-z_]|" + _DPART + r")(?:[A-Za-z0-
 _ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _WS = re.compile(r"[ \t\n]")
 
-GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
+# The tools that run git. home: its work tree is always $HOME, wherever it runs.
+# repo: it takes the name of one of its repositories before the git arguments.
+Wrapper = namedtuple("Wrapper", "home repo")
+GIT_WRAPPERS = {"git": Wrapper(False, False), "yadm": Wrapper(True, False), "vcsh": Wrapper(True, True)}
+GIT = re.compile(r"(?:^|/)(?:" + "|".join(GIT_WRAPPERS) + r")\Z")
 GH = re.compile(r"(?:^|/)gh\Z")
 # A word that is cd, pushd or popd: the builtins that move the working directory.
 CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 # git's global options that take the next word as their value.
 GIT_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
-PROSE = frozenset("grep egrep fgrep rg ag ack echo printf git yadm gh glab sed awk jq yq "
-                  "cat tee test [ diff sort head tail wc tr cut less more".split())
+PROSE = frozenset("grep egrep fgrep rg ag ack echo printf gh glab sed awk jq yq "
+                  "cat tee test [ diff sort head tail wc tr cut less more".split()) | frozenset(GIT_WRAPPERS)
 # Process tools name a script to find it, not to run it.
 PROSE_PROCESS = PROSE | frozenset("pkill pgrep killall ps lsof fuser which type".split())
 LAUNCH = frozenset("npx bunx pnpm yarn bun".split())
@@ -1230,17 +1234,23 @@ def texts_of_command(text, prose=PROSE, read=None):
     return out
 
 
+def _repo_word(s, a, i):
+    """Whether the word at i is the repository name a wrapper such as vcsh takes after its own word."""
+    return i > a and s.k[i - 1] == "w" and GIT.search(s.w[i - 1]) is not None and git_wrapper(s.w[i - 1])[1].repo
+
+
 def cmd_index(s, a, b, cmd, nested, parents=None, prose=PROSE):
     """Index in a..b of the word that is the command `cmd` (a compiled regex)
     describes, or None. Top level: any word counts unless the word before it
-    matches `parents`, or the segment is led by a prose consumer and no segment
+    matches `parents` or is a wrapper's repository name, or the segment is led by a prose consumer and no segment
     is a shell. Nested: only the command position, past assignments, wrappers
     with their options, and shell keywords."""
     if not nested:
         c = seg_cmd(s, a, b)
         for i in range(a, b + 1):
             if (s.k[i] == "w" and cmd.search(s.w[i]) and
-                    not (i > a and s.k[i - 1] == "w" and parents is not None and parents.search(s.w[i - 1]))):
+                    not (i > a and s.k[i - 1] == "w" and parents is not None and
+                         (parents.search(s.w[i - 1]) or _repo_word(s, a, i - 1)))):
                 return i
             if i == c and s.w[c] in prose and not s.shellseg:
                 return None
@@ -1266,19 +1276,25 @@ def cmd_index(s, a, b, cmd, nested, parents=None, prose=PROSE):
     return None
 
 
+def git_wrapper(word):
+    """(name, row) of the GIT_WRAPPERS entry a word that GIT matched names."""
+    name = word.rsplit("/", 1)[-1]
+    return name, GIT_WRAPPERS[name]
+
+
 def git_subcommand(s, g, b):
-    """The index of the subcommand word of the git call at g, past its global options;
-    beyond b when the segment ends first."""
+    """The index of the subcommand word of the git call at g, past its global options
+    (and the repository name a wrapper takes); beyond b when the segment ends first."""
     i = g + 1
     while i <= b and s.w[i].startswith("-"):
         i += 1 + (s.w[i] in GIT_VALUE)
-    return i
+    return i + (git_wrapper(s.w[g])[1].repo and i <= b)
 
 
 def git_options(s, g, sub):
     """The index of each global option word of the git call at g, before its subcommand at sub."""
     i = g + 1
-    while i < sub:
+    while i < sub and s.w[i].startswith("-"):
         yield i
         i += 1 + (s.w[i] in GIT_VALUE)
 

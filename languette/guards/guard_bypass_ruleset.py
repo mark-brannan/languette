@@ -4,7 +4,7 @@ An agent that runs on the user's credentials may bypass a branch's rules
 wherever the user may, and GitHub cannot tell them apart. Two
 doors are watched:
 
-- a `git push` (or `yadm push`) that lands on the remote's default branch,
+- a `git push` (or `yadm push`, `vcsh <repo> push`) that lands on the remote's default branch,
   when GitHub says that branch requires a pull request: a ruleset with a
   `pull_request` rule, or classic branch protection with required reviews.
   Only a "requires a pull request" answer is cached, for an hour under
@@ -79,8 +79,8 @@ ADMIN = say("ruleset_admin")
 
 
 class _Push:
-    def __init__(self, prog, here, remote, dsts):
-        self.prog, self.here, self.remote, self.dsts = prog, here, remote, dsts
+    def __init__(self, prog, here, remote, dsts, repo=()):
+        self.prog, self.here, self.remote, self.dsts, self.repo = prog, here, remote, dsts, repo
 
 
 class _Literals:
@@ -187,10 +187,11 @@ def _push(s, a, b, nested, here, lits=None):
     g = sw.cmd_index(s, a, b, sw.GIT, nested)
     if g is None:
         return None
-    prog = "yadm" if s.w[g].endswith("yadm") else "git"
+    prog, row = sw.git_wrapper(s.w[g])
     if any(s.w[i].startswith(_GIT_ENV) for i in range(a, g)):
         here = None
     sub = sw.git_subcommand(s, g, b)
+    repo = (s.w[sub - 1],) if row.repo and sub <= b else ()
     for i in sw.git_options(s, g, sub):
         x = s.w[i]
         if x == "-C" and i + 1 <= b:
@@ -249,9 +250,9 @@ def _push(s, a, b, nested, here, lits=None):
     if remote is not None and _UNREADABLE.search(remote):
         raise Refuse(f"the remote `{remote}` is built at run time")
     if all_:
-        return _Push(prog, here, remote, [ALL])
+        return _Push(prog, here, remote, [ALL], repo)
     if not pos:
-        return None if tags else _Push(prog, here, remote, [IMPLICIT])
+        return None if tags else _Push(prog, here, remote, [IMPLICIT], repo)
     dsts = []
     for j in pos:
         r = (lits and s.live[j] and lits.word(j, a)) or s.w[j]
@@ -269,7 +270,7 @@ def _push(s, a, b, nested, here, lits=None):
         elif dst.startswith("refs/"):
             continue                           # a tag or another namespace
         dsts.append(dst)
-    return _Push(prog, here, remote, dsts) if dsts else None
+    return _Push(prog, here, remote, dsts, repo) if dsts else None
 
 
 def _admin_merge(s, a, b, nested):
@@ -423,9 +424,9 @@ def _walk(doc, cmd, cwd, home=None):
 
 
 def _git(p, env, *args):
-    if p.here is None and p.prog == "git":
+    if p.here is None and not sw.GIT_WRAPPERS[p.prog].home:
         return None
-    return (yield Need("git", p.prog, p.here or env.get("HOME") or "/", *args))
+    return (yield Need("git", p.prog, p.here or env.get("HOME") or "/", *p.repo, *args))
 
 
 def _says(body, words):

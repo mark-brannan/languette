@@ -179,6 +179,7 @@ Feature: guard-recursive-delete
       | {HOME}/project     | echo "do not rm -rf examples"                        | is silent | prose that names the command is not the command |
       | {HOME}/project     | git rm -r examples                                   | is silent | rm is git's subcommand here                     |
       | {HOME}/project     | yadm rm -r examples                                  | is silent |                                                 |
+      | {HOME}/project     | vcsh dots rm -r examples                             | is silent | rm is git's subcommand past vcsh's repository   |
       | {HOME}/project     | git rm -r --cached examples && git commit -m x       | is silent |                                                 |
       | {HOME}/project     | docker rm -f mycontainer                             | is silent |                                                 |
       | {HOME}/project     | rm -rf node_modules 2>/dev/null                      | is silent | a redirection is not a target                   |
