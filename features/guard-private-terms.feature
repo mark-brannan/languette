@@ -1,9 +1,20 @@
 @python
 Feature: guard-private-terms
-  Text bound for a public GitHub repo is checked against the user's private
-  terms file, wherever the text travels: a flag value, a heredoc, a file, an
-  MCP field. The file is the private_terms_file option. Without one the guard
-  is inert; with one that cannot be read it is closed.
+  Text bound for a public GitHub repo is judged twice, wherever it travels:
+  a flag value, a heredoc, a file, an MCP field.
+
+  Anonymize. A home-directory path in that text, $HOME or another spelling
+  of it (/home/<user>, /Users/<user>, /mnt/c/Users/<user>, <user> the login
+  name), is rewritten to `~` and the call is allowed, as a secret is
+  redacted. It is on by default, needs no configuration and runs whether or
+  not a terms file is set; the guard_private_terms_anonymize option turns it
+  off. It never denies for text it cannot read: it cannot help there, so the
+  call goes through.
+
+  Hard block. A short list of terms so sensitive that even a redacted post
+  could leak a concept or a strategy (a company name, a code name). A hit
+  denies the whole post. Only this half needs a terms file, and only this
+  half fails closed.
 
   Why. A private repo or notes directory holds details (hostnames,
   service URLs, account identifiers, project code names) that must not reach the
@@ -29,13 +40,14 @@ Feature: guard-private-terms
   included, after replaying what the command does before the gh (a cd, an
   assignment).
 
-  A home-directory path in that text is a sanitization job, not a denial job:
-  where this Claude Code version's PreToolUse hooks support rewriting the
-  call (`updatedInput`) the guard replaces it with `~` in the posted text
-  alone and asks, so a person still sees the rewrite; a path the command
-  also holds outside the posted text is a denial, since a text match cannot tell
-  which copy is posted; otherwise
-  it stays a denial whose reason names the substitution to make by hand.
+  The anonymize rewrite (`updatedInput`) replaces the home path with `~` in
+  the posted text alone and allows the call. A path the command also holds
+  outside the posted text is a denial, since a text match cannot tell which
+  copy is posted, and so is a Claude Code version whose PreToolUse hooks
+  cannot rewrite the call; either reason names the substitution to make by
+  hand. A home path inside a file's contents (--body-file) is out of the
+  rewrite's reach: it stays a denial with the fix in the reason. Open:
+  whether that file case should deny, pass or be handled another way.
 
   The target repo is --repo/-R, GH_REPO=, a positional issue or PR URL or
   `owner/repo#n`, the `gh api` path, or MCP owner/repo; failing those, the
@@ -46,12 +58,21 @@ Feature: guard-private-terms
   empty) is allowed unscanned, and only when every target of the command is
   one.
 
-  Inert without a terms file: a guard that denied every public post for want
-  of a list would be unusable for anyone who has none. Once the option is
-  set the file is load-bearing, and the guard is a gate: a body it cannot
-  see, a gh write whose flag shape it does not recognise as carrying text, or
-  a terms file that is set but unreadable or empty while a target is not a
-  private repo is a deny, with the fix in the reason.
+  The terms file is the private_terms_file option. Current thinking: the
+  option expands a leading `~` or `$HOME` itself, since Claude Code does not
+  expand plugin options, so settings need no machine-specific absolute
+  path. Current thinking: with the option unset or empty, the guard reads
+  ~/.config/languette/private-terms.txt if it exists; a CI job or a cloud VM
+  provisions terms by writing that file, from a secret say, and no
+  environment variable is read. No file at either place means no hard
+  block: a guard that denied every public post for want of a list would be
+  unusable for anyone who has none, and anonymize still runs.
+
+  Once a terms file is found the hard block is load-bearing, and the guard
+  is a gate: a body it cannot see, a gh write whose flag shape it does not
+  recognise as carrying text, or a terms file that is set but unreadable or
+  empty while a target is not a private repo is a deny, with the fix in the
+  reason.
 
   Background:
     Given the private terms file holds:
@@ -191,94 +212,115 @@ Feature: guard-private-terms
       | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"Wanderlust"}                  | denies    |
       | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"clean"}                       | is silent |
 
+  # --- anonymize: a home path is rewritten to ~ and the call allowed -------------
+
   @also_guard-signed-comments
-  Scenario: the home directory in the text is rewritten to ~ and the rewrite asked about
-    Given the private terms file holds:
-      """
-      {HOME}
-      """
+  Scenario: the home directory in the text is rewritten to ~ and the call allowed
     When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
-    Then the guard asks, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"
+    Then the guard allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"
+
+  @also_guard-signed-comments
+  Scenario: anonymize needs no terms file
+    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
+    When the agent runs `gh pr comment 3 -R o/r --body "repro under {HOME}/x"`
+    Then the guard allows, rewriting the command to `gh pr comment 3 -R o/r --body "repro under ~/x"`
+
+  Scenario Outline: another spelling of the home directory is rewritten too, another user's is not
+    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
+    When the agent runs `gh issue comment 3 -R o/r -b <path>/x`
+    Then the guard <verdict>
+
+    @also_guard-signed-comments
+    Examples:
+      | path                    | verdict                                                                  |
+      | /home/{USER}            | allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"     |
+      | /Users/{USER}           | allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"     |
+      | /mnt/c/Users/{USER}     | allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"     |
+      | /home/someone-else      | is silent                                                                |
+
+  Scenario Outline: the guard_private_terms_anonymize option turns the rewrite off
+    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
+    And CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS_ANONYMIZE is "<value>"
+    When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
+    Then the guard <verdict>
+
+    @also_guard-signed-comments
+    Examples:
+      | value | verdict                                                              |
+      | true  | allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x" |
+      | false | is silent                                                            |
+
+  # Anonymize cannot help with text it cannot read, so it lets the call through;
+  # only the hard block, with terms to protect, fails closed (the Rule below).
+  Scenario Outline: with no terms file, text the guard cannot read passes
+    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
+    When the agent runs `<command>`
+    Then the guard is silent
+
+    Examples:
+      | command                                                         |
+      | gh issue comment 3 -R o/r --response-body-file /tmp/x           |
+
+    @also_guard-github-issues
+    Examples:
+      | command                                                         |
+      | gh issue create -R o/r -t t -b "$(date)"                        |
+      | cat notes.md \| gh issue create -R o/r -t x -F -                |
+      | gh issue create -R o/r -t x --body-file /nowhere/absent.md      |
 
   @also_guard-signed-comments
   Scenario: only the posted text is rewritten, not a cd before it
-    Given the private terms file holds:
-      """
-      {HOME}
-      """
     When the agent runs `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "under {HOME}/x"`
-    Then the guard asks, rewriting the command to `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "under ~/x"`
+    Then the guard allows, rewriting the command to `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "under ~/x"`
 
   @also_guard-signed-comments
   Scenario: a path the command also uses outside the posted text is a denial, not a guess at which is posted
-    Given the private terms file holds:
-      """
-      {HOME}
-      """
     When the agent runs `gh pr comment 3 -R o/r --body "{HOME}/x" && cd {HOME}/x`
-    Then the guard denies, naming "{HOME}"
+    Then the guard denies, naming "by hand"
 
   @also_guard-signed-comments
   Scenario: a body that repeats an earlier cd path is a denial too
-    Given the private terms file holds:
-      """
-      {HOME}
-      """
     When the agent runs `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "{HOME}/x"`
-    Then the guard denies, naming "{HOME}"
+    Then the guard denies, naming "by hand"
 
   @also_guard-signed-comments
   Scenario: a path used by a later command is a denial that says to write ~ by hand
-    Given the private terms file holds:
-      """
-      {HOME}
-      """
     When the agent runs `gh pr comment 3 -R o/r --body "{HOME}/x"; ls {HOME}/x`
     Then the guard denies, naming "by hand"
 
   @also_guard-signed-comments
   Scenario: a ~ is escaped wherever a bare word has the path, not only at its start
-    Given the private terms file holds:
-      """
-      {HOME}
-      """
     When the agent runs `gh pr comment 3 -R o/r -b note={HOME}/x`
-    Then the guard asks, rewriting the command to "gh pr comment 3 -R o/r -b note=\~/x"
+    Then the guard allows, rewriting the command to "gh pr comment 3 -R o/r -b note=\~/x"
 
   @also_guard-github-issues
   Scenario: a title and a body with the same path are both rewritten
-    Given the private terms file holds:
-      """
-      {HOME}
-      """
     When the agent runs `gh issue create -R o/r -t {HOME}/x -b {HOME}/x`
-    Then the guard asks, rewriting the command to "gh issue create -R o/r -t \~/x -b \~/x"
+    Then the guard allows, rewriting the command to "gh issue create -R o/r -t \~/x -b \~/x"
 
   @also_guard-signed-comments
   Scenario: a multi-line quoted body is rewritten
-    Given the private terms file holds:
-      """
-      {HOME}
-      """
     When the agent runs:
       """
       gh pr comment 3 -R o/r --body "line1
       see {HOME}/x"
       """
-    Then the guard asks, naming "home directory"
+    Then the guard allows, rewriting the command to:
+      """
+      gh pr comment 3 -R o/r --body "line1
+      see ~/x"
+      """
 
   @also_guard-signed-comments
   Scenario: a cd whose path matches a multi-line body once flattened is a denial
-    Given the private terms file holds:
-      """
-      {HOME}
-      """
     When the agent runs:
       """
       cd "{HOME}/x y" && gh pr comment 3 -R o/r --body "{HOME}/x
       y"
       """
     Then the guard denies, naming "by hand"
+
+  # --- the hard block: a term denies the whole post -----------------------------
 
   @also_guard-github-issues
   Scenario: a terms file that is set but cannot be read denies, naming the option
@@ -296,14 +338,45 @@ Feature: guard-private-terms
     When the agent runs `gh issue create -R o/r -t t -b "all public"`
     Then the guard denies, naming "no terms in it"
 
+  # Current thinking: Claude Code does not expand a plugin option, so the
+  # guard does, and settings need no machine-specific absolute path.
+  Scenario Outline: the terms file option may start with ~ or $HOME
+    Given the file "{HOME}/pt-terms.txt" holds:
+      """
+      Wanderlust
+      """
+    And CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is "<option>"
+    When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`
+    Then the guard denies, naming "Wanderlust"
+
+    @also_guard-github-issues
+    Examples:
+      | option             |
+      | ~/pt-terms.txt     |
+      | $HOME/pt-terms.txt |
+
+  # Current thinking: a CI job or a cloud VM provisions terms by writing this
+  # file, from a secret say; no environment variable is read.
   @also_guard-github-issues
-  Scenario: with the option unset the guard is inert
+  Scenario: with the option unset, a terms file at the default path is read
+    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
+    And the default private terms file holds:
+      """
+      Wanderlust
+      """
+    When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`
+    Then the guard denies, naming "Wanderlust"
+    When the agent runs `gh issue create -R o/r -t t -b "all public"`
+    Then the guard is silent
+
+  @also_guard-github-issues
+  Scenario: with the option unset and no file at the default path, no term is blocked
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
     When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`
     Then the guard is silent
 
   @also_guard-github-issues
-  Scenario: with the option empty the guard is inert
+  Scenario: with the option empty and no file at the default path, no term is blocked
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is ""
     When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`
     Then the guard is silent
@@ -313,7 +386,7 @@ Feature: guard-private-terms
     heredoc, an MCP field, another case), a repo in private_repos is never
     scanned, reads are never touched, and the gate is loud when it cannot see
     the text or the denylist. These scenarios walk the long tail of shapes
-    those promises take.
+    those promises take, with a terms file set, so the hard block is on.
 
     Background:
       Given the private terms file holds:
@@ -400,13 +473,9 @@ Feature: guard-private-terms
         | mcp__github__create_pull_request_review | {"owner":"o","repo":"r","pullNumber":1,"event":"COMMENT","comments":[{"path":"a.ts","body":"acct-4471"}]} | denies    |
 
     @also_guard-signed-comments
-    Scenario: the home directory in an MCP body is rewritten to ~
-      Given the private terms file holds:
-        """
-        {HOME}
-        """
+    Scenario: the home directory in an MCP body is rewritten to ~ and the call allowed
       When the agent calls MCP tool "mcp__github__add_issue_comment" with input `{"owner":"o","repo":"r","issue_number":3,"body":"repro under {HOME}/project"}`
-      Then the guard asks, rewriting the input field "body" to "repro under ~/project"
+      Then the guard allows, rewriting the input field "body" to "repro under ~/project"
 
     # --- gh api -------------------------------------------------------------------
 
@@ -616,12 +685,8 @@ Feature: guard-private-terms
     # command line was scanned, and a path under $HOME collides with a denylist
     # that names $HOME.
 
-    Scenario Outline: a path under the home directory is not posted text, when the denylist names the home directory
-      Given the private terms file holds:
-        """
-        {HOME}
-        """
-      And the file "{HOME}/pt-scratch-body.md" holds:
+    Scenario Outline: a path under the home directory that the command reads is not posted text, so nothing is rewritten
+      Given the file "{HOME}/pt-scratch-body.md" holds:
         """
         a clean scratchpad body
         """
@@ -656,31 +721,25 @@ Feature: guard-private-terms
       Then the guard denies, naming "Wanderlust"
 
     # --- the home directory: a sanitization job, until it is not one --------------
+    # Open: a rewrite of the call cannot reach a file's contents, so for now the
+    # file case is a denial with the fix in the reason.
 
     @also_guard-github-issues
     Scenario: the home directory inside a body-file's content stays a denial
-      Given the private terms file holds:
-        """
-        {HOME}
-        """
-      And a project directory
+      Given a project directory
       And the file "home-in-file.md" holds:
         """
         repro under {HOME}/project
         """
       When the agent runs `gh issue create -R o/r -t x --body-file {PROJ}/home-in-file.md`
-      Then the guard denies, naming "{HOME}"
+      Then the guard denies, naming "home directory"
 
     # A longer path that merely starts with $HOME is not $HOME: a plain replace
     # would corrupt it (~2 is a different user). Scar from an earlier
     # review.
     Scenario Outline: a path that only starts with the home directory is not rewritten
-      Given the private terms file holds:
-        """
-        {HOME}
-        """
       When the agent runs `gh issue comment 3 -R o/r -b '<text>'`
-      Then the guard denies, naming "{HOME}"
+      Then the guard is silent
 
       @also_guard-signed-comments
       Examples:
@@ -689,12 +748,7 @@ Feature: guard-private-terms
         | see {HOME}-backup/notes for details |
 
     @also_guard-signed-comments
-    Scenario: fixing the home directory alone would not make the post safe
-      Given the private terms file holds:
-        """
-        {HOME}
-        Wanderlust
-        """
+    Scenario: a term denies the whole post, even one anonymize would otherwise rewrite and allow
       When the agent runs `gh issue comment 3 -R o/r -b 'seen aboard Wanderlust, path {HOME}/x'`
       Then the guard denies, naming "Wanderlust"
 
@@ -1120,7 +1174,7 @@ Feature: guard-private-terms
       Then the guard denies, naming "Wanderlust"
 
   Rule: a run-time value is refused with a remedy the guard then accepts
-    The message names what was flagged (the flag or the field), says the text
+    While a terms file is set, as here. The message names what was flagged (the flag or the field), says the text
     must exist before the call, and says which paths cannot be read. Each
     remedy it gives is run here as the follow-up command.
 
