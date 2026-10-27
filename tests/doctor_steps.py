@@ -7,34 +7,25 @@ import json
 import os
 import re
 import shutil
-import subprocess
-import sys
-import tempfile
 from pathlib import Path
 
 import pytest
-from hamcrest import assert_that, contains_string, equal_to, has_length, is_not
+from hamcrest import assert_that, contains_string, equal_to, is_not
 from pytest_bdd import given, parsers, then, when
+
+from harness import FakeHome
 
 ROOT = Path(__file__).resolve().parent.parent
 PLUGIN_ID = "languette@languette"
 
 
-class Doctor:
+class Doctor(FakeHome):
     def __init__(self):
-        # Not under /tmp: guard-recursive-delete allows all of /tmp.
-        self.home = Path(tempfile.mkdtemp(prefix="languette-doctor-home-", dir="/var/tmp"))
-        (self.home / "project/sub").mkdir(parents=True)
-        (self.home / ".claude/plugins").mkdir(parents=True)
-        self.aside = Path(tempfile.mkdtemp(prefix="languette-doctor-"))   # stubs and copies, outside HOME
-        self.bin = self.aside / "bin"
-        self.bin.mkdir()
+        super().__init__("doctor", ("project/sub", ".claude/plugins"))
         self.installs = []
         self.claude_ok = True
         self.gh_ok = True
         self.overrides = {}                    # path -> text, written over what the install steps wrote
-        self.out = self.err = self.code = None
-        self.before = None
 
     def expand(self, s):
         return s.replace("{HOME}", str(self.home)).replace("~/", f"{self.home}/")
@@ -45,9 +36,6 @@ class Doctor:
 
     def write_settings(self, s):
         (self.home / ".claude/settings.json").write_text(json.dumps(s))
-
-    def snapshot(self):
-        return sorted((str(p.relative_to(self.home)), p.stat().st_size) for p in self.home.rglob("*"))
 
     def stub(self, name, body):
         f = self.bin / name
@@ -73,22 +61,7 @@ class Doctor:
         for path, text in self.overrides.items():
             Path(path).write_text(text)
         self.stub("gh", f'[ "$1 $2" = "auth status" ] && exit {0 if self.gh_ok else 1}\nexit 2')
-        env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "LANGUETTE_"))}
-        env.update(HOME=str(self.home), PATH=f"{self.bin}{os.pathsep}{os.environ['PATH']}",
-                   TMPDIR=str(self.aside), PYTHONPATH=str(ROOT))
-        self.before = self.snapshot()
-        r = subprocess.run([sys.executable, "-m", "languette", "doctor"], cwd=cwd, env=env, capture_output=True,
-                           text=True, timeout=60)
-        self.out, self.err, self.code = r.stdout, r.stderr, r.returncode
-
-    def row(self, label):
-        rows = [ln for ln in self.out.splitlines() if ln[2:].startswith(label + " ")]
-        assert_that(rows, has_length(1), f"one {label!r} row in:\n{self.out}{self.err}")
-        return rows[0][0], rows[0][2:][len(label):].strip()
-
-    def cleanup(self):
-        for d in (self.home, self.aside):
-            shutil.rmtree(d, ignore_errors=True)
+        self.invoke(["doctor"], cwd, os.environ["PATH"])
 
 
 @pytest.fixture
@@ -247,7 +220,7 @@ def _runs_in(doctor, path):
 
 @then(parsers.re(r'the "(?P<label>[^"]+)" row is (?P<mark>[✓!✗]) "(?P<text>.*)"'))
 def _row(doctor, label, mark, text):
-    assert_that(doctor.row(label), equal_to((mark, text)))
+    doctor.assert_row(label, mark, text)
 
 
 @then(parsers.re(r'the "(?P<label>[^"]+)" row is (?P<mark>[✓!✗]) matching "(?P<pattern>.*)"'))
@@ -270,7 +243,7 @@ def _row_there(doctor, label):
 
 @then(parsers.parse("the doctor exits {code:d}"))
 def _exits(doctor, code):
-    assert_that(doctor.code, equal_to(code), doctor.out + doctor.err)
+    doctor.assert_exit(code)
 
 
 @then("the doctor prints no traceback")
@@ -281,7 +254,7 @@ def _no_traceback(doctor):
 
 @then("the fake HOME is as it was")
 def _home_untouched(doctor):
-    assert_that(doctor.snapshot(), equal_to(doctor.before))
+    doctor.assert_untouched()
 
 
 # What conftest.py takes: the fixture and the step fixtures pytest-bdd made above.

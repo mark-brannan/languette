@@ -49,7 +49,7 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 
 - Languette runs on python3 and its standard library plus the parser ladder
   above, takes no other dependency, and depends on nothing in
-  mark-brannan/claude: `jq` goes, `prose-budget-commit` loses its engine
+  the maintainer's own hook layer: `jq` goes, `prose-budget-commit` loses its engine
   there, and `no-checkout-home` recognises the shape of a command that checks
   out `$HOME` through git, yadm, chezmoi or another common dotfiles manager,
   without needing that tool installed. `gh` is optional, for

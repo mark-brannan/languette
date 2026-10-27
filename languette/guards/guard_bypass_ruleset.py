@@ -1,7 +1,7 @@
 """guard-bypass-ruleset: a ruleset's bypass is the user's, never the agent's.
 
-An agent runs on the user's credentials, so wherever the user may bypass a
-branch's rules, so may the agent, and GitHub cannot tell them apart. Two
+An agent that runs on the user's credentials may bypass a branch's rules
+wherever the user may, and GitHub cannot tell them apart. Two
 doors are watched:
 
 - a `git push` (or `yadm push`) that lands on the remote's default branch,
@@ -58,8 +58,7 @@ _GITHUB = re.compile(r"github\.com(?::\d+)?[:/]+([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-
 # The operators a separator's text is made of, as Scan piles them up (`;}&&` for `; } &&`).
 _OPS = re.compile(r"\|\||&&|\|&|\||&|;|\n|\(|\)|\{|\}|`")
 _PIPE = ("|", "|&")
-# Keywords that may lead a segment before its command; the openers among them, and the closers.
-_LEADS = frozenset("if then else elif do while until ! time".split())
+# The openers among the keywords that lead a segment, and the closers.
 _OPEN = {"if": False, "while": True, "until": True, "for": True, "select": True}   # keyword -> a loop
 _CLOSE = frozenset("fi done".split())
 _FALLBACK = ("main", "master")
@@ -315,7 +314,7 @@ def _compound(s, a, b):
     """(the command word's index or None, the compounds opened, a close): segment a..b read
     past the keywords leading it. `for` and `select` open a loop whose own words are no command."""
     i, opens = a, []
-    while i <= b and s.k[i] == "w" and not s.quoted[i] and s.w[i] in _LEADS:
+    while i <= b and s.k[i] == "w" and not s.quoted[i] and s.w[i] in sw.KEYWORD_LEADS:
         if s.w[i] in _OPEN:
             opens.append(_OPEN[s.w[i]])
         i += 1

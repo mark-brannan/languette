@@ -26,7 +26,6 @@ _WRAPPERS = re.compile(r"(?:sudo|doas|env|nice|nohup|timeout|command|exec|time|i
 _PERM_IN_TEXT = re.compile(r"(?:^|[^A-Za-z0-9_./-])(chmod|chown|chgrp)(?![A-Za-z0-9_-])")
 _CHMOD_FLAGS = re.compile(r"-[Rcfv]+\Z")
 _WORLD = re.compile(r"(?:0*777|(?:a|ugo)[+=]rwx)\Z")
-_ALLOW_CHARS = re.compile(r"[A-Za-z0-9._@+/-]*")
 
 _WAY_OUT = ("Spell the files out: chmod or chown the paths themselves, without -R (`git ls-files <dir>` lists "
             "what a sweep would touch), or sweep inside the scratchpad, /tmp or an agent worktree. Anything "
@@ -35,27 +34,9 @@ _WAY_OUT = ("Spell the files out: chmod or chown the paths themselves, without -
 
 
 def _parse_allow(value, home, home_p, physical):
-    """LANGUETTE_PERM_ALLOW -> (extra_roots, error or None): absolute paths only.
-    `physical` resolves each entry through the disk."""
-    roots = []
-    for ent in value.split(":"):
-        if ent == "":
-            return roots, "an empty entry"
-        if not _ALLOW_CHARS.fullmatch(ent):
-            return roots, f"unsupported character in '{ent}'"
-        if not ent.startswith("/"):
-            return roots, f"'{ent}' is not an absolute path"
-        if ent.endswith(("/.", "/..")) or "/./" in ent or "/../" in ent or "//" in ent:
-            return roots, f"'{ent}' has an empty, . or .. segment"
-        if ent.endswith("/"):
-            ent = ent[:-1]
-        if ent in ("", home):
-            return roots, f"'{ent}' is / or $HOME"
-        ent_p = physical(ent)
-        if ent_p in ("", home, home_p):
-            return roots, f"'{ent}' resolves to / or $HOME"
-        roots += [ent, ent_p]
-    return roots, None
+    """LANGUETTE_PERM_ALLOW -> (extra_roots, error or None): absolute paths only."""
+    roots, _, err = paths.parse_allow(value, home, home_p, physical)
+    return roots, err
 
 
 def _exec_perm(s, g, b):
@@ -78,11 +59,11 @@ def _exec_perm(s, g, b):
 
 
 class _Judge:
-    """What the awk half of the shell guard does: find every judged target in
-    the command and either refuse it on sight or return it resolved."""
+    """Find every judged target in the command and either refuse it on sight
+    or return it resolved."""
 
     def __init__(self, cwd, home):
-        self.cwd, self.home, self.homeN = cwd, home, paths.normalize(home)
+        self.cwd, self.home = cwd, home
         self.moved, self.targets, self.what = False, [], ""
 
     def blocked(self, raw, why):
@@ -91,11 +72,9 @@ class _Judge:
     def target(self, s, idx):
         raw = s.w[idx]
         try:
-            t = paths.resolve(raw, s.k[idx] == "q", self.cwd, self.home, self.moved)
+            t = paths.resolve_target(raw, s.k[idx] == "q", self.cwd, self.home, self.moved)
         except paths.Unresolved as e:
             self.blocked(raw, str(e))
-        if t == "/" or t == self.homeN:
-            self.blocked(raw, "that is " + ("the root of the filesystem" if t == "/" else "$HOME itself"))
         if ".git" in t.split("/"):
             self.blocked(raw, "it is inside a .git directory, the repository's own store")
         self.targets.append((t, self.what, raw))

@@ -4,8 +4,7 @@ once (docs/design/guard-pipeline.md).
 Each piece of the parse is computed on first use and kept, a failure too: a
 guard that touches a parse that raised gets the same exception, so the parser
 ladder runs once per call and no text is scanned twice. A shell text is read
-as the shell guards have always read the command: trailing newlines as one,
-heredoc bodies stripped. Read-only. Standard library only.
+with trailing newlines as one and heredoc bodies stripped. Read-only. Standard library only.
 """
 
 import json
@@ -24,7 +23,7 @@ class Document:
         ti = payload.get("tool_input")
         tool = payload.get("tool_name")
         cmd = ti.get("command") if isinstance(ti, dict) else None
-        # The command as the shell guards read it: a non-string as `jq -r` prints it.
+        # A non-string command is read as its JSON text.
         text = "" if cmd is None or cmd is False else cmd if isinstance(cmd, str) else json.dumps(cmd)
         fields = {"payload": payload, "env": env, "event": payload.get("hook_event_name") or "PreToolUse",
                   "tool": tool, "tool_input": ti, "command": cmd if tool == "Bash" and isinstance(cmd, str) else None,

@@ -16,7 +16,7 @@ import os
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import WAY_USER, Need, Refuse, deny
+from languette.verdict import WAY_USER, Need, Refuse, judged
 
 NAME = "guard-scheduled-jobs"
 
@@ -32,40 +32,33 @@ def _own(r, where):
         raise sw.BadRules(f"{where}.why must be a non-empty string")
 
 
-def _load(path):
-    """The file's rules, or Refuse naming the fault."""
-    cfg = yield from paths.read_json(path)
-    try:
-        return sw.load_rules(cfg, "rules", ("action", "why"), _own, taken={r["id"] for r in RULES})
-    except sw.BadRules as e:
-        raise Refuse(str(e))
-
-
 def rules(path):
     """RULES, then the rule file's, gathered: the defaults alone when the file is
     absent, Refuse when it is present and does not load."""
     if not (yield Need("path", "lexists", path)):
         return list(RULES)
-    return list(RULES) + (yield from _load(path))
+    return list(RULES) + (yield from paths.read_rules(
+        path, "rules", ("action", "why"), _own, taken={r["id"] for r in RULES}))
 
 
-def check(doc):
-    if doc.text is None:
-        return None
+def judge(doc):
+    """The deny reason for the command, or None."""
     try:
         found = yield from rules(RULE_FILE)
     except Refuse as e:
-        return deny(say("judged", guard=NAME, why=say("rules_bad", file=RULE_FILE, err=e)))
+        return say("rules_bad", file=RULE_FILE, err=e)
     for rule in found:
         # PROSE, not PROSE_PROCESS, and no launchers: `pkill crontab -r` is denied
-        # and `sh -c "npx crontab -r"` passes, as before the shared matcher.
+        # and `sh -c "npx crontab -r"` passes.
         n = sw.match_rule(doc, rule["match"], prose=sw.PROSE, launchers=False)[0]
         if not n:
             continue
         if rule in RULES:
-            why = say("cron_remove", way_user=WAY_USER)
-        else:
-            why = say("rule_deny", cmd=rule["match"]["cmd"], id=rule["id"], file=RULE_FILE,
-                      why=(rule.get("why") or "the rule file lists it").rstrip("."), way_user=WAY_USER)
-        return deny(say("judged", guard=NAME, why=why))
+            return say("cron_remove", way_user=WAY_USER)
+        return say("rule_deny", cmd=rule["match"]["cmd"], id=rule["id"], file=RULE_FILE,
+                   why=(rule.get("why") or "the rule file lists it").rstrip("."), way_user=WAY_USER)
     return None
+
+
+def check(doc):
+    return judged(doc, NAME, judge)
