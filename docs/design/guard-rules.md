@@ -81,13 +81,11 @@ environment variable such as `HOME`, and what to put there: `~`, the literal
 `$HOME`, a placeholder. The replacement is spliced as data into the matched
 literal span, never across a quote boundary; a find that would cross one is
 a deny. The new bytes are parsed and judged again by every rule; a rewrite
-that still matches a deny is a deny. A redaction rewrite (a home path, a
-secret, a host, user or address shape) is then allowed, as a secret is
-redacted, and Verdict carries the rewrite with the allow; any other rewrite
-is asked about, with before and after in the reason. guard-private-terms'
-`$HOME` to `~` is the first rule on it; secret redaction and host, user and
-address shapes are others. Shipped and user
-tiers only: a replacement runs with the agent's privileges, so the tier an
+that still matches a deny is a deny. A redaction is then allowed, Verdict
+carrying the rewrite; any other rewrite is asked about, before and after in
+the reason. guard-private-terms' `$HOME` to `~` is the first rule on it;
+secret redaction and host, user and address shapes are others. Shipped and
+user tiers only: a replacement runs with the agent's privileges, so the tier an
 agent writes never carries one.
 
 ## Plan from the rules
