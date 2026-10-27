@@ -45,7 +45,7 @@ TIMEOUT = 10
 # The last 100 comments: the bot's last word and every reply after it.
 QUERY = ("query($id: ID!) { viewer { login } node(id: $id) { ... on PullRequestReviewThread { "
          "comments(last: 100) { nodes { author { login __typename } body createdAt } } } } }")
-DO = ("Reply on the thread with the fix commit, or with a link to the ruling, decision record or issue the "
+DO = ("Reply on the thread with the fix commit, or with a link to the decision record or issue the "
       "dismissal rests on, then resolve it. A dismissal with nothing behind it leaves the thread open for a person.")
 
 

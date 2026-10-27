@@ -182,7 +182,7 @@
     "guard_signed_comments": {
       "type": "boolean",
       "title": "Experimental, opt-in: sign an agent's GitHub comments as an agent's",
-      "description": "Experimental and off by default: the signature is one workflow's convention. Deny a PR or issue comment, review or review-thread reply posted through gh, gh api or a GitHub MCP tool unless its body's first line starts with signed_comments_opening and its last line matches signed_comments_signature. The agent posts under your login; the signature keeps its words from being read as yours. Turn on if your agents sign their comments that way.",
+      "description": "Experimental and off by default: the signature is one workflow's convention. Deny a PR or issue comment, review or review-thread reply posted through gh, gh api or a GitHub MCP tool unless its body's first line starts with signed_comments_opening and its last line matches signed_comments_signature. If the agent posts under your login, the signature keeps its words from being read as yours. Turn on if your agents sign their comments that way.",
       "default": false
     },
     "signed_comments_opening": {
@@ -214,7 +214,7 @@
     "bypass_labels": {
       "type": "string",
       "title": "Bypass labels",
-      "description": "Labels a session may not apply: comma-separated, matched case-insensitively. Empty, the default, guards no label: a label that waives a CI gate is the driver's to apply unless this names it.",
+      "description": "Labels a session may not apply: comma-separated, matched case-insensitively. Empty, the default, guards no label: a label that waives a CI gate is the user's to apply unless this names it.",
       "default": "",
       "required": false
     },
@@ -240,7 +240,7 @@
     "guard_worktrees": {
       "type": "boolean",
       "title": "Guard worktrees: no branch switch in $HOME, no reach into another session's worktree",
-      "description": "Opt-in, off by default. Two controls. Deny git or yadm checkout and switch that would change the branch checked out in your home directory, for a $HOME that is itself a worktree (yadm, a bare-repo setup); deny any command or file edit that reaches into a linked git worktree other than the session's own, and EnterWorktree(path=...). Turn on if $HOME is a worktree or you run several sessions against one repo.",
+      "description": "Opt-in, off by default. Two controls. Deny a git checkout or switch that would change the branch checked out in your home directory, for a $HOME that is itself a work tree (a bare repository over $HOME, or a dotfile manager such as yadm); deny any command or file edit that reaches into a linked git worktree other than the session's own, and EnterWorktree(path=...). Turn on if $HOME is a worktree or you run several sessions against one repo.",
       "default": false
     },
     "guard_worktrees_checkout_home": {

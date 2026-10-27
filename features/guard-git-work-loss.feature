@@ -16,8 +16,7 @@ Feature: guard-git-work-loss
   throw away uncommitted work, as `reset --hard` does, and `branch -D` throws
   away unmerged work (`-d` refuses; use that). On a clean working tree the
   discards (checkout, restore, clean, `reset --hard`) have nothing to lose and
-  pass. `yadm`, a git wrapper for
-  dotfiles, is treated as `git`.
+  pass. A git wrapper such as `yadm` is treated as `git`.
 
   Each rule has its own switch, the plugin options
   guard_git_work_loss_blanket_staging, _stash, _force_push, _discard and

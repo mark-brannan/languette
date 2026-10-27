@@ -42,28 +42,72 @@ def resolve(word, quoted, cwd, home, moved):
     """One word of a command, as the absolute path it names, or Unresolved."""
     t = word
     if quoted:
-        raise Unresolved("a quoted string with whitespace in it is not one path this hook can resolve")
+        raise Unresolved(say("rd_quoted_space"))
     if re.search(r"[*?\[{}]", t):
-        raise Unresolved("a glob or brace expansion could name anything")
+        raise Unresolved(say("rd_glob"))
     if re.search(r"[$`]", t):
-        raise Unresolved("a variable or command substitution could expand to anything")
+        raise Unresolved(say("rd_substitution"))
     if re.search(r"[\t\n\r]", t):
-        raise Unresolved("it contains a tab or newline")
+        raise Unresolved(say("rd_tab_newline"))
     if t == ".." or re.search(r"(?:^|/)\.\.(?:/|\Z)", t):
-        raise Unresolved("a `..` segment steps out of the directory the name suggests")
+        raise Unresolved(say("rd_dotdot"))
     if "~" in t:
         if t == "~":
             t = home
         elif t.startswith("~/"):
             t = home + t[1:]
         else:
-            raise Unresolved("only a leading `~/` is understood")
+            raise Unresolved(say("rd_tilde"))
     if not t.startswith("/"):
         if moved:
-            raise Unresolved("a `cd` earlier in this command moves the working directory and the hook "
-                             "cannot follow it; use an absolute path")
+            raise Unresolved(say("rd_cd_moved"))
         t = cwd + "/" + t
     return normalize(t)
+
+
+def resolve_target(word, quoted, cwd, home, moved):
+    """resolve, for a guard that judges a target: `/` and $HOME itself are Unresolved too."""
+    t = resolve(word, quoted, cwd, home, moved)
+    if t == "/":
+        raise Unresolved(say("rd_root"))
+    if t == normalize(home):
+        raise Unresolved(say("rd_home"))
+    return t
+
+
+_ALLOW_CHARS = re.compile(r"[A-Za-z0-9._@+/-]*")
+
+
+def parse_allow(value, home, home_p, physical, bare_names=False):
+    """An allow var -> (roots, names, error or None): absolute paths, and with
+    `bare_names` directory names too. `physical` resolves each path entry
+    through the disk."""
+    roots, names = [], []
+    for ent in value.split(":"):
+        if ent == "":
+            return roots, names, "an empty entry"
+        if not _ALLOW_CHARS.fullmatch(ent):
+            return roots, names, f"unsupported character in '{ent}'"
+        if ent.startswith("/"):
+            if ent.endswith(("/.", "/..")) or "/./" in ent or "/../" in ent or "//" in ent:
+                return roots, names, f"'{ent}' has an empty, . or .. segment"
+            if ent.endswith("/"):
+                ent = ent[:-1]
+            if ent in ("", home):
+                return roots, names, f"'{ent}' is / or $HOME"
+            ent_p = physical(ent)
+            if ent_p in ("", home, home_p):
+                return roots, names, f"'{ent}' resolves to / or $HOME"
+            roots += [ent, ent_p]
+        elif not bare_names:
+            return roots, names, f"'{ent}' is not an absolute path"
+        elif "/" in ent:
+            return roots, names, f"'{ent}' is neither a bare name nor an absolute path"
+        elif ent in (".", ".."):
+            return roots, names, f"'{ent}' is not a name"
+        else:
+            names.append(ent)
+    return roots, names, None
 
 
 def own_bases(home):
@@ -80,7 +124,7 @@ def own_roots(home, physical, extra=()):
 
 def physical_of(answers):
     """Path -> its planned Need("physical") answer. One the world could not
-    have is raised, as the runner once threw it into the guard."""
+    have is raised."""
     def physical(p):
         got = answers[Need("physical", p)]
         if isinstance(got, Exception):
@@ -252,3 +296,13 @@ def read_json(path):
         raise Refuse("not JSON (nested too deep to parse)")
     except OSError as e:
         raise Refuse(f"unreadable ({e.strerror})")
+
+
+def read_rules(path, *args, **kwargs):
+    """The command rules of the file at path (scan.load_rules, given args and
+    kwargs after cfg), or Refuse naming why they cannot be had."""
+    cfg = yield from read_json(path)
+    try:
+        return sw.load_rules(cfg, *args, **kwargs)
+    except sw.BadRules as e:
+        raise Refuse(str(e))

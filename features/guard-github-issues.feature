@@ -6,7 +6,7 @@ Feature: guard-github-issues
   plugin's copy of this hook, so the two never spend each other's.
 
   Why. An issue number is an identifier things link to where no agent can
-  see, so minting or moving one is a one-way door (the maintainer, 2026-09-30): one
+  see, so minting or moving one is a one-way door: one
   create, transfer or delete per human turn, never two in one call, never one
   in a loop.
 
@@ -223,12 +223,12 @@ Feature: guard-github-issues
     When the agent runs `gh issue create -t t -b b`
     Then the guard denies, naming "wait for their yes"
 
-  Scenario: this door and the claude plugin's door do not spend each other
-    Given the claude plugin's door file is already present
+  Scenario: this door and another plugin's door do not spend each other
+    Given another plugin's door file is already present
     When the human speaks, opening the door
     And the agent runs `gh issue create -t t -b b`
     Then the guard is silent
-    And the claude plugin's door file is still present
+    And another plugin's door file is still present
 
   Scenario: a symlink planted at the door path is replaced, not written through
     Given the door file is a symlink to "{TMP}/victim"
