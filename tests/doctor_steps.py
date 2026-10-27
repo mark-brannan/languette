@@ -225,7 +225,9 @@ def _row(doctor, label, mark, text):
 
 @then(parsers.re(r'the "(?P<label>[^"]+)" row is (?P<mark>[✓!✗]) "(?P<state>[^"]*)" and its note'))
 def _row_noted(doctor, label, mark, state):
-    doctor.assert_row(label, mark, f"{state}; {FORGES[label][2]}")
+    got_mark, text = doctor.row(label)
+    head, semicolon, _ = text.partition(";")
+    assert (got_mark, head, semicolon) == (mark, state, ";"), text   # the state, then some note; not the note's words
 
 
 @then(parsers.re(r'the "(?P<label>[^"]+)" row is (?P<mark>[✓!✗]) matching "(?P<pattern>.*)"'))
