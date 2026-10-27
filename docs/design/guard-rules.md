@@ -71,10 +71,19 @@ on order within a command, and order is computed per segment in gather.
 ## Actions
 
 A rule only tightens. Its action is `deny`, `ask` (ask-first's approval,
-spent once per run when the rule says so) or `context`, never allow: a rule
-set adds to what languette judges and takes nothing from it. Whether `ask`
-and `context` belong to every tier, and whether a rewrite is an action, are
-open below.
+spent once per run when the rule says so), `context` or `rewrite`, never
+allow: a rule set adds to what languette judges and takes nothing from it.
+Whether `ask` and `context` belong to every tier is open below.
+
+`rewrite` replaces inside the text a call carries, never its words or flags.
+The rule names what to find, a term, a secret shape or the value of an
+environment variable such as `HOME`, and what to put there: `~`, the literal
+`$HOME`, a placeholder. The rewritten call is judged again by every rule,
+then asked about, with before and after in the reason; a rewrite that still
+matches a deny is a deny. guard-private-terms' `$HOME` to `~` is the first
+rule on it; secret redaction and host, user and address shapes are others.
+Shipped and user tiers only: a replacement runs with the agent's privileges,
+so the tier an agent writes never carries one.
 
 ## Plan from the rules
 
@@ -127,8 +136,10 @@ stay code, ~2000 are messages and stay where they are.
 
 ## Open
 
-- A rewrite action, as guard-private-terms rewrites `$HOME` to `~` and asks,
-  or rewriting stays code beside the engine (#198).
+- `rewrite` then allow, with a note to the agent after the call runs, for a
+  safer flag (`--force` to `--force-with-lease`). It would keep an unattended
+  session going where an ask is a deny; the user never sees the bytes. Today
+  a safer flag is a deny with the fix in the reason.
 - `ask` and `context` as repo-tier actions; probably yes.
 - A repo rule naming a fact that costs network or a program run.
 - #134's step 3 asks the same question for git and GitHub alone; this design
