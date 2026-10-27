@@ -44,7 +44,6 @@ _MCP = ("create_issue|update_issue|issue_write|add_issue_comment|create_pull_req
 # The tools hooks.json wires this guard to; the MCP ones by their name's tail.
 TOOLS = re.compile(rf"(?:Bash|mcp__.*__(?:{_MCP}))\Z")
 _MCP_TOOL = re.compile(rf"mcp__.*__(?:{_MCP})\Z")
-GH = re.compile(r"(?:^|/)gh\Z")
 TO_PRIVATE = "target a repo listed in the private_repos option"
 _UNSEEN = re.compile(r"--[A-Za-z-]*(?:body|comment|message)[A-Za-z-]*")
 _ACTS = frozenset("create comment edit review close reopen merge".split())
@@ -190,7 +189,7 @@ class _Meta:
                         self.assign(s.w[i], s.live[i])
             elif c is not None and s.w[c] in ("cd", "pushd", "popd"):
                 self.cdto(c, lo, hi)
-        g = sw.cmd_index(s, lo, hi, GH, nested)
+        g = sw.cmd_index(s, lo, hi, sw.GH, nested)
         if g is None or g + 1 > hi:
             return
         repo = posrepo = ""
@@ -250,44 +249,20 @@ class _Meta:
             self.add("R", _flat(repo) if repo else "-")
 
     def api(self, g, hi):
-        s = self.s
-        path, method, fields = "", "", False
-        i = g + 2
-        while i <= hi:
-            t = sw.word(self.s, i)
-            if m := sw.gh_method_flag(s, i, hi, method):
-                method, i = m
-            elif t in ("-f", "-F", "--field", "--raw-field"):
-                fields = True
-                if i < hi:
-                    i += 1
-                    self.field(sw.word(self.s, i), s.live[i])
-            elif re.match(r"-[fF].", t):
-                fields = True
-                self.field(t[2:], s.live[i])
-            elif re.match(r"--(?:field|raw-field)=", t):
-                fields = True
-                self.field(t.split("=", 1)[1], s.live[i])
-            elif t == "--input":
-                fields = True
-                if i < hi:
-                    i += 1
-                    self.file(sw.word(self.s, i))
-            elif t.startswith("--input="):
-                fields = True
-                self.file(t[8:])
-            elif t in sw.GH_API_VALUED:
-                i += 1
-            elif _UNSEEN.match(t):
+        api = sw.gh_api(self.s, g + 2, hi)
+        for a in api.args:
+            if a.text is None:
+                continue
+            if a.flag == "--input":
+                self.file(a.text)
+            else:
+                self.field(a.text, a.live)
+        for t in api.flags:
+            if _UNSEEN.match(t):
                 self.add("UNSEEN", _flat(t))
-            elif t.startswith("-"):
-                pass
-            elif path == "":
-                path = t
-            i += 1
-        p = sw.gh_api_path(path)
+        p = api.path
         if re.match(r"repos/[^/]+/[^/]+/(?:issues|pulls)(?:/|\Z)", p):
-            if method in ("GET", "HEAD") or (method == "" and not fields):
+            if api.method in ("GET", "HEAD") or (api.method == "" and not api.sends):
                 return
             parts = p.split("/")
             self.add("R", parts[1] + "/" + parts[2])
@@ -339,12 +314,11 @@ def check(doc):
     terms_file = env.get("CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE") or ""
     if not terms_file:
         return None                              # inert until the user names a terms file
-    tool = payload.get("tool_name")
+    tool = doc.tool
     if not isinstance(tool, str) or not tool:
         return None
     cwd = payload["cwd"]
-    ti = payload.get("tool_input")
-    ti = ti if isinstance(ti, dict) else {}
+    ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
     if tool == "Bash":
         cmd = ti.get("command")
         if not isinstance(cmd, str) or not cmd:
