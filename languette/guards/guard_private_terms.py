@@ -1,9 +1,22 @@
-"""guard-private-terms: text bound for a public GitHub repo is checked against
-the user's private terms file. The spec is features/guard-private-terms.feature.
+"""guard-private-terms: text bound for a public GitHub repo is judged twice. The
+spec is features/guard-private-terms.feature.
 
 Once a private term is in a public issue or PR it is in GitHub's history and
 every mirror of it; the undo is a support ticket, not an edit. So the check
 sits at the moment the text leaves the machine.
+
+Anonymize: a home-directory path in the posted text ($HOME, /home/<user>,
+/Users/<user>, /mnt/c/Users/<user>) is rewritten to `~` in the posted text
+alone and the call is allowed, as a secret is redacted. On by default, no
+configuration, with or without a terms file; guard_private_terms_anonymize
+turns it off. It never denies for text it cannot read. A path the command also
+holds outside the posted text, or one inside a file's contents, which a rewrite
+cannot reach, is a deny with the fix in the reason.
+
+Hard block: a hit on a term from the terms file denies the whole post; the
+reason names the terms that hit. The file is private_terms_file, a leading `~`
+or `$HOME` expanded; unset or empty, ~/.config/languette/private-terms.txt if it
+exists. No file, no hard block.
 
 Fires on Bash `gh issue|pr create|comment|edit|review|close|reopen|merge`,
 `gh api` writing to repos/*/*/issues|pulls or a graphql mutation that comments
@@ -13,20 +26,17 @@ issue, PR, comment or review. A body posted from a script file, `curl` or
 --body/--title/--comment/--subject/--label values, gh api field values, every
 heredoc body, and the contents of a --body-file/--comment-file/-F/--input file,
 never its path; for MCP, every string in tool_input. Each term is matched
-case-insensitively as plain text, and the reason names the terms that hit.
-
-A home-directory path in the text is sanitized, not denied: rewritten to `~`
-in the posted text alone and asked about, unless it sits in a file's contents, which a rewrite cannot reach.
+case-insensitively as plain text.
 
 The target repo is --repo/-R, GH_REPO=, a positional URL or owner/repo#n, the
 gh api path, or MCP owner/repo; failing those, the origin of the cwd, unless
 the command runs a `cd`. A graphql mutation's repo is unknown. Unknown is
-scanned; only when every target is in private_repos does the text go unscanned.
+judged; only when every target is in private_repos does the text go unjudged.
 
-Inert with private_terms_file unset or empty. Once it is set, fails closed: a
-terms file unreadable or empty, a body built at run time that no heredoc feeds,
-stdin with no heredoc, a file it cannot read, or a flag whose shape says it
-carries text but is not one it knows -> deny, with the fix in the reason.
+Only the hard block fails closed. With a terms file found: one configured but
+unreadable, or holding no terms, a body built at run time that no heredoc
+feeds, stdin with no heredoc, a file it cannot read, or a flag whose shape says
+it carries text but is not one it knows -> deny, with the fix in the reason.
 """
 
 import re

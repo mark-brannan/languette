@@ -164,13 +164,19 @@
     "guard_private_terms": {
       "type": "boolean",
       "title": "Keep private terms out of public issues and PRs",
-      "description": "Deny issue and PR text posted to a public GitHub repo that names a term from your private-terms file. Does nothing until you also set the private terms file. Leave on unless you want that text through unchecked.",
+      "description": "Rewrite a home-directory path in issue and PR text posted to a public GitHub repo to ~ and allow the post, and deny the post if it names a term from your private-terms file. Leave on unless you want that text through unchecked.",
+      "default": true
+    },
+    "guard_private_terms_anonymize": {
+      "type": "boolean",
+      "title": "Rewrite home-directory paths to ~ in public posts",
+      "description": "Rewrite your home directory, and its other spellings such as /home/<user>, /Users/<user> and /mnt/c/Users/<user>, to ~ in text posted to a public GitHub repo, and allow the post. Needs no terms file. Leave on unless you want those paths posted as written. Has no effect while guard_private_terms is false.",
       "default": true
     },
     "private_terms_file": {
       "type": "file",
       "title": "Private terms file",
-      "description": "A text file of terms that must not appear in text posted to a public GitHub repo: one per line, matched case-insensitively as plain text, # for comments. With no file set, the public-issue guard allows everything.",
+      "description": "A text file of terms so sensitive that a post naming one is denied whole: one per line, matched case-insensitively as plain text, # for comments. A leading ~ or $HOME is expanded. Unset, ~/.config/languette/private-terms.txt is read if it exists; with neither, no term is blocked, and home-directory paths are still rewritten. A file set here but unreadable denies every public post.",
       "required": false
     },
     "private_repos": {

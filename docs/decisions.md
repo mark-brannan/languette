@@ -154,11 +154,31 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
   user's own hook, is not designed; it enters by request from a user, as
   an issue. Current thinking.
 - `rewrite` is a rule action: it replaces inside the text a call carries,
-  never its words or flags; the result is judged again by every rule, then
-  asked about, before and after in the reason. Shipped and user tiers only.
+  never its words or flags; the result is judged again by every rule. A
+  redaction is then allowed, any other rewrite asked about, before and after
+  in the reason. Shipped and user tiers only.
 - What a rewrite finds and puts is the rule's: a term, a secret shape or an
   environment variable's value, replaced by `~`, the literal `$HOME`, a
   placeholder or another variable's name.
 - Rewrite then allow, with a note to the agent after the call, for a safer
   flag: open, no strong view.
 - Design: [docs/design/guard-rules.md](design/guard-rules.md).
+
+## guard-private-terms: 2026-10-27
+
+- No environment variable configures languette. One is a last resort, for a
+  pressing need with real design intent behind it.
+- guard-private-terms is two behaviours. Anonymize rewrites a home-directory
+  path in text bound for a public repo ($HOME and its other spellings, such
+  as /home/<user>, /Users/<user>, /mnt/c/Users/<user>) to `~` and allows the
+  call. It is on by default, needs no configuration and runs whether or not
+  a terms file is set. Hard block denies the whole post for a term on a
+  short list of really sensitive terms, where even a redacted post could
+  leak concepts or strategy. Only the hard block needs a terms file, and
+  only it fails closed.
+- Rewrite then allow is the action for redaction.
+- Anonymize never denies for text it cannot read, such as a body built at
+  run time or an unreadable file: it cannot help there, so the call goes
+  through. Fail-closed denials for unreadable text apply only when
+  hard-block terms are configured.
+- Spec: [features/guard-private-terms.feature](../features/guard-private-terms.feature).

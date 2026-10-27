@@ -97,7 +97,8 @@ Each guard checks for one kind of hazard:
 - [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`, `sh <(curl ..)`,
   `eval "$(wget ..)"`
 - [`guard-private-terms`](#settings-for-guard-private-terms): a term from your
-  private list, posted to a public repo (off until given the list)
+  private list, posted to a public repo; a home-directory path in that text
+  is rewritten to `~` and the post allowed
 - [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
@@ -254,7 +255,8 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 | `private_terms_file` | a text file of terms, one per line, matched case-insensitively | `~/.config/private-terms` |
 | `private_repos` | repos whose posts are never scanned, comma-separated | `you/notes,you/scratch` |
 
-Without a terms file the guard is off.
+Without a terms file no term is blocked; home-directory paths are still
+rewritten to `~`, unless `guard_private_terms_anonymize` is false.
 
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
 comma-separated; empty, the default, guards no label. A label that waives a CI
