@@ -48,6 +48,9 @@ Feature: guard-bypass-hooks
       | vcsh ci -n -m x                              | ci is vcsh's abbreviation of commit    |
       | vcsh foreach commit --no-verify              | foreach puts git before its arguments, in every repository |
       | vcsh foreach -p commit -n -m x               | -p only prefixes the repository name  |
+      | vcsh foreach -c core.hooksPath=x commit      | git options come before the subcommand |
+      | vcsh foreach --no-pager commit -n            | a flag option, then the subcommand    |
+      | vcsh foreach -g git -c core.hooksPath=x commit | git options after -g's git          |
       | vcsh foreach -g git commit --no-verify       | -g runs the command as it is, here git |
       | vcsh foreach -gp git commit -n -m x          | clustered flags                       |
       | bash -c "git commit -n -m x"                 | bash -c nests                         |

@@ -1331,7 +1331,7 @@ def _git_walk(s, g, b):
         if j <= b and s.w[j] == "--":
             j += 1
         if not general:
-            return None, j, opts
+            return None, take(j), opts
     elif verb == "run":
         repo, j = (s.w[j] if j <= b else None), j + 1
     else:
