@@ -24,7 +24,7 @@ GitHub that cannot answer (gh missing, signed out, offline, an error), a
 timeline page filled with no open PR on it (an older one may sit past it),
 or a repo that cannot be told asks, as the other guards that ask GitHub do. A
 body the guard cannot read (built at run time, a file it cannot open or
-past MAX_READ, stdin with no heredoc) is a deny that says why.
+past paths.MAX_READ, stdin with no heredoc) is a deny that says why.
 """
 
 import os
