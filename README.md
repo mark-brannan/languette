@@ -44,6 +44,10 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 /plugin install languette@languette
 ```
 
+```
+python3 -I "$(ls -td ~/.claude/plugins/cache/languette/languette/*/ | head -1)languette/__main__.py" doctor
+```
+
 It needs `python3`, standard library only. `shfmt` (the parser it trusts
 most) and `gh` (for the guards that ask GitHub) are optional.
 
