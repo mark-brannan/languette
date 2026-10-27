@@ -267,8 +267,6 @@ def check(doc):
     ids, why = yield from _resolves(doc, cmd, cwd, (doc.env or {}).get("HOME") or "")
     if why:
         return deny(say("rt_unknown_thread", guard=NAME, why=why, do=DO))
-    if ids and not cwd:
-        cwd = yield Need("cwd")
     for tid in ids:
         got = yield from _thread(cwd, tid)
         if isinstance(got, str):
