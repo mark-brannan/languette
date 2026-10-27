@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from languette import scan
@@ -388,13 +389,16 @@ def check(cwd):
             else:
                 rows.append((FAIL, label, f"`{sent}` was not denied {how}: {what}"))
 
-    for name, (args, lists, note) in FORGES.items():
-        path = shutil.which(name)
-        if not path:
+    paths = {name: shutil.which(name) for name in FORGES}
+    # The probes may reach the network: in parallel, a dead one costs one timeout, not one per client.
+    with ThreadPoolExecutor() as pool:
+        answers = {name: pool.submit(signed_in, path, *FORGES[name][:2]) for name, path in paths.items() if path}
+    for name, (_, _, note) in FORGES.items():
+        if name not in answers:
             if name == "gh":
                 rows.append((WARN, name, f"not installed; {note}"))
             continue
-        signed = signed_in(path, args, lists)
+        signed = answers[name].result()
         state = {True: "signed in", False: "installed, not signed in", None: "installed, not answering"}[signed]
         quiet = signed is True if name == "gh" else signed is False
         rows.append((OK, name, state) if quiet else (WARN, name, f"{state}; {note}"))
