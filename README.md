@@ -51,7 +51,7 @@ most) and `gh` (for the guards that ask GitHub) are optional.
 
 ```
 brew install mark-brannan/tap/languette
-languette install && languette doctor
+languette doctor
 ```
 
 ### Linux and WSL (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
@@ -59,7 +59,7 @@ languette install && languette doctor
 ```
 sudo apt install python3 pipx shfmt gh
 pipx install languette
-languette install && languette doctor
+languette doctor
 ```
 
 ### Windows without WSL
