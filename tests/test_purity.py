@@ -202,6 +202,14 @@ def test_every_known_escape_is_still_there():
     assert_that({rel: g for rel, g in gone.items() if g}, equal_to({}))
 
 
+def test_install_writes_nothing_itself():
+    """`languette install` only finds `claude`, runs it and reads the cwd; only
+    Claude Code writes. Any other way out, a file opened or a path written, fails here."""
+    found = {w for _, w in escapes((ROOT / "languette" / "install.py").read_text())}
+    assert_that(sorted(found), equal_to(["import shutil", "import subprocess", "os.getcwd", "shutil.which",
+                                         "subprocess.TimeoutExpired", "subprocess.run"]))
+
+
 @pytest.mark.parametrize("source", [
     "open('x')",
     "import io\nio.open('x')",

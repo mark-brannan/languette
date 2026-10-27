@@ -1,5 +1,5 @@
-"""The `languette` command: `languette doctor` or `languette scan`; from a
-clone, `python3 -m languette ...`; from a plugin install, `python3 -I
+"""The `languette` command: `languette install`, `languette doctor` or
+`languette scan`; from a clone, `python3 -m languette ...`; from a plugin install, `python3 -I
 "$PLUGIN_ROOT/languette/__main__.py" ...`. `scan` is experimental: its
 output may change in any release while "languette_scan" is a v0 version."""
 
@@ -48,9 +48,24 @@ def _regex(text):
         raise argparse.ArgumentTypeError(f"not a regex: {e}") from None
 
 
+def _host(text):
+    from languette import install
+    if text not in install.HOSTS:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a host languette installs into yet: only claude today; "
+                                         "other hosts are planned (#5)")
+    return text
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="languette", description="Guards against risky actions by coding agents.")
     sub = p.add_subparsers(dest="command", required=True, metavar="COMMAND")
+    ins = sub.add_parser("install", help="wire languette into Claude Code through its plugin marketplace; "
+                                         "exits 1 on any ✗",
+                         description="Add languette's plugin marketplace to Claude Code and install the plugin, "
+                                     "through the claude command; this writes nothing itself. Nothing runs when "
+                                     "the plugin is already installed. Exits 1 on any ✗.")
+    ins.add_argument("host", nargs="?", default="claude", type=_host, metavar="HOST",
+                     help="the coding agent to wire: claude (the default, and the only one today)")
     sub.add_parser("doctor", help="say whether languette protects Claude Code here; exits 1 on any ✗",
                    description="Say whether languette protects Claude Code on this machine, from the current "
                                "directory. Exits 1 on any ✗.")
@@ -72,6 +87,9 @@ def main(argv=None):
             return 1
         print(json.dumps(doc, indent=2))
         return 0
+    if args.command == "install":
+        from languette import install
+        return install.main(args.host)
     from languette import doctor
     return doctor.main()
 

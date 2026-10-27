@@ -44,10 +44,6 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 /plugin install languette@languette
 ```
 
-```
-python3 -I "$(ls -td ~/.claude/plugins/cache/languette/languette/*/ | head -1)languette/__main__.py" doctor
-```
-
 It needs `python3`, standard library only. `shfmt` (the parser it trusts
 most) and `gh` (for the guards that ask GitHub) are optional.
 
@@ -55,15 +51,15 @@ most) and `gh` (for the guards that ask GitHub) are optional.
 
 ```
 brew install mark-brannan/tap/languette
-languette doctor
+languette install && languette doctor
 ```
 
-### Linux and WSL (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
+### Linux and WSL
 
 ```
 sudo apt install python3 pipx shfmt gh
 pipx install languette
-languette doctor
+languette install && languette doctor
 ```
 
 ### Windows without WSL
