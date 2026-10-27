@@ -15,13 +15,16 @@ helps write a config that works.
 
 ## What it does
 
-1. **Checks protection:** one ✓, ! or ✗ row per check; any ✗ exits non-zero.
+1. **Checks protection and its dependencies:** one ✓, ! or ✗ row per check; any ✗ exits non-zero.
 2. **Diagnoses every config** through the guard's own loader. (planned)
 3. **Offers the fix** as a diff, applied only on a yes. (planned)
 4. **Assists with configuration,** not only repair. (planned)
 
-The checks are the install, the shell parser, a probe through the hooks as
-installed, and `gh`; CI can run them. The configs are the plugin's options
+The checks are the install, the dependencies, a probe through the hooks as
+installed, and the version; CI can run them. The dependencies are few and
+each gets its row: `shfmt`, the preferred parser, has top billing, and a
+machine without it is told which rung reads commands instead; `gh` is
+optional, and without it the guards that ask GitHub ask the user instead. The configs are the plugin's options
 and every file under `.languette/`. A config its guard would refuse is a ✗
 row naming the file, the entry and why: a key no guard reads, a value of the
 wrong type, a file that does not parse. A config that switches every command
