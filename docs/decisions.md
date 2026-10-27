@@ -168,15 +168,26 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 
 - No environment variable configures languette. One is a last resort, for a
   pressing need with real design intent behind it.
-- guard-private-terms is two behaviours. Anonymize rewrites a home-directory
-  path in text bound for a public repo ($HOME and its other spellings, such
-  as /home/<user>, /Users/<user>, /mnt/c/Users/<user>) to `~` and allows the
-  call. It is on by default, needs no configuration and runs whether or not
-  a terms file is set. Hard block denies the whole post for a term on a
-  short list of really sensitive terms, where even a redacted post could
-  leak concepts or strategy. Only the hard block needs a terms file, and
-  only it fails closed.
+- guard-private-terms is two behaviours. Anonymize rewrites text bound for
+  a public repo by a list of [find, put] pairs and allows the call: shipped,
+  the home directory ($HOME and its other spellings, such as /home/<user>,
+  /Users/<user>, /mnt/c/Users/<user>) to `~`; the user's own in a rewrites
+  file. It is on by default, needs no configuration and runs whether or not
+  a blocked terms file is set. Hard block denies the whole post for a term
+  on a short list of really sensitive terms, where even a redacted post
+  could leak concepts or strategy. Only the hard block needs its file, and
+  only it fails closed on text it cannot see.
 - Rewrite then allow is the action for redaction.
+- The hard block's list is the blocked terms file, option `blocked_terms_file`,
+  default `~/.config/languette/blocked-terms.txt`. "Private terms" names the
+  guard and what anonymize redacts; "blocked" says what the list does.
+- The rewrites file, option `rewrites_file`, default
+  `~/.config/languette/rewrites.json`, is `{"rewrite": [[find, put], ...]}`:
+  the `rewrite` rule's own find and put, so it reads unchanged as the user
+  tier's first rule set when the engine lands. A find `$NAME` is that
+  variable's value; a pair with no put puts `<redacted>`. Current thinking.
+- A file that is found must load, or the post is denied naming the option;
+  a file absent from the default path is no file. Current thinking.
 - Anonymize never denies for text it cannot read, such as a body built at
   run time or an unreadable file: it cannot help there, so the call goes
   through. Fail-closed denials for unreadable text apply only when

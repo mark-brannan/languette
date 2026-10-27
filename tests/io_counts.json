@@ -362,6 +362,7 @@
  "tests/test_features.py::test_a_files_contents_decide_wherever_the_flag_spells_the_path[{PROJ}-gh issue comment 4 -R o/r --body-file=~/pt-term.md-denies, naming \"Wanderlust\"]": {"git": 3},
  "tests/test_features.py::test_a_files_contents_decide_wherever_the_flag_spells_the_path[{PROJ}-gh issue create -R o/r -t x -F {PROJ}/clean.md-is silent]": {"git": 3},
  "tests/test_features.py::test_a_files_contents_decide_wherever_the_flag_spells_the_path[{PROJ}-gh pr create -R o/r -t x -F body.md-denies, naming \"Wanderlust\"]": {"git": 2},
+ "tests/test_features.py::test_a_find_spelled_name_is_that_variables_value_unset_or_empty_the_pair_matches_nothing[-is silent]": {"git": 2},
  "tests/test_features.py::test_a_flagged_file_elsewhere_in_the_tree_still_denies_a_discard_of_the_whole_tree": {"git": 4, "run": 2},
  "tests/test_features.py::test_a_footgun_after_a_heredoc_is_still_run": {"git": 1},
  "tests/test_features.py::test_a_footgun_before_a_heredoc_is_still_run": {"git": 1},

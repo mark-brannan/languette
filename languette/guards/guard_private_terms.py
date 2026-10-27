@@ -5,18 +5,22 @@ Once a private term is in a public issue or PR it is in GitHub's history and
 every mirror of it; the undo is a support ticket, not an edit. So the check
 sits at the moment the text leaves the machine.
 
-Anonymize: a home-directory path in the posted text ($HOME, /home/<user>,
-/Users/<user>, /mnt/c/Users/<user>) is rewritten to `~` in the posted text
-alone and the call is allowed, as a secret is redacted. On by default, no
-configuration, with or without a terms file; guard_private_terms_anonymize
-turns it off. It never denies for text it cannot read. A path the command also
-holds outside the posted text, or one inside a file's contents, which a rewrite
+Anonymize: each find in a list of pairs is replaced by its put in the posted
+text alone and the call is allowed, as a secret is redacted. Shipped: the home
+directory ($HOME, /home/<user>, /Users/<user>, /mnt/c/Users/<user>) to `~`.
+Yours: rewrites_file, JSON, {"rewrite": [[find, put], ...]}; a find `$NAME` is
+that variable's value, unset it matches nothing; no put puts `<redacted>`. On
+by default, with or without a blocked terms file; guard_private_terms_anonymize
+turns it off. It never denies for text it cannot read. A find the command also
+holds outside the posted text, or inside a file's contents, which a rewrite
 cannot reach, is a deny with the fix in the reason.
 
-Hard block: a hit on a term from the terms file denies the whole post; the
-reason names the terms that hit. The file is private_terms_file, a leading `~`
-or `$HOME` expanded; unset or empty, ~/.config/languette/private-terms.txt if it
-exists. No file, no hard block.
+Hard block: a hit on a term from blocked_terms_file denies the whole post; the
+reason names the terms that hit. No file, no hard block.
+
+Either option expands a leading `~` or `$HOME`; unset or empty, the guard reads
+~/.config/languette/blocked-terms.txt or rewrites.json if it exists. A file that
+is found must load: set but unreadable, empty of terms, or not in shape -> deny.
 
 Fires on Bash `gh issue|pr create|comment|edit|review|close|reopen|merge`,
 `gh api` writing to repos/*/*/issues|pulls or a graphql mutation that comments
@@ -33,10 +37,10 @@ gh api path, or MCP owner/repo; failing those, the origin of the cwd, unless
 the command runs a `cd`. A graphql mutation's repo is unknown. Unknown is
 judged; only when every target is in private_repos does the text go unjudged.
 
-Only the hard block fails closed. With a terms file found: one configured but
-unreadable, or holding no terms, a body built at run time that no heredoc
-feeds, stdin with no heredoc, a file it cannot read, or a flag whose shape says
-it carries text but is not one it knows -> deny, with the fix in the reason.
+Only the hard block fails closed on text it cannot see. With a blocked terms
+file found: a body built at run time that no heredoc feeds, stdin with no
+heredoc, a file it cannot read, or a flag whose shape says it carries text but
+is not one it knows -> deny, with the fix in the reason.
 """
 
 import re
