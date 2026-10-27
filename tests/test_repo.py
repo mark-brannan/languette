@@ -201,7 +201,7 @@ def test_a_command_rules_cmd_picks_the_program_it_matches():
     def hit(cmd, command):
         doc = Document({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": "/"}, {})
         match = {"cmd": cmd, "verbs": scan.CTL_STOPS, "unit": {"units": ["nginx"]}}
-        return scan.ctl_hit(doc, match)
+        return scan.match_rule(doc, match, prose=scan.PROSE)[2]
 
     assert_that(hit("systemctl", "systemctl stop nginx"), equal_to("systemctl stop nginx"))
     assert_that(hit("systemctl", "foo stop nginx"), equal_to(None))
