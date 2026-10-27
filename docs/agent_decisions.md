@@ -443,3 +443,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261027t192915z
 - tests/test_structure.py's known tables are two-sided (found == KNOWN), replacing the first push's ceilings after a review thread showed a ceiling admits a swapped copy; the spec PR merges first and each sibling refactor prunes its own entries Undo: drop the equality on the removed side, back to ceilings ([#281](https://github.com/mark-brannan/languette/pull/281))
+
+### 20261027t192927z
+- an answer's text counts as said outside messages unless it is a say() call, so a forwarded str(e) or a joined list sits in KNOWN_INLINE_TEXT Undo: exempt Name and Call nodes in _answer_text's caller ([#281](https://github.com/mark-brannan/languette/pull/281))
