@@ -259,7 +259,7 @@ Without a terms file the guard is off.
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
 comma-separated; empty, the default, guards no label. A label that waives a CI
 gate is the driver's to apply unless this setting names it, for example
-`churn-ok,mixed-loops-ok`.
+`skip-ci,waive-review`.
 
 `review_thread_logins` lists the logins, besides the gh login, whose reply
 lets `guard-review-threads` pass a thread's resolve, comma-separated, for
@@ -371,9 +371,7 @@ test, which installs the plugin in a scratch project and confirms a recursive
 `rm` is really blocked, stays manual: it needs a model call and a login.
 
 `features/` holds the contract as scenarios: a command in, tokens or a
-verdict out. The guards began as shell scripts copied from
-[mark-brannan/dotfiles](https://github.com/mark-brannan/dotfiles); they run
-in Python now, and this repo is where they are maintained.
+verdict out.
 
 ## License
 
