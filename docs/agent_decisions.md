@@ -455,3 +455,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261027t193435z
 - the doctor and install test base class is tests/harness.py FakeHome Undo: rename or move ([#280](https://github.com/mark-brannan/languette/pull/280))
+
+### 20261027t193438z
+- tests/test_repo.py keeps its GUARDS literal as the one list independent of run.GUARDS Undo: derive from harness.GUARD_NAMES ([#280](https://github.com/mark-brannan/languette/pull/280))
