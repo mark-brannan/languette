@@ -1,3 +1,4 @@
 - Name nothing from the mark-brannan/claude setup or its owner's workflow: no workflow state, claim stamps, cards, pickups or curia.
 - A new guard starts as an issue labelled `ready`, and is prototyped outside this repo first. Decisions: `docs/decisions.md`, "New guards".
 - A new guard builds on Document, scan and verdict; a primitive two guards would share lands there first. Decisions: `docs/decisions.md`, "New guards".
+- Reuse before build: `tests/test_structure.py` fails on a constant a guard keeps that the shared layer or another guard holds, a call field read past Document, a sentence said outside messages. Its known lists only shrink.
