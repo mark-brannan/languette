@@ -19,6 +19,7 @@ from languette.guards import (guard_bypass_labels, guard_duplicate_prs, guard_gi
                               guard_protected_services, guard_signed_comments)
 
 ROOT = Path(__file__).resolve().parent.parent
+# Spelled out, not read from run.GUARDS, so a guard dropped from run.GUARDS fails the comparisons below.
 GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
           "guard-private-terms", "prose-budget-commit", "guard-worktrees",
           "guard-bypass-labels", "require-well-formed", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
