@@ -48,7 +48,6 @@ from languette.verdict import Act, Need, Refuse, ask, deny
 NAME = "guard-bypass-ruleset"
 TTL = 3600
 
-_GH = re.compile(r"(?:^|/)gh\Z")
 _EXPORT = frozenset("export declare typeset".split())
 _GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
 _PUSH_VALUED = frozenset("-o --push-option --repo --receive-pack --exec".split())
@@ -274,7 +273,7 @@ def _push(s, a, b, nested, here, lits=None):
 
 
 def _admin_merge(s, a, b, nested):
-    g = sw.cmd_index(s, a, b, _GH, nested)
+    g = sw.cmd_index(s, a, b, sw.GH, nested)
     if g is None:
         return False
     w = s.w[g + 1:b + 1]

@@ -84,6 +84,7 @@ Feature: guard-github-issues
       | eval "gh issue transfer 4 o/x"                      |
       | url=$(gh issue create -t t -b b)                     |
       | gh api repos/o/r/issues -f title=t                  |
+      | gh api -X=POST repos/o/r/issues -f title=t          |
 
     @also_guard-bypass-labels
     Examples:
