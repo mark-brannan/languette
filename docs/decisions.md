@@ -144,3 +144,21 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 
 - No licence rider against AI companies: AGPL answers hosting, and no licence
   answers training. The README states the distrust as a position, not a condition.
+
+## One rules engine: 2026-10-27
+
+- Primitives (selectors, predicates, facts) are Python inside languette.
+  The user tier and the repo tier hold rules as data, never Python, at
+  every tier. Current thinking.
+- A plug point for outside code, reusing the scanner or the engine in a
+  user's own hook, is not designed; it enters by request from a user, as
+  an issue. Current thinking.
+- `rewrite` is a rule action: it replaces inside the text a call carries,
+  never its words or flags; the result is judged again by every rule, then
+  asked about, before and after in the reason. Shipped and user tiers only.
+- What a rewrite finds and puts is the rule's: a term, a secret shape or an
+  environment variable's value, replaced by `~`, the literal `$HOME`, a
+  placeholder or another variable's name.
+- Rewrite then allow, with a note to the agent after the call, for a safer
+  flag: open, no strong view.
+- Design: [docs/design/guard-rules.md](design/guard-rules.md).
