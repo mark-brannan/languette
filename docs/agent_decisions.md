@@ -440,3 +440,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261027t192142z
 - the five reuse checks live in one file, tests/test_structure.py, not spread across test_repo.py and test_messages.py Undo: move the functions ([#281](https://github.com/mark-brannan/languette/pull/281))
+
+### 20261027t192915z
+- tests/test_structure.py's known tables are two-sided (found == KNOWN), replacing the first push's ceilings after a review thread showed a ceiling admits a swapped copy; the spec PR merges first and each sibling refactor prunes its own entries Undo: drop the equality on the removed side, back to ceilings ([#281](https://github.com/mark-brannan/languette/pull/281))
