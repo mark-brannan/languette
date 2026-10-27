@@ -41,7 +41,7 @@ of sending the agent to ask.
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import NO_QUESTION, Refuse, claim, deny
+from languette.verdict import NO_QUESTION, Refuse, approve, deny
 
 NAME = "ask-first"
 CONFIG = ".languette/ask-first.json"
@@ -67,11 +67,8 @@ def _own(c, where):
 
 
 def _load(path):
-    cfg = yield from paths.read_json(path)
-    try:
-        commands = sw.load_rules(cfg, "commands", ("cost", "approve_label", "cheaper"), _own, many=True, nonempty=True)
-    except sw.BadRules as e:
-        raise Refuse(str(e))
+    commands = yield from paths.read_rules(
+        path, "commands", ("cost", "approve_label", "cheaper"), _own, many=True, nonempty=True)
     labels = {}
     for n, c in enumerate(commands):
         if c["approve_label"] in labels:
@@ -109,16 +106,15 @@ def check(doc):
     if not hits:
         return None
     if looped:
-        return deny(say("loop", guard="ask-first", what=", ".join(f"`{c['id']}`" for c in looped),
+        return deny(say("loop", guard=NAME, what=", ".join(f"`{c['id']}`" for c in looped),
                         then="Run it once, on its own."))
 
-    try:
-        approved, spent = yield from claim({c["approve_label"]: runs[c["id"]] for c in hits})
-    except (OSError, ValueError) as e:
-        return deny(say("transcript_unreadable", guard="ask-first", err=e, cmd=cmd.strip(),
-                        then="Ask the user to run it themselves."))
-    if spent:
-        return None
+    approved, done = yield from approve(
+        {c["approve_label"]: runs[c["id"]] for c in hits},
+        lambda e: say("transcript_unreadable", guard=NAME, err=e, cmd=cmd.strip(),
+                      then="Ask the user to run it themselves."))
+    if done:
+        return done[0]
     parts = []
     for c in hits:
         have = len(approved[c["approve_label"]])
@@ -132,4 +128,4 @@ def check(doc):
         parts.append(say("ask_first_need", id=c["id"], path=path,
                          times=(say("ask_first_times", n=runs[c["id"]], have=have) if runs[c["id"]] > 1 else ""),
                          cost=c["cost"], cheaper=cheaper, cmd=cmd.strip(), label=c["approve_label"]))
-    return deny(say("judged", guard="ask-first", why="\n\n".join(parts)))
+    return deny(say("judged", guard=NAME, why="\n\n".join(parts)))

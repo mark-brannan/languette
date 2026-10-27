@@ -1,13 +1,11 @@
 """guard-bypass-labels: a label named in the bypass_labels option is a human's
 to apply.
 
-A label that waives a CI gate is the driver's to apply unless the option names
+A label that waives a CI gate is the user's to apply unless the option names
 it. The list is the bypass_labels option (CLAUDE_PLUGIN_OPTION_BYPASS_LABELS),
 comma-separated, and it is empty by default: unset, empty or blank guards no
-label and the guard allows every command. (Until 2026-10-23 the default list
-was churn-ok and mixed-loops-ok, and an empty option meant that list, so a
-misconfiguration could not open the gate; that is reversed.) A deployment that
-wants the gate back names its labels; a gate whose bypass the gated party can
+label and the guard allows every command. A deployment that
+wants the gate names its labels; a gate whose bypass the gated party can
 apply to its own PR is not a gate, so a session may then not apply a named
 label, in any repo, public or private. Names are compared case-folded, as
 GitHub compares label names.

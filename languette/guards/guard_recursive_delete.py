@@ -1,13 +1,14 @@
 """guard-recursive-delete: features/guard-recursive-delete.feature is the spec.
 
 Blocks recursive `rm` and `find ... -delete` unless every target, resolved
-against the payload's cwd and then through the filesystem, is Claude's to
+against the payload's cwd and then through the filesystem, is the agent's to
 remove: under the scratchpad, an agent worktree or /tmp, or a generated
 directory (GENERATED_NAMES) that is not a direct child of $HOME or of /.
 A target this guard cannot resolve to one allowed path is denied on sight,
 with a reason naming what it saw.
 """
 
+import functools
 import re
 
 from languette import paths
@@ -27,44 +28,14 @@ GENERATED_NAMES = ("node_modules", "dist", "coverage", ".pio")
 _FIND = re.compile(r"(?:^|/)find\Z")
 _RM = re.compile(r"(?:^|/)rm\Z")
 _RM_PARENTS = re.compile(r"^(?:git|yadm|svn|hg|jj|gsutil)\Z")
-_ALLOW_CHARS = re.compile(r"[A-Za-z0-9._@+/-]*")
-
-
-def _parse_allow(value, home, home_p, physical):
-    """LANGUETTE_RM_ALLOW -> (extra_roots, extra_names, error or None).
-    `physical` resolves each path entry through the disk."""
-    roots, names = [], []
-    for ent in value.split(":"):
-        if ent == "":
-            return roots, names, "an empty entry"
-        if not _ALLOW_CHARS.fullmatch(ent):
-            return roots, names, f"unsupported character in '{ent}'"
-        if ent.startswith("/"):
-            if ent.endswith(("/.", "/..")) or "/./" in ent or "/../" in ent or "//" in ent:
-                return roots, names, f"'{ent}' has an empty, . or .. segment"
-            if ent.endswith("/"):
-                ent = ent[:-1]
-            if ent in ("", home):
-                return roots, names, f"'{ent}' is / or $HOME"
-            ent_p = physical(ent)
-            if ent_p in ("", home, home_p):
-                return roots, names, f"'{ent}' resolves to / or $HOME"
-            roots += [ent, ent_p]
-        elif "/" in ent:
-            return roots, names, f"'{ent}' is neither a bare name nor an absolute path"
-        elif ent in (".", ".."):
-            return roots, names, f"'{ent}' is not a name"
-        else:
-            names.append(ent)
-    return roots, names, None
 
 
 class _Judge:
-    """What the awk half of the shell guard does: find every recursive target
-    in the command and either refuse it on sight or return it resolved."""
+    """Find every recursive target in the command and either refuse it on
+    sight or return it resolved."""
 
     def __init__(self, cwd, home):
-        self.cwd, self.home, self.homeN = cwd, home, paths.normalize(home)
+        self.cwd, self.home = cwd, home
         self.trig, self.moved, self.targets = "rm", False, []
 
     def lab(self, raw):
@@ -76,31 +47,11 @@ class _Judge:
         raise Refuse(say("recursive_delete", label=self.lab(raw), why=why))
 
     def target(self, s, idx):
-        raw = t = s.w[idx]
-        if s.k[idx] == "q":
-            self.blocked(raw, say("rd_quoted_space"))
-        if re.search(r"[*?\[{}]", t):
-            self.blocked(t, say("rd_glob"))
-        if re.search(r"[$`]", t):
-            self.blocked(t, say("rd_substitution"))
-        if re.search(r"[\t\n\r]", t):
-            self.blocked(t, say("rd_tab_newline"))
-        if t == ".." or re.search(r"(?:^|/)\.\.(?:/|\Z)", t):
-            self.blocked(t, say("rd_dotdot"))
-        if "~" in t:
-            if t == "~":
-                t = self.home
-            elif t.startswith("~/"):
-                t = self.home + t[1:]
-            else:
-                self.blocked(t, say("rd_tilde"))
-        if not t.startswith("/"):
-            if self.moved:
-                self.blocked(t, say("rd_cd_moved"))
-            t = self.cwd + "/" + t
-        t = paths.normalize(t)
-        if t in ("/", self.homeN):
-            self.blocked(raw, (say("rd_root") if t == "/" else say("rd_home")))
+        raw = s.w[idx]
+        try:
+            t = paths.resolve_target(raw, s.k[idx] == "q", self.cwd, self.home, self.moved)
+        except paths.Unresolved as e:
+            self.blocked(raw, str(e))
         self.targets.append((t, self.trig, raw))
 
     def segment(self, s, a, b, nested):
@@ -165,7 +116,7 @@ def _verdict(targets, home, physical, extra_roots=(), extra_names=()):
         return False
 
     def allowed(p):
-        return any(p == r or p.startswith(r + "/") for r in roots) or is_generated(p)
+        return paths.under(p, roots) or is_generated(p)
 
     for abs_, kind, raw in targets:
         what = f"find {raw} -delete" if kind == "find" else f"rm -r {raw}"
@@ -185,6 +136,9 @@ def _verdict(targets, home, physical, extra_roots=(), extra_names=()):
     return None
 
 
+_PARSE_ALLOW = functools.partial(paths.parse_allow, bare_names=True)
+
+
 def check(doc):
-    return (yield from paths.check_targets(doc, NAME, _Judge, "LANGUETTE_RM_ALLOW", _parse_allow, _MALFORMED,
+    return (yield from paths.check_targets(doc, NAME, _Judge, "LANGUETTE_RM_ALLOW", _PARSE_ALLOW, _MALFORMED,
                                            _verdict))

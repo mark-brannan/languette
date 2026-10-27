@@ -31,7 +31,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Act, Need, claim, deny
+from languette.verdict import Act, Need, approve, deny
 
 NAME = "guard-github-issues"
 # The tools hooks.json wires this guard to; the MCP ones by their name's tail.
@@ -233,11 +233,9 @@ def check(doc):
     if why is None:
         return None
     label = _label(*found[0])
-    try:
-        _, spent = yield from claim({label: 1})
-    except (OSError, ValueError) as e:
-        return deny(say("gi_transcript", guard=NAME, err=e, why=why, ask=say("gi_ask", label=label)))
-    return None if spent else deny(say("gi_door", guard=NAME, why=why, ask=say("gi_ask", label=label)))
+    _, done = yield from approve(
+        {label: 1}, lambda e: say("gi_transcript", guard=NAME, err=e, why=why, ask=say("gi_ask", label=label)))
+    return done[0] if done else deny(say("gi_door", guard=NAME, why=why, ask=say("gi_ask", label=label)))
 
 
 def _door(payload, session):

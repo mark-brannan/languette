@@ -6,38 +6,26 @@ conftest.py imports these, so pytest-bdd finds them."""
 import json
 import os
 import shlex
-import shutil
-import subprocess
-import sys
-import tempfile
 from pathlib import Path
 
 import pytest
-from hamcrest import assert_that, contains_string, equal_to, has_length
+from hamcrest import assert_that, contains_string, equal_to
 from pytest_bdd import given, parsers, then, when
 
+from harness import FakeHome
 from languette.install import REPO, SOURCE
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-class Install:
+class Install(FakeHome):
     def __init__(self):
-        # Not under /tmp: guard-recursive-delete allows all of /tmp.
-        self.home = Path(tempfile.mkdtemp(prefix="languette-install-home-", dir="/var/tmp"))
-        (self.home / "project").mkdir()
-        self.aside = Path(tempfile.mkdtemp(prefix="languette-install-"))   # the stub and its log, outside HOME
-        self.bin = self.aside / "bin"
-        self.bin.mkdir()
+        super().__init__("install", ("project",))
         self.log = self.aside / "asked"
         self.claude = True
         self.plugins, self.marketplaces = [], []
         self.add = (0, "")                     # exit code and stderr of `claude plugin marketplace add`
         self.after_add = [{"name": "languette", "source": "github", "repo": REPO}]   # what list shows after an add
-        self.out = self.err = self.code = self.before = None
-
-    def snapshot(self):
-        return sorted((str(p.relative_to(self.home)), p.stat().st_size) for p in self.home.rglob("*"))
 
     def stub(self):
         listed, after = self.aside / "marketplaces.json", self.aside / "after-add.json"
@@ -62,22 +50,7 @@ class Install:
             self.stub()
         self.log.write_text("")
         # Without the real PATH, so the real claude is never found: only the stub's directory and the system's.
-        env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "LANGUETTE_"))}
-        env.update(HOME=str(self.home), PATH=f"{self.bin}{os.pathsep}/usr/bin{os.pathsep}/bin",
-                   TMPDIR=str(self.aside), PYTHONPATH=str(ROOT))
-        self.before = self.snapshot()
-        r = subprocess.run([sys.executable, "-m", "languette", "install", *args], cwd=self.home / "project",
-                           env=env, capture_output=True, text=True, timeout=60)
-        self.out, self.err, self.code = r.stdout, r.stderr, r.returncode
-
-    def row(self, label):
-        rows = [ln for ln in self.out.splitlines() if ln[2:].startswith(label + " ")]
-        assert_that(rows, has_length(1), f"one {label!r} row in:\n{self.out}{self.err}")
-        return rows[0][0], rows[0][2:][len(label):].strip()
-
-    def cleanup(self):
-        for d in (self.home, self.aside):
-            shutil.rmtree(d, ignore_errors=True)
+        self.invoke(["install", *args], self.home / "project", f"/usr/bin{os.pathsep}/bin")
 
 
 def _expand(text):
@@ -139,7 +112,7 @@ def _runs_for(installer, host):
 
 @then(parsers.re(r'the install "(?P<label>[^"]+)" row is (?P<mark>[✓!✗]) "(?P<text>.*)"'))
 def _row(installer, label, mark, text):
-    assert_that(installer.row(label), equal_to((mark, _expand(text))))
+    installer.assert_row(label, mark, _expand(text))
 
 
 @then("claude was asked only:")
@@ -154,7 +127,7 @@ def _asked_nothing(installer):
 
 @then(parsers.parse("install exits {code:d}"))
 def _exits(installer, code):
-    assert_that(installer.code, equal_to(code), installer.out + installer.err)
+    installer.assert_exit(code)
 
 
 @then(parsers.parse('install says on stderr "{text}"'))
@@ -164,7 +137,7 @@ def _stderr(installer, text):
 
 @then("the fake HOME is as it was before install")
 def _home_untouched(installer):
-    assert_that(installer.snapshot(), equal_to(installer.before))
+    installer.assert_untouched()
 
 
 # What conftest.py takes: the fixture and the step fixtures pytest-bdd made above.

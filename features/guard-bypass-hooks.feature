@@ -6,7 +6,7 @@ Feature: guard-bypass-hooks
   am, and `git -c core.hooksPath=...` are denied, and run only after the user
   answered an AskUserQuestion with the label "Skip hooks once". One answer
   allows one run. On push -n is --dry-run, and on merge, pull and rebase it is
-  --no-stat; those pass. yadm counts as git. A git alias, and core.hooksPath
+  --no-stat; those pass. A git wrapper such as yadm counts as git. A git alias, and core.hooksPath
   set by `git config`, are not seen. Each
   scenario runs in a fresh git repo with CLAUDE_PROJECT_DIR set to it and an
   empty transcript, unless it says otherwise.

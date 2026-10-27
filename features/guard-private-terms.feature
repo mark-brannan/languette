@@ -159,11 +159,11 @@ Feature: guard-private-terms
     Then the guard <verdict>
 
     Examples:
-      | command                                                                     | verdict   |
-      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id=$id           | is silent |
-      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id=${id}         | is silent |
-      | work-item brief c1 'gh api repos/o/r/issues/1/sub_issues -F sub_issue_id=$id' | is silent |
-      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id="$(cat f)"    | denies    |
+      | command                                                                      | verdict   |
+      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id=$id            | is silent |
+      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id=${id}          | is silent |
+      | some-tool note c1 'gh api repos/o/r/issues/1/sub_issues -F sub_issue_id=$id' | is silent |
+      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id="$(cat f)"     | denies    |
 
     @also_guard-signed-comments
     Examples:
@@ -500,8 +500,8 @@ Feature: guard-private-terms
 
       @also_guard-github-issues
       Examples:
-        | command                                                                                                                                                     |
-        | gh issue create -R o/r -t "Ruling: Q-14" -b "Argument in o/r requirements.md; see https://github.com/o/r-engine/pull/25 and o/state#3" |
+        | command                                                                                                                           |
+        | gh issue create -R o/r -t "Design note" -b "Argument in o/r requirements.md; see https://github.com/o/r-engine/pull/25 and o/r#3" |
 
     Scenario: a Bash call with no command, and a tool this guard does not gate, are silent
       When the agent calls tool "Bash" with input `{}`

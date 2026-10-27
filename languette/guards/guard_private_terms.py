@@ -31,6 +31,7 @@ carries text but is not one it knows -> deny, with the fix in the reason.
 
 import re
 
+from languette import paths
 from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Need, ask, deny
@@ -302,19 +303,6 @@ def _is_private(repo, env):
     return any(sw.norm_repo(r) == repo for r in sw.listed(listed))
 
 
-def normpath(p):
-    out = []
-    for seg in p.split("/"):
-        if seg in ("", "."):
-            continue
-        if seg == "..":
-            if out:
-                out.pop()
-            continue
-        out.append(seg)
-    return "/" + "/".join(out)
-
-
 class _Replay:
     """The virtual cwd and $VARs as the command stands at each record."""
 
@@ -342,8 +330,8 @@ class _Replay:
         if "$" in p or "`" in p:
             return None
         if p.startswith("/"):
-            return normpath(p)
-        return normpath(self.vcwd + "/" + p) if self.vcwd else None
+            return paths.lexical(p)
+        return paths.lexical(self.vcwd + "/" + p) if self.vcwd else None
 
 
 def check(doc):

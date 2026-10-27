@@ -28,7 +28,7 @@ Feature: require-well-formed
       | jq -n --arg x "a b" '{x: $x}'                            | jq's $x inside sq                                                                        |
       | git commit -m "quote <<EOF in prose"                     | a heredoc opener quoted in a message                                                     |
       | git commit -m "docs: the \"<<'EOF'\" opener"             | an escaped, quoted heredoc opener                                                        |
-      | sh -c "if then fi"                                       | known gap: nested text shfmt refuses goes to the awk rung (#62's pencil)                 |
+      | sh -c "if then fi"                                       | known gap: nested text shfmt refuses goes to the awk rung (#62)                 |
       | git commit -m "docs: `pgrep -f` matches its own parent"  | known gap, seen: backticks that parse still run, here pgrep, and drop out of the message |
 
   @shfmt_only
