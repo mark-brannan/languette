@@ -434,3 +434,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261026t183246z
 - A hard reset to origin/<branch> keeps the 'runs on its own' clean-tree check, so a chained cd-then-reset stays denied: the 33 own-upstream resets drop to one rewrite each, not to zero Undo: a follow-up that reads an absolute cd or -C target equal to the payload's toplevel as the same tree ([#267](https://github.com/mark-brannan/languette/pull/267))
+
+### 20261027t192127z
+- tests/test_structure.py's known tables are ceilings only, not the two-sided ratchet test_purity.py uses, because four sibling refactor PRs land in an unknown order Undo: add a still-there test once #277, #279, #280 and #282 have merged and the tables are pruned ([#281](https://github.com/mark-brannan/languette/pull/281))
