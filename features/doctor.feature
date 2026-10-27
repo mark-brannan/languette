@@ -2,7 +2,7 @@ Feature: doctor
   `languette doctor` says whether languette protects Claude Code here: one row
   per check, each ✓, ! or ✗, and a non-zero exit on any ✗, so CI can run it.
   Each scenario runs it in "{HOME}/project" against a fake HOME, with stubs
-  for `claude` and `gh`, and this repo as the plugin's install path. The
+  for `claude` and the forge clients, and this repo as the plugin's install path. The
   doctor sends two probes to the installed hooks as payloads, a command that
   does not parse and a recursive delete of a fake path; nothing runs either.
 
@@ -45,8 +45,24 @@ Feature: doctor
     Given languette "cd31356ad5db" is installed at user scope
     And gh is signed out
     When the doctor runs
-    Then the "gh" row is ! "not signed in; the stacked-base and ruleset guards will ask instead of deciding"
+    Then the "gh" row is ! "installed, not signed in" and its note
     And the doctor exits 0
+
+  Scenario Outline: another forge client signed in is a warning, signed out is not
+    Given languette "cd31356ad5db" is installed at user scope
+    And <client> is signed in
+    And <other> is signed out
+    When the doctor runs
+    Then the "<client>" row is ! "signed in" and its note
+    And the "<other>" row is ✓ "installed, not signed in"
+    And the "gh" row comes before the "<client>" row
+    And the doctor exits 0
+
+    Examples:
+      | client | other |
+      | glab   | tea   |
+      | fj     | glab  |
+      | tea    | fj    |
 
   Scenario: nothing installed fails
     When the doctor runs
