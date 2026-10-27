@@ -73,6 +73,54 @@ Feature: ask-first
       When the agent runs `ls`
       Then the guard denies, naming "needs args or script"
 
+    Scenario: a command has a key a rule does not
+      Given the file ".languette/ask-first.json" holds:
+        """
+        {"commands": [{"id": "x",
+          "match": [{"cmd": "npm", "args": ["run", "x"]}],
+          "cost": "c",
+          "approve_label": "Run x",
+          "note": "slow"}]}
+        """
+      When the agent runs `ls`
+      Then the guard denies, naming "has keys a rule does not"
+
+    Scenario: two commands share an id
+      Given the file ".languette/ask-first.json" holds:
+        """
+        {"commands": [{"id": "x",
+          "match": [{"cmd": "npm", "args": ["run", "x"]}],
+          "cost": "c",
+          "approve_label": "Run x"},
+         {"id": "x",
+          "match": [{"cmd": "npm", "args": ["run", "y"]}],
+          "cost": "c",
+          "approve_label": "Run y"}]}
+        """
+      When the agent runs `ls`
+      Then the guard denies, naming "is a duplicate"
+
+  Rule: a match may name the option letters the command must carry
+
+    Background:
+      Given the file ".languette/ask-first.json" holds:
+        """
+        {"commands": [{"id": "wipe",
+          "match": [{"cmd": "prune-all", "flags": ["r"]}],
+          "cost": "it deletes every cache",
+          "approve_label": "Prune all"}]}
+        """
+
+    Scenario Outline: a command with the flag is denied; without it, not
+      When the agent runs `<command>`
+      Then the guard <verdict>
+
+      Examples:
+        | command      | verdict   |
+        | prune-all -r   | denies    |
+        | prune-all -ir  | denies    |
+        | prune-all -l   | is silent |
+
   Rule: a listed command needs the user's approval for each run
 
     Background:

@@ -11,7 +11,7 @@ pattern matches the unit as written, without its type suffix, or without its
 (`pkill -v`) one, and an operand the scan cannot read. The services a session runs on (ssh, the network) are
 guard-host-availability's. Its rules are command rules
 (docs/design/guard-rules.md), each naming its program's description in scan,
-matched by scan's ctl_hit; the setting fills their units.
+matched by scan's command-rule matcher; the setting fills their units.
 """
 
 import re
@@ -47,7 +47,7 @@ def judge(doc):
     for rule in rules(doc.env):
         if rule["action"] != "deny":           # a verdict here is a deny; no other action is read yet
             continue
-        verb = sw.ctl_hit(doc, rule["match"])
+        verb = sw.match_rule(doc, rule["match"], prose=sw.PROSE)[2]
         if verb:
             return say("protected_stop", verb=verb, way_user=WAY_USER)
     return None
