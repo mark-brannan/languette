@@ -252,3 +252,13 @@ def read_json(path):
         raise Refuse("not JSON (nested too deep to parse)")
     except OSError as e:
         raise Refuse(f"unreadable ({e.strerror})")
+
+
+def read_rules(path, *args, **kwargs):
+    """The command rules of the file at path (scan.load_rules, given args and
+    kwargs after cfg), or Refuse naming why they cannot be had."""
+    cfg = yield from read_json(path)
+    try:
+        return sw.load_rules(cfg, *args, **kwargs)
+    except sw.BadRules as e:
+        raise Refuse(str(e))

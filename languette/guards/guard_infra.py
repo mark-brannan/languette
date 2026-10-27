@@ -46,7 +46,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import claim, deny
+from languette.verdict import approve, deny
 
 NAME = "guard-infra"
 
@@ -309,15 +309,14 @@ def check(doc):
     if not found:
         return None
     if loop:
-        return deny(say("loop", guard="guard-infra", what=", ".join(f"`{r}`" for r in found),
+        return deny(say("loop", guard=NAME, what=", ".join(f"`{r}`" for r in found),
                         then="Run it once, on its own, after looking at what it would remove."))
-    try:
-        approved, spent = yield from claim({RULES[r][0]: len(found[r]) for r in found})
-    except (OSError, ValueError) as e:
-        return deny(say("transcript_unreadable", guard="guard-infra", err=e, cmd=cmd.strip(),
-                        then="Ask the user to run it themselves."))
-    if spent:
-        return None
+    approved, done = yield from approve(
+        {RULES[r][0]: len(found[r]) for r in found},
+        lambda e: say("transcript_unreadable", guard=NAME, err=e, cmd=cmd.strip(),
+                      then="Ask the user to run it themselves."))
+    if done:
+        return done[0]
     parts = []
     for r in found:
         label, what, cost, instead = RULES[r]
@@ -327,4 +326,4 @@ def check(doc):
         parts.append(say("infra_need", cmd=cmd.strip(), what=what, rule=r,
                          times=(say("infra_times", n=n, have=have) if n > 1 else ""),
                          cost=cost, instead=instead.format(tool=found[r][0]), label=label))
-    return deny(say("judged", guard="guard-infra", why="\n\n".join(parts)))
+    return deny(say("judged", guard=NAME, why="\n\n".join(parts)))

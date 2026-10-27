@@ -10,6 +10,8 @@ Refuse is how a guard's internals say "deny, for this reason" from deep inside
 a walk; check catches it and returns deny. Standard library only.
 """
 
+import inspect
+
 from languette.messages import say
 
 # Claude Code's permission_mode values in which a hook's ask reaches no one:
@@ -75,14 +77,27 @@ class Need:
 
 def claim(wants):
     """Spend one of the user's approvals per run; `wants` is {approve_label: runs}.
-    Use as `approved, spent = yield from claim({c["approve_label"]: runs[c["id"]] for c in hits})`: approved is {label:
-    tool_use ids}, spent is whether every label had its runs' worth, now recorded
-    against this tool call. A click comes back when the transcript shows the call
+    `approved, spent = yield from claim(wants)`: approved is {label: tool_use ids},
+    spent is whether every label had its runs' worth, now recorded against this
+    tool call. A click comes back when the transcript shows the call
     never ran (languette.world). The world's OSError or ValueError, for a payload
     with no transcript or a transcript that can't be read, is raised from here.
-    Shared with guard-infra and guard-bypass-hooks: one click is one run,
-    whichever guard asked."""
+    One click is one run, whichever guard asked; the guards call it through approve."""
     return (yield Need("claim", dict(wants)))
+
+
+def approve(wants, unreadable):
+    """claim, for a guard that denies until the user has approved every run:
+    `approved, done = yield from approve({label: runs}, unreadable)`. `done` is
+    None when the approvals fall short (approved says how far, to tell the user
+    what is missing), else a 1-tuple holding the check's result: (None,) when
+    every label was spent, (deny,) when the transcript could not be read, the
+    reason being unreadable(err), the error world raised."""
+    try:
+        approved, spent = yield from claim(wants)
+    except (OSError, ValueError) as e:
+        return None, (deny(unreadable(e)),)
+    return approved, (None,) if spent else None
 
 
 class Act(Need):
@@ -103,11 +118,20 @@ class Act(Need):
 
 def judged(doc, name, judge):
     """A check for a guard whose judge(doc) gives a deny reason or None: no
-    command is no finding, and a reason is a deny under the guard's name."""
+    command is no finding, and a reason is a deny under the guard's name. A judge
+    that is a generator is run to its end, so the check is one too."""
     if doc.text is None:
         return None
     why = judge(doc)
+    return _judged_after(name, why) if inspect.isgenerator(why) else _judged(name, why)
+
+
+def _judged(name, why):
     return deny(say("judged", guard=name, why=why)) if why else None
+
+
+def _judged_after(name, gen):
+    return _judged(name, (yield from gen))
 
 
 def planned(doc, parse, plan, judge):
