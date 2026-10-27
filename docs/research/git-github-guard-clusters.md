@@ -35,7 +35,7 @@ languette's shipped and pending members:
 | `guard-git-work-loss` | blanket staging, stash pop/drop/clear, force push, discard (`checkout .`, `reset --hard`), `branch -D` | no; one switch per rule |
 | `guard-git-stacked-base` | deleting a remote branch an open PR names as base or head | yes (`gh pr list`); asks when it cannot answer |
 | `guard-bypass-hooks` | `--no-verify`, `-n` on commit/am, `core.hooksPath` | approval, spent once |
-| `guard-bypass-labels` | an agent applying `churn-ok`, `mixed-loops-ok` | no (reads flags, `gh api`, MCP fields) |
+| `guard-bypass-labels` | an agent applying a label the `bypass_labels` setting names | no (reads flags, `gh api`, MCP fields) |
 | `guard-bypass-ruleset` | a push to the default branch that needs a PR; `gh pr merge --admin` | yes (rulesets, cached an hour) |
 | #118 `guard-review-threads` | resolving a bot's thread with no reply that names a commit or link | yes |
 | #119 `guard-signed-comments` | a GitHub comment not signed as an agent's | session id |
