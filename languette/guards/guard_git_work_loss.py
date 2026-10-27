@@ -213,7 +213,7 @@ def _stash(a):
 
 def _push(a):
     force = lease = delete = False
-    tomain = ""
+    protected_branch = ""  # the main/master branch this push targets, or "" if none
     for t in a:
         if t.startswith("--force-with-lease=") or (t.startswith("--force-") and (
                 _pfx(t, "--force-with-lease") or _pfx(t, "--force-if-includes"))):
@@ -227,16 +227,16 @@ def _push(a):
             force = True
         elif t.startswith(":") and _MAIN.match(_dst(t)):
             delete = True
-            tomain = _dst(t).removeprefix("refs/heads/")
+            protected_branch = _dst(t).removeprefix("refs/heads/")
         elif not t.startswith("-") and _MAIN.match(_dst(t)):
-            tomain = _dst(t).removeprefix("refs/heads/")
+            protected_branch = _dst(t).removeprefix("refs/heads/")
     if force:
         raise Refuse("bare `git push --force` is blocked. Rebasing a session branch is the one legitimate force: "
                      "use `--force-with-lease origin <branch>`, never to `main` or `master`.")
-    if tomain and delete:
-        raise Refuse(f"`{tomain}` is protected: deleting it is blocked. Rebased work reaches it through a pull request.")
-    if tomain and lease:
-        raise Ask(f"`{tomain}` is protected: `--force-with-lease` to it rewrites shared history. Rebased work "
+    if protected_branch and delete:
+        raise Refuse(f"`{protected_branch}` is protected: deleting it is blocked. Rebased work reaches it through a pull request.")
+    if protected_branch and lease:
+        raise Ask(f"`{protected_branch}` is protected: `--force-with-lease` to it rewrites shared history. Rebased work "
                   "reaches it through a pull request; if a force to it is meant, the user confirms it.")
 
 

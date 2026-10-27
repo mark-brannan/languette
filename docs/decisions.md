@@ -2,7 +2,7 @@
 
 Decisions that settle languette's public interface. The README says what the
 interface is; this file says what was decided and why, one line each. Every
-line is the maintainer's unless it says otherwise.
+line is the maintainer's (@mark-brannan) unless it says otherwise.
 
 ## ask-first config: 2026-10-02 and 2026-10-03
 

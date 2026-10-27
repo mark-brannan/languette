@@ -159,11 +159,11 @@ Feature: guard-private-terms
     Then the guard <verdict>
 
     Examples:
-      | command                                                                     | verdict   |
-      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id=$id           | is silent |
-      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id=${id}         | is silent |
+      | command                                                                      | verdict   |
+      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id=$id            | is silent |
+      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id=${id}          | is silent |
       | some-tool note c1 'gh api repos/o/r/issues/1/sub_issues -F sub_issue_id=$id' | is silent |
-      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id="$(cat f)"    | denies    |
+      | gh api -X POST repos/o/r/issues/76/sub_issues -F sub_issue_id="$(cat f)"     | denies    |
 
     @also_guard-signed-comments
     Examples:
@@ -500,7 +500,7 @@ Feature: guard-private-terms
 
       @also_guard-github-issues
       Examples:
-        | command                                                                                                                                                     |
+        | command                                                                                                                           |
         | gh issue create -R o/r -t "Design note" -b "Argument in o/r requirements.md; see https://github.com/o/r-engine/pull/25 and o/r#3" |
 
     Scenario: a Bash call with no command, and a tool this guard does not gate, are silent

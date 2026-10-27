@@ -1,7 +1,8 @@
 """Rule 1 of docs/design/portability.md: nothing in the package, the hooks,
 the feature files, the tests, the README or the docs names the maintainer or
 the maintainer's setup. The project's own homepage, install coordinates and
-issue links are the one exception.
+issue links are the one exception, and so is the maintainer's handle on the
+attribution line of docs/decisions.md, which names whose decisions they are.
 
 A denylist, not a proof: it catches the identifier that slips into a fixture,
 not every way a setup can leak."""
@@ -18,6 +19,7 @@ DENY = re.compile(r"mark-brannan|markbrannan|solace|claude_prompts_scratch"
                   r"|claim.?stamp|\bcuria\b|\bagora\b", re.IGNORECASE)
 # The project's own homepage, install coordinates, and links to its own issues and pull requests.
 ALLOW = re.compile(r"(?:https://github\.com/)?mark-brannan/(?:tap/languette|languette(?:/(?:issues|pull)/\d+|#\w+)?)\b")
+ATTRIBUTION = ("docs/decisions.md", "line is the maintainer's (@mark-brannan) unless it says otherwise.")
 
 
 def _hits():
@@ -30,6 +32,8 @@ def _hits():
             except UnicodeDecodeError:
                 continue
             for n, line in enumerate(text.splitlines(), 1):
+                if (str(f.relative_to(ROOT)), line) == ATTRIBUTION:
+                    continue
                 if DENY.search(ALLOW.sub("", line)):
                     yield f"{f.relative_to(ROOT)}:{n}: {line.strip()[:120]}"
 
