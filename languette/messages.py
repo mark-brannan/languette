@@ -249,6 +249,11 @@ MESSAGES = {
         "worktree or the session's scratchpad with no cd or -C, on a clean tree, and the branch tracks "
         "that same name or nothing."
     ),
+    "wl_stow_adopt": (
+        "`stow --adopt` moves each file that conflicts from the target directory into the package, "
+        "overwriting the repo's copy; it survives only if committed. Commit or stash the package first; "
+        "if adopting is meant, the user confirms it."
+    ),
     "cron_remove": "`crontab -r` is blocked: it deletes the whole crontab with no undo. {way_user}",
     "rule_deny": "`{cmd}` is blocked by rule `{id}` in {file}: {why}. {way_user}",
     "rules_bad": (

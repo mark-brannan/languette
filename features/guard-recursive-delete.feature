@@ -197,6 +197,7 @@ Feature: guard-recursive-delete
       | {HOME}/project     | echo rm -rf examples \| bash                         | denies    |                                                 |
       | {HOME}/project     | python3 -c "import os; os.system('rm -rf examples')" | denies    | an unknown consumer's quoted text is scanned    |
       | {HOME}/project     | mytool --run "rm -rf examples"                       | denies    | an unknown consumer's quoted text is scanned    |
+      | {HOME}/project     | man -P 'rm -rf ~' ls                                 | denies    | man runs its -P pager, so it is not prose       |
 
     @also_ask-first
     Examples:
