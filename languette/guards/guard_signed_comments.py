@@ -288,8 +288,6 @@ def check(doc):
                  + (", where {session} is the first 8 hex of the session id." if "{session}" in pattern else "."))
         signed = "A signed body, as the settings have it: " + shape[0].lower() + shape[1:]
     cwd = payload.get("cwd")
-    if not isinstance(cwd, str) or not cwd:
-        cwd = yield Need("cwd")
     home = env.get("HOME") or ""
     files = {}
 

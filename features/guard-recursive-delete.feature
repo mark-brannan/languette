@@ -145,6 +145,8 @@ Feature: guard-recursive-delete
     Examples:
       | cwd                                 | command                         | note                                                      |
       | /tmp                                | cd ~/project && rm -rf examples | a cd moves the target out of /tmp                         |
+      | /tmp                                | env -C /tmp/elsewhere rm -r build | env -C moves the target as a cd does                    |
+      | /tmp                                | sudo -D ~/project rm -r x       | so does sudo -D                                           |
       | {HOME}                              | rm -rf .                        | the cwd is $HOME                                          |
       | {HOME}/project                      | rm -rf ~/dist                   | a generated name directly under $HOME is just a directory |
       | {HOME}                              | rm -rf coverage                 | the same, reached from $HOME                              |

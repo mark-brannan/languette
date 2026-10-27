@@ -385,3 +385,8 @@ Feature: guard-signed-comments
       Then the guard is silent
       When the agent runs `gh pr comment 1 -b "Replacement is the intent"`
       Then the guard denies, naming "🤖 claude-opus-5-5 · high ·"
+
+  Scenario: a payload without an absolute working directory is denied before the guard judges
+    Given the working directory is "relative/dir"
+    When the agent runs `gh pr comment 1 -b "no signature"`
+    Then the guard denies, naming "no working directory"
