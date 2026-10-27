@@ -33,6 +33,7 @@ import pytest
 import harness
 import pipeline_checks
 from doctor_steps import *  # noqa: F401,F403  (features/doctor.feature)
+from install_steps import *  # noqa: F401,F403  (features/install.feature)
 from fixtures import *  # noqa: F401,F403  (engine, rungs, writes_in_acts, ctx)
 from harness import ENGINES, GUARD_NAMES, IN_PROCESS, _REAL_HOME
 from pipeline_checks import *  # noqa: F401,F403  (the guard pipeline's promises, on every scenario)
