@@ -79,7 +79,7 @@ ADMIN = say("ruleset_admin")
 
 
 class _Push:
-    def __init__(self, prog, here, remote, dsts, repo=()):
+    def __init__(self, prog, here, remote, dsts, repo=None):
         self.prog, self.here, self.remote, self.dsts, self.repo = prog, here, remote, dsts, repo
 
 
@@ -190,8 +190,7 @@ def _push(s, a, b, nested, here, lits=None):
     prog, row = sw.git_wrapper(s.w[g])
     if any(s.w[i].startswith(_GIT_ENV) for i in range(a, g)):
         here = None
-    sub = sw.git_subcommand(s, g, b)
-    repo = (s.w[sub - 1],) if row.repo and sub <= b else ()
+    repo, sub = sw.git_call(s, g, b)
     for i in sw.git_options(s, g, sub):
         x = s.w[i]
         if x == "-C" and i + 1 <= b:
@@ -206,7 +205,9 @@ def _push(s, a, b, nested, here, lits=None):
     i = sub
     if i > b:
         return None
-    x = s.w[i]
+    x = sw.git_verb(s.w[g], s.w[i])
+    if row.repo and repo is None and x == "push":
+        return _Push(prog, here, None, [IMPLICIT])    # in every repository, a bare push: vcsh push ignores what follows
     if x != "push":
         if s.live[i] or _UNREADABLE.search(x):
             raise Refuse(f"the subcommand `{x}` is built at run time")
@@ -426,7 +427,10 @@ def _walk(doc, cmd, cwd, home=None):
 def _git(p, env, *args):
     if p.here is None and not sw.GIT_WRAPPERS[p.prog].home:
         return None
-    return (yield Need("git", p.prog, p.here or env.get("HOME") or "/", *p.repo, *args))
+    run = sw.wrapper_git(p.prog, p.repo, env)
+    if run is None:
+        return None                            # a vcsh repository that cannot be told from a verb or a path
+    return (yield Need("git", run[0], p.here or env.get("HOME") or "/", *run[1], *args))
 
 
 def _says(body, words):

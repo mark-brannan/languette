@@ -6,7 +6,9 @@ Feature: guard-bypass-hooks
   am, and `git -c core.hooksPath=...` are denied, and run only after the user
   answered an AskUserQuestion with the label "Skip hooks once". One answer
   allows one run. On push -n is --dry-run, and on merge, pull and rebase it is
-  --no-stat; those pass. A git wrapper such as yadm or vcsh counts as git. A git alias, and core.hooksPath
+  --no-stat; those pass. A git wrapper such as yadm or vcsh counts as git; of vcsh's own verbs only
+  commit, pull, push, foreach and run (with a git call after them) are read as git, the rest are not.
+  A git alias, and core.hooksPath
   set by `git config`, are not seen. Each
   scenario runs in a fresh git repo with CLAUDE_PROJECT_DIR set to it and an
   empty transcript, unless it says otherwise.
@@ -39,6 +41,12 @@ Feature: guard-bypass-hooks
       | git --attr-source HEAD commit -n -m x        | global option with a separate value   |
       | yadm commit -n -m x                          | yadm is git                           |
       | vcsh dots commit -n -m x                     | vcsh is git                           |
+      | vcsh run dots git commit --no-verify         | vcsh run, then git                    |
+      | vcsh run dots git -c core.hooksPath=x commit | git options after vcsh run's git      |
+      | vcsh dots -c core.hooksPath=x commit -m x    | git options after the repository      |
+      | vcsh commit --no-verify                      | vcsh commit runs git commit in every repository |
+      | vcsh ci -n -m x                              | ci is vcsh's abbreviation of commit    |
+      | vcsh foreach git commit -n -m x              | foreach runs git in every repository  |
       | bash -c "git commit -n -m x"                 | bash -c nests                         |
       | sudo git commit -n -m x                      | sudo                                  |
       | git add f && git commit -n -m x              | later in a chain                      |
@@ -71,6 +79,7 @@ Feature: guard-bypass-hooks
       | git --git-dir=/x/.git push --no-verify       | global option with an attached value  |
       | yadm push --no-verify                        | yadm is git                           |
       | vcsh dots push --no-verify                   | vcsh is git                           |
+      | vcsh run dots git push --no-verify           | vcsh run, then git                    |
       | /usr/bin/git push --no-verify                | git by path                           |
       | sh -c 'git push --no-verify'                 | sh -c nests                           |
       | env X=1 git push --no-verify                 | env prefix                            |
@@ -102,6 +111,11 @@ Feature: guard-bypass-hooks
       | git commit -m '--no-verify'                         | a message that is the flag          |
       | git commit -m -n                                    | a message that is -n                |
       | git commit -m x -m "and git push --no-verify"       | a second message                    |
+      | vcsh clone -n url                                   | a vcsh verb is not a git call       |
+      | vcsh list-untracked                                 | a vcsh verb is not a git call       |
+      | vcsh run dots ls -n                                 | vcsh run of a command that is not git |
+      | vcsh pull -n                                        | vcsh pull takes no arguments for git |
+      | vcsh init commit --no-verify                        | init is a vcsh verb, not a repository |
       | git commit -F msg.txt                               | message from a file                 |
       | git commit --message=--no-verify                    | attached message                    |
       | git commit --amend --no-edit                        | --no-edit is not --no-verify        |

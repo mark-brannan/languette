@@ -93,7 +93,7 @@ def _runs(doc):
             hooks_path = hooks_path or v.split("=", 1)[0].lower() == "core.hookspath"
         if hooks_path:
             n += 1
-        elif i <= b and s.k[i] == "w" and s.w[i] in VALUE and _skips(s.w[i], s.w[i + 1:b + 1]):
+        elif i <= b and s.k[i] == "w" and sw.git_verb(s.w[g], s.w[i]) in VALUE and _skips(sw.git_verb(s.w[g], s.w[i]), s.w[i + 1:b + 1]):
             n += 1
     return n, loop
 
