@@ -470,3 +470,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261027t193457z
 - guard-bypass-labels reads operands[0], not GhApi.path, keeping its fixed-position verb read Undo: use api.path ([#284](https://github.com/mark-brannan/languette/pull/284))
+
+### 20261027t225901z
+- guard-private-terms: a list file found but empty or not in shape warns and is skipped, like a missing one, rather than denying Undo: make empty/malformed deny again in features/guard-private-terms.feature ([#290](https://github.com/mark-brannan/languette/pull/290))
