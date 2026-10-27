@@ -164,25 +164,25 @@
     "guard_private_terms": {
       "type": "boolean",
       "title": "Keep private terms out of public issues and PRs",
-      "description": "Rewrite your home directory and the pairs in your rewrites file in issue and PR text posted to a public GitHub repo and allow the post, and deny the post if it names a term from your blocked terms file. Leave on unless you want that text through unchecked.",
+      "description": "In issue and PR text posted to a public GitHub repo: redact your home directory and the terms in your redacted-terms file, then allow the post; deny the post whole if it names a term from your blocked-terms file. Leave on unless you want that text through unchecked.",
       "default": true
     },
-    "guard_private_terms_anonymize": {
+    "redact_home_paths": {
       "type": "boolean",
-      "title": "Rewrite home-directory paths to ~ in public posts",
-      "description": "Rewrite your home directory, and its other spellings such as /home/<user>, /Users/<user> and /mnt/c/Users/<user>, to ~, and each pair in your rewrites file, in text posted to a public GitHub repo, and allow the post. Needs no file. Leave on unless you want that text posted as written. Has no effect while guard_private_terms is false.",
+      "title": "Redact home-directory paths to ~ in public posts",
+      "description": "Replace your home directory, in its spellings such as /home/<user>, /Users/<user> and /mnt/c/Users/<user>, with ~ in text posted to a public GitHub repo. Needs no file. Off, home paths are posted as written; your redacted-terms file still applies.",
       "default": true
+    },
+    "redacted_terms_file": {
+      "type": "file",
+      "title": "Redacted terms file",
+      "description": "Terms replaced in a post before it leaves, one per line: the term, a tab, its replacement (<redacted> when there is none); # starts a comment; matched case-insensitively as plain text; a term $NAME is that variable's value. A leading ~ or $HOME is expanded. Unset, $XDG_CONFIG_HOME/languette/redacted-terms.txt (~/.config by default) is read if present. Set but missing, or found but unreadable or not in this shape, denies public posts until fixed.",
+      "required": false
     },
     "blocked_terms_file": {
       "type": "file",
       "title": "Blocked terms file",
-      "description": "A text file of terms so sensitive that a post naming one is denied whole: one per line, matched case-insensitively as plain text, # for comments. A leading ~ or $HOME is expanded. Unset, ~/.config/languette/blocked-terms.txt is read if it exists; with neither, no term is blocked, and the rewrites still run. A file set here but unreadable, or found but empty, blocks nothing and warns.",
-      "required": false
-    },
-    "rewrites_file": {
-      "type": "file",
-      "title": "Rewrites file",
-      "description": "A JSON file of pairs rewritten in a post before it leaves: {\"rewrite\": [[\"find\", \"put\"], ...]}, matched case-insensitively; a find spelled $NAME is that variable's value, and a pair with no put puts <redacted>. A leading ~ or $HOME is expanded. Unset, ~/.config/languette/rewrites.json is read if it exists; with neither, only the home directory is rewritten. A file set here but unreadable, or found but not in that shape, rewrites nothing and warns.",
+      "description": "Terms so sensitive that a post naming one is denied whole, one per line; # starts a comment; matched case-insensitively as plain text; a term $NAME is that variable's value. A leading ~ or $HOME is expanded. Unset, $XDG_CONFIG_HOME/languette/blocked-terms.txt (~/.config by default) is read if present; with neither, no term is blocked. Set but missing, or found but unreadable or not in this shape, denies public posts until fixed.",
       "required": false
     },
     "private_repos": {

@@ -5,23 +5,25 @@ Once a private term is in a public issue or PR it is in GitHub's history and
 every mirror of it; the undo is a support ticket, not an edit. So the check
 sits at the moment the text leaves the machine.
 
-Anonymize: each find in a list of pairs is replaced by its put in the posted
-text alone and the call is allowed, as a secret is redacted. Shipped: the home
-directory ($HOME, /home/<user>, /Users/<user>, /mnt/c/Users/<user>) to `~`.
-Yours: rewrites_file, JSON, {"rewrite": [[find, put], ...]}; a find `$NAME` is
-that variable's value, unset it matches nothing; no put puts `<redacted>`. On
-by default, with or without a blocked terms file; guard_private_terms_anonymize
-turns it off. It never denies for text it cannot read. A find the command also
-holds outside the posted text, or inside a file's contents, which a rewrite
-cannot reach, is a deny with the fix in the reason.
+Redact: each term in a list is replaced in the posted text alone and the call
+is allowed, as a secret is redacted. Shipped: the home directory ($HOME,
+/home/<user>, /Users/<user>, /mnt/c/Users/<user>) to `~`, under
+redact_home_paths. Yours: redacted_terms_file, one term per line, a tab then
+the replacement, none puts `<redacted>`; a term `$NAME` is that variable's
+value, unset it matches nothing. A term the command also holds outside the
+posted text, or inside a file's contents, which a redaction cannot reach, is a
+deny with the fix in the reason.
 
 Hard block: a hit on a term from blocked_terms_file denies the whole post; the
 reason names the terms that hit. No file, no hard block.
 
-Either option expands a leading `~` or `$HOME`; unset or empty, the guard reads
-~/.config/languette/blocked-terms.txt or rewrites.json if it exists. A file that
-does not load (missing, unreadable, empty of terms, not in shape) is no file:
-the call goes on with a warning naming the option. Cloud sessions hold no copy.
+Both files are plain text, `#` comments, case-insensitive. Either option
+expands a leading `~` or `$HOME`; unset or empty, the guard reads
+$XDG_CONFIG_HOME/languette/blocked-terms.txt or redacted-terms.txt (~/.config
+by default) if it exists. A path set is a promise: set but missing, or found
+but unreadable, a directory or not in shape, denies every public-bound post
+this guard judges, naming the option and the fix. A file with no terms is
+valid. A cloud session or CI job is provisioned its list, never excused.
 
 Fires on Bash `gh issue|pr create|comment|edit|review|close|reopen|merge`,
 `gh api` writing to repos/*/*/issues|pulls or a graphql mutation that comments
@@ -39,7 +41,7 @@ the command runs a `cd`. A graphql mutation's repo is unknown. Unknown is
 judged; only when every target is in private_repos does the text go unjudged.
 
 Only the hard block fails closed on text it cannot see. With a blocked terms
-file found: a body built at run time that no heredoc feeds, stdin with no
+file loaded: a body built at run time that no heredoc feeds, stdin with no
 heredoc, a file it cannot read, or a flag whose shape says it carries text but
 is not one it knows -> deny, with the fix in the reason.
 """

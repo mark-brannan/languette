@@ -168,28 +168,30 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 
 - No environment variable configures languette. One is a last resort, for a
   pressing need with real design intent behind it.
-- guard-private-terms is two behaviours. Anonymize rewrites text bound for
-  a public repo by a list of [find, put] pairs and allows the call: shipped,
-  the home directory ($HOME and its other spellings, such as /home/<user>,
-  /Users/<user>, /mnt/c/Users/<user>) to `~`; the user's own in a rewrites
-  file. It is on by default, needs no configuration and runs whether or not
-  a blocked terms file is set. Hard block denies the whole post for a term
-  on a short list of really sensitive terms, where even a redacted post
-  could leak concepts or strategy. Only the hard block needs its file, and
-  only it fails closed on text it cannot see.
-- Rewrite then allow is the action for redaction.
-- The hard block's list is the blocked terms file, option `blocked_terms_file`,
-  default `~/.config/languette/blocked-terms.txt`. "Private terms" names the
-  guard and what anonymize redacts; "blocked" says what the list does.
-- The rewrites file, option `rewrites_file`, default
-  `~/.config/languette/rewrites.json`, is `{"rewrite": [[find, put], ...]}`:
-  the `rewrite` rule's own find and put, so it reads unchanged as the user
-  tier's first rule set when the engine lands. A find `$NAME` is that
-  variable's value; a pair with no put puts `<redacted>`. Current thinking.
-- A list that is missing or unreadable never fails a call: a cloud session
-  has no copy of it. ([thread](https://github.com/mark-brannan/languette/pull/290#discussion_r4395050677))
-- A rewrite transforms data, so a per-repo rule may loosen one a wider tier
+- guard-private-terms is two behaviours. Redact replaces terms in text bound
+  for a public repo and allows the call: shipped, the home directory ($HOME
+  and its other spellings, /home/<user>, /Users/<user>, /mnt/c/Users/<user>)
+  to `~`, under the `redact_home_paths` boolean; the user's own terms from
+  the redacted terms file. Hard block denies the whole post for a term on a
+  short list of really sensitive terms, where even a redacted post could
+  leak concepts or strategy.
+- The step is a redaction, not a guard: it transforms data and has no
+  verdict. "Redact" over anonymize (a person's identity, overclaims), scrub,
+  mask, and rewrite (the rule action, a mechanism). Rewrite then allow is the
+  action for redaction.
+- Two files, both plain text: one term per line, `#` comments,
+  case-insensitive, a term `$NAME` the variable's value. The redacted terms
+  file's optional second column, after a tab, is the replacement; none puts
+  `<redacted>`. Options `redacted_terms_file` and `blocked_terms_file`;
+  unset, `$XDG_CONFIG_HOME/languette/redacted-terms.txt` and
+  `blocked-terms.txt` are read if present. Pencil: the names without `_file`;
+  a limited, fast pattern syntax in a term.
+- A path the user set is a promise. Set but missing, or found but unreadable,
+  a directory or not in shape, denies this guard's public-bound posts,
+  naming the option and the fix. Unset with no default file is silent; a file
+  with zero terms is valid. A cloud session or CI job that needs a list is
+  provisioned one (claude#338), never excused.
+  ([thread](https://github.com/mark-brannan/languette/pull/290#discussion_r4395050677))
+- A redaction transforms data, so a per-repo rule may loosen one a wider tier
   applies. Current thinking. ([thread](https://github.com/mark-brannan/languette/pull/290#discussion_r4395034528))
-- Anonymize never denies for text it cannot read; only a loaded blocked
-  terms list fails closed there.
 - Spec: [features/guard-private-terms.feature](../features/guard-private-terms.feature).

@@ -83,8 +83,8 @@ literal span, never across a quote boundary; a find that would cross one is
 a deny. The new bytes are parsed and judged again by every rule; a rewrite
 that still matches a deny is a deny. A redaction is then allowed, Verdict
 carrying the rewrite; any other rewrite is asked about, before and after in
-the reason. guard-private-terms' pairs, `$HOME` to `~` shipped and the user's
-rewrites file, are the first rules on it; secret redaction and host, user and
+the reason. guard-private-terms' redactions, `$HOME` to `~` shipped and the user's
+redacted terms file, are the first rules on it; secret redaction and host, user and
 address shapes are others.
 
 ## Plan from the rules
@@ -102,7 +102,7 @@ names; the handler is code, as the issue door's protocol is today.
 | Tier | Lives | May say |
 |---|---|---|
 | shipped | `languette/rules/`, one file per guard | everything above |
-| user | a file the user names in the plugin options; guard-private-terms' rewrites file is the first | everything above |
+| user | a file the user names in the plugin options; guard-private-terms' redacted terms file is the first | everything above |
 | repo | `.languette/`, agent-writable | data that adds `deny`; the rest open |
 
 Primitives are Python in languette at every tier; no tier loads code. An
@@ -117,7 +117,7 @@ A rule set that does not parse, names an unknown primitive, or has another
 shape, denies every call its guard would judge, naming the file and the
 fault. That is ask-first's and guard-secrets' behaviour today. A test loads
 every rule set languette ships, so that deny never greets an install.
-guard-private-terms' lists are the exception: one that does not load warns.
+guard-private-terms' two lists deny only its own public-bound posts.
 
 ## Path there
 
