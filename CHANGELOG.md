@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.9](https://github.com/mark-brannan/languette/compare/v0.0.8...v0.0.9) (2026-10-27)
+
+
+### Bug Fixes
+
+* **guards:** a Need the world cannot answer, and recursive-delete follows env -C like its siblings ([#282](https://github.com/mark-brannan/languette/issues/282)) ([3bc8c7b](https://github.com/mark-brannan/languette/commit/3bc8c7b72832807a4b167aa2901c96e3785c51b5))
+
+
+### Documentation
+
+* **design:** one rules engine for every guard ([#285](https://github.com/mark-brannan/languette/issues/285)) ([c3b35eb](https://github.com/mark-brannan/languette/commit/c3b35eba31188ee5d61eacaf1f6c5d791b055be0))
+
 ## [0.0.8](https://github.com/mark-brannan/languette/compare/v0.0.7...v0.0.8) (2026-10-27)
 
 
