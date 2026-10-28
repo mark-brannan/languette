@@ -58,7 +58,15 @@ jobs:
       - run: pip install -r requirements-dev.txt
       # smoke_steps.py builds its own PATHs and venvs: the smoke job runs it.
       # pytest-xdist on min(4, cores) workers: pyproject's -n auto, capped in tests/conftest.py.
-      - run: python -m pytest -q
+      # --cov reads pyproject's [tool.coverage.run]; the report feeds the coverage job.
+      - run: python -m pytest -q --cov --cov-report=xml
+      # On main too: main's report at a PR's merge base is what the total's delta is measured against.
+      - if: github.event_name == 'pull_request' || github.event_name == 'push'
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: coverage
+          path: coverage.xml
+          retention-days: 90
 
   # The parser ladder's promise end to end: require-well-formed's hooks.json
   # command under PATHs holding only shfmt, only bash, only python3, or a
@@ -141,6 +149,16 @@ jobs:
       contents: read
       pull-requests: write
     uses: mark-brannan/.github/.github/workflows/duplication.yml@main
+
+  # Of the lines a pull request changes, the share the tests hit; the total's
+  # move against main's report at the merge base. A measurement, not a gate.
+  coverage:
+    needs: tests
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    uses: mark-brannan/.github/.github/workflows/coverage.yml@claude/coverage-workflow
 
   ci-gate:
     needs: [nonempty, pr-title, tests, smoke, shellcheck, prose-budget, new-guard-names]
