@@ -261,8 +261,8 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 One tab-separated format, `#` comments, case-insensitive, `re:` for a regular
 expression; unset, both read from `~/.config/languette/`. A path set but not
 loading denies public posts until fixed; `languette doctor` says which line.
-The shipped pairs, [`languette/rules/redacted-terms.tsv`](languette/rules/redacted-terms.tsv),
-always run; [`features/fixtures/private-terms/`](features/fixtures/private-terms/)
+Only the file's entries count; `languette doctor --restore-terms` writes the
+[default entries](languette/rules/redacted-terms.tsv) into it; [`features/fixtures/private-terms/`](features/fixtures/private-terms/)
 shows a comment beside what leaves. (planned)
 
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,

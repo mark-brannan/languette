@@ -15,7 +15,7 @@ from pytest_bdd import given, parsers, then, when
 
 from harness import IN_PROCESS, ROOT, fixture_text, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
 from matchers import Verdict, asks, denies, is_silent, warns_about
-from languette import run, scan, verdict, world
+from languette import run, scan, terms, verdict, world
 
 # --- Given ---------------------------------------------------------------
 
@@ -88,6 +88,13 @@ def _terms(ctx, kind, docstring):
     f = Path(ctx.mkdtemp()) / f"{kind}-terms.txt"
     f.write_text(ctx.expand(docstring) + "\n")
     ctx.env[f"CLAUDE_PLUGIN_OPTION_{kind.upper()}_TERMS_FILE"] = str(f)
+
+
+@given("the redacted terms file holds the default entries")
+def _terms_defaults(ctx):
+    f = Path(ctx.mkdtemp()) / "redacted-terms.tsv"
+    shutil.copyfile(terms.SHIPPED, f)
+    ctx.env["CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE"] = str(f)
 
 
 @given(parsers.re(r'the (?P<kind>blocked|redacted) terms file is the fixture "(?P<name>[^"]+)"'))

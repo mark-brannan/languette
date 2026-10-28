@@ -232,7 +232,7 @@ Feature: doctor
   Scenario: no redacted terms file, with the guard on, is a warning that names the fix
     Given languette "cd31356ad5db" is installed at user scope
     When the doctor runs
-    Then the "redacted terms" row is ! "none at ~/.config/languette/redacted-terms.tsv: only the shipped pairs are redacted"
+    Then the "redacted terms" row is ! "none at ~/.config/languette/redacted-terms.tsv: nothing is redacted"
     And beneath it "run `languette doctor --restore-terms` to write the defaults" is !
     And the doctor exits 0
 
