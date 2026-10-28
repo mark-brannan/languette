@@ -3,22 +3,25 @@ Feature: guard-private-terms
   Text bound for a public GitHub repo is judged twice, wherever it travels:
   a flag value, a heredoc, a file, an MCP field.
 
-  Anonymize. The posted text is rewritten and the call allowed, as a secret
-  is redacted. What it finds and puts is a list of pairs. Shipped: the home
-  directory, $HOME or another spelling of it (/home/<user>, /Users/<user>,
-  /mnt/c/Users/<user>, <user> the login name), to `~`. Yours: the rewrites
-  file, JSON, a `rewrite` list of [find, put] pairs, matched as the blocked
-  terms are; a find spelled `$NAME` is that variable's value in the hook's
-  environment, and unset or empty it matches nothing; a pair with no put
-  puts `<redacted>`. On by default, needs no configuration, runs whether or
-  not a blocked terms file is set; the guard_private_terms_anonymize option
-  turns the whole half off. It never denies for text it cannot read: it
-  cannot help there, so the call goes through.
+  Redact. The posted text has terms replaced and the call is allowed, as a
+  secret is redacted. Shipped: the home directory, $HOME or another spelling
+  of it (/home/<user>, /Users/<user>, /mnt/c/Users/<user>, <user> the login
+  name), to `~`; the redact_home_paths option turns that off. Yours: the
+  redacted terms file, one term per line, matched as the blocked terms are,
+  with an optional second column after a tab, the replacement; a term with
+  none is replaced by `<redacted>`. On by default, needs no configuration:
+  the home rule runs whether or not either file is set, and
+  guard_private_terms turns the whole guard off. It never denies for text it
+  cannot read: it cannot help there, so the call goes through.
 
   Hard block. A short list of terms so sensitive that even a redacted post
   could leak a concept or a strategy (a company name, a code name). A hit
-  denies the whole post. Only this half needs the blocked terms file, and
-  only this half fails closed on text it cannot see.
+  denies the whole post. Only this half fails closed on text it cannot see.
+
+  Both files are plain text: one term per line, `#` starts a comment, a blank
+  line is skipped, and a term is matched as case-insensitive plain text. A
+  term spelled `$NAME` is that environment variable's value in the hook's
+  environment; unset or empty it matches nothing.
 
   Why. A private repo or notes directory holds details (hostnames,
   service URLs, account identifiers, project code names) that must not reach the
@@ -38,19 +41,19 @@ Feature: guard-private-terms
   -f/-F/--field/--raw-field values, every heredoc body, and the contents of
   --body-file, --comment-file, -F, --input and `-F key=@file`, never the path
   itself, which is read, not posted. A value built from `$(...)` or an unfed
-  `$VAR` is refused, not scanned around. Matching is case-insensitive fixed
-  substrings; the reason names the terms that hit and nothing around them. A
+  `$VAR` is refused, not scanned around. Matching is case-insensitive plain
+  text; the reason names the terms that hit and nothing around them. A
   --body-file path is read as the shell would read it, `~`, `.` and `..`
   included, after replaying what the command does before the gh (a cd, an
   assignment).
 
-  The anonymize rewrite (`updatedInput`) replaces each find with its put in
+  The redaction (`updatedInput`) replaces each term with its replacement in
   the posted text alone and allows the call. A path the command also holds
   outside the posted text is a denial, since a text match cannot tell which
   copy is posted, and so is a Claude Code version whose PreToolUse hooks
   cannot rewrite the call; either reason names the substitution to make by
-  hand. A find inside a file's contents (--body-file) is out of the
-  rewrite's reach: it stays a denial with the fix in the reason. Open:
+  hand. A term inside a file's contents (--body-file) is out of the
+  redaction's reach: it stays a denial with the fix in the reason. Open:
   whether that file case should deny, pass or be handled another way.
 
   The target repo is --repo/-R, GH_REPO=, a positional issue or PR URL or
@@ -62,31 +65,34 @@ Feature: guard-private-terms
   empty) is allowed unscanned, and only when every target of the command is
   one.
 
-  The two files are the blocked_terms_file and rewrites_file options. Current
-  thinking: an option expands a leading `~` or `$HOME` itself, since Claude
-  Code does not expand plugin options, so settings need no machine-specific
-  absolute path; with an option unset or empty, the guard reads
-  ~/.config/languette/blocked-terms.txt or rewrites.json if it exists, which
-  is how a CI job or a cloud VM provisions either, from a secret say; no
-  environment variable is read. No blocked terms file at either place means
-  no hard block: a guard that denied every public post for want of a list
-  would be unusable for anyone who has none. No rewrites file means the
-  shipped pairs alone.
+  The two files are the redacted_terms_file and blocked_terms_file options.
+  Current thinking: an option expands a leading `~` or `$HOME` itself, since
+  Claude Code does not expand plugin options, so settings need no
+  machine-specific absolute path; with an option unset or empty, the guard
+  reads $XDG_CONFIG_HOME/languette/redacted-terms.txt or blocked-terms.txt,
+  ~/.config when XDG_CONFIG_HOME is unset, if it exists, which is how a CI
+  job or a cloud VM provisions either, from a secret say; no languette
+  environment variable is read. Unset with no file at the default path is
+  silent: no blocked terms file means no hard block, since a guard that
+  denied every public post for want of a list would be unusable for anyone
+  who has none, and no redacted terms file means the shipped home rule
+  alone.
 
-  A file that does not load never fails a call. Set but missing or
-  unreadable, empty of terms, or not in shape, it is no file: the call goes
-  on, with a warning naming the option, and the shipped pairs still run. A
-  cloud session or CI job holds no copy of a private list, and its posts must
-  go through. Once a blocked terms file loads, the hard block is
-  load-bearing and the guard is a gate: a body it cannot see, or a gh write
-  whose flag shape it does not recognise as carrying text, while a target is
-  not a private repo, is a deny with the fix in the reason.
-
-  The scenarios still spell the option private_terms_file: the implementation
-  renames the option, the step and the messages in one change.
+  A path the user set is a promise. A file that loads is used, and one with no
+  terms in it is valid and silent: it is what a cloud session or CI job holds
+  when it has no list. A path set but missing, or a file found (set or at the
+  default path) but unreadable, a directory, or not in shape, denies every
+  public-bound post this guard judges, naming the option and the fix; a post
+  to a repo in private_repos, and every other command, is untouched. There is
+  no warn-and-allow. A cloud session or CI job that needs a list is
+  provisioned one (claude#338), never excused. Once a blocked terms file
+  loads, the hard block is load-bearing and the guard is a gate: a body it
+  cannot see, or a gh write whose flag shape it does not recognise as
+  carrying text, while a target is not a private repo, is a deny with the fix
+  in the reason.
 
   Background:
-    Given the private terms file holds:
+    Given the blocked terms file holds:
       """
       # one term per line
       Wanderlust
@@ -223,21 +229,22 @@ Feature: guard-private-terms
       | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"Wanderlust"}                  | denies    |
       | mcp__github__create_issue                      | {"owner":"o","repo":"r","title":"t","body":"clean"}                       | is silent |
 
-  # --- anonymize: a home path is rewritten to ~ and the call allowed -------------
+  # --- redact: a home path becomes ~ and the call is allowed -----------------------
 
   @also_guard-signed-comments
-  Scenario: the home directory in the text is rewritten to ~ and the call allowed
+  Scenario: the home directory in the text is redacted to ~ and the call allowed
     When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
     Then the guard allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"
 
   @also_guard-signed-comments
-  Scenario: anonymize needs no terms file
-    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
+  Scenario: the home rule needs no terms file
+    Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    And CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE is unset
     When the agent runs `gh pr comment 3 -R o/r --body "repro under {HOME}/x"`
     Then the guard allows, rewriting the command to `gh pr comment 3 -R o/r --body "repro under ~/x"`
 
-  Scenario Outline: another spelling of the home directory is rewritten too, another user's is not
-    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
+  Scenario Outline: another spelling of the home directory is redacted too, another user's is not
+    Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     When the agent runs `gh issue comment 3 -R o/r -b <path>/x`
     Then the guard <verdict>
 
@@ -249,9 +256,9 @@ Feature: guard-private-terms
       | /mnt/c/Users/{USER}     | allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"     |
       | /home/someone-else      | is silent                                                                |
 
-  Scenario Outline: the guard_private_terms_anonymize option turns the rewrite off
-    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
-    And CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS_ANONYMIZE is "<value>"
+  Scenario Outline: the redact_home_paths option turns the home rule off
+    Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    And CLAUDE_PLUGIN_OPTION_REDACT_HOME_PATHS is "<value>"
     When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
     Then the guard <verdict>
 
@@ -261,15 +268,17 @@ Feature: guard-private-terms
       | true  | allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x" |
       | false | is silent                                                            |
 
-  # --- the rewrites file: your own pairs, beside the shipped home-directory ones --
+  # --- the redacted terms file: your own terms, beside the shipped home rule ----------
 
-  Scenario Outline: a pair from the rewrites file is rewritten in the posted text, case-insensitively
-    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
-    And the file "{HOME}/pt-rewrites.json" holds:
+  Scenario Outline: a term from the redacted terms file is replaced in the posted text, case-insensitively
+    Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    And the redacted terms file holds:
       """
-      {"rewrite": [["zephyr-01", "<host>"], ["acct-9931"]]}
+      # the term, a tab, its replacement; with none, <redacted>
+      zephyr-01{TAB}<host>
+
+      acct-9931
       """
-    And CLAUDE_PLUGIN_OPTION_REWRITES_FILE is "{HOME}/pt-rewrites.json"
     When the agent runs `gh issue comment 3 -R o/r -b "<text>"`
     Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "<posted>"`
 
@@ -280,60 +289,92 @@ Feature: guard-private-terms
       | Zephyr-01 again               | <host> again          |
       | billed to acct-9931           | billed to <redacted>  |
 
-  Scenario Outline: a find spelled $NAME is that variable's value; unset or empty, the pair matches nothing
-    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
-    And the file "{HOME}/pt-rewrites.json" holds:
+  @also_guard-signed-comments
+  Scenario: with redact_home_paths off, the redacted terms file still applies
+    Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    And CLAUDE_PLUGIN_OPTION_REDACT_HOME_PATHS is "false"
+    And the redacted terms file holds:
       """
-      {"rewrite": [["$PT_HOST", "<host>"]]}
+      zephyr-01{TAB}<host>
       """
-    And CLAUDE_PLUGIN_OPTION_REWRITES_FILE is "{HOME}/pt-rewrites.json"
+    When the agent runs `gh issue comment 3 -R o/r -b "seen on zephyr-01 at {HOME}/x"`
+    Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <host> at {HOME}/x"`
+
+  Scenario Outline: a term spelled $NAME is that variable's value, in either file; unset or empty, it matches nothing
+    Given the <file> terms file holds:
+      """
+      $PT_HOST
+      """
     And PT_HOST is "<value>"
     When the agent runs `gh issue comment 3 -R o/r -b "seen on zephyr-01"`
     Then the guard <verdict>
 
     @also_guard-signed-comments
     Examples:
-      | value     | verdict                                                                          |
-      | zephyr-01 | allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <host>"` |
-      |           | is silent                                                                        |
+      | file     | value     | verdict                                                                              |
+      | redacted | zephyr-01 | allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <redacted>"` |
+      | redacted |           | is silent                                                                            |
+      | blocked  | zephyr-01 | denies, naming "zephyr-01"                                                           |
+      | blocked  |           | is silent                                                                            |
 
-  Scenario Outline: the rewrites file is found as the blocked terms file is: the option, ~ expanded, else the default path
-    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
-    And the file "<file>" holds:
+  # The home is this scenario's own directory, so the default path is too.
+  Scenario Outline: the redacted terms file is found by the option, ~ expanded, else at the default path
+    Given HOME is "{TMP}/h"
+    And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    And the file "{TMP}/h/<file>" holds:
       """
-      {"rewrite": [["zephyr-01", "<host>"]]}
+      zephyr-01{TAB}<host>
       """
-    And CLAUDE_PLUGIN_OPTION_REWRITES_FILE is "<option>"
+    And CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE is "<option>"
     When the agent runs `gh issue comment 3 -R o/r -b "seen on zephyr-01"`
     Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <host>"`
 
     @also_guard-signed-comments
     Examples:
-      | file                                   | option                 |
-      | {HOME}/pt-rewrites.json                | ~/pt-rewrites.json     |
-      | {HOME}/pt-rewrites.json                | $HOME/pt-rewrites.json |
-      | {HOME}/.config/languette/rewrites.json |                        |
+      | file                                   | option                |
+      | pt-redacted.txt                        | ~/pt-redacted.txt     |
+      | pt-redacted.txt                        | $HOME/pt-redacted.txt |
+      | .config/languette/redacted-terms.txt   |                       |
 
-  # A cloud session holds no copy of a private list; its posts must go through.
-  Scenario Outline: a rewrites file that is set but unreadable, or found but not in that shape, warns, naming the option
-    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
-    And the file "{HOME}/pt-bad.json" holds:
+  @also_guard-signed-comments
+  Scenario: XDG_CONFIG_HOME moves the default path of the redacted terms file
+    Given HOME is "{TMP}/h"
+    And the directory "{TMP}/h"
+    And XDG_CONFIG_HOME is "{TMP}/xdg"
+    And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    And CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE is unset
+    And the file "{TMP}/xdg/languette/redacted-terms.txt" holds:
       """
-      rewrite: zephyr-01 -> <host>
+      zephyr-01{TAB}<host>
       """
-    And CLAUDE_PLUGIN_OPTION_REWRITES_FILE is "<option>"
+    When the agent runs `gh issue comment 3 -R o/r -b "seen on zephyr-01"`
+    Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <host>"`
+
+  # A path the user set is a promise: a post this guard judges is denied until it
+  # is kept. A cloud session or CI job is provisioned its list, never excused.
+  Scenario Outline: a redacted terms file that is missing, a directory, or not in shape denies a public post, naming the option
+    Given HOME is "{TMP}/h"
+    And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    And the file "<file>" holds:
+      """
+      zephyr-01{TAB}<host>{TAB}a third column
+      """
+    And CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE is "<option>"
     When the agent runs `gh issue comment 3 -R o/r -b "all public"`
-    Then the guard warns about "rewrites_file"
+    Then the guard denies, naming "redacted_terms_file"
 
     @also_guard-signed-comments
     Examples:
-      | option              |
-      | {HOME}/no-such.json |
-      | {HOME}/pt-bad.json  |
-  # Anonymize cannot help with text it cannot read, so it lets the call through;
+      | file                                         | option                |
+      | {TMP}/h/pt-bad.txt                           | {TMP}/h/no-such.txt   |
+      | {TMP}/h/pt-bad.txt                           | {TMP}/h               |
+      | {TMP}/h/pt-bad.txt                           | {TMP}/h/pt-bad.txt    |
+      | {TMP}/h/.config/languette/redacted-terms.txt |                       |
+
+  # Redaction cannot help with text it cannot read, so it lets the call through;
   # only the hard block, with terms to protect, fails closed (the Rule below).
-  Scenario Outline: with no terms file, text the guard cannot read passes
-    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
+  Scenario Outline: with no blocked terms file, text the guard cannot read passes
+    Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     When the agent runs `<command>`
     Then the guard is silent
 
@@ -349,7 +390,7 @@ Feature: guard-private-terms
       | gh issue create -R o/r -t x --body-file /nowhere/absent.md      |
 
   @also_guard-signed-comments
-  Scenario: only the posted text is rewritten, not a cd before it
+  Scenario: only the posted text is redacted, not a cd before it
     When the agent runs `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "under {HOME}/x"`
     Then the guard allows, rewriting the command to `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "under ~/x"`
 
@@ -374,12 +415,12 @@ Feature: guard-private-terms
     Then the guard allows, rewriting the command to "gh pr comment 3 -R o/r -b note=\~/x"
 
   @also_guard-github-issues
-  Scenario: a title and a body with the same path are both rewritten
+  Scenario: a title and a body with the same path are both redacted
     When the agent runs `gh issue create -R o/r -t {HOME}/x -b {HOME}/x`
     Then the guard allows, rewriting the command to "gh issue create -R o/r -t \~/x -b \~/x"
 
   @also_guard-signed-comments
-  Scenario: a multi-line quoted body is rewritten
+  Scenario: a multi-line quoted body is redacted
     When the agent runs:
       """
       gh pr comment 3 -R o/r --body "line1
@@ -400,32 +441,50 @@ Feature: guard-private-terms
       """
     Then the guard denies, naming "by hand"
 
-  # --- the hard block: a term denies the whole post -----------------------------
+  # --- the blocked terms file: a term denies the whole post, a bad path denies too --
 
-  @also_guard-github-issues
-  Scenario: a terms file that is set but cannot be read warns, naming the option
-    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is "{HOME}/no-such-terms.txt"
+  # A path the user set is a promise; see the redacted terms file above.
+  Scenario Outline: a blocked terms file that is missing or a directory denies a public post, naming the option
+    Given HOME is "{TMP}/h"
+    And the directory "{TMP}/h/.config/languette/blocked-terms.txt"
+    And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is "<option>"
     When the agent runs `gh issue create -R o/r -t t -b "all public"`
-    Then the guard warns about "private_terms_file"
+    Then the guard denies, naming "blocked_terms_file"
 
-  @also_guard-github-issues
-  Scenario: a terms file with no terms in it warns
-    Given the private terms file holds:
+    @also_guard-github-issues
+    Examples:
+      | option                    |
+      | {TMP}/h/no-such-terms.txt |
+      | {TMP}/h/.config/languette |
+      |                           |
+
+  # A file with no terms is the shim for a cloud session or CI job that holds no
+  # list; the home rule still runs.
+  Scenario Outline: a terms file with no terms in it is valid and silent
+    Given the <file> terms file holds:
       """
       # comments only
 
       """
     When the agent runs `gh issue create -R o/r -t t -b "all public"`
-    Then the guard warns about "no terms in it"
+    Then the guard is silent
+    When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
+    Then the guard allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"
+
+    @also_guard-github-issues @also_guard-signed-comments
+    Examples:
+      | file     |
+      | redacted |
+      | blocked  |
 
   # Current thinking: Claude Code does not expand a plugin option, so the
   # guard does, and settings need no machine-specific absolute path.
-  Scenario Outline: the terms file option may start with ~ or $HOME
+  Scenario Outline: the blocked terms file option may start with ~ or $HOME
     Given the file "{HOME}/pt-terms.txt" holds:
       """
       Wanderlust
       """
-    And CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is "<option>"
+    And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is "<option>"
     When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`
     Then the guard denies, naming "Wanderlust"
 
@@ -436,12 +495,12 @@ Feature: guard-private-terms
       | $HOME/pt-terms.txt |
 
   # Current thinking: a CI job or a cloud VM provisions terms by writing this
-  # file, from a secret say; no environment variable is read.
-  @also_guard-github-issues
+  # file, from a secret say; no languette environment variable is read.
   @also_guard-github-issues
   Scenario: with the option unset, a blocked terms file at the default path is read
-    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
-    And the file "{HOME}/.config/languette/blocked-terms.txt" holds:
+    Given HOME is "{TMP}/h"
+    And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    And the file "{TMP}/h/.config/languette/blocked-terms.txt" holds:
       """
       Wanderlust
       """
@@ -451,28 +510,44 @@ Feature: guard-private-terms
     Then the guard is silent
 
   @also_guard-github-issues
+  Scenario: XDG_CONFIG_HOME moves the default path of the blocked terms file
+    Given HOME is "{TMP}/h"
+    And the directory "{TMP}/h"
+    And XDG_CONFIG_HOME is "{TMP}/xdg"
+    And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    And the file "{TMP}/xdg/languette/blocked-terms.txt" holds:
+      """
+      Wanderlust
+      """
+    When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`
+    Then the guard denies, naming "Wanderlust"
+
+  @also_guard-github-issues
   Scenario: with the option unset and no file at the default path, no term is blocked
-    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
+    Given HOME is "{TMP}/h"
+    And the directory "{TMP}/h"
+    And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`
     Then the guard is silent
 
   @also_guard-github-issues
   Scenario: with the option empty and no file at the default path, no term is blocked
-    Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is ""
+    Given HOME is "{TMP}/h"
+    And the directory "{TMP}/h"
+    And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is ""
     When the agent runs `gh issue create -R o/r -t t -b "seen on Wanderlust"`
     Then the guard is silent
-
   Rule: the long tail of shapes a post takes
     A private term is caught wherever the text travels (a flag value, a
     heredoc, an MCP field, another case), a repo in private_repos is never
     scanned, reads are never touched, and the gate is loud when it cannot see
     the text or the denylist. These scenarios walk the long tail of shapes
-    those promises take, with a terms file set, so the hard block is on.
+    those promises take, with a blocked terms file set, so the hard block is on.
 
     Background:
-      Given the private terms file holds:
+      Given the blocked terms file holds:
         """
-        # private terms -- lines starting with # are comments
+        # blocked terms -- lines starting with # are comments
 
         Wanderlust
         gateway.home.example
@@ -554,7 +629,7 @@ Feature: guard-private-terms
         | mcp__github__create_pull_request_review | {"owner":"o","repo":"r","pullNumber":1,"event":"COMMENT","comments":[{"path":"a.ts","body":"acct-4471"}]} | denies    |
 
     @also_guard-signed-comments
-    Scenario: the home directory in an MCP body is rewritten to ~ and the call allowed
+    Scenario: the home directory in an MCP body is redacted to ~ and the call allowed
       When the agent calls MCP tool "mcp__github__add_issue_comment" with input `{"owner":"o","repo":"r","issue_number":3,"body":"repro under {HOME}/project"}`
       Then the guard allows, rewriting the input field "body" to "repro under ~/project"
 
@@ -766,7 +841,7 @@ Feature: guard-private-terms
     # command line was scanned, and a path under $HOME collides with a denylist
     # that names $HOME.
 
-    Scenario Outline: a path under the home directory that the command reads is not posted text, so nothing is rewritten
+    Scenario Outline: a path under the home directory that the command reads is not posted text, so nothing is redacted
       Given the file "{HOME}/pt-scratch-body.md" holds:
         """
         a clean scratchpad body
@@ -801,7 +876,7 @@ Feature: guard-private-terms
       When the agent runs `gh issue comment 3 -R o/r --comment-file {PROJ}/comment-term.md`
       Then the guard denies, naming "Wanderlust"
 
-    # --- the home directory: a sanitization job, until it is not one --------------
+    # --- the home directory: a redaction job, until it is not one --------------
     # Open: a rewrite of the call cannot reach a file's contents, so for now the
     # file case is a denial with the fix in the reason.
 
@@ -818,7 +893,7 @@ Feature: guard-private-terms
     # A longer path that merely starts with $HOME is not $HOME: a plain replace
     # would corrupt it (~2 is a different user). Scar from an earlier
     # review.
-    Scenario Outline: a path that only starts with the home directory is not rewritten
+    Scenario Outline: a path that only starts with the home directory is not redacted
       When the agent runs `gh issue comment 3 -R o/r -b '<text>'`
       Then the guard is silent
 
@@ -829,48 +904,38 @@ Feature: guard-private-terms
         | see {HOME}-backup/notes for details |
 
     @also_guard-signed-comments
-    Scenario: a term denies the whole post, even one anonymize would otherwise rewrite and allow
+    Scenario: a term denies the whole post, even one the redaction would otherwise allow
       When the agent runs `gh issue comment 3 -R o/r -b 'seen aboard Wanderlust, path {HOME}/x'`
       Then the guard denies, naming "Wanderlust"
 
-    # --- the terms file -----------------------------------------------------------
+    # --- the terms files ----------------------------------------------------------
 
-    @also_guard-github-issues
-    Scenario: a terms file that cannot be read says so, lets the post through, and a private repo or a read needs none
-      Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is "{HOME}/no-such-terms.txt"
+    @also_guard-github-issues @also_guard-signed-comments
+    Scenario Outline: a terms file that is set but missing denies every public post, naming the option; a private repo or a read needs none
+      Given <variable> is "{HOME}/no-such-terms.txt"
       When the agent runs `gh issue create -R o/r -t x -b "all public"`
-      Then the guard warns about "is unreadable"
-      And the guard warns about "private_terms_file"
-      When the agent runs `gh issue create -R o/r -t x -b "seen on Wanderlust"`
-      Then the guard warns about "private_terms_file"
+      Then the guard denies, naming "<option>"
+      When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
+      Then the guard denies, naming "<option>"
       When the agent runs `gh issue create --repo you/notes -t x -b Wanderlust`
       Then the guard is silent
       When the agent runs `gh issue list -R o/r`
       Then the guard is silent
 
-    @also_guard-github-issues
-    Scenario: a terms file with no terms in it warns everywhere but a private repo
-      Given the private terms file holds:
-        """
-        # comments only
-
-
-        """
-      When the agent runs `gh issue create -R o/r -t x -b "all public"`
-      Then the guard warns about "no terms in it"
-      When the agent runs `gh issue create --repo you/notes -t x -b Wanderlust`
-      Then the guard is silent
-
+      Examples:
+        | variable                                 | option              |
+        | CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE  | blocked_terms_file  |
+        | CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE | redacted_terms_file |
     @also_guard-github-issues @also_guard-worktrees
     Scenario: with the option unset the guard needs nothing on PATH
-      Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is unset
+      Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
       And PATH holds only ""
       When the agent runs `gh issue create -R o/r -t x -b "seen on Wanderlust"`
       Then the guard is silent
 
     @also_guard-github-issues @also_guard-worktrees
     Scenario: with the option empty the guard needs nothing on PATH
-      Given CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE is ""
+      Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is ""
       And PATH holds only ""
       When the agent runs `gh issue create -R o/r -t x -b "seen on Wanderlust"`
       Then the guard is silent
@@ -890,7 +955,7 @@ Feature: guard-private-terms
     literal $SP in the path the hook tried, 30 missed a cd or a `..`.
 
     Background:
-      Given the private terms file holds:
+      Given the blocked terms file holds:
         """
         Wanderlust
         gateway.home.example
@@ -1256,7 +1321,7 @@ Feature: guard-private-terms
       Then the guard denies, naming "Wanderlust"
 
   Rule: a run-time value is refused with a remedy the guard then accepts
-    While a terms file is set, as here. The message names what was flagged (the flag or the field), says the text
+    While a blocked terms file is set, as here. The message names what was flagged (the flag or the field), says the text
     must exist before the call, and says which paths cannot be read. Each
     remedy it gives is run here as the follow-up command.
 
@@ -1265,7 +1330,7 @@ Feature: guard-private-terms
     the file in the same command as the post.
 
     Background:
-      Given the private terms file holds:
+      Given the blocked terms file holds:
         """
         Wanderlust
         """

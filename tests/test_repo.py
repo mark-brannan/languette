@@ -30,13 +30,13 @@ GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-ba
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"guard_worktrees", "guard_review_threads", "guard_signed_comments"}
 # Options that are not a guard's on/off toggle: name -> type.
-OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string", "review_thread_logins": "string",
+OTHER_OPTIONS = {"redacted_terms_file": "file", "blocked_terms_file": "file", "private_repos": "string", "bypass_labels": "string", "review_thread_logins": "string",
                  "protected_services": "string", "prose_budget_command": "string",
                  "signed_comments_opening": "string", "signed_comments_signature": "string",
                  "record_decisions": "boolean", "record_raw_commands": "boolean"}
 # Per-rule switches inside one guard: boolean, on by default.
 RULE_OPTIONS = {f"guard_git_work_loss_{r}" for r in ("blanket_staging", "stash", "force_push", "discard", "branch_delete")} | {
-    "guard_worktrees_checkout_home", "guard_worktrees_foreign"}
+    "guard_worktrees_checkout_home", "guard_worktrees_foreign", "redact_home_paths"}
 # Guards that also judge file-editing tools and EnterWorktree, so they match more than Bash.
 WIDE_MATCHER = {"guard-worktrees": "Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree"}
 
