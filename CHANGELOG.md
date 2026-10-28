@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.0.10](https://github.com/mark-brannan/languette/compare/v0.0.9...v0.0.10) (2026-10-28)
+
+
+### Features
+
+* **doctor:** one row per forge client installed, gh first ([#289](https://github.com/mark-brannan/languette/issues/289)) ([aa5d424](https://github.com/mark-brannan/languette/commit/aa5d424dae282cedf70aac1bca31f1ccfd25feac))
+* **doctor:** the spec'd rows, terms rows, the terms inits and restore, stdin --redact ([#305](https://github.com/mark-brannan/languette/issues/305)) ([c846d28](https://github.com/mark-brannan/languette/commit/c846d28985ba7707bcdd9c6a9b53e3e34221b6e8))
+* **guard-git-work-loss:** ask on stow --adopt ([#296](https://github.com/mark-brannan/languette/issues/296)) ([ddb59fc](https://github.com/mark-brannan/languette/commit/ddb59fcb32e7e7a8d44b4b7fef6e42e6cf4e45f7))
+* **guard-worktrees:** checkout-home asks on chezmoi's forced apply, destroy and purge ([#295](https://github.com/mark-brannan/languette/issues/295)) ([98ba2e4](https://github.com/mark-brannan/languette/commit/98ba2e40cf2cd16728a254d381ef82ff5d5d4ed3))
+
+
+### Bug Fixes
+
+* **guards:** mask the command quoted in guard deny reasons ([#307](https://github.com/mark-brannan/languette/issues/307)) ([b44865a](https://github.com/mark-brannan/languette/commit/b44865a3f91f382911ea0411badfa23205b1d075))
+
+
+### Documentation
+
+* **budgets:** raise the README line cap to 470 ([#302](https://github.com/mark-brannan/languette/issues/302)) ([06185a1](https://github.com/mark-brannan/languette/commit/06185a15f698a502680b4292d8dd533aa394450e))
+* **budgets:** raise the section cap to 360 ([#304](https://github.com/mark-brannan/languette/issues/304)) ([46d9539](https://github.com/mark-brannan/languette/commit/46d9539984295f1f2c870c1749e01300d1738386))
+* **doctor:** spec the output rows, terms rows, the terms inits and restore, and stdin --redact ([#301](https://github.com/mark-brannan/languette/issues/301)) ([7506ced](https://github.com/mark-brannan/languette/commit/7506cedc2f033e8e83bec29f2a2ae116ceca1a43))
+* **doctor:** trim four words from What it does ([#303](https://github.com/mark-brannan/languette/issues/303)) ([1553dc7](https://github.com/mark-brannan/languette/commit/1553dc748d4fcbdcc4b8b1bf3a084784db995a06))
+* **install:** run main or a checkout, scan examples, a config design ([#300](https://github.com/mark-brannan/languette/issues/300)) ([9d0fbca](https://github.com/mark-brannan/languette/commit/9d0fbcad85d9e2e4b7a976516fbc164cf8a68650))
+* **private-terms:** spec anonymize and hard block as two behaviours ([#290](https://github.com/mark-brannan/languette/issues/290)) ([98b2dad](https://github.com/mark-brannan/languette/commit/98b2dad87cb0a952b9228fd727e6c142af5c393e))
+
 ## [0.0.9](https://github.com/mark-brannan/languette/compare/v0.0.8...v0.0.9) (2026-10-27)
 
 
