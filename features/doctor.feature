@@ -221,17 +221,53 @@ Feature: doctor
     And beneath that, "line 4:  re:(?:Wanderlust|Wanderer)\s+a…  7.20 ms"
     And the doctor exits 0
 
-  Scenario: no blocked terms file is a warning that says what that means
+  # The marks follow what the guard does with each file: on with no file is a !,
+  # off with no file is a ✓, a file it cannot read is a ✗. An empty file is one
+  # step stricter than the guard, which judges by it without complaint: a !.
+  Scenario: no blocked terms file, with the guard on, is a warning that says what that means
     Given languette "cd31356ad5db" is installed at user scope
     When the doctor runs
     Then the "blocked terms" row is ! "none at ~/.config/languette/blocked-terms.tsv, and blocked_terms_file is unset: no term is blocked"
 
-  Scenario: no redacted terms file is a warning that names the fix
+  Scenario: no redacted terms file, with the guard on, is a warning that names the fix
     Given languette "cd31356ad5db" is installed at user scope
     When the doctor runs
-    Then the "redacted terms" row is ! "none at ~/.config/languette/redacted-terms.tsv: nothing is redacted"
+    Then the "redacted terms" row is ! "none at ~/.config/languette/redacted-terms.tsv: only the shipped pairs are redacted"
     And beneath it "run `languette doctor --restore-terms` to write the defaults" is !
     And the doctor exits 0
+
+  Scenario: no terms files, with the guard off, is fine
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{"guard_private_terms": false}`
+    When the doctor runs
+    Then the "redacted terms" row is ✓ "off, and none at ~/.config/languette/redacted-terms.tsv"
+    And the "blocked terms" row is ✓ "off, and none at ~/.config/languette/blocked-terms.tsv"
+    And the doctor exits 0
+
+  Scenario Outline: an empty terms file is a warning, though the guard accepts it
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/<file>" holds ``
+    When the doctor runs
+    Then the "<row>" row is ! "enabled"
+    And beneath it "~/.config/languette/<file> (0 entries)" is !
+    And the doctor exits 0
+
+    Examples:
+      | file               | row            |
+      | redacted-terms.tsv | redacted terms |
+      | blocked-terms.tsv  | blocked terms  |
+
+  Scenario Outline: a terms file the guard cannot read fails the row, as it would fail every public post
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/<file>" <state>
+    When the doctor runs
+    Then the "<row>" row is ✗ "~/.config/languette/<file> <why>: every public post is denied until it is fixed"
+    And the doctor exits 1
+
+    Examples:
+      | file               | row            | state                       | why             |
+      | redacted-terms.tsv | redacted terms | is a directory              | is a directory  |
+      | blocked-terms.tsv  | blocked terms  | exists but is not readable  | is not readable |
 
   Scenario Outline: a line the guard would refuse fails the row, naming the line
     Given languette "cd31356ad5db" is installed at user scope

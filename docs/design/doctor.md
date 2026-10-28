@@ -40,7 +40,8 @@ guard-private-terms is the first: a row per terms file counting only the
 entries in it, the min, max and average time of its `re:` lines, each slow one
 and each refused line named by line number, `--restore-terms` writing the
 default entries without removing yours (planned), and `--redact` printing what
-a post would become, from a file or stdin.
+a post would become, from a file or stdin. Its marks follow the guard,
+except that an empty file is a !.
 
 ## Limits
 
