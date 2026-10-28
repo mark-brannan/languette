@@ -9,8 +9,8 @@ How a guard's options are set, on any host. Present tense is the aim;
 Which guards run, and how, is set in one place that is not the installer. Today
 an option is reached through the host (`claude plugin install … --config`,
 `/plugin configure`), a file under `.languette/`, a terms file or an
-environment variable, and the one command that reads them all is the doctor,
-which cannot write. Installing and configuring are separate acts: install
+environment variable, and the one command that reads them all is the doctor.
+Installing and configuring are separate acts: install
 puts languette on the host, and config changes it afterwards, any day.
 
 ## languette config (planned)
@@ -34,12 +34,18 @@ languette config --unset guard_recursive_delete
 
 ## The doctor's part
 
-The doctor diagnoses and offers the fix; `config` is what writes it. The
-doctor's "assists with configuration" step ([doctor](doctor.md)) is a call to
-`config`, not a second writer.
+The doctor diagnoses and offers the fix; `config` sets an option. Where the
+doctor writes on a yes ([doctor](doctor.md): an applied fix,
+`--restore-terms`), it writes through the same loaders, so neither can store
+a value the other would refuse.
 
 ## install takes no options
 
 `languette install [host]` wires the host and nothing else. The `--config` in
 the README belongs to `claude plugin install`, the host's flag, and the README
 points to `languette config` as the way to change an option later.
+
+## Open questions
+
+- Whether `config` and the doctor stay two commands or merge into one, and
+  if they merge, which name survives. Open.
