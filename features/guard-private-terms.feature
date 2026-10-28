@@ -254,7 +254,7 @@ Feature: guard-private-terms
     When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
     Then the guard allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: with no redacted terms file, nothing is redacted
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     And CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE is unset
@@ -371,7 +371,7 @@ Feature: guard-private-terms
     @also_guard-signed-comments
     Examples:
       | text                          | posted                |
-      | seen on zephyr-01 at {HOME}/x | seen on <host> at ~/x |
+      | seen on zephyr-01             | seen on <host>        |
       | Zephyr-01 again               | <host> again          |
       | billed to acct-9931           | billed to <redacted>  |
       | mirrored to ACCT-1234         | mirrored to <account> |
@@ -589,13 +589,13 @@ Feature: guard-private-terms
     When the agent runs `gh issue create -R o/r -t t -b "all public"`
     Then the guard is silent
     When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
-    Then the guard allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"
+    Then the guard <verdict>
 
     @also_guard-github-issues @also_guard-signed-comments
     Examples:
-      | file     |
-      | redacted |
-      | blocked  |
+      | file     | verdict                                                                  |
+      | redacted | is silent                                                                |
+      | blocked  | allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"    |
 
   # A term naming an unset variable matches nothing, so a file of only those has no
   # terms to protect: text the guard cannot see is not a reason to deny.

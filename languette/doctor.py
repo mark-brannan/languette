@@ -11,7 +11,10 @@ Only trusted hooks get a probe: the plugin's own hooks.json and by-hand
 entries in the user's ~/.claude/settings.json. A project's settings arrive
 with whatever was checked out, so their hooks are counted, never run.
 Anything it cannot read, or reads in a shape it does not know, is a ! row,
-never a traceback. Standard library only.
+never a traceback. A ✗ never stops a later check; the exit is decided after the
+last row. For guard-private-terms it also writes: --init-redacted-terms and
+--init-blocked-terms a missing file, --restore-redacted-terms the defaults into
+one on a yes; --redact prints what a post would become. Standard library only.
 """
 
 import json
@@ -285,9 +288,29 @@ def by_hand(files):
             for p, s in files.items() if not isinstance(s, Unreadable)}
 
 
+def _titles(root):
+    """Option name -> its one-line title from the install's plugin.json; {} when it will not say."""
+    try:
+        conf = _json(Path(root) / ".claude-plugin/plugin.json").get("userConfig")
+    except (Unreadable, AttributeError):
+        return {}
+    return {k: v["title"] for k, v in conf.items() if isinstance(v, dict) and isinstance(v.get("title"), str)} \
+        if isinstance(conf, dict) else {}
+
+
+def line(mark, text, *children):
+    """A detail line beneath a row: its mark ("" for a bare line), text and its own lines."""
+    return mark, text, list(children)
+
+
+def worst(marks):
+    return FAIL if FAIL in marks else WARN if WARN in marks else OK
+
+
 def check(cwd):
-    """[(mark, label, text)] for this machine, from cwd."""
-    rows = []
+    """[(mark, label, text, [detail lines])] for this machine, from cwd, in the order printed:
+    version, shell parser, the probes, Claude Code with its guards beneath, the forge clients,
+    the terms files. A ✗ never stops a later check."""
     files = settings_files(cwd)
     user_path = _home() / ".claude/settings.json"
     hand = {p: hs for p, hs in by_hand(files).items() if hs}
@@ -298,6 +321,7 @@ def check(cwd):
         inst, problem = None, str(e)
 
     options = {}
+    claude = None                            # the Claude Code row
     probed, env, not_run = {}, None, {}      # guard -> trusted hook; guard -> why its probe did not run
     # A probe's environment is an allowlist, not the doctor's own.
     base_env = {k: os.environ[k] for k in ("PATH", "HOME", "TMPDIR") if k in os.environ}
@@ -306,10 +330,10 @@ def check(cwd):
         root = str(inst.get("installPath") or "")
         if hand:
             names = ", ".join(_tilde(p) for p in hand)
-            rows.append((FAIL, "Claude Code", f"{where}, and by-hand run.py hooks in {names}: every guard "
-                                              "runs twice; remove the by-hand entries"))
+            claude = (FAIL, "Claude Code", f"{where}, and by-hand run.py hooks in {names}: every guard "
+                                           "runs twice; remove the by-hand entries", [])
         elif inst.get("enabled") is False:
-            rows.append((FAIL, "Claude Code", f"{where}, is disabled: claude plugin enable {inst.get('id')}"))
+            claude = (FAIL, "Claude Code", f"{where}, is disabled: claude plugin enable {inst.get('id')}", [])
         try:
             options = _options(files, user_path, inst)
         except Unreadable as e:
@@ -324,14 +348,17 @@ def check(cwd):
             found, hooks_problem = {}, str(e)
         else:
             hooks_problem = None
-        if not hand and inst.get("enabled") is not False:
+        if claude is None:
             if hooks_problem or opt_problem:
-                rows.append((WARN, "Claude Code", f"{where}; {hooks_problem or opt_problem}, so which guards "
-                                                  "are on is unknown"))
+                claude = (WARN, "Claude Code", f"{where}; {hooks_problem or opt_problem}, so which guards "
+                                               "are on is unknown", [])
             else:
                 off = sorted(k for k, g in found.items() if not is_on(g, options.get(k)))
-                rows.append((OK, "Claude Code", f"{where}; {len(found) - len(off)} guards on, {len(off)} off"
-                                                + (f": {', '.join(off)}" if off else "")))
+                titles = _titles(root)
+                claude = (OK, "Claude Code", where, [
+                    line(OK, f"guards enabled: {len(found) - len(off)}"),
+                    line(WARN if off else OK, f"guards disabled: {len(off)}",
+                         *(line(WARN, f"(off) {k}: {titles.get(k, '')}".rstrip()) for k in off))])
         for _, guard, sent in PROBES:
             key = guard.replace("-", "_")
             if inst.get("enabled") is False:
@@ -342,7 +369,7 @@ def check(cwd):
     elif hand:
         names = ", ".join(_tilde(p) for p in hand)
         count = len({m for hs in hand.values() for h in hs for m in re.findall(r"--guard ([\w-]+)", h["command"])})
-        rows.append((OK, "Claude Code", f"by hand, {count} guard{'' if count == 1 else 's'} in {names}"))
+        claude = (OK, "Claude Code", f"by hand, {count} guard{'' if count == 1 else 's'} in {names}", [])
         # Only the user's own file supplies a command to run: a project's settings
         # come with whatever repository was checked out, and the doctor runs in CI.
         for _, guard, _ in PROBES:
@@ -355,49 +382,51 @@ def check(cwd):
                                   "command a project supplies; the probe did not run")
         env = base_env
     elif problem:
-        rows.append((WARN, "Claude Code", problem))
+        claude = (WARN, "Claude Code", problem, [])
     else:
-        rows.append((FAIL, "Claude Code", "languette is not installed for this directory"))
+        claude = (FAIL, "Claude Code", "languette is not installed for this directory", [])
 
+    rows = []
     if inst:
         v = str(inst.get("version") or "")
         rows.append((WARN, "version", f"plugin at commit {v[:7]}, from main; not a release" if SHA.fullmatch(v) else
-                     f"plugin at {v or 'an unknown version'}; not checked against the latest release"))
+                     f"plugin at {v or 'an unknown version'}; not checked against the latest release", []))
     elif hand:
-        rows.append((WARN, "version", "installed by hand; not checked"))
+        rows.append((WARN, "version", "installed by hand; not checked", []))
 
     try:
         path = scan.shfmt()
     except scan.Unparseable as e:
-        rows.append((WARN, "shell parser", f"shfmt did not answer: {e}"))
+        rows.append((WARN, "shell parser", f"shfmt did not answer: {e}", []))
     else:
         if path:
-            rows.append((OK, "shell parser", f"shfmt {shfmt_version(path) or '(version unread)'}"))
+            rows.append((OK, "shell parser", f"shfmt {shfmt_version(path) or '(version unread)'}", []))
         else:
             fallback = "bash -n checks the parse" if shutil.which("bash") else "the built-in lexer reads commands"
             rows.append((WARN, "shell parser", f"no shfmt {'.'.join(map(str, scan.SHFMT_MIN))} or newer on PATH; "
-                                               f"{fallback} instead"))
+                                               f"{fallback} instead", []))
 
     for p in PROBES:
         label, guard, sent = p
         hook = probed.get(guard)
         if guard in not_run:
-            rows.append((WARN, label, not_run[guard]))
+            rows.append((WARN, label, not_run[guard], []))
         elif hook is None:
             # A by-hand install may carry only some guards; a plugin's hooks.json carries both.
             absent = f"no {guard} hook {'in the install' if inst or hand else 'installed'} to send the probe to"
-            rows.append((FAIL if p == CANARY or inst else WARN, label, absent))
+            rows.append((FAIL if p == CANARY or inst else WARN, label, absent, []))
         else:
             t = hook.get("timeout")
             limit = t if isinstance(t, (int, float)) and not isinstance(t, bool) and t > 0 else HOOK_TIMEOUT
             denied, what, ms = probe(hook["command"], env, cwd, limit, sent)
             how = "through the hook command as installed"
             if denied and p == PARSE:
-                rows.append((OK, label, f"`{sent}` was denied: {what}, {ms} ms"))
+                rows.append((OK, label, f"`{sent}` was denied: {what}, {ms} ms", []))
             elif denied:
-                rows.append((OK, label, f"`{sent}` was denied {how}, {ms} ms of {limit:g} s"))
+                rows.append((OK, label, f"`{sent}` was denied {how}, {ms} ms of {limit:g} s", []))
             else:
-                rows.append((FAIL, label, f"`{sent}` was not denied {how}: {what}"))
+                rows.append((FAIL, label, f"`{sent}` was not denied {how}: {what}", []))
+    rows.append(claude)
 
     paths = {name: shutil.which(name) for name in FORGES}
     # The probes may reach the network: in parallel, a dead one costs one timeout, not one per client.
@@ -406,107 +435,211 @@ def check(cwd):
     for name, (_, _, note) in FORGES.items():
         if name not in answers:
             if name == "gh":
-                rows.append((WARN, name, f"not installed; {note}"))
+                rows.append((WARN, name, f"not installed; {note}", []))
             continue
         signed = answers[name].result()
         state = {True: "signed in", False: "installed, not signed in", None: "installed, not answering"}[signed]
         quiet = signed is True if name == "gh" else signed is False
-        rows.append((OK, name, state) if quiet else (WARN, name, f"{state}; {note}"))
+        rows.append((OK, name, state, []) if quiet else (WARN, name, f"{state}; {note}", []))
     return rows + terms_rows(options)
+
+
+def render(rows):
+    """The lines printed for rows: a row, then its detail lines indented beneath it."""
+    def details(lines, depth):
+        for mark, text, sub in lines:
+            yield f"{'    ' * depth}{mark + ' ' if mark else '  '}{text}"
+            yield from details(sub, depth + 1)
+    for mark, label, text, lines in rows:
+        yield f"{mark} {label:<13} {text}"
+        yield from details(lines, 1)
 
 
 # --- guard-private-terms' files, through the guard's own loader --------------
 
 # What each accepted re: is timed over; shown, never the verdict.
 SAMPLE = Path(__file__).resolve().parent.parent / "features/fixtures/private-terms/bad-comment.md"
+FIRST = 32                                 # characters of a refused line shown beneath its reason
+LABELS = {"redacted": "redacted terms", "blocked": "blocked terms"}
+
+
+def _env(options):
+    """The guard's environment, as the installed plugin's options give it."""
+    return {**os.environ, "HOME": str(_home()), **_option_env(options)}
 
 
 def _terms(options):
-    """(the default terms, the redacted terms, the blocked terms) as the guard loads them, each of
-    the last two (terms or None, path, whether an option named it, the exception or None). The
-    options are the installed plugin's, as the guard's environment carries them."""
+    """(penv, kind -> (text, path, whether an option named it, the exception or None)): each terms
+    file read as the guard reads it, and the environment its $NAMEs are filled from."""
     from languette.run import drive          # run.py exits when a guard will not import
     from languette.world import World
-    env = {**os.environ, "HOME": str(_home()), **_option_env(options)}
+    env = _env(options)
     world = World(env, {})
-
-    def run_(gen):
-        return drive(gen, world, [])
-    penv = run_(terms.environment(env))
-    return (run_(terms.defaults(penv)),) + tuple(run_(terms.load(kind, env, penv)) for kind in terms.KINDS)
+    penv = drive(terms.environment(env), world, [])
+    return penv, {kind: drive(terms.read(kind, env), world, []) for kind in terms.KINDS}
 
 
-def _why(err):
-    return str(err) if isinstance(err, terms.BadTerms) else terms.why_not(err)
+def _ms(rx, text):
+    start = time.perf_counter()
+    rx.sub("", text)
+    return (time.perf_counter() - start) * 1000
 
 
-def _slowest(found, text):
-    """(milliseconds, the find) of the slowest accepted re: over text, or None when there is none."""
-    best = None
-    for t in found:
-        if t.is_re and t.rx:
-            start = time.perf_counter()
-            t.rx.sub("", text)
-            ms = (time.perf_counter() - start) * 1000
-            best = max(best or (0, ""), (ms, t.find))
-    return best
-
-
-def _counts(found, noun, text):
-    lines = [t for t in found if not t.drop]
-    slow = _slowest(lines, text) if text is not None else None
-    find = slow[1] if slow and len(slow[1]) <= 40 else slow and slow[1][:39] + "…"
-    timed = f" (slowest {slow[0]:.2f} ms: {find})" if slow else ""
-    return f"{len(lines)} {noun}{'' if len(lines) == 1 else 's'}, {sum(t.is_re for t in lines)} re:{timed}"
+def _file_lines(kind, text, path, penv):
+    """(the detail lines for a terms file that loaded, its entry count): the count, every line the
+    guard would refuse with the start of that line beneath it, and its re: lines counted and timed."""
+    found = list(terms.entries(text, kind, penv))
+    bad = [(n, raw, item) for n, raw, item in found if isinstance(item, terms.BadTerms)]
+    good = [item for _, _, item in found if isinstance(item, terms.Term)]
+    count = f"{len(found)} entr{'y' if len(found) == 1 else 'ies'}"
+    out = [line(WARN if not found else OK, f"{_tilde(path)} ({count})")]
+    for n, raw, err in bad:
+        first = raw if len(raw) <= FIRST else raw[:FIRST - 1] + "…"
+        out.append(line(FAIL, f"line {n}: {err.why}", line("", first)))
+    invalid = sum(raw.startswith("re:") for _, raw, _ in bad)
+    res = sum(t.is_re for t in good) + invalid
+    if res:
+        try:
+            sample = SAMPLE.read_text(encoding="utf-8")
+        except OSError:
+            sample = None
+        times = [_ms(t.rx, sample) for t in good if t.is_re and t.rx] if sample is not None else []
+        timed = f" (min={min(times):.2f}ms, max={max(times):.2f}ms, avg={sum(times) / len(times):.2f}ms)" \
+            if times else ""
+        out.append(line(FAIL if invalid else OK, f"{res} regular expression{'' if res == 1 else 's'}"
+                        f"{f', {invalid} invalid' if invalid else ''}{timed}"))
+    return out, count
 
 
 def terms_rows(options):
-    """A row for the redacted terms, defaults included, and one for the blocked terms: what loaded,
-    with each accepted re: timed, or the line the guard would refuse, which would deny every
-    public post."""
-    defaults, *loaded = _terms(options)
-    try:
-        sample = SAMPLE.read_text(encoding="utf-8")
-    except OSError:
-        sample = None
+    """A row per terms file, as the guard would read it: the entries in it counted, each line it
+    would refuse named, its re: lines timed; what loads but is empty is a !; what does not load is
+    a ✗, since every public post is denied until it does; off, the files are reported and nothing
+    is a ✗."""
+    on = is_on("=", options.get("guard_private_terms"))
+    penv, read = _terms(options)
     rows = []
-    for kind, label, noun in (("redacted", "redacted terms", "pair"), ("blocked", "blocked terms", "term")):
-        found, path, named, err = loaded[list(terms.KINDS).index(kind)]
+    for kind, label in LABELS.items():
+        text, path, named, err = read[kind]
         option, where = terms.option_name(kind), _tilde(path)
-        why = _why(err) if err else None
-        if why and why.startswith("line "):
-            rows.append((FAIL, label, f"{where} {why}"))
-        elif why:
-            until = "does" if why == "does not exist" else "loads"
-            rows.append((FAIL, label, f"{option} is {where}, which {why}: every public post is denied until it {until}"
-                         if named else f"{where} {why}: every public post is denied until it loads"))
-        elif kind == "redacted":
-            mine = "none of your own" if found is None else f"{where} {_counts(found, noun, sample)}"
-            rows.append((OK, label, f"default {_counts(defaults, noun, sample)}; {mine}"))
-        elif found is None:
-            rows.append((WARN, label, f"none at {where}, and {option} is unset: no term is blocked"))
+        if err:
+            why = "is a directory" if isinstance(err, ValueError) and os.path.isdir(path) else terms.why_not(err)
+            until = "does" if why == "does not exist" else "is fixed"
+            text_ = (f"{option} is {where}, which {why}: every public post is denied until it {until}" if named
+                     else f"{where} {why}: every public post is denied until it {until}")
+            rows.append((FAIL if on else WARN, label, text_ if on else f"off, and {where} {why}", []))
+        elif text is None and not on:
+            rows.append((OK, label, f"off, and none at {where}", []))
+        elif text is None and kind == "redacted":
+            rows.append((WARN, label, f"none at {where}: nothing is redacted",
+                         [line(WARN, "run `languette doctor --init-redacted-terms` to write the defaults")]))
+        elif text is None:
+            rows.append((WARN, label, f"none at {where}, and {option} is unset: no term is blocked", []))
         else:
-            rows.append((OK, label, f"{where} {_counts(found, noun, sample)}"))
+            lines, count = _file_lines(kind, text, path, penv)
+            if on:
+                rows.append((worst([m for m, _, _ in lines]), label, "enabled", lines))
+            else:
+                bad = any(m == FAIL for m, _, _ in lines)
+                rows.append((WARN if bad else OK, label, f"off, and {where} ({count})", []))
     return rows
 
 
+def _loaded(kind, text, path, penv):
+    """The kind's terms, or None after printing each line the guard would refuse."""
+    found = list(terms.entries(text, kind, penv))
+    bad = [item for _, _, item in found if isinstance(item, terms.BadTerms)]
+    for err in bad:
+        print(f"{FAIL} {_tilde(path)} {err}")
+    return None if bad else [item for _, _, item in found]
+
+
 def redact(file, options):
-    """Print `file` as a post would leave through the files as loaded, then which blocked terms it
-    holds. Exits 1 when any, or when a file would not load."""
+    """Print `file`, stdin for none or "-", as a post would leave through the files as loaded, then
+    which blocked terms it holds. Exits 1 when any, or when a file would not load."""
     try:
-        text = Path(file).read_text(encoding="utf-8")
+        text = sys.stdin.read() if file in (None, "-") else Path(file).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as e:
         print(f"{FAIL} {file} {terms.why_not(e)}")
         return 1
-    defaults, mine, blocked = _terms(options)
-    for _, path, _, err in (mine, blocked):
+    penv, read = _terms(options)
+    loaded = {}
+    for kind, (body, path, _, err) in read.items():
         if err:
-            print(f"{FAIL} {_tilde(path)} {_why(err)}")
+            print(f"{FAIL} {_tilde(path)} {terms.why_not(err)}")
             return 1
-    print(terms.redact(text, terms.pairs(defaults, mine[0] or [])).rstrip("\n"))
-    hits = terms.hits(text, blocked[0] or [])
-    print("blocked: " + (terms.named(hits) if hits else "none"))
-    return 1 if hits else 0
+        loaded[kind] = [] if body is None else _loaded(kind, body, path, penv)
+        if loaded[kind] is None:
+            return 1
+    print(terms.redact(text, terms.pairs(loaded["redacted"])).rstrip("\n"))
+    found = terms.hits(text, loaded["blocked"])
+    print("blocked: " + (terms.named(found) if found else "none"))
+    return 1 if found else 0
+
+
+def _defaults():
+    return terms.defaults(Path(terms.DEFAULTS).read_text(encoding="utf-8"))
+
+
+def init(kind, options):
+    """Write the kind's file where the guard reads it, never over one that exists: the redacted
+    file with every default, the blocked one with a header and no terms."""
+    path, _ = terms.where(kind, _env(options))
+    where = _tilde(path)
+    if os.path.lexists(path):
+        repair = "; to repair it: languette doctor --restore-redacted-terms" if kind == "redacted" else ""
+        print(f"{FAIL} {where} exists{repair}")
+        return 1
+    if kind == "redacted":
+        groups = _defaults()
+        body, what = terms.initial(groups), f"{len(groups)} defaults"
+    else:
+        body = terms.header("blocked") + "\n# A term that denies a whole public post: find, a message for the agent, comment.\n"
+        what = "no terms yet"
+    try:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(body, encoding="utf-8")
+    except OSError as e:
+        print(f"{FAIL} {where} cannot be written ({e.strerror or e})")
+        return 1
+    print(f"{OK} wrote {where} ({what})")
+    return 0
+
+
+def restore(options):
+    """Repair the defaults in the redacted terms file: show the diff, write it on a yes."""
+    import difflib
+    path, _ = terms.where("redacted", _env(options))
+    where = _tilde(path)
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        print(f"{FAIL} none at {where}; to create it: languette doctor --init-redacted-terms")
+        return 1
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"{FAIL} {where} {terms.why_not(e)}")
+        return 1
+    new, notes = terms.restore(text, _defaults())
+    for note in notes:
+        print(f"{WARN if 'edited' in note else OK} {note}")
+    if new == text:
+        print(f"{OK} {where} holds every default as it is now; nothing to write")
+        return 0
+    sys.stdout.writelines(difflib.unified_diff(text.splitlines(True), new.splitlines(True), where, where))
+    try:
+        answer = input("Write it? [y/N] ")
+    except EOFError:
+        answer = ""
+    if answer.strip().lower() not in ("y", "yes"):
+        print(f"{WARN} {where} left as it was")
+        return 0
+    try:
+        Path(path).write_text(new, encoding="utf-8")
+    except OSError as e:
+        print(f"{FAIL} {where} cannot be written ({e.strerror or e})")
+        return 1
+    print(f"{OK} wrote {where}")
+    return 0
 
 
 def installed_options(cwd):
@@ -519,7 +652,9 @@ def installed_options(cwd):
         return {}
 
 
-def main(redact_file=None):
+def main(args=None):
+    """`args`: the parsed doctor options (redact, init_redacted_terms, init_blocked_terms,
+    restore_redacted_terms); none runs the checks."""
     try:
         sys.stdout.reconfigure(errors="replace")
     except (AttributeError, ValueError):
@@ -529,9 +664,19 @@ def main(redact_file=None):
     except OSError as e:
         print(f"{FAIL} {'doctor':<13} the current directory is unreadable ({e.strerror or e})")
         return 1
-    if redact_file:
-        return redact(redact_file, installed_options(cwd))
+    if args is not None:
+        if args.redact is not False:
+            return redact(args.redact, installed_options(cwd))
+        if args.init_redacted_terms:
+            return init("redacted", installed_options(cwd))
+        if args.init_blocked_terms:
+            return init("blocked", installed_options(cwd))
+        if args.restore_redacted_terms:
+            return restore(installed_options(cwd))
     rows = check(cwd)
-    for mark, label, text in rows:
-        print(f"{mark} {label:<13} {text}")
-    return 1 if any(mark == FAIL for mark, _, _ in rows) else 0
+    for text in render(rows):
+        print(text)
+    problems = sum(mark == FAIL for mark, _, _, _ in rows)
+    code = 1 if problems else 0
+    print(f"{problems} problem{'' if problems == 1 else 's'}; exit {code}")
+    return code

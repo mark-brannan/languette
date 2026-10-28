@@ -282,7 +282,7 @@ expression; unset, both read from `~/.config/languette/`. A path set but not
 loading denies public posts until fixed; `languette doctor` says which line.
 Only the file's entries count; `languette doctor --init-redacted-terms` writes the
 [default entries](languette/rules/redacted-terms.tsv) into it; [`features/fixtures/private-terms/`](features/fixtures/private-terms/)
-shows a comment beside what leaves. (planned)
+shows a comment beside what leaves.
 
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
 comma-separated; empty, the default, guards no label. A label that waives a CI

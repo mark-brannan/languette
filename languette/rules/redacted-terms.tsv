@@ -1,17 +1,19 @@
 find	put	comment
 # languette's default redactions: what a post to a public repo carries out of
-# this machine without them. Pairs apply in file order on the running text,
-# defaults then yours. $NAME is the hook's environment, quoted as a literal
-# inside a re: find; $HOSTNAME alone is asked of the OS when unset, and a line
-# naming a variable that is unset or empty is skipped. A path is
-# not a longer path: ~2 and ~-backup are someone else's. /Users comes last: it
-# is inside /mnt/c/Users and C:/Users, which go whole.
-re:$HOME(?![\w.-])	~	the home directory as the shell spells it
-re:/home/$USER(?![\w.-])	~	Linux
-re:/mnt/c/Users/$USER(?![\w.-])	~	WSL, the Windows home mounted
-re:C:[\\/]Users[\\/]$USER(?![\w.-])	~	the Windows spelling of it; a Windows account named unlike $USER is a line of your own
-re:/Users/$USER(?![\w.-])	~	macOS
-re:\b[\w-]+(\.[\w-]+)*\.(local|lan|internal|home|ts\.net)\b	<host>	a name that resolves only on your network or tailnet; before $HOSTNAME so a full name goes whole
-re:(?<![\w.-])$HOSTNAME(?![\w.-])	<host>	this machine's name, short or full; a hyphen or dot continues a name, so zephyr leaves zephyr-01 alone
-re:\b(10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])(\.\d{1,3}){2}|169\.254(\.\d{1,3}){2})\b(?!/\d)	<private-ip>	RFC 1918, CGNAT (a tailnet) and link-local; a range such as 10.0.0.0/8 is left as written
-re:\bf[cd][0-9a-f]{2}(:[0-9a-f]{0,4}){1,7}\b	<private-ip>	IPv6 unique local
+# this machine without them. `languette doctor --init-redacted-terms` writes
+# them into your redacted terms file, each tagged default:<name>@<version>, and
+# `--restore-redacted-terms` repairs them there; comment one out to turn it
+# off. Pairs apply in file order on the running text. $NAME is the hook's
+# environment, quoted as a literal inside a re: find; $HOSTNAME alone is asked
+# of the OS when unset, and a line naming a variable that is unset or empty is
+# skipped. A path is not a longer path: ~2 and ~-backup are someone else's.
+# /Users comes last: it is inside /mnt/c/Users and C:/Users, which go whole.
+re:$HOME(?![\w.-])	~	default:home the home directory as the shell spells it
+re:/home/$USER(?![\w.-])	~	default:home Linux
+re:/mnt/c/Users/$USER(?![\w.-])	~	default:home WSL, the Windows home mounted
+re:C:[\\/]Users[\\/]$USER(?![\w.-])	~	default:home the Windows spelling of it; a Windows account named unlike $USER is a line of your own
+re:/Users/$USER(?![\w.-])	~	default:home macOS
+re:\b[\w-]+(\.[\w-]+)*\.(local|lan|internal|home|ts\.net)\b	<host>	default:host a name that resolves only on your network or tailnet; before $HOSTNAME so a full name goes whole
+re:(?<![\w.-])$HOSTNAME(?![\w.-])	<host>	default:host this machine's name, short or full; a hyphen or dot continues a name, so zephyr leaves zephyr-01 alone
+re:\b(10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])(\.\d{1,3}){2}|169\.254(\.\d{1,3}){2})\b(?!/\d)	<private-ip>	default:private-ip RFC 1918, CGNAT (a tailnet) and link-local; a range such as 10.0.0.0/8 is left as written
+re:\bf[cd][0-9a-f]{2}(:[0-9a-f]{0,4}){1,7}\b	<private-ip>	default:private-ip IPv6 unique local
