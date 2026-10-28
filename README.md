@@ -77,6 +77,17 @@ One line in `devcontainer.json` installs languette before the agent starts:
 
 Without the plugin system or the installer, see [Installing by hand](#installing-by-hand).
 
+### Try it: `languette scan` (experimental)
+
+It reads a shell command on stdin and prints the words each guard would judge:
+
+```
+$ echo 'rm -rf build && sh -c "git push --force"' | languette scan | jq -c '.segments[] | [.nested, [.words[].text]]'
+[false,["rm","-rf","build"]]
+[false,["sh","-c","git push --force"]]
+[true,["git","push","--force"]]
+```
+
 ## The guards
 
 Each guard checks for one kind of hazard:
@@ -206,6 +217,8 @@ or at install, by its name with underscores:
 ```
 claude plugin install languette@languette --config guard_recursive_delete=false
 ```
+
+Changing an option later, outside the installer, is `languette config` (planned; [design](docs/design/config.md)).
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
