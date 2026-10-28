@@ -117,15 +117,6 @@ def project_rules(payload, env):
     return (yield from _load(path)) if path else ()
 
 
-def _scans(doc):
-    """Every text the command may run or feed, read the way it will be: the
-    command with heredocs stripped and its nested shell strings as shell,
-    each heredoc body as lines of data. The document's scans, so no text is
-    read twice; the decision record reads the command again (secrets.scans),
-    after the verdict."""
-    return [doc.scan(text) for text, _ in doc.texts()] + [secrets.Text(h) for h in doc.heredoc_bodies()]
-
-
 def check(doc):
     payload, env = doc.payload, doc.env
     if not doc.text:
@@ -136,7 +127,7 @@ def check(doc):
         return deny(say("secrets_config", config=CONFIG, err=e))
     desc = {r.id: r.description for r in tuple(secrets.secret_rules.RULES) + tuple(extra)}
     shapes, contexts = [], []
-    for s in _scans(doc):
+    for s in secrets.doc_scans(doc):
         for f in secrets.findings(s, extra):
             item = f"`{secrets.shown(s, f)}` ({desc.get(f.rule, f.rule.replace('context:', 'named by '))})"
             (shapes if f.how == "shape" else contexts).append(item)

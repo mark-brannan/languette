@@ -21,49 +21,11 @@ import os
 import time
 
 from languette import scan, secrets
+from languette.secrets import MASK, MIN_MASKED, mask  # noqa: F401 -- the record's masking lives with the detector
 
 VERSION = 1
 ON = "CLAUDE_PLUGIN_OPTION_RECORD_DECISIONS"
 RAW = "CLAUDE_PLUGIN_OPTION_RECORD_RAW_COMMANDS"
-
-
-MASK = "<secret>"
-MIN_MASKED = 8      # a shorter secret is not swapped in place; the text is dropped
-
-
-def mask(text, extra=()):
-    """(text with each secret in it replaced by MASK, how many distinct ones),
-    by the detector guard-secrets uses, with the project's own rules (`extra`). The text is the command as written, so
-    quoting, spacing and heredocs survive: each word a finding names is swapped
-    for its redacted form where it stands, or, when the shell unquoted it so it
-    does not stand as read, just the secret in it is. Text is None when a
-    secret is nowhere in the command as spelled (`"gh""p_..."`, `\\g`), or is
-    shorter than MIN_MASKED (swapping "a" would rewrite every "a" in the
-    command): it cannot be placed, so a record with a hole beats one with a
-    secret or a command that no longer reads as it ran."""
-    out, secret, lost = text, set(), False
-    for s in secrets.scans(text):
-        found = secrets.findings(s, extra, mask_only=True)
-        redacted = secrets.redact(s, found, MASK)
-        for i in sorted({f.index for f in found}):
-            word = secrets.word_text(s, i)
-            if any(f.index == i and f.span[1] - f.span[0] < MIN_MASKED for f in found):
-                continue
-            if word in out:
-                out = out.replace(word, redacted[i])
-                secret.update(secrets.word_text(s, f.index)[slice(*f.span)] for f in found if f.index == i)
-        for f in found:
-            value = secrets.word_text(s, f.index)[slice(*f.span)]
-            if value in secret:
-                continue
-            secret.add(value)
-            if len(value) < MIN_MASKED:
-                lost = True
-            elif value in out:
-                out = out.replace(value, MASK)
-            else:
-                lost = True
-    return (None if lost else out), len(secret)
 
 
 def _mask_prose(text, extra=()):

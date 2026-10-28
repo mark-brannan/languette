@@ -50,6 +50,8 @@ MESSAGES = {
         "unknown number of times, and each run needs its own approval. Fix what the blocking "
         "hook reported, or run it once, on its own, after asking."
     ),
+    # Stands for the command in a reason when a secret in it cannot be masked in place.
+    "command_withheld": "<command withheld: it holds a secret that cannot be masked in place>",
     "transcript_unreadable": (
         "{guard}: cannot read the session transcript to look for the user's approval, or "
         "record it as spent ({err}), so `{cmd}` is denied. {then}"
