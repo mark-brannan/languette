@@ -176,7 +176,7 @@
     "private_terms_file": {
       "type": "file",
       "title": "Private terms file (deprecated)",
-      "description": "Deprecated: use blocked_terms_file. A text file of terms that must not appear in text posted to a public GitHub repo: one per line, matched case-insensitively as plain text, # for comments. With no file set, the public-issue guard allows everything.",
+      "description": "Deprecated: use blocked_terms_file. Read as the blocked list until the two-file design lands, then dropped: one term per line, matched case-insensitively as plain text, # for comments.",
       "required": false
     },
     "redacted_terms_file": {

@@ -258,14 +258,12 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 | `redacted_terms_file` | terms replaced before the post leaves: the term, a tab, the replacement | `~/.config/languette/redacted-terms.tsv` |
 | `private_repos` | repos whose posts are never scanned, comma-separated | `you/notes,you/scratch` |
 
-Both files are one tab-separated format, `#` comments, case-insensitive, a
-regular expression under `re:`. Unset, both read from `~/.config/languette/`;
-a path set but missing, or a file that does not load, denies public posts
-until fixed, and `languette doctor` says which line. Without a blocked terms
-file no term is blocked. The shipped pairs always run:
-[`languette/rules/redacted-terms.tsv`](languette/rules/redacted-terms.tsv), and
-[`features/fixtures/private-terms/`](features/fixtures/private-terms/) shows a
-comment an agent would post beside what leaves.
+One tab-separated format, `#` comments, case-insensitive, `re:` for a regular
+expression; unset, both read from `~/.config/languette/`. A path set but not
+loading denies public posts until fixed; `languette doctor` says which line.
+The shipped pairs, [`languette/rules/redacted-terms.tsv`](languette/rules/redacted-terms.tsv),
+always run; [`features/fixtures/private-terms/`](features/fixtures/private-terms/)
+shows a comment beside what leaves. (planned)
 
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
 comma-separated; empty, the default, guards no label. A label that waives a CI

@@ -384,4 +384,4 @@ def test_every_shipped_rule_file_loads_and_is_packaged(rule_file):
     assert_that(Path(guard.RULE_FILE), equal_to(rule_file))
     got = _gathered(guard.rules(str(rule_file)))
     assert_that(got[:len(guard.RULES)], equal_to(guard.RULES))
-    assert_that((ROOT / "pyproject.toml").read_text(), contains_string('languette = ["rules/*.json"]'))
+    assert_that((ROOT / "pyproject.toml").read_text(), contains_string('languette = ["rules/*.json", "rules/*.tsv"]'))

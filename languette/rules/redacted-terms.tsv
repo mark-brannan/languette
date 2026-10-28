@@ -2,7 +2,8 @@ find	put	comment
 # languette's shipped redactions: what a post to a public repo carries out of
 # this machine without them. Pairs apply in file order on the running text,
 # shipped then yours. $NAME is the hook's environment, quoted as a literal
-# inside a re: find; $HOSTNAME alone is asked of the OS when unset. A path is
+# inside a re: find; $HOSTNAME alone is asked of the OS when unset, and a line
+# naming a variable that is unset or empty is skipped. A path is
 # not a longer path: ~2 and ~-backup are someone else's.
 re:$HOME(?![\w.-])	~	the home directory as the shell spells it
 re:/home/$USER(?![\w.-])	~	Linux
