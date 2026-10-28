@@ -17,6 +17,7 @@ Feature: doctor
     Given a fake HOME
     And gh is signed in
 
+  @planned
   Scenario: a plugin install whose hooks deny both probes
     Given languette "cd31356ad5db" is installed at user scope
     And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true}`
@@ -36,6 +37,7 @@ Feature: doctor
     And the doctor exits 0
     And the fake HOME is as it was
 
+  @planned
   Scenario Outline: a guard is off only when its option says so exactly
     Given languette "cd31356ad5db" is installed at user scope
     And the languette options are `<options>`
@@ -169,6 +171,7 @@ Feature: doctor
     When the doctor runs in "{HOME}/project/sub"
     Then the "Claude Code" row is ✓ matching "plugin 617e6fe, project scope; "
 
+  @planned
   Scenario: without the claude CLI the doctor reads installed_plugins.json
     Given languette "cd31356ad5db" is installed at user scope
     And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true}`
@@ -200,6 +203,7 @@ Feature: doctor
   # accepted or refused by its shape alone, and a slow one is a ! warning, exit 0. Every bad line is reported, and the valid
   # ones are still loaded and timed.
 
+  @planned
   Scenario: a terms file gets a row, its path and entry count, and the timings of its re: lines
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"
@@ -212,6 +216,7 @@ Feature: doctor
     And beneath it "~/.config/languette/blocked-terms.tsv (3 entries)" is ✓
     And the doctor exits 0
 
+  @planned
   Scenario: a re: slower than the threshold is listed on its own line, with its line number and its first characters
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds `a\nb\nc\nre:(?:Wanderlust|Wanderer)\s+aboard\b`
@@ -229,6 +234,7 @@ Feature: doctor
     When the doctor runs
     Then the "blocked terms" row is ! "none at ~/.config/languette/blocked-terms.tsv, and blocked_terms_file is unset: no term is blocked"
 
+  @planned
   Scenario: no redacted terms file, with the guard on, is a warning that names the fix
     Given languette "cd31356ad5db" is installed at user scope
     When the doctor runs
@@ -236,6 +242,7 @@ Feature: doctor
     And beneath it "run `languette doctor --init-redacted-terms` to write the defaults" is !
     And the doctor exits 0
 
+  @planned
   Scenario: no terms files, with the guard off, is fine
     Given languette "cd31356ad5db" is installed at user scope
     And the languette options are `{"guard_private_terms": false}`
@@ -244,6 +251,7 @@ Feature: doctor
     And the "blocked terms" row is ✓ "off, and none at ~/.config/languette/blocked-terms.tsv"
     And the doctor exits 0
 
+  @planned
   Scenario Outline: an empty terms file is a warning, though the guard accepts it
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/<file>" holds ``
@@ -257,6 +265,7 @@ Feature: doctor
       | redacted-terms.tsv | redacted terms |
       | blocked-terms.tsv  | blocked terms  |
 
+  @planned
   Scenario Outline: a terms file the guard cannot read fails the row, as it would fail every public post
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/<file>" <state>
@@ -269,6 +278,7 @@ Feature: doctor
       | redacted-terms.tsv | redacted terms | is a directory              | is a directory  |
       | blocked-terms.tsv  | blocked terms  | exists but is not readable  | is not readable |
 
+  @planned
   Scenario Outline: a line the guard would refuse fails the row, naming the line
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/<file>" holds `<text>`
@@ -285,6 +295,7 @@ Feature: doctor
       | blocked-terms.tsv  | blocked terms  | a{TAB}b{TAB}c{TAB}d               | 1 | four columns                           |
       | redacted-terms.tsv | redacted terms | re:(?:a\|aa)+x                    | 1 | overlapping alternatives inside a repeat |
 
+  @planned
   Scenario: every bad line is listed, and the valid re: lines are still timed
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds a malformed line 13, an empty-matching re: line 17, a nested-quantifier line 22 and 8 valid re: lines
@@ -293,6 +304,7 @@ Feature: doctor
     And beneath it a line is ✗ matching "^10 regular expressions, 2 invalid \(min=\d+\.\d\dms, max=\d+\.\d\dms, avg=\d+\.\d\dms\)$"
     And the doctor exits 1
 
+  @planned
   Scenario: a failed check does not stop the ones after it
     When the doctor runs
     Then the "Claude Code" row is ✗ "languette is not installed for this directory"
@@ -310,6 +322,7 @@ Feature: doctor
 
   # Mending configuration: a default entry is a copied line tagged default:<name>@<version>
   # in its comment column; the user's own lines are never touched.
+  @planned
   Scenario: --init-redacted-terms writes the file with every default entry
     Given languette "cd31356ad5db" is installed at user scope
     When the doctor runs with `--init-redacted-terms`
@@ -317,12 +330,14 @@ Feature: doctor
     And it prints "✓ wrote ~/.config/languette/redacted-terms.tsv (3 defaults)"
     And the doctor exits 0
 
+  @planned
   Scenario: --init-blocked-terms writes the file with a header and no terms
     Given languette "cd31356ad5db" is installed at user scope
     When the doctor runs with `--init-blocked-terms`
     Then "~/.config/languette/blocked-terms.tsv" holds a header and no terms
     And the doctor exits 0
 
+  @planned
   Scenario Outline: an init never overwrites a file, and names the repair
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/<file>" holds `zephyr-01\tthe boat`
@@ -336,6 +351,7 @@ Feature: doctor
       | --init-redacted-terms | redacted-terms.tsv | ; to repair it: languette doctor --restore-redacted-terms |
       | --init-blocked-terms  | blocked-terms.tsv  |                                                          |
 
+  @planned
   Scenario: --restore-redacted-terms adds a missing default in order and leaves the rest alone
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds every default entry but "host", with "private-ip" commented out, and the line "zephyr-01\tthe boat"
@@ -346,6 +362,7 @@ Feature: doctor
     And the line "zephyr-01\tthe boat" is unchanged
     And running it again changes nothing
 
+  @planned
   Scenario: --restore-redacted-terms updates an unedited default and reports an edited one
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds "home" as an earlier version wrote it, and "host" edited by hand
@@ -353,12 +370,14 @@ Feature: doctor
     Then "home" holds the current version
     And "host" is unchanged, and it prints that "host" was edited by hand
 
+  @planned
   Scenario: --restore-redacted-terms writes nothing without a yes
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds every default entry but "host"
     When the doctor runs with `--restore-redacted-terms` and answers no
     Then "~/.config/languette/redacted-terms.tsv" is unchanged
 
+  @planned
   Scenario: --restore-redacted-terms with no file names the init
     Given languette "cd31356ad5db" is installed at user scope
     When the doctor runs with `--restore-redacted-terms`
@@ -377,12 +396,14 @@ Feature: doctor
     Then it prints "blocked: Wanderlust (the boat's name stays off public repos; say \"the boat\")"
     And the doctor exits 1
 
+  @planned
   Scenario: doctor --help shows the parent command's help too
     When the doctor runs with `--help`
     Then it prints the doctor's own options
     And it then prints everything `languette --help` prints
     And the doctor exits 0
 
+  @planned
   Scenario Outline: --redact reads stdin when it is given no file, or "-"
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"

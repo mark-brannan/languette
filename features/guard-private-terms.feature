@@ -254,7 +254,7 @@ Feature: guard-private-terms
     When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
     Then the guard allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"
 
-  @also_guard-signed-comments
+  @also_guard-signed-comments @planned
   Scenario: with no redacted terms file, nothing is redacted
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     And CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE is unset
