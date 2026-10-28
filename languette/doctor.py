@@ -18,13 +18,14 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from languette import scan
+from languette import scan, terms
 
 OK, WARN, FAIL = "✓", "!", "✗"
 # A probe is (row label, guard, command): the command goes to the guard's hook as a payload.
@@ -282,6 +283,7 @@ def check(cwd):
     except Unreadable as e:
         inst, problem = None, str(e)
 
+    options = {}
     probed, env, not_run = {}, None, {}      # guard -> trusted hook; guard -> why its probe did not run
     # A probe's environment is an allowlist, not the doctor's own.
     base_env = {k: os.environ[k] for k in ("PATH", "HOME", "TMPDIR") if k in os.environ}
@@ -402,10 +404,94 @@ def check(cwd):
         state = {True: "signed in", False: "installed, not signed in", None: "installed, not answering"}[signed]
         quiet = signed is True if name == "gh" else signed is False
         rows.append((OK, name, state) if quiet else (WARN, name, f"{state}; {note}"))
+    return rows + terms_rows(options)
+
+
+# --- guard-private-terms' files, through the guard's own loader --------------
+
+def _terms_env(options):
+    """The guard's environment for the terms files: this one, the installed plugin's two options,
+    and this machine's name for $HOSTNAME."""
+    env = {**os.environ, "HOME": str(_home())}
+    for kind in terms.KINDS:
+        name = terms.option_name(kind)
+        if isinstance(options.get(name), str):
+            env["CLAUDE_PLUGIN_OPTION_" + name.upper()] = options[name]
+    env["HOSTNAME"] = env.get("HOSTNAME") or socket.gethostname()
+    return env
+
+
+def _load_terms(kind, env):
+    """(the kind's terms, its path, whether an option named it, why the guard would refuse it or
+    None); the terms are None when there is no file to read."""
+    from languette.world import World
+    path, named = terms.where(kind, env)
+    if not path:
+        return None, "", named, None
+    try:
+        return terms.parse(World(env, {})._read(path, terms.MAX_READ), kind, env), path, named, None
+    except terms.BadTerms as e:
+        return None, path, named, str(e)
+    except (OSError, ValueError) as e:
+        if not named and isinstance(e, (FileNotFoundError, NotADirectoryError)):
+            return None, path, named, None
+        return None, path, named, terms.why_not(e)
+
+
+def _counts(found, noun):
+    lines = [t for t in found if not t.drop]
+    return f"{len(lines)} {noun}{'' if len(lines) == 1 else 's'}, {sum(t.is_re for t in lines)} re:"
+
+
+def terms_rows(options):
+    """A row for the redacted terms, shipped included, and one for the blocked terms: what loaded,
+    or the line the guard would refuse, which would deny every public post."""
+    env = _terms_env(options)
+    shipped = terms.parse(Path(terms.SHIPPED).read_text(encoding="utf-8"), "redacted", env)
+    rows = []
+    for kind, label, noun in (("redacted", "redacted terms", "pair"), ("blocked", "blocked terms", "term")):
+        found, path, named, why = _load_terms(kind, env)
+        option, where = terms.option_name(kind), _tilde(path)
+        if why and why.startswith("line "):
+            rows.append((FAIL, label, f"{where} {why}"))
+        elif why:
+            until = "does" if why == "does not exist" else "loads"
+            rows.append((FAIL, label, f"{option} is {where}, which {why}: every public post is denied until it {until}"
+                         if named else f"{where} {why}: every public post is denied until it loads"))
+        elif kind == "redacted":
+            mine = "none of your own" if found is None else f"{where} {_counts(found, noun)}"
+            rows.append((OK, label, f"shipped {_counts(shipped, noun)}; {mine}"))
+        elif found is None:
+            rows.append((WARN, label, f"none at {where}, and {option} is unset: no term is blocked"))
+        else:
+            rows.append((OK, label, f"{where} {_counts(found, noun)}"))
     return rows
 
 
-def main():
+def redact(file):
+    """Print `file` as a post would leave through the files as loaded, then which blocked terms it
+    holds. Exits 1 when any, or when a file would not load."""
+    env = _terms_env({})
+    try:
+        text = Path(file).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"{FAIL} {file} {terms.why_not(e)}")
+        return 1
+    shipped = terms.parse(Path(terms.SHIPPED).read_text(encoding="utf-8"), "redacted", env)
+    mine, blocked = (_load_terms(kind, env) for kind in ("redacted", "blocked"))
+    for found, path, _, why in (mine, blocked):
+        if why:
+            print(f"{FAIL} {_tilde(path)} {why}")
+            return 1
+    print(terms.redact(text, terms.pairs(shipped, mine[0] or [])).rstrip("\n"))
+    hits = terms.hits(text, blocked[0] or [])
+    print("blocked: " + (terms.named(hits) if hits else "none"))
+    return 1 if hits else 0
+
+
+def main(redact_file=None):
+    if redact_file:
+        return redact(redact_file)
     try:
         sys.stdout.reconfigure(errors="replace")
     except (AttributeError, ValueError):

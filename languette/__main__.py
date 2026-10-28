@@ -66,9 +66,12 @@ def main(argv=None):
                                      "the plugin is already installed. Exits 1 on any ✗.")
     ins.add_argument("host", nargs="?", default="claude", type=_host, metavar="HOST",
                      help="the coding agent to wire: claude (the default, and the only one today)")
-    sub.add_parser("doctor", help="say whether languette protects Claude Code here; exits 1 on any ✗",
-                   description="Say whether languette protects Claude Code on this machine, from the current "
-                               "directory. Exits 1 on any ✗.")
+    doc = sub.add_parser("doctor", help="say whether languette protects Claude Code here; exits 1 on any ✗",
+                         description="Say whether languette protects Claude Code on this machine, from the current "
+                                     "directory. Exits 1 on any ✗.")
+    doc.add_argument("--redact", metavar="FILE",
+                     help="instead, print FILE as a post would leave through the terms files as loaded, "
+                          "then which blocked terms it names; exits 1 on any")
     sc = sub.add_parser("scan", help="(experimental) read a shell command on stdin and print its segments as JSON",
                         description="Read a shell command on stdin, as the Bash tool would run it, and print one "
                                     "JSON document of the segments the guards would judge, nested texts included. "
@@ -91,7 +94,7 @@ def main(argv=None):
         from languette import install
         return install.main(args.host)
     from languette import doctor
-    return doctor.main()
+    return doctor.main(args.redact)
 
 
 if __name__ == "__main__":
