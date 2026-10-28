@@ -274,14 +274,15 @@ class FakeHome:
     def snapshot(self):
         return sorted((str(p.relative_to(self.home)), p.stat().st_size) for p in self.home.rglob("*"))
 
-    def invoke(self, args, cwd, path):
-        """Run `python3 -m languette *args` in `cwd` with `path` after the stubs' directory on PATH."""
+    def invoke(self, args, cwd, path, stdin=None):
+        """Run `python3 -m languette *args` in `cwd` with `path` after the stubs' directory on PATH,
+        `stdin` as its input, nothing when None."""
         env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "LANGUETTE_")) and k not in SCRUB}
         env.update(HOME=str(self.home), USER=self.home.name, PATH=f"{self.bin}{os.pathsep}{path}", TMPDIR=str(self.aside),
                    PYTHONPATH=str(ROOT))
         self.before = self.snapshot()
         r = subprocess.run([sys.executable, "-m", "languette", *args], cwd=cwd, env=env, capture_output=True,
-                           text=True, timeout=60)
+                           text=True, timeout=60, input=stdin or "")
         self.out, self.err, self.code = r.stdout, r.stderr, r.returncode
 
     def row(self, label):

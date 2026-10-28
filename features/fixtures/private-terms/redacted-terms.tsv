@@ -1,6 +1,15 @@
 find	put	comment
-# A user's redacted terms, beside the default entries. {USER}, {HOME} and {TAB} are
-# the test harness's placeholders.
+# A user's redacted terms: the default entries as `languette doctor --init-redacted-terms`
+# wrote them, then the user's own. {USER}, {HOME} and {TAB} are the test harness's placeholders.
+re:$HOME(?![\w.-])	~	default:home@b403403 the home directory as the shell spells it
+re:/home/$USER(?![\w.-])	~	default:home@b403403 Linux
+re:/mnt/c/Users/$USER(?![\w.-])	~	default:home@b403403 WSL, the Windows home mounted
+re:C:[\\/]Users[\\/]$USER(?![\w.-])	~	default:home@b403403 the Windows spelling of it; a Windows account named unlike $USER is a line of your own
+re:/Users/$USER(?![\w.-])	~	default:home@b403403 macOS
+re:\b[\w-]+(\.[\w-]+)*\.(local|lan|internal|home|ts\.net)\b	<host>	default:host@84bfe26 a name that resolves only on your network or tailnet; before $HOSTNAME so a full name goes whole
+re:(?<![\w.-])$HOSTNAME(?![\w.-])	<host>	default:host@84bfe26 this machine's name, short or full; a hyphen or dot continues a name, so zephyr leaves zephyr-01 alone
+re:\b(10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])(\.\d{1,3}){2}|169\.254(\.\d{1,3}){2})\b(?!/\d)	<private-ip>	default:private-ip@021614a RFC 1918, CGNAT (a tailnet) and link-local; a range such as 10.0.0.0/8 is left as written
+re:\bf[cd][0-9a-f]{2}(:[0-9a-f]{0,4}){1,7}\b	<private-ip>	default:private-ip@021614a IPv6 unique local
 zephyr-01	<host>	the dev box, by its old name
 acct-9931		no put, so <redacted>
 re:acct-\d{4}	<account>	every other account id; a plain line above wins by order

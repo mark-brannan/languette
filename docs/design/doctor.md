@@ -37,11 +37,13 @@ there is none. Where the fix is the user's call, it asks with the choices. It wr
 Assisting means saying what each guard's options do and writing a starting
 file for a guard that has none.
 guard-private-terms is the first: a row per terms file counting only the
-entries in it, the min, max and average time of its `re:` lines, each slow one
-and each refused line named by line number, `--init-redacted-terms` and
-`--init-blocked-terms` writing a new file, `--restore-redacted-terms` repairing
-the defaults in one without touching yours (planned), and `--redact` printing what
-a post would become, from a file or stdin. Its marks follow the guard,
+entries in it, each refused line named by line number with its first
+characters, the min, max and average time of its accepted `re:` lines shown
+and gating nothing, `--init-redacted-terms` and `--init-blocked-terms` writing
+a new file, `--restore-redacted-terms` repairing the defaults in one without
+touching yours, and `--redact` printing what a post would become, from a file
+or stdin. A `re:` is refused by its shape alone (`languette/reshape.py`), never
+by a clock: one that can backtrack without bound. Its marks follow the guard,
 except that an empty file is a !.
 
 ## Limits

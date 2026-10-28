@@ -56,6 +56,20 @@ def _host(text):
     return text
 
 
+class _Help(argparse.Action):
+    """`languette doctor --help`: the doctor's options, then everything `languette --help` prints."""
+
+    def __init__(self, option_strings, dest, parent, **kw):
+        super().__init__(option_strings, dest, nargs=0, **kw)
+        self.parent = parent
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        parser.print_help()
+        print()
+        self.parent.print_help()
+        parser.exit()
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="languette", description="Guards against risky actions by coding agents.")
     sub = p.add_subparsers(dest="command", required=True, metavar="COMMAND")
@@ -68,10 +82,21 @@ def main(argv=None):
                      help="the coding agent to wire: claude (the default, and the only one today)")
     doc = sub.add_parser("doctor", help="say whether languette protects Claude Code here; exits 1 on any ✗",
                          description="Say whether languette protects Claude Code on this machine, from the current "
-                                     "directory. Exits 1 on any ✗.")
-    doc.add_argument("--redact", metavar="FILE",
-                     help="instead, print FILE as a post would leave through the terms files as loaded, "
-                          "then which blocked terms it names; exits 1 on any")
+                                     "directory. Exits 1 on any ✗.", add_help=False)
+    doc.add_argument("-h", "--help", action=_Help, parent=p, help="show this help, then languette's own, and exit")
+    one = doc.add_mutually_exclusive_group()
+    one.add_argument("--redact", metavar="FILE", nargs="?", const="-", default=False,
+                     help="instead, print FILE (stdin for none or -) as a post would leave through the terms "
+                          "files as loaded, then which blocked terms it names; exits 1 on any")
+    one.add_argument("--init-redacted-terms", action="store_true",
+                     help="instead, write the redacted terms file where guard-private-terms reads it, with every "
+                          "default entry; never over one that exists")
+    one.add_argument("--init-blocked-terms", action="store_true",
+                     help="instead, write the blocked terms file where guard-private-terms reads it, a header and "
+                          "no terms; never over one that exists")
+    one.add_argument("--restore-redacted-terms", action="store_true",
+                     help="instead, repair the default entries in the redacted terms file: show the diff, write "
+                          "it on a yes; your own lines and a commented-out default are left alone")
     sc = sub.add_parser("scan", help="(experimental) read a shell command on stdin and print its segments as JSON",
                         description="Read a shell command on stdin, as the Bash tool would run it, and print one "
                                     "JSON document of the segments the guards would judge, nested texts included. "
@@ -94,7 +119,7 @@ def main(argv=None):
         from languette import install
         return install.main(args.host)
     from languette import doctor
-    return doctor.main(args.redact)
+    return doctor.main(args)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,9 @@
-"""The terms files of guard-private-terms, parsed: the default
-rules/redacted-terms.tsv, the user's redacted_terms_file and the
-blocked_terms_file, one tab-separated format. The guard and `languette doctor`
-both load through this module, so a line one would refuse the other names.
+"""The terms files of guard-private-terms, parsed: the user's
+redacted_terms_file and blocked_terms_file, one tab-separated format. The guard
+and `languette doctor` both load through this module, so a line one would
+refuse the other names. Only a file's entries count: the guard loads no other
+set. The default entries, rules/redacted-terms.tsv, are what the doctor writes
+into a new redacted terms file and repairs in an old one.
 
 A line is the find, an optional put, an optional comment. The first line is
 skipped when it is the header (`find put comment`, or `find message comment`
@@ -9,14 +11,19 @@ for the blocked file); `#` starts a comment line, a blank line is skipped, a
 fourth column is not in shape. A find is case-insensitive plain text, or a
 regular expression under `re:` that languette.reshape accepts. `$NAME` in a
 find is that variable's value in the env given, a literal inside a `re:`; a
-line naming a variable that is unset or empty is kept but matches nothing. In
-the redacted file a line `!<put>` drops every default pair with that put.
+line naming a variable that is unset or empty is kept but matches nothing.
+
+A default entry is a line the doctor copied, its comment column tagged
+`default:<name>@<version>`: the name groups the lines of one default, the
+version is a hash of the group's finds and puts, so an edit to any of them
+shows. Commenting a default's line out turns it off and keeps it off.
 
 The parsing is pure. The loading is a generator that yields the Needs for the
 read and the hostname, which the guard and the doctor both drive. Standard
 library only.
 """
 
+import hashlib
 import os
 import re
 from collections import namedtuple
@@ -31,18 +38,24 @@ DEFAULT_PUT = "<redacted>"
 DEFAULTS = os.path.join(os.path.dirname(__file__), "rules", "redacted-terms.tsv")
 MAX_READ = 1 << 20                                  # bytes of a terms file the guard reads
 _VAR = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*)")
+# The tag on a default entry's comment column; the version is absent in the rules file.
+TAG = re.compile(r"^default:(?P<name>[\w-]+)(?:@(?P<version>[0-9a-f]+))?(?=\s|$)")
+# A default's line, active or commented out, split into its columns.
+_LINE = re.compile(r"^(?P<off>#\s*)?(?P<find>[^\t]*)\t(?P<put>[^\t]*)\t(?P<comment>default:[^\t]*)$")
 
-# find: as written; put: its second column or None; rx: compiled, None for a drop or a skipped line;
+# find: as written; put: its second column or None; rx: compiled, None for a skipped line;
 # name: what a hit is called, a plain find with its $NAMEs filled.
-Term = namedtuple("Term", "find put rx is_re drop name")
+Term = namedtuple("Term", "find put rx is_re name")
+# One default entry's line: the find, the put, what its comment says after the tag.
+Default = namedtuple("Default", "find put about")
 
 
 class BadTerms(Exception):
-    """A line the guard would refuse: its number (1-based) and why."""
+    """A line the guard would refuse: its number (1-based), why, and whether it was a `re:` find."""
 
-    def __init__(self, line, why):
+    def __init__(self, line, why, is_re=False):
         super().__init__(f"line {line}: {why}")
-        self.line, self.why = line, why
+        self.line, self.why, self.is_re = line, why, is_re
 
 
 def option_name(kind):
@@ -52,6 +65,10 @@ def option_name(kind):
 def option_env(option):
     """The environment variable Claude Code gives a plugin option."""
     return "CLAUDE_PLUGIN_OPTION_" + option.upper()
+
+
+def header(kind):
+    return f"find\t{KINDS[kind][2]}\tcomment"
 
 
 def where(kind, env):
@@ -82,34 +99,38 @@ def _value(find, is_re, env):
     return _VAR.sub(fill, find), unset
 
 
-def parse(text, kind, env):
-    """The Terms in file order. BadTerms on the first line the guard would refuse."""
-    second = KINDS[kind][2]
-    out = []
+def entries(text, kind, env):
+    """(line number, the line, its Term or the BadTerms the guard would refuse it for) for
+    every entry line, in file order: the header, comment and blank lines are skipped."""
     for n, line in enumerate(text.split("\n"), 1):
         line = line.rstrip("\r")
-        if n == 1 and line == f"find\t{second}\tcomment":
+        if n == 1 and line == header(kind):
             continue
         if not line.strip() or line.startswith("#"):
             continue
         cols = line.split("\t")
         if len(cols) > 3:
-            raise BadTerms(n, "four columns")
+            yield n, line, BadTerms(n, "four columns")
+            continue
         find = cols[0].strip()
         put = cols[1] if len(cols) > 1 and cols[1] != "" else None
-        if kind == "redacted" and find.startswith("!"):
-            out.append(Term(find, find[1:], None, False, True, find))
-            continue
         is_re = find.startswith("re:")
         pattern, unset = _value(find[3:] if is_re else find, is_re, env)
-        if is_re:
-            why = reshape.refusal(pattern)
-            if why:
-                raise BadTerms(n, why)
-        elif not pattern:
-            raise BadTerms(n, "matches the empty string")
+        why = reshape.refusal(pattern) if is_re else "matches the empty string" if not pattern else None
+        if why:
+            yield n, line, BadTerms(n, why, is_re)
+            continue
         rx = re.compile(pattern if is_re else re.escape(pattern), re.I)
-        out.append(Term(find, put, None if unset else rx, is_re, False, pattern))
+        yield n, line, Term(find, put, None if unset else rx, is_re, pattern)
+
+
+def parse(text, kind, env):
+    """The Terms in file order. BadTerms on the first line the guard would refuse."""
+    out = []
+    for _, _, item in entries(text, kind, env):
+        if isinstance(item, BadTerms):
+            raise item
+        out.append(item)
     return out
 
 
@@ -118,33 +139,36 @@ def environment(env):
     return {**env, "HOSTNAME": env.get("HOSTNAME") or (yield Need("hostname"))}
 
 
-def defaults(penv):
-    """The default redacted pairs."""
-    return parse((yield Need("read", DEFAULTS)), "redacted", penv)
-
-
-def load(kind, env, penv):
-    """(the kind's terms, its path, whether an option named it, the exception that stops the guard
-    judging by it or None). The terms are None when there is no file to read: an unset option with
-    nothing at the default path, which is no error."""
+def read(kind, env):
+    """(the kind's file's text, its path, whether an option named it, the exception that stops
+    the guard judging by it or None). The text is None when there is no file to read: an unset
+    option with nothing at the default path, which is no error."""
     path, named = where(kind, env)
     if not path:
         return None, "", named, None
     try:
-        return parse((yield Need("read", path, MAX_READ)), kind, penv), path, named, None
-    except BadTerms as e:
-        return None, path, named, e
+        return (yield Need("read", path, MAX_READ)), path, named, None
     except Exception as e:  # noqa: BLE001 -- the world's own: missing, a directory, unreadable
         if not named and isinstance(e, (FileNotFoundError, NotADirectoryError)):
             return None, path, named, None
         return None, path, named, e
 
 
-def pairs(defaults, mine):
-    """The redacted pairs in the order they apply: the default ones, minus any whose put a
-    `!<put>` line of yours drops, then yours."""
-    dropped = {t.put for t in mine if t.drop}
-    return [t for t in defaults if t.rx and t.put not in dropped] + [t for t in mine if t.rx and not t.drop]
+def load(kind, env, penv):
+    """(the kind's terms, its path, whether an option named it, the exception that stops the guard
+    judging by it or None): read, then parse under penv."""
+    text, path, named, err = yield from read(kind, env)
+    if text is None:
+        return None, path, named, err
+    try:
+        return parse(text, kind, penv), path, named, None
+    except BadTerms as e:
+        return None, path, named, e
+
+
+def pairs(found):
+    """The redacted pairs that apply, in file order: a line naming an unset variable matches nothing."""
+    return [t for t in found if t.rx]
 
 
 def redact(text, applied, esc=None):
@@ -174,6 +198,10 @@ def why_not(e):
     """Why a terms file could not be had, from the exception a read raised."""
     if isinstance(e, (FileNotFoundError, NotADirectoryError)):
         return "does not exist"
+    if isinstance(e, IsADirectoryError):
+        return "is a directory"
+    if isinstance(e, PermissionError):
+        return "is not readable"
     if isinstance(e, UnicodeDecodeError):
         return "is not UTF-8 text"
     if isinstance(e, ValueError):
@@ -184,3 +212,115 @@ def why_not(e):
 def named(found):
     """hits() as the deny and the doctor say them: `term (message)`, comma-separated."""
     return ", ".join(name + (f" ({message})" if message else "") for name, message in found)
+
+
+# --- the default entries ----------------------------------------------------
+
+def defaults(text):
+    """name -> [Default] in the rules file's order, from its text: every entry line whose
+    comment column carries a tag."""
+    out = {}
+    for line in text.split("\n"):
+        m = _LINE.match(line.rstrip("\r"))
+        tag = m and TAG.match(m["comment"])
+        if tag and not m["off"]:
+            about = m["comment"][tag.end():].strip()
+            out.setdefault(tag["name"], []).append(Default(m["find"], m["put"], about))
+    return out
+
+
+def version(lines):
+    """A default's version: a hash of its lines' finds and puts, so an edit to any of them shows."""
+    h = hashlib.sha1("\n".join(f"{d.find}\t{d.put}" for d in lines).encode("utf-8"))
+    return h.hexdigest()[:7]
+
+
+def written(name, lines):
+    """A default's lines as the doctor writes them, each tagged with the name and the version."""
+    v = version(lines)
+    return [f"{d.find}\t{d.put}\tdefault:{name}@{v}" + (f" {d.about}" if d.about else "") for d in lines]
+
+
+def initial(groups):
+    """A new redacted terms file: the header and every default."""
+    lines = [header("redacted"), "# Terms replaced in a post bound for a public repo: find, put, comment.",
+             "# A default: line is one languette doctor wrote and can repair; comment it out to turn it off."]
+    for name, group in groups.items():
+        lines += written(name, group)
+    return "\n".join(lines) + "\n"
+
+
+def _tagged(text):
+    """[(index, name, version, off, Default)] for every tagged line of a user's file."""
+    out = []
+    for i, line in enumerate(text.split("\n")):
+        m = _LINE.match(line.rstrip("\r"))
+        tag = m and TAG.match(m["comment"])
+        if tag:
+            out.append((i, tag["name"], tag["version"], bool(m["off"]),
+                        Default(m["find"], m["put"], m["comment"][tag.end():].strip())))
+    return out
+
+
+def restore(text, groups):
+    """(the user's redacted terms file repaired, [what was done or left]): a missing default is
+    inserted in the defaults' order, one unedited since its version is replaced by the current
+    lines, one edited by hand is reported and left, one commented out anywhere is left, one no
+    longer a default is commented out, and every other line is left as it is."""
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    tagged = _tagged(text)
+    by_name = {}
+    for i, name, v, off, d in tagged:
+        by_name.setdefault(name, []).append((i, v, off, d))
+    edits = {}                             # line index -> replacement lines, [] to drop
+    inserts = {}                           # line index -> lines to put before it; len(lines) for the end
+    notes = []
+    for name, group in groups.items():
+        current = version(group)
+        mine = by_name.get(name)
+        if mine is None:
+            continue
+        if any(off for _, _, off, _ in mine):
+            continue
+        tags = {v for _, v, _, _ in mine}
+        found = version([d for _, _, _, d in mine])
+        if found == current:
+            continue
+        if tags == {found}:
+            first, *rest = (i for i, _, _, _ in mine)
+            edits[first] = written(name, group)
+            for i in rest:
+                edits[i] = []
+            notes.append(f"{name}: updated to the current version")
+        else:
+            notes.append(f"{name}: edited by hand, so left as it is")
+    present = [n for n in groups if n in by_name]
+    for k, name in enumerate(groups):
+        if name in by_name:
+            continue
+        later = next((n for n in list(groups)[k + 1:] if n in by_name), None)
+        if later is not None:
+            at = min(i for i, _, _, _ in by_name[later])
+        elif present:
+            earlier = [n for n in list(groups)[:k] if n in by_name]
+            at = max(i for i, _, _, _ in by_name[earlier[-1]]) + 1
+        else:
+            at = 1 if lines and lines[0] == header("redacted") else 0
+        inserts.setdefault(at, []).extend(written(name, groups[name]))
+        notes.append(f"{name}: added")
+    for name, mine in by_name.items():
+        if name in groups:
+            continue
+        live = [i for i, _, off, _ in mine if not off]
+        for i in live:
+            edits[i] = ["# " + lines[i]]
+        if live:
+            notes.append(f"{name}: no longer a default, so commented out")
+    out = []
+    for i, line in enumerate(lines):
+        out += inserts.get(i, [])
+        out += edits[i] if i in edits else [line]
+    out += inserts.get(len(lines), [])
+    return "\n".join(out) + "\n", notes
