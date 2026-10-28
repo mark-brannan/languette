@@ -485,3 +485,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261028t075735z
 - doctor: the fixture redacted-terms.tsv holds the default entries as --init-redacted-terms writes them, then the user's lines, so the redacted twin follows with no built-in set; the row counting it says 14 entries and 10 regular expressions Undo: restore the five-line fixture and give the --redact and redacted-twin scenarios a file of their own ([#305](https://github.com/mark-brannan/languette/pull/305))
+
+### 20261028t075750z
+- doctor: the trailer line is printed on every run, '0 problems; exit 0' included; --restore-redacted-terms with nothing to change says so and exits 0 without asking, and a no leaves the file and exits 0 Undo: print the trailer only when a ✗ is there; exit 1 on a no ([#305](https://github.com/mark-brannan/languette/pull/305))
