@@ -479,3 +479,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261028t075711z
 - doctor: a default entry's version in default:<name>@<version> is a 7-hex sha1 of the default's finds and puts, not a counter, so an edit by hand is told from an outdated copy with no table of past texts Undo: a counter per name in languette/rules/redacted-terms.tsv and a table of past texts ([#305](https://github.com/mark-brannan/languette/pull/305))
+
+### 20261028t075722z
+- doctor: a terms file that is a directory is named 'is a directory' by the doctor's own isdir, while World._read keeps raising 'is not a regular file', which guard-bypass-labels' feature pins Undo: drop the isdir in terms_rows and change World._read and that feature together ([#305](https://github.com/mark-brannan/languette/pull/305))
