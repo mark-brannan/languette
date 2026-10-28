@@ -166,54 +166,33 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 
 ## guard-private-terms: 2026-10-27
 
-- No environment variable configures languette. One is a last resort, for a
-  pressing need with real design intent behind it.
-- guard-private-terms is two behaviours. Redact replaces terms in text bound
-  for a public repo and allows the call: the shipped pairs, then the user's
-  own from the redacted terms file. Hard block denies the whole post for a
-  term on a short list of really sensitive terms, where even a redacted post
-  could leak concepts or strategy.
+- No environment variable configures languette; one is a last resort.
+- Two behaviours. Redact replaces terms in text bound for a public repo and
+  allows the call: the shipped pairs, then the user's own. Hard block denies
+  the whole post for a term on a short list, where even a redacted post
+  could leak strategy; it reads the text as written, before any redaction.
 - The shipped redactions are a file in the shipped tier,
   `languette/rules/redacted-terms.tsv`, not a boolean each: the home
-  directory in every spelling (/home, /Users, /mnt/c/Users, C:\Users, $HOME)
-  to `~`; this machine's hostname and a name on a LAN or tailnet (.local,
-  .lan, .internal, .home, .ts.net) to `<host>`; a private address (RFC 1918,
-  CGNAT, link-local, IPv6 unique local) to `<private-ip>`. Only
-  `guard_private_terms` switches; `redact_home_paths` goes. Not shipped: the
-  login name, an email address, a session id, a scratchpad or worktree path,
-  a localhost URL; a reader needs those, and one's own address is a line in
-  one's file. The false positive of a machine named like a word is accepted.
-  A line `!<put>` in the user's file drops every shipped pair with that put:
-  current thinking, pending the repo tier.
-- The step is a redaction, not a guard: it transforms data and has no
-  verdict. "Redact" over anonymize (a person's identity, overclaims), scrub,
-  mask, and rewrite (the rule action, a mechanism). Rewrite then allow is the
-  action for redaction.
-- Two files, one tab-separated format: find, put, comment, the last two
-  optional; an optional header row of the literal column names; `#`
-  comments; case-insensitive plain text, or a regular expression under a
-  `re:` prefix, Python's syntax, the put literal; `$NAME` the variable's
-  value, quoted inside a `re:` find, `$HOSTNAME` asked of the OS when unset.
-  In the redacted file the put is the replacement, `<redacted>` when none; in
-  the blocked file it is a message added to the deny reason, for the agent.
-  Pairs apply in file order, shipped then the user's. Options
-  `redacted_terms_file` and `blocked_terms_file`; unset,
-  `$XDG_CONFIG_HOME/languette/redacted-terms.tsv` and `blocked-terms.tsv`
-  are read if present. Pencil: the names without `_file`.
-- A `re:` line the guard would not run is not in shape and refused at load,
-  on purpose: does not compile, matches the empty string, a quantifier
-  inside a quantified group, a backreference. A post never hangs on a
-  pattern. `languette doctor` reads both files through the guard's loader,
-  one row each, names a refused line, times each `re:` over the fixture
-  comment against a budget, and `--redact <file>` shows what a post would
-  become. The fixture, `features/fixtures/private-terms/`, is the design's
-  own example and the docs' and the doctor's: a comment an agent would post,
-  its redacted twin, a redacted and a blocked file.
+  directory in every spelling to `~`, this machine's hostname and a LAN or
+  tailnet name to `<host>`, a private address to `<private-ip>`. Only
+  `guard_private_terms` switches; `redact_home_paths` goes. Not shipped: a
+  login name, email, session id, scratchpad path or localhost URL. A line `!<put>` in the user's file drops the
+  shipped pairs with that put: current thinking, pending the repo tier.
+- A redaction is not a guard: it transforms data and has no verdict.
+  "Redact" over anonymize, scrub, mask and rewrite; rewrite then allow is
+  its action.
+- Two files, one tab-separated format, described in `plugin.json`; pairs
+  apply in file order, shipped then the user's. Options `redacted_terms_file`
+  and `blocked_terms_file`; unset, `$XDG_CONFIG_HOME/languette/` is read.
+  Pencil: the names without `_file`.
+- A `re:` the guard would not run is refused at load. `languette doctor`
+  reads both files through the guard's loader; the fixture is
+  `features/fixtures/private-terms/`.
 - A path the user set is a promise. Set but missing, or found but unreadable,
-  a directory or not in shape, denies this guard's public-bound posts,
-  naming the option and the fix. Unset with no default file is silent; a file
-  with zero terms is valid. A cloud session or CI job that needs a list is
-  provisioned one (claude#338), never excused.
+  a directory or not in shape, denies this guard's public-bound posts, naming
+  the option and the fix. Unset with no default file is silent; zero terms is
+  valid. A cloud session or CI job is provisioned its list (claude#338),
+  never excused.
   ([thread](https://github.com/mark-brannan/languette/pull/290#discussion_r4395050677))
 - A redaction transforms data, so a per-repo rule may loosen one a wider tier
   applies. Current thinking. ([thread](https://github.com/mark-brannan/languette/pull/290#discussion_r4395034528))

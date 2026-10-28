@@ -144,7 +144,7 @@ stay code, ~2000 are messages and stay where they are.
   session going where an ask is a deny, as a redaction's allow does; the
   user never sees the bytes. Today a safer flag is a deny with the fix in the reason.
 - Repo-tier actions: `ask` and `context`, probably yes; `rewrite`, at least
-  dropping a wider tier's pair so a hostname or path goes out as written.
+  dropping a wider tier's pair, though it then runs with the agent's privileges.
 - A repo rule naming a fact that costs network or a program run.
 - #134's step 3 asks the same question for git and GitHub alone; this design
   is one answer to it, not a decision on it.

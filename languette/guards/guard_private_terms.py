@@ -15,13 +15,13 @@ the posted text, or inside a file's contents, which a redaction cannot reach,
 is a deny with the fix in the reason.
 
 Hard block: a hit on a term from blocked_terms_file denies the whole post; the
-reason names the terms that hit and each term's message. No file, no hard
-block.
+reason names the terms that hit and each term's message. It reads the text as
+written, before any redaction. No file, no hard block.
 
 Both files are one tab-separated format: find, put, comment, an optional
 header row, `#` comments, case-insensitive plain text or a regular expression
 under `re:`, `$NAME` the variable's value, `$HOSTNAME` asked of the OS when
-unset. A `re:` the guard would not run (no compile, matches empty, nested
+unset; a line naming a variable that is unset or empty is skipped. A `re:` the guard would not run (no compile, matches empty, nested
 quantifier, backreference) is not in shape. Either option expands a leading
 `~` or `$HOME`; unset or empty, the guard reads
 $XDG_CONFIG_HOME/languette/blocked-terms.tsv or redacted-terms.tsv (~/.config
