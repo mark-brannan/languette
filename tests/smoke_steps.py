@@ -81,7 +81,7 @@ def make_path(tmp_path, tools, python):
 
 
 class Machine:
-    path = home = out = code = None
+    path = home = out = code = last = None
 
 
 @pytest.fixture
@@ -177,6 +177,21 @@ def row(machine, label, mark, pattern):
     assert len(rows) == 1, f"one {label!r} row in:\n{out}"
     got, text = rows[0].groups()
     assert (got, re.search(pattern, text) is not None) == (mark, True), f"{got} {text}\n{out}"
+    machine.last = label
+
+
+@then(parsers.re(r'beneath it a line is (?P<mark>[✓!✗]) matching "(?P<pattern>.*)"'))
+def beneath(machine, mark, pattern):
+    """A detail line indented beneath the row the last row step matched."""
+    lines = machine.out.splitlines()
+    at = next(i for i, ln in enumerate(lines) if re.match(r"\S+\s+" + re.escape(machine.last) + r"\s", ln))
+    below = []
+    for ln in lines[at + 1:]:
+        if not ln.startswith(" "):
+            break
+        below.append(ln.strip())
+    hits = [ln for ln in below if re.search(pattern, ln[2:])]
+    assert hits and hits[0][0] == mark, f"no {mark} line matching {pattern!r} beneath {machine.last!r}:\n{machine.out}"
 
 
 @then(parsers.parse("the doctor exits {code:d}"))
