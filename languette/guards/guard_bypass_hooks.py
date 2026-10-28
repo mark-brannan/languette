@@ -24,6 +24,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
+from languette.secrets import quote
 from languette.verdict import approve, deny
 
 NAME = "guard-bypass-hooks"
@@ -109,10 +110,10 @@ def check(doc):
         return deny(say("loop_hooks", guard=NAME))
     approved, done = yield from approve(
         {APPROVE_LABEL: runs},
-        lambda e: say("transcript_unreadable", guard=NAME, err=e, cmd=cmd.strip(),
+        lambda e: say("transcript_unreadable", guard=NAME, err=e, cmd=quote(doc),
                       then="Fix what the blocking hook reported, or ask the user to run it themselves."))
     if done:
         return done[0]
     have = len(approved[APPROVE_LABEL])
-    return deny(say("hooks_skipped", guard=NAME, cmd=cmd.strip(), runs=runs, runs_s="s" * (runs > 1),
+    return deny(say("hooks_skipped", guard=NAME, cmd=quote(doc), runs=runs, runs_s="s" * (runs > 1),
                     have=have, have_s="s" * (have != 1), label=APPROVE_LABEL))
