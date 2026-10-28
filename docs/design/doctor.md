@@ -47,3 +47,13 @@ a post would become, from a file or stdin.
 The probes send payloads to the hooks and run neither command. Only trusted
 hooks get a probe; a project's checked-out settings are counted, never run.
 What the doctor cannot read is a ! row, never a traceback.
+
+## Help
+
+`languette doctor --help` prints the doctor's own options and, after them,
+all of `languette --help`, so one screen shows where the doctor sits.
+
+## Open questions
+
+- Whether `--redact` belongs on the doctor at all, or at the level of `scan`
+  as a command of its own. Deferred.

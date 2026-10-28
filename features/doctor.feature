@@ -298,6 +298,12 @@ Feature: doctor
     Then it prints "blocked: Wanderlust (the boat's name stays off public repos; say \"the boat\")"
     And the doctor exits 1
 
+  Scenario: doctor --help shows the parent command's help too
+    When the doctor runs with `--help`
+    Then it prints the doctor's own options
+    And it then prints everything `languette --help` prints
+    And the doctor exits 0
+
   Scenario: --redact reads stdin when it is given no file, or "-"
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"
