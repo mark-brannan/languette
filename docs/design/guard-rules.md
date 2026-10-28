@@ -70,23 +70,22 @@ on order within a command, and order is computed per segment in gather.
 
 ## Actions
 
-A rule only tightens. Its action is `deny`, `ask` (ask-first's approval,
-spent once per run when the rule says so), `context` or `rewrite`, never
-allow: a rule set adds to what languette judges and takes nothing from it.
-Whether `ask` and `context` belong to every tier is open below.
+A verdict only tightens. A rule's action is `deny`, `ask` (ask-first's
+approval, spent once per run when the rule says so), `context` or `rewrite`;
+allow only follows a redaction. A rewrite transforms data, so a repo rule may
+loosen one a wider tier applies; what each tier may say is open below.
 
 `rewrite` replaces inside the text a call carries, never its words or flags.
 The rule names what to find, a term, a secret shape or the value of an
 environment variable such as `HOME`, and what to put there: `~`, the literal
 `$HOME`, a placeholder. The replacement is spliced as data into the matched
 literal span, never across a quote boundary; a find that would cross one is
-a deny. The new bytes are parsed and judged again by every rule, then asked
-about, with before and after in the reason; a rewrite that still matches a
-deny is a deny. Verdict carries the rewrite with the ask, as it does today.
-guard-private-terms' `$HOME` to `~` is the first rule on it; secret
-redaction and host, user and address shapes are others. Shipped and user
-tiers only: a replacement runs with the agent's privileges, so the tier an
-agent writes never carries one.
+a deny. The new bytes are parsed and judged again by every rule; a rewrite
+that still matches a deny is a deny. A redaction is then allowed, Verdict
+carrying the rewrite; any other rewrite is asked about, before and after in
+the reason. guard-private-terms' redactions are the first rules on it: the shipped
+`rules/redacted-terms.tsv` (home, host and address shapes) and the user's
+redacted terms file, the same format; secret redaction is another.
 
 ## Plan from the rules
 
@@ -103,7 +102,7 @@ names; the handler is code, as the issue door's protocol is today.
 | Tier | Lives | May say |
 |---|---|---|
 | shipped | `languette/rules/`, one file per guard | everything above |
-| user | a file the user names in the plugin options | everything above |
+| user | a file the user names in the plugin options; guard-private-terms' redacted terms file is the first | everything above |
 | repo | `.languette/`, agent-writable | data that adds `deny`; the rest open |
 
 Primitives are Python in languette at every tier; no tier loads code. An
@@ -118,6 +117,7 @@ A rule set that does not parse, names an unknown primitive, or has another
 shape, denies every call its guard would judge, naming the file and the
 fault. That is ask-first's and guard-secrets' behaviour today. A test loads
 every rule set languette ships, so that deny never greets an install.
+guard-private-terms' two lists deny only its own public-bound posts.
 
 ## Path there
 
@@ -141,9 +141,10 @@ stay code, ~2000 are messages and stay where they are.
 
 - `rewrite` then allow, with a note to the agent after the call runs, for a
   safer flag (`--force` to `--force-with-lease`). It would keep an unattended
-  session going where an ask is a deny, and break "never allow" above; the
+  session going where an ask is a deny, as a redaction's allow does; the
   user never sees the bytes. Today a safer flag is a deny with the fix in the reason.
-- `ask` and `context` as repo-tier actions; probably yes.
+- Repo-tier actions: `ask` and `context`, probably yes; `rewrite`, at least
+  dropping a wider tier's pair, though it then runs with the agent's privileges.
 - A repo rule naming a fact that costs network or a program run.
 - #134's step 3 asks the same question for git and GitHub alone; this design
   is one answer to it, not a decision on it.

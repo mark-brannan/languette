@@ -1,0 +1,6 @@
+find	message	comment
+# Terms that deny the whole post. The message is added to the deny reason,
+# for the agent; it is never posted.
+Wanderlust	the boat's name stays off public repos; say "the boat"	
+gateway.home.example		no message: the deny names the term alone
+re:acct-44\d\d	the 44xx accounts are the client's; never public	

@@ -1,0 +1,8 @@
+find	put	comment
+# A user's redacted terms, beside the shipped file. {USER}, {HOME} and {TAB} are
+# the test harness's placeholders.
+zephyr-01	<host>	the dev box, by its old name
+acct-9931		no put, so <redacted>
+re:acct-\d{4}	<account>	every other account id; a plain line above wins by order
+someone@example.net	<email>	my own address; the shipped file redacts no email
+C:\Users\Someone Else	~	the Windows account is not $USER

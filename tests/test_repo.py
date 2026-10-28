@@ -30,7 +30,7 @@ GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-ba
 # Guards that are off unless the user turns them on: their option defaults to false.
 OPT_IN = {"guard_worktrees", "guard_review_threads", "guard_signed_comments"}
 # Options that are not a guard's on/off toggle: name -> type.
-OTHER_OPTIONS = {"private_terms_file": "file", "private_repos": "string", "bypass_labels": "string", "review_thread_logins": "string",
+OTHER_OPTIONS = {"private_terms_file": "file", "redacted_terms_file": "file", "blocked_terms_file": "file", "private_repos": "string", "bypass_labels": "string", "review_thread_logins": "string",
                  "protected_services": "string", "prose_budget_command": "string",
                  "signed_comments_opening": "string", "signed_comments_signature": "string",
                  "record_decisions": "boolean", "record_raw_commands": "boolean"}
@@ -384,4 +384,4 @@ def test_every_shipped_rule_file_loads_and_is_packaged(rule_file):
     assert_that(Path(guard.RULE_FILE), equal_to(rule_file))
     got = _gathered(guard.rules(str(rule_file)))
     assert_that(got[:len(guard.RULES)], equal_to(guard.RULES))
-    assert_that((ROOT / "pyproject.toml").read_text(), contains_string('languette = ["rules/*.json"]'))
+    assert_that((ROOT / "pyproject.toml").read_text(), contains_string('languette = ["rules/*.json", "rules/*.tsv"]'))

@@ -1,9 +1,34 @@
-"""guard-private-terms: text bound for a public GitHub repo is checked against
-the user's private terms file. The spec is features/guard-private-terms.feature.
+"""guard-private-terms: text bound for a public GitHub repo is judged twice. The
+spec is features/guard-private-terms.feature.
 
 Once a private term is in a public issue or PR it is in GitHub's history and
 every mirror of it; the undo is a support ticket, not an edit. So the check
 sits at the moment the text leaves the machine.
+
+Redact: each pair's find is replaced in the posted text alone and the call
+is allowed, as a secret is redacted. Shipped, rules/redacted-terms.tsv: the
+home directory in every spelling to `~`, this machine's name and LAN or
+tailnet names to `<host>`, private addresses to `<private-ip>`. Yours:
+redacted_terms_file, applied after, none puts `<redacted>`; a line `!<put>`
+drops the shipped pairs with that put. A term the command also holds outside
+the posted text, or inside a file's contents, which a redaction cannot reach,
+is a deny with the fix in the reason.
+
+Hard block: a hit on a term from blocked_terms_file denies the whole post; the
+reason names the terms that hit and each term's message. It reads the text as
+written, before any redaction. No file, no hard block.
+
+Both files are one tab-separated format: find, put, comment, an optional
+header row, `#` comments, case-insensitive plain text or a regular expression
+under `re:`, `$NAME` the variable's value, `$HOSTNAME` asked of the OS when
+unset; a line naming a variable that is unset or empty is skipped. A `re:` the guard would not run (no compile, matches empty, nested
+quantifier, backreference) is not in shape. Either option expands a leading
+`~` or `$HOME`; unset or empty, the guard reads
+$XDG_CONFIG_HOME/languette/blocked-terms.tsv or redacted-terms.tsv (~/.config
+by default) if it exists. A path set is a promise: set but missing, or found
+but unreadable, a directory or not in shape, denies every public-bound post
+this guard judges, naming the option and the fix. A file with no terms is
+valid. A cloud session or CI job is provisioned its list, never excused.
 
 Fires on Bash `gh issue|pr create|comment|edit|review|close|reopen|merge`,
 `gh api` writing to repos/*/*/issues|pulls or a graphql mutation that comments
@@ -13,20 +38,17 @@ issue, PR, comment or review. A body posted from a script file, `curl` or
 --body/--title/--comment/--subject/--label values, gh api field values, every
 heredoc body, and the contents of a --body-file/--comment-file/-F/--input file,
 never its path; for MCP, every string in tool_input. Each term is matched
-case-insensitively as plain text, and the reason names the terms that hit.
-
-A home-directory path in the text is sanitized, not denied: rewritten to `~`
-in the posted text alone and asked about, unless it sits in a file's contents, which a rewrite cannot reach.
+case-insensitively as plain text.
 
 The target repo is --repo/-R, GH_REPO=, a positional URL or owner/repo#n, the
 gh api path, or MCP owner/repo; failing those, the origin of the cwd, unless
 the command runs a `cd`. A graphql mutation's repo is unknown. Unknown is
-scanned; only when every target is in private_repos does the text go unscanned.
+judged; only when every target is in private_repos does the text go unjudged.
 
-Inert with private_terms_file unset or empty. Once it is set, fails closed: a
-terms file unreadable or empty, a body built at run time that no heredoc feeds,
-stdin with no heredoc, a file it cannot read, or a flag whose shape says it
-carries text but is not one it knows -> deny, with the fix in the reason.
+Only the hard block fails closed on text it cannot see. With a blocked terms
+file loaded: a body built at run time that no heredoc feeds, stdin with no
+heredoc, a file it cannot read, or a flag whose shape says it carries text but
+is not one it knows -> deny, with the fix in the reason.
 """
 
 import re

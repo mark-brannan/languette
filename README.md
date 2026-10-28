@@ -96,8 +96,9 @@ Each guard checks for one kind of hazard:
   `LANGUETTE_PERM_ALLOW` directories
 - [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`, `sh <(curl ..)`,
   `eval "$(wget ..)"`
-- [`guard-private-terms`](#settings-for-guard-private-terms): a term from your
-  private list, posted to a public repo (off until given the list)
+- [`guard-private-terms`](#settings-for-guard-private-terms): a blocked term
+  posted to a public repo; home paths, this machine's name, private
+  addresses and your terms redacted first
 - [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
@@ -253,10 +254,16 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 
 | Setting | Holds | Example |
 |---|---|---|
-| `private_terms_file` | a text file of terms, one per line, matched case-insensitively | `~/.config/private-terms` |
+| `blocked_terms_file` | terms that deny the whole post: the term, a tab, a message for the agent | `~/.config/languette/blocked-terms.tsv` |
+| `redacted_terms_file` | terms replaced before the post leaves: the term, a tab, the replacement | `~/.config/languette/redacted-terms.tsv` |
 | `private_repos` | repos whose posts are never scanned, comma-separated | `you/notes,you/scratch` |
 
-Without a terms file the guard is off.
+One tab-separated format, `#` comments, case-insensitive, `re:` for a regular
+expression; unset, both read from `~/.config/languette/`. A path set but not
+loading denies public posts until fixed; `languette doctor` says which line.
+The shipped pairs, [`languette/rules/redacted-terms.tsv`](languette/rules/redacted-terms.tsv),
+always run; [`features/fixtures/private-terms/`](features/fixtures/private-terms/)
+shows a comment beside what leaves. (planned)
 
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
 comma-separated; empty, the default, guards no label. A label that waives a CI
