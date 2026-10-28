@@ -17,13 +17,15 @@ helps write a config that works.
 
 ## What it does
 
-1. **Checks protection and its dependencies:** one ✓, ! or ✗ row per check; any ✗ exits non-zero.
+1. **Checks protection and its dependencies:** one ✓, ! or ✗ row per check, detail lines indented beneath it; any ✗ exits non-zero. A ✗ never stops a later check: the doctor runs every check it can and decides the exit code once, after the last row, with a closing line counting the problems. A check that cannot run because something it needs failed is a ! row saying so.
 2. **Diagnoses every config** through the guard's own loader. (planned)
 3. **Offers the fix** as a diff, applied only on a yes. (planned)
 4. **Assists with configuration,** not only repair. (planned)
 
-The checks are the install, the dependencies, a probe through the hooks as
-installed, and the version; CI can run them. The dependencies are few and
+The checks run in this order: the version, the shell parser, the parse-check
+probe, the fail-closed probe, the install with its guards beneath it (counts
+enabled and disabled, each disabled guard named with a one-line description),
+the forge clients, then the terms files; CI can run them. The dependencies are few and
 each gets its row: `shfmt`, the preferred parser, has top billing, and a
 machine without it is told which rung reads commands instead; `gh` is
 optional, and without it the guards that ask GitHub ask the user instead.
@@ -41,10 +43,20 @@ writes nothing without a yes.
 
 Assisting means saying what each guard's options are and what a given choice
 would ask or deny, and writing a starting file for a guard that has none.
-guard-private-terms is the first: a row per terms file, shipped
-one included, through the guard's loader, a refused line named, each accepted
-`re:` timed over `features/fixtures/private-terms/bad-comment.md`, shown only,
-and `--redact <file>` printing what a post would become and which terms block it.
+guard-private-terms is the first. Each terms file gets a row, then indented
+lines: its path, the number of entries it holds, and the min, max and average
+time of its `re:` lines. Only the entries in the file count; the doctor does
+not add a shipped set. Every line the loader would refuse is a ✗ line naming
+its line number and why, and the valid lines are still loaded and timed. A
+`re:` slower than the threshold is listed on its own line with its line
+number and the first characters of the find. The time is shown, never the
+verdict. A missing redacted terms file is a ! row naming the fix.
+
+`--restore-terms` writes the default entries into the redacted terms file when
+there is none, and otherwise appends the defaults the file lacks; it never
+edits or removes a line you wrote, and prints what it added. (planned)
+`--redact` prints what a post would become and which terms block it, reading
+the post from a file or, with none given or `-`, from stdin.
 
 ## Limits
 
