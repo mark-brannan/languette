@@ -88,6 +88,12 @@ $ echo 'rm -rf build && sh -c "git push --force"' | languette scan | jq -c '.seg
 [true,["git","push","--force"]]
 ```
 
+From a checkout without installing, swap `languette scan` for `python3 -m languette scan`:
+
+```
+$ echo 'rm -rf build && sh -c "git push --force"' | python3 -m languette scan | jq -c '.segments[] | [.nested, [.words[].text]]'
+```
+
 ## The guards
 
 Each guard checks for one kind of hazard:
