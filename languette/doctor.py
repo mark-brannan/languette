@@ -422,7 +422,7 @@ SAMPLE = Path(__file__).resolve().parent.parent / "features/fixtures/private-ter
 
 
 def _terms(options):
-    """(the shipped terms, the redacted terms, the blocked terms) as the guard loads them, each of
+    """(the default terms, the redacted terms, the blocked terms) as the guard loads them, each of
     the last two (terms or None, path, whether an option named it, the exception or None). The
     options are the installed plugin's, as the guard's environment carries them."""
     from languette.run import drive          # run.py exits when a guard will not import
@@ -433,7 +433,7 @@ def _terms(options):
     def run_(gen):
         return drive(gen, world, [])
     penv = run_(terms.environment(env))
-    return (run_(terms.shipped(penv)),) + tuple(run_(terms.load(kind, env, penv)) for kind in terms.KINDS)
+    return (run_(terms.defaults(penv)),) + tuple(run_(terms.load(kind, env, penv)) for kind in terms.KINDS)
 
 
 def _why(err):
@@ -461,10 +461,10 @@ def _counts(found, noun, text):
 
 
 def terms_rows(options):
-    """A row for the redacted terms, shipped included, and one for the blocked terms: what loaded,
+    """A row for the redacted terms, defaults included, and one for the blocked terms: what loaded,
     with each accepted re: timed, or the line the guard would refuse, which would deny every
     public post."""
-    shipped, *loaded = _terms(options)
+    defaults, *loaded = _terms(options)
     try:
         sample = SAMPLE.read_text(encoding="utf-8")
     except OSError:
@@ -482,7 +482,7 @@ def terms_rows(options):
                          if named else f"{where} {why}: every public post is denied until it loads"))
         elif kind == "redacted":
             mine = "none of your own" if found is None else f"{where} {_counts(found, noun, sample)}"
-            rows.append((OK, label, f"shipped {_counts(shipped, noun, sample)}; {mine}"))
+            rows.append((OK, label, f"default {_counts(defaults, noun, sample)}; {mine}"))
         elif found is None:
             rows.append((WARN, label, f"none at {where}, and {option} is unset: no term is blocked"))
         else:
@@ -498,12 +498,12 @@ def redact(file, options):
     except (OSError, UnicodeDecodeError) as e:
         print(f"{FAIL} {file} {terms.why_not(e)}")
         return 1
-    shipped, mine, blocked = _terms(options)
+    defaults, mine, blocked = _terms(options)
     for _, path, _, err in (mine, blocked):
         if err:
             print(f"{FAIL} {_tilde(path)} {_why(err)}")
             return 1
-    print(terms.redact(text, terms.pairs(shipped, mine[0] or [])).rstrip("\n"))
+    print(terms.redact(text, terms.pairs(defaults, mine[0] or [])).rstrip("\n"))
     hits = terms.hits(text, blocked[0] or [])
     print("blocked: " + (terms.named(hits) if hits else "none"))
     return 1 if hits else 0

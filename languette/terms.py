@@ -1,4 +1,4 @@
-"""The terms files of guard-private-terms, parsed: the shipped
+"""The terms files of guard-private-terms, parsed: the default
 rules/redacted-terms.tsv, the user's redacted_terms_file and the
 blocked_terms_file, one tab-separated format. The guard and `languette doctor`
 both load through this module, so a line one would refuse the other names.
@@ -10,7 +10,7 @@ fourth column is not in shape. A find is case-insensitive plain text, or a
 regular expression under `re:` that languette.reshape accepts. `$NAME` in a
 find is that variable's value in the env given, a literal inside a `re:`; a
 line naming a variable that is unset or empty is kept but matches nothing. In
-the redacted file a line `!<put>` drops every shipped pair with that put.
+the redacted file a line `!<put>` drops every default pair with that put.
 
 The parsing is pure. The loading is a generator that yields the Needs for the
 read and the hostname, which the guard and the doctor both drive. Standard
@@ -28,7 +28,7 @@ from languette.verdict import Need
 KINDS = {"redacted": ("redacted_terms_file", "redacted-terms.tsv", "put"),
          "blocked": ("blocked_terms_file", "blocked-terms.tsv", "message")}
 DEFAULT_PUT = "<redacted>"
-SHIPPED = os.path.join(os.path.dirname(__file__), "rules", "redacted-terms.tsv")
+DEFAULTS = os.path.join(os.path.dirname(__file__), "rules", "redacted-terms.tsv")
 MAX_READ = 1 << 20                                  # bytes of a terms file the guard reads
 _VAR = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*)")
 
@@ -118,9 +118,9 @@ def environment(env):
     return {**env, "HOSTNAME": env.get("HOSTNAME") or (yield Need("hostname"))}
 
 
-def shipped(penv):
-    """The shipped redacted pairs."""
-    return parse((yield Need("read", SHIPPED)), "redacted", penv)
+def defaults(penv):
+    """The default redacted pairs."""
+    return parse((yield Need("read", DEFAULTS)), "redacted", penv)
 
 
 def load(kind, env, penv):
@@ -140,11 +140,11 @@ def load(kind, env, penv):
         return None, path, named, e
 
 
-def pairs(shipped, mine):
-    """The redacted pairs in the order they apply: the shipped ones, minus any whose put a
+def pairs(defaults, mine):
+    """The redacted pairs in the order they apply: the default ones, minus any whose put a
     `!<put>` line of yours drops, then yours."""
     dropped = {t.put for t in mine if t.drop}
-    return [t for t in shipped if t.rx and t.put not in dropped] + [t for t in mine if t.rx and not t.drop]
+    return [t for t in defaults if t.rx and t.put not in dropped] + [t for t in mine if t.rx and not t.drop]
 
 
 def redact(text, applied, esc=None):

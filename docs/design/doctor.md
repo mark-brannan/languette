@@ -17,37 +17,47 @@ helps write a config that works.
 
 ## What it does
 
-1. **Checks protection and its dependencies:** one ✓, ! or ✗ row per check; any ✗ exits non-zero.
+1. **Checks protection and its dependencies:** a ✓, ! or ✗ row per check, details beneath; any ✗ exits non-zero.
 2. **Diagnoses every config** through the guard's own loader. (planned)
 3. **Offers the fix** as a diff, applied only on a yes. (planned)
 4. **Assists with configuration,** not only repair. (planned)
 
-The checks are the install, the dependencies, a probe through the hooks as
-installed, and the version; CI can run them. The dependencies are few and
-each gets its row: `shfmt`, the preferred parser, has top billing, and a
-machine without it is told which rung reads commands instead; `gh` is
-optional, and without it the guards that ask GitHub ask the user.
-Every other forge client installed gets a row, a warning when signed in,
-since the agent can act through it where the guards see only part. The configs are the plugin's options
-and every file under `.languette/`. A config its guard would refuse is a ✗
-row naming the file, the entry and why: a key no guard reads, a value of the
-wrong type, a file that does not parse. A config that switches every command
-to deny is reported first.
+The checks run in order, and a ✗ never stops a later one: version, shell parser, parse-check and fail-closed
+probes, the install with its guards beneath it, the forge clients, the terms
+files. `shfmt`, the preferred parser, has top billing; without it the doctor
+names the rung that reads commands instead. `gh` is optional; without it guards ask the user. Every other forge client installed gets a
+row, a warning when signed in: the agent can act through it unseen. The configs are the plugin's options and every file
+under `.languette/`. A config its guard would refuse is a ✗ row naming the
+file, the entry and why. A config that switches every command to deny is
+reported first.
 
 The fix is offered at a terminal, or through a flag where
-there is none. Where the fix is the user's call, such as an entry that
-could be a typo for either of two keys, the doctor asks with the choices. It
-writes nothing without a yes.
+there is none. Where the fix is the user's call, it asks with the choices. It writes nothing without a yes.
 
-Assisting means saying what each guard's options are and what a given choice
-would ask or deny, and writing a starting file for a guard that has none.
-guard-private-terms is the first: a row per terms file, shipped
-one included, through the guard's loader, a refused line named, each accepted
-`re:` timed over `features/fixtures/private-terms/bad-comment.md`, shown only,
-and `--redact <file>` printing what a post would become and which terms block it.
+Assisting means saying what each guard's options do and writing a starting
+file for a guard that has none.
+guard-private-terms is the first: a row per terms file counting only the
+entries in it, the min, max and average time of its `re:` lines, each slow one
+and each refused line named by line number, `--init-redacted-terms` and
+`--init-blocked-terms` writing a new file, `--restore-redacted-terms` repairing
+the defaults in one without touching yours (planned), and `--redact` printing what
+a post would become, from a file or stdin. Its marks follow the guard,
+except that an empty file is a !.
 
 ## Limits
 
 The probes send payloads to the hooks and run neither command. Only trusted
 hooks get a probe; a project's checked-out settings are counted, never run.
 What the doctor cannot read is a ! row, never a traceback.
+
+## Help
+
+`languette doctor --help` prints the doctor's own options and, after them,
+all of `languette --help`, so one screen shows where the doctor sits.
+
+## Open questions
+
+- Whether `--redact` belongs on the doctor at all, or at the level of `scan`
+  as a command of its own. Deferred.
+- Whether a general `init` writes every languette config at once, beside
+  the per-file flags. Open.

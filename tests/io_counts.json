@@ -614,7 +614,6 @@
  "tests/test_features.py::test_a_languette_rm_allow_that_does_not_parse_warns_on_every_other_command[{HOME}-ls -la-warns about \"LANGUETTE_RM_ALLOW\"]": {"git": 1},
  "tests/test_features.py::test_a_languette_rm_allow_that_does_not_parse_warns_on_every_other_command[{HOME}-rm build.log-warns about \"LANGUETTE_RM_ALLOW\"]": {"git": 1},
  "tests/test_features.py::test_a_line_continuation_does_not_split_rm_from_its_target": {"git": 1},
- "tests/test_features.py::test_a_line_put_in_your_file_drops_every_shipped_pair_with_that_put": {"git": 2},
  "tests/test_features.py::test_a_listed_command_is_denied_however_it_is_reached[bash -c 'timeout 1h npm run e2e'-bash -c with a wrapper inside]": {"git": 1},
  "tests/test_features.py::test_a_listed_command_is_denied_however_it_is_reached[cd scripts; npm test; npm run e2e-later in a ; chain]": {"git": 3},
  "tests/test_features.py::test_a_listed_command_is_denied_however_it_is_reached[echo npm run e2e | sh-echo into a shell]": {"git": 1},
