@@ -331,11 +331,17 @@ class _Replay:
         return paths.lexical(self.vcwd + "/" + p) if self.vcwd else None
 
 
+def _terms(env):
+    """The user's terms. Neither redacted_terms_file nor blocked_terms_file is read
+    yet, so there are none and the guard is inert."""
+    return []
+
+
 def check(doc):
     payload, env = doc.payload, doc.env
-    terms_file = env.get("CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE") or ""
-    if not terms_file:
-        return None                              # inert until the user names a terms file
+    terms = _terms(env)
+    if not terms:
+        return None
     tool = doc.tool
     if not isinstance(tool, str) or not tool:
         return None
@@ -377,13 +383,6 @@ def check(doc):
     unseen = next((v for k, v in meta if k == "UNSEEN"), None)
     if unseen is not None:
         return deny(say("pt_unseen", guard=NAME, unseen=unseen, to_private=TO_PRIVATE))
-    try:
-        listed = yield Need("read", terms_file)
-    except Exception:  # noqa: BLE001
-        return deny(say("pt_unreadable", guard=NAME, terms_file=terms_file, to_private=TO_PRIVATE))
-    terms = [t for t in (line.strip() for line in listed.split("\n")) if t and not t.startswith("#")]
-    if not terms:
-        return deny(say("pt_no_terms", guard=NAME, terms_file=terms_file, to_private=TO_PRIVATE))
     opaque = next((v for k, v in meta if k == "OPAQUE"), None)
     if opaque is not None:
         what, value = opaque

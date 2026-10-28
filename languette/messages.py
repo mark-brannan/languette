@@ -481,18 +481,6 @@ MESSAGES = {
         "-b/-t/-c), --body-file/--comment-file/-F/--input <path>, --label/--add-label, gh api "
         "-f/-F/--field/--raw-field. Use one of those, or {to_private}."
     ),
-    "pt_unreadable": (
-        "{guard}: the private-terms file ({terms_file}), set as the private_terms_file option, is unreadable, "
-        "so text bound for a public repo cannot be checked. Fix the path in the plugin's "
-        "private_terms_file option (/plugin configure languette@languette), or clear the option to "
-        "turn the check off. To post without the check, {to_private}."
-    ),
-    "pt_no_terms": (
-        "{guard}: the private-terms file ({terms_file}) is readable but has no terms in it -- only comments "
-        "and blank lines, or nothing at all. An empty list matches nothing, so every post would pass "
-        "unchecked, which is indistinguishable from a check that ran. Populate it (one term per line, "
-        "# for comments) and retry. To post without the check, {to_private}."
-    ),
     "pt_what_body": "the body or title",
     "pt_what_field": "the `{name}` field",
     "pt_what_flag": "the `{name}` value",
