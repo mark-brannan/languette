@@ -36,10 +36,12 @@ Feature: guard-private-terms
   message added to the deny reason, for the agent, never posted. Pairs apply
   in file order on the running text, shipped then yours. A `re:` find the
   guard would not run is not in shape: one that does not compile, matches the
-  empty string, nests a quantifier inside a quantified group, or holds a
-  backreference; `languette doctor` names the file and the line, and times
-  each line over features/fixtures/private-terms/bad-comment.md. The fixtures
-  there are the design's own example: a comment an agent would post, its
+  empty string, holds a backreference, or has one of the three shapes that
+  backtrack without bound (found by parsing it, never by timing it): a
+  quantifier inside a quantified group, two unbounded repeats in a row over
+  the same characters, or overlapping alternatives inside a repeat.
+  `languette doctor` names the file and the line. The fixtures in
+  features/fixtures/private-terms are the design's own example: a comment an agent would post, its
   redacted twin, and a redacted and a blocked file.
 
   Why. A private repo or notes directory holds details (hostnames,
@@ -118,7 +120,6 @@ Feature: guard-private-terms
       gateway.home.example
       """
 
-  @planned
   Scenario Outline: a term in the posted text is denied, naming the term
     When the agent runs `<command>`
     Then the guard denies, naming "<term>"
@@ -156,7 +157,7 @@ Feature: guard-private-terms
       | command                                                    |
       | gh issue create -R o/r -t t -b "all public"                |
 
-  @also_guard-github-issues @planned
+  @also_guard-github-issues
   Scenario: a term in a heredoc body is denied
     When the agent runs:
       """
@@ -166,7 +167,7 @@ Feature: guard-private-terms
       """
     Then the guard denies, naming "gateway.home.example"
 
-  @also_guard-github-issues @planned
+  @also_guard-github-issues
   Scenario: a term in the file named by --body-file is denied, one only in its path is not
     Given a project directory
     And the file "body.md" holds:
@@ -190,12 +191,11 @@ Feature: guard-private-terms
     When the agent runs `gh issue comment https://github.com/you/notes/issues/1 -b "Wanderlust"`
     Then the guard is silent
 
-  @also_guard-github-issues @planned
+  @also_guard-github-issues
   Scenario: with private_repos unset, every repo is scanned
     When the agent runs `gh issue create -R you/notes -t t -b "Wanderlust"`
     Then the guard denies, naming "Wanderlust"
 
-  @planned
   Scenario Outline: a positional target or a graphql mutation is scanned against its own repo
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS is "you/notes"
     When the agent runs `<command>`
@@ -208,12 +208,11 @@ Feature: guard-private-terms
       | gh pr comment o/r#1 -b Wanderlust                                        |
       | gh api graphql -f query='mutation { addComment(input:{body:"Wanderlust"}) { clientMutationId } }' |
 
-  @also_guard-github-issues @planned
+  @also_guard-github-issues
   Scenario: a body built at run time that no heredoc feeds cannot be seen, so it is denied
     When the agent runs `gh issue create -R o/r -t t -b "$(date)"`
     Then the guard denies
 
-  @planned
   Scenario Outline: an id or number field built at run time carries no text, so it is not refused
     When the agent runs `<command>`
     Then the guard <verdict>
@@ -230,7 +229,6 @@ Feature: guard-private-terms
       | command                                                                     | verdict   |
       | gh api repos/o/r/issues/1/comments -f body=$x                               | denies    |
 
-  @planned
   Scenario Outline: an MCP tool's text is judged the same as the gh CLI
     When the agent calls MCP tool "<tool>" with input `<input>`
     Then the guard <verdict>
@@ -254,19 +252,18 @@ Feature: guard-private-terms
 
   # --- redact: a home path becomes ~ and the call is allowed -----------------------
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: the home directory in the text is redacted to ~ and the call allowed
     When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
     Then the guard allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: the home rule needs no terms file
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     And CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE is unset
     When the agent runs `gh pr comment 3 -R o/r --body "repro under {HOME}/x"`
     Then the guard allows, rewriting the command to `gh pr comment 3 -R o/r --body "repro under ~/x"`
 
-  @planned
   Scenario Outline: another spelling of the home directory is redacted too, another user's is not
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     When the agent runs `gh issue comment 3 -R o/r -b '<path>/x'`
@@ -284,7 +281,6 @@ Feature: guard-private-terms
 
   # --- the shipped file: this machine's name, private names and addresses ----------
 
-  @planned
   Scenario Outline: this machine's hostname, and a name that resolves only on a LAN or tailnet, is redacted to <host>
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     When the agent runs `gh issue comment 3 -R o/r -b "seen on <name>"`
@@ -304,7 +300,6 @@ Feature: guard-private-terms
 
   # A hyphen or a dot continues a name: the machine zephyr leaves zephyr-01 alone.
   # The maintainer accepts the false positive of a machine named like a word.
-  @planned
   Scenario Outline: a private address is redacted to <private-ip>, a public one or a range is not
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     When the agent runs `gh issue comment 3 -R o/r -b "curl http://<address>:8080/health"`
@@ -325,13 +320,13 @@ Feature: guard-private-terms
       | 100.128.0.1    | is silent                                                                                      |
       | v10.0.0.5      | is silent                                                                                      |
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: a range is left as written, an IPv6 unique local address is not
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     When the agent runs `gh issue comment 3 -R o/r -b "10.0.0.0/8 excluded; fd12:3456::1 on the tailnet"`
     Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "10.0.0.0/8 excluded; <private-ip> on the tailnet"`
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: a line !<put> in your file drops every shipped pair with that put
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     And the redacted terms file holds:
@@ -345,14 +340,14 @@ Feature: guard-private-terms
   # features/fixtures/private-terms holds the design's own example. The harness
   # fills {USER}, {HOME} and {HOSTNAME} in both files before comparing.
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: the fixture comment leaves as its redacted twin
     Given the redacted terms file is the fixture "redacted-terms.tsv"
     And the blocked terms file is the fixture "blocked-terms.tsv"
     When the agent posts the fixture "bad-comment.md" as the --body of `gh pr comment 3 -R o/r`
     Then the guard allows, rewriting the --body to the fixture "bad-comment.redacted.md"
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: a blocked term in the fixture comment denies it whole, naming the term and its message
     Given the redacted terms file is the fixture "redacted-terms.tsv"
     And the blocked terms file is the fixture "blocked-terms.tsv"
@@ -362,7 +357,7 @@ Feature: guard-private-terms
     And the guard denies, naming "acct-4471"
     And the guard denies, naming "the 44xx accounts are the client's"
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: a blocked term with no message is named alone
     Given the blocked terms file is the fixture "blocked-terms.tsv"
     When the agent runs `gh pr comment 3 -R o/r -b "ssh gateway.home.example"`
@@ -371,7 +366,6 @@ Feature: guard-private-terms
 
   # --- the redacted terms file: your own terms, beside the shipped home rule ----------
 
-  @planned
   Scenario Outline: a term from the redacted terms file is replaced in the posted text, case-insensitively
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     And the redacted terms file holds:
@@ -396,7 +390,7 @@ Feature: guard-private-terms
       | acct-12345 is not four digits | <account>5 is not four digits |
 
   # The header is the literal column names and nothing else is.
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: a first line that is not the header is a term
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     And the redacted terms file holds:
@@ -406,7 +400,6 @@ Feature: guard-private-terms
     When the agent runs `gh issue comment 3 -R o/r -b "find it"`
     Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "<x> it"`
 
-  @planned
   Scenario Outline: a term spelled $NAME is that variable's value, in either file; unset or empty, it matches nothing, except $HOSTNAME, asked of the OS
     Given the <file> terms file holds:
       """
@@ -424,7 +417,7 @@ Feature: guard-private-terms
       | blocked  | zephyr-01 | denies, naming "zephyr-01"                                                           |
       | blocked  |           | is silent                                                                            |
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: $HOSTNAME unset in the environment is still this machine's name
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     And HOSTNAME is unset
@@ -432,7 +425,6 @@ Feature: guard-private-terms
     Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <host>"`
 
   # The home is this scenario's own directory, so the default path is too.
-  @planned
   Scenario Outline: the redacted terms file is found by the option, ~ expanded, else at the default path
     Given HOME is "{TMP}/h"
     And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
@@ -451,7 +443,7 @@ Feature: guard-private-terms
       | pt-redacted.tsv                        | $HOME/pt-redacted.tsv |
       | .config/languette/redacted-terms.tsv   |                       |
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: XDG_CONFIG_HOME moves the default path of the redacted terms file
     Given HOME is "{TMP}/h"
     And the directory "{TMP}/h"
@@ -467,7 +459,6 @@ Feature: guard-private-terms
 
   # A path the user set is a promise: a post this guard judges is denied until it
   # is kept. A cloud session or CI job is provisioned its list, never excused.
-  @planned
   Scenario Outline: a redacted terms file that is missing, a directory, or not in shape denies a public post, naming the option
     Given HOME is "{TMP}/h"
     And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
@@ -489,7 +480,6 @@ Feature: guard-private-terms
 
   # A regular expression the guard would not run is refused at load, on purpose:
   # a post must never hang on a pattern. The deny names the file and the line.
-  @planned
   Scenario Outline: a re: line that does not compile or could run away is not in shape
     Given the <file> terms file holds:
       """
@@ -509,6 +499,9 @@ Feature: guard-private-terms
       | redacted | redacted_terms_file | re:(a+)+$         | a quantifier inside a quantified group |
       | redacted | redacted_terms_file | re:(a)\\1          | a backreference           |
       | blocked  | blocked_terms_file  | re:(\\d+)*x        | a quantifier inside a quantified group |
+      | redacted | redacted_terms_file | re:.*.*.*.*;      | two unbounded repeats in a row over the same characters |
+      | blocked  | blocked_terms_file  | re:\\w+\\d+x        | two unbounded repeats in a row over the same characters |
+      | redacted | redacted_terms_file | re:(?:a\|aa)+x    | overlapping alternatives inside a repeat |
 
   # Redaction cannot help with text it cannot read, so it lets the call through;
   # only the hard block, with terms to protect, fails closed (the Rule below).
@@ -528,37 +521,37 @@ Feature: guard-private-terms
       | cat notes.md \| gh issue create -R o/r -t x -F -                |
       | gh issue create -R o/r -t x --body-file /nowhere/absent.md      |
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: only the posted text is redacted, not a cd before it
     When the agent runs `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "under {HOME}/x"`
     Then the guard allows, rewriting the command to `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "under ~/x"`
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: a path the command also uses outside the posted text is a denial, not a guess at which is posted
     When the agent runs `gh pr comment 3 -R o/r --body "{HOME}/x" && cd {HOME}/x`
     Then the guard denies, naming "by hand"
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: a body that repeats an earlier cd path is a denial too
     When the agent runs `cd "{HOME}/x" && gh pr comment 3 -R o/r --body "{HOME}/x"`
     Then the guard denies, naming "by hand"
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: a path used by a later command is a denial that says to write ~ by hand
     When the agent runs `gh pr comment 3 -R o/r --body "{HOME}/x"; ls {HOME}/x`
     Then the guard denies, naming "by hand"
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: a ~ is escaped wherever a bare word has the path, not only at its start
     When the agent runs `gh pr comment 3 -R o/r -b note={HOME}/x`
     Then the guard allows, rewriting the command to "gh pr comment 3 -R o/r -b note=\~/x"
 
-  @also_guard-github-issues @planned
+  @also_guard-github-issues
   Scenario: a title and a body with the same path are both redacted
     When the agent runs `gh issue create -R o/r -t {HOME}/x -b {HOME}/x`
     Then the guard allows, rewriting the command to "gh issue create -R o/r -t \~/x -b \~/x"
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: a multi-line quoted body is redacted
     When the agent runs:
       """
@@ -571,7 +564,7 @@ Feature: guard-private-terms
       see ~/x"
       """
 
-  @also_guard-signed-comments @planned
+  @also_guard-signed-comments
   Scenario: a cd whose path matches a multi-line body once flattened is a denial
     When the agent runs:
       """
@@ -583,7 +576,6 @@ Feature: guard-private-terms
   # --- the blocked terms file: a term denies the whole post, a bad path denies too --
 
   # A path the user set is a promise; see the redacted terms file above.
-  @planned
   Scenario Outline: a blocked terms file that is missing or a directory denies a public post, naming the option
     Given HOME is "{TMP}/h"
     And the directory "{TMP}/h/.config/languette/blocked-terms.tsv"
@@ -600,7 +592,6 @@ Feature: guard-private-terms
 
   # A file with no terms is the shim for a cloud session or CI job that holds no
   # list; the home rule still runs.
-  @planned
   Scenario Outline: a terms file with no terms in it is valid and silent
     Given the <file> terms file holds:
       """
@@ -618,9 +609,20 @@ Feature: guard-private-terms
       | redacted |
       | blocked  |
 
+  # A term naming an unset variable matches nothing, so a file of only those has no
+  # terms to protect: text the guard cannot see is not a reason to deny.
+  @also_guard-github-issues
+  Scenario: a blocked file whose only term names an unset variable fails nothing closed
+    Given the blocked terms file holds:
+      """
+      $CLIENT_CODENAME
+      """
+    And CLIENT_CODENAME is unset
+    When the agent runs `gh issue create -R o/r -t x -b "$(date)"`
+    Then the guard is silent
+
   # Current thinking: Claude Code does not expand a plugin option, so the
   # guard does, and settings need no machine-specific absolute path.
-  @planned
   Scenario Outline: the blocked terms file option may start with ~ or $HOME
     Given the file "{HOME}/pt-terms.txt" holds:
       """
@@ -638,7 +640,7 @@ Feature: guard-private-terms
 
   # Current thinking: a CI job or a cloud VM provisions terms by writing this
   # file, from a secret say; no languette environment variable is read.
-  @also_guard-github-issues @planned
+  @also_guard-github-issues
   Scenario: with the option unset, a blocked terms file at the default path is read
     Given HOME is "{TMP}/h"
     And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
@@ -651,7 +653,7 @@ Feature: guard-private-terms
     When the agent runs `gh issue create -R o/r -t t -b "all public"`
     Then the guard is silent
 
-  @also_guard-github-issues @planned
+  @also_guard-github-issues
   Scenario: XDG_CONFIG_HOME moves the default path of the blocked terms file
     Given HOME is "{TMP}/h"
     And the directory "{TMP}/h"
@@ -699,7 +701,7 @@ Feature: guard-private-terms
 
     # --- a term in the body, wherever it travels ----------------------------------
 
-    @also_guard-github-issues @planned
+    @also_guard-github-issues
     Scenario: the deny names the term and nothing around it
       When the agent runs `gh issue create -R o/r -t "Log rotation" --body "seen on Wanderlust last night"`
       Then the guard denies, naming "Wanderlust"
@@ -707,7 +709,6 @@ Feature: guard-private-terms
       And the guard denies, naming "private_repos"
       And the guard denies, naming "rewrite the body"
 
-    @planned
     Scenario Outline: a term is found in whichever flag, spelling or position carries it
       When the agent runs `<command>`
       Then the guard denies, naming "<term>"
@@ -737,7 +738,7 @@ Feature: guard-private-terms
         | gh issue create -R o/r -t x -b "ACCT-4471 again"                     | acct-4471            |
         | gh issue create -R o/r -t x -b "WANDERLUST"                          | Wanderlust           |
 
-    @also_guard-github-issues @planned
+    @also_guard-github-issues
     Scenario: a term is found in the body a variable carries out of a heredoc
       When the agent runs:
         """
@@ -756,7 +757,6 @@ Feature: guard-private-terms
 
     # --- MCP ----------------------------------------------------------------------
 
-    @planned
     Scenario Outline: an MCP tool's field is judged wherever it sits in the input
       When the agent calls MCP tool "<tool>" with input `<input>`
       Then the guard <verdict>
@@ -772,14 +772,13 @@ Feature: guard-private-terms
         | tool                                  | input                                                                                              | verdict   |
         | mcp__github__create_pull_request_review | {"owner":"o","repo":"r","pullNumber":1,"event":"COMMENT","comments":[{"path":"a.ts","body":"acct-4471"}]} | denies    |
 
-    @also_guard-signed-comments @planned
+    @also_guard-signed-comments
     Scenario: the home directory in an MCP body is redacted to ~ and the call allowed
       When the agent calls MCP tool "mcp__github__add_issue_comment" with input `{"owner":"o","repo":"r","issue_number":3,"body":"repro under {HOME}/project"}`
       Then the guard allows, rewriting the input field "body" to "repro under ~/project"
 
     # --- gh api -------------------------------------------------------------------
 
-    @planned
     Scenario Outline: a gh api write is judged, a read is not
       When the agent runs `<command>`
       Then the guard <verdict>
@@ -818,13 +817,12 @@ Feature: guard-private-terms
         | command                                                                 |
         | gh issue comment 3 --repo=https://github.com/you/notes -b Wanderlust    |
 
-    @also_guard-github-issues @planned
+    @also_guard-github-issues
     Scenario: with private_repos empty, nothing is private
       Given CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS is ""
       When the agent runs `gh issue create -R you/notes -t x -b Wanderlust`
       Then the guard denies, naming "Wanderlust"
 
-    @planned
     Scenario Outline: with no repo named, the origin of the working directory decides, unless the command moves
       Given a clone of "git@github.com:you/notes.git" at "{TMP}/private" on branch "main"
       And a clone of "https://github.com/o/r.git" at "{TMP}/public" on branch "main"
@@ -856,7 +854,6 @@ Feature: guard-private-terms
 
     # --- reads and clean text pass ------------------------------------------------
 
-    @planned
     Scenario Outline: a read, clean text, or no command at all is silent
       When the agent runs `<command>`
       Then the guard is silent
@@ -883,7 +880,7 @@ Feature: guard-private-terms
 
     # --- the gate is loud when it cannot see --------------------------------------
 
-    @also_guard-github-issues @planned
+    @also_guard-github-issues
     Scenario: a body from stdin with no heredoc to read is denied
       When the agent runs `cat notes.md | gh issue create -R o/r -t x -F -`
       Then the guard denies, naming "stdin"
@@ -898,14 +895,13 @@ Feature: guard-private-terms
         """
       Then the guard is silent
 
-    @also_guard-github-issues @also_guard-signed-comments @planned
+    @also_guard-github-issues @also_guard-signed-comments
     Scenario: a body built at run time is denied, and says so
       When the agent runs `gh issue create -R o/r -t x -b "$(cat notes.md)"`
       Then the guard denies, naming "run time"
       When the agent runs `gh pr comment 3 -R o/r --body "$body"`
       Then the guard denies
 
-    @planned
     Scenario: a heredoc inside the body's own $(...) is the text the gate reads
       When the agent runs:
         """
@@ -924,7 +920,7 @@ Feature: guard-private-terms
         """
       Then the guard denies, naming "Wanderlust"
 
-    @also_guard-github-issues @also_guard-signed-comments @planned
+    @also_guard-github-issues @also_guard-signed-comments
     Scenario: a variable fed by a clean heredoc is read, one fed by anything else is not
       When the agent runs:
         """
@@ -951,7 +947,6 @@ Feature: guard-private-terms
         """
       Then the guard denies
 
-    @planned
     Scenario Outline: single quotes make $ and a backtick ordinary characters, double quotes do not
       When the agent runs `<command>`
       Then the guard <verdict>
@@ -970,13 +965,12 @@ Feature: guard-private-terms
 
     # --- fail closed: a flag that looks like it carries text ----------------------
 
-    @planned
     Scenario: an unrecognised flag shaped like a body is refused, naming the flag
       When the agent runs `gh issue comment 3 -R o/r --response-body-file /tmp/x`
       Then the guard denies, naming "--response-body-file"
       And the guard denies, naming "doesn't recognise its shape"
 
-    @also_guard-github-issues @planned
+    @also_guard-github-issues
     Scenario: an unrecognised flag is refused on gh api too
       When the agent runs `gh api repos/o/r/issues -f title=x --long-comment-blob=hi`
       Then the guard denies
@@ -1017,7 +1011,6 @@ Feature: guard-private-terms
         | command                                                                |
         | gh issue create -R o/r -t x --body-file {HOME}/pt-scratch-body.md      |
 
-    @planned
     Scenario: a term in a --comment-file's content still denies
       Given a project directory
       And the file "comment-term.md" holds:
@@ -1031,7 +1024,7 @@ Feature: guard-private-terms
     # Open: a rewrite of the call cannot reach a file's contents, so for now the
     # file case is a denial with the fix in the reason.
 
-    @also_guard-github-issues @planned
+    @also_guard-github-issues
     Scenario: the home directory inside a body-file's content stays a denial
       Given a project directory
       And the file "home-in-file.md" holds:
@@ -1054,14 +1047,14 @@ Feature: guard-private-terms
         | see {HOME}2/notes for details      |
         | see {HOME}-backup/notes for details |
 
-    @also_guard-signed-comments @planned
+    @also_guard-signed-comments
     Scenario: a term denies the whole post, even one the redaction would otherwise allow
       When the agent runs `gh issue comment 3 -R o/r -b 'seen aboard Wanderlust, path {HOME}/x'`
       Then the guard denies, naming "Wanderlust"
 
     # --- the terms files ----------------------------------------------------------
 
-    @also_guard-github-issues @also_guard-signed-comments @planned
+    @also_guard-github-issues @also_guard-signed-comments
     Scenario Outline: a terms file that is set but missing denies every public post, naming the option; a private repo or a read needs none
       Given <variable> is "{HOME}/no-such-terms.txt"
       When the agent runs `gh issue create -R o/r -t x -b "all public"`
@@ -1150,7 +1143,6 @@ Feature: guard-private-terms
 
     # --- the file's contents are scanned, its path is not -------------------------
 
-    @planned
     Scenario Outline: a file's contents decide, wherever the flag spells the path
       Given the working directory is "<cwd>"
       When the agent runs `<command>`
@@ -1171,7 +1163,6 @@ Feature: guard-private-terms
         | cwd    | command                                                                     | verdict                     |
         | {PROJ} | gh issue create -R o/r -t x -F {PROJ}/clean.md                              | is silent                   |
 
-    @planned
     Scenario Outline: a term in the directory name is not a hit, a term in the file under it is
       Given the file "Wanderlust/clean.md" holds:
         """
@@ -1196,7 +1187,7 @@ Feature: guard-private-terms
         | command                                                                         | verdict                     |
         | gh pr comment 4 -R o/r --body-file={PROJ}/Wanderlust/clean.md                   | is silent                   |
 
-    @also_guard-github-issues @planned
+    @also_guard-github-issues
     Scenario: a file that is not there is denied, naming it, unless the repo is private
       When the agent runs `gh issue create -R o/r -t x -F {PROJ}/absent.md`
       Then the guard denies, naming "absent.md"
@@ -1208,7 +1199,7 @@ Feature: guard-private-terms
     # the gate scanned. Denying it forced every session to split the write and the
     # post into two Bash calls.
 
-    @also_guard-signed-comments @planned
+    @also_guard-signed-comments
     Scenario: a heredoc that writes the file the post reads is the text the gate scans
       When the agent runs:
         """
@@ -1238,7 +1229,7 @@ Feature: guard-private-terms
         """
       Then the guard is silent
 
-    @also_guard-github-issues @planned
+    @also_guard-github-issues
     Scenario: a heredoc that writes some other path does not vouch for the one posted
       When the agent runs:
         """
@@ -1249,7 +1240,7 @@ Feature: guard-private-terms
         """
       Then the guard denies, naming "absent.md"
 
-    @also_guard-github-issues @planned
+    @also_guard-github-issues
     Scenario: a << inside a heredoc body is text, not a redirect that vouches for a path
       When the agent runs:
         """
@@ -1261,7 +1252,7 @@ Feature: guard-private-terms
         """
       Then the guard denies, naming "payload.md"
 
-    @also_guard-signed-comments @planned
+    @also_guard-signed-comments
     Scenario: a file written from a heredoc and then mutated again before the post is denied
       When the agent runs:
         """
@@ -1286,7 +1277,6 @@ Feature: guard-private-terms
 
     # --- . and .. -----------------------------------------------------------------
 
-    @planned
     Scenario Outline: . and .. collapse, and the file found there is still scanned
       Given the working directory is "{PROJ}/proj/sub"
       When the agent runs `<command>`
@@ -1301,7 +1291,6 @@ Feature: guard-private-terms
 
     # --- a cd or pushd before the gh ----------------------------------------------
 
-    @planned
     Scenario Outline: a path is read from where the command's own cd left the shell
       Given the working directory is "{PROJ}"
       When the agent runs `<command>`
@@ -1322,7 +1311,6 @@ Feature: guard-private-terms
         | cd - && gh pr comment 3 -R o/r --body-file {PROJ}/clean.md               | is silent                            |
         | cd {PROJ}/proj \| cat; gh pr comment 3 -R o/r -F {PROJ}/clean.md         | is silent                            |
 
-    @planned
     Scenario Outline: where the shell stands cannot be known, so a relative path is denied
       Given the working directory is "{PROJ}"
       When the agent runs `<command>`
@@ -1338,7 +1326,7 @@ Feature: guard-private-terms
         | (cd {PROJ}/proj); gh pr comment 3 -R o/r -F clean.md                      |
         | CDPATH=/elsewhere cd proj && gh pr comment 3 -R o/r -F clean.md           |
 
-    @also_guard-signed-comments @planned
+    @also_guard-signed-comments
     Scenario: pushd then popd leaves the shell somewhere unseen, and the deny names the path as spelled
       Given the working directory is "{PROJ}"
       When the agent runs `pushd {PROJ}/proj >/dev/null; popd >/dev/null; gh pr comment 3 -R o/r -F clean.md`
@@ -1346,7 +1334,6 @@ Feature: guard-private-terms
 
     # A directory literally named $X, or `id`, with a clean decoy in it must not let
     # the spelling stand in for the value the shell will use.
-    @planned
     Scenario Outline: a cd to a value the hook cannot resolve is unknowable, even past a decoy directory of that name
       Given the file "<decoy>/clean.md" holds:
         """
@@ -1365,7 +1352,6 @@ Feature: guard-private-terms
     # A ( ) subshell inherits the cwd and its cd dies at the ): a paren that
     # belongs to a neighbouring statement, or encloses both the cd and the gh,
     # moves nothing. Only an unmatched ) means the shell is somewhere unseen.
-    @planned
     Scenario Outline: a ( ) subshell moves the shell only inside its parentheses
       Given the working directory is "{PROJ}"
       When the agent runs `<command>`
@@ -1386,7 +1372,6 @@ Feature: guard-private-terms
     # is denied. A path inside sh -c is read as spelled: literal and absolute, or
     # denied.
 
-    @planned
     Scenario Outline: a variable assigned earlier in the same command fills the path
       Given the working directory is "{PROJ}"
       When the agent runs `<command>`
@@ -1427,14 +1412,13 @@ Feature: guard-private-terms
         """
       Then the guard is silent
 
-    @also_guard-duplicate-prs @planned
+    @also_guard-duplicate-prs
     Scenario: a variable no command assigned is denied, and the deny says earlier commands are invisible
       Given the working directory is "{PROJ}"
       When the agent runs `gh pr create -R o/r -t x --body-file "$SP/clean.md"`
       Then the guard denies, naming "$SP/clean.md"
       And the guard denies, naming "earlier command is invisible"
 
-    @planned
     Scenario Outline: a value the shell would not expand at that point leaves the path unknowable
       Given the working directory is "{PROJ}"
       And the file "~/b.md" holds:
@@ -1462,7 +1446,7 @@ Feature: guard-private-terms
         | command                                                                       |
         | sh -c 'gh pr create -R o/r -t x --body-file ~/b.md'                           |
 
-    @also_guard-duplicate-prs @planned
+    @also_guard-duplicate-prs
     Scenario: a quoted word leading a line is not an assignment list, so the real path is the one read
       Given the file "decoy/notes.md" holds:
         """
@@ -1495,7 +1479,6 @@ Feature: guard-private-terms
         Wanderlust
         """
 
-    @planned
     Scenario Outline: the message names the flag or field that was flagged
       When the agent runs `<command>`
       Then the guard denies, naming "<named>"
@@ -1553,7 +1536,7 @@ Feature: guard-private-terms
         """
       Then the guard is silent
 
-    @also_guard-github-issues @planned
+    @also_guard-github-issues
     Scenario: a file this command writes by redirect is not there yet, and a $TMPDIR path cannot be read
       Given a project directory
       When the agent runs:

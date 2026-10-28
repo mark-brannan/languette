@@ -481,18 +481,6 @@ MESSAGES = {
         "-b/-t/-c), --body-file/--comment-file/-F/--input <path>, --label/--add-label, gh api "
         "-f/-F/--field/--raw-field. Use one of those, or {to_private}."
     ),
-    "pt_unreadable": (
-        "{guard}: the private-terms file ({terms_file}), set as the private_terms_file option, is unreadable, "
-        "so text bound for a public repo cannot be checked. Fix the path in the plugin's "
-        "private_terms_file option (/plugin configure languette@languette), or clear the option to "
-        "turn the check off. To post without the check, {to_private}."
-    ),
-    "pt_no_terms": (
-        "{guard}: the private-terms file ({terms_file}) is readable but has no terms in it -- only comments "
-        "and blank lines, or nothing at all. An empty list matches nothing, so every post would pass "
-        "unchecked, which is indistinguishable from a check that ran. Populate it (one term per line, "
-        "# for comments) and retry. To post without the check, {to_private}."
-    ),
     "pt_what_body": "the body or title",
     "pt_what_field": "the `{name}` field",
     "pt_what_flag": "the `{name}` value",
@@ -517,17 +505,36 @@ MESSAGES = {
         "same command assigns before it, after any cd in it, with . and .. collapsed; a variable set in "
         "an earlier command is invisible here, so spell the path out."
     ),
-    "pt_home": (
-        "{guard}: the text about to be posted to a public repo names the home directory. Post "
-        "`~` in its place. The rewrite does this; check it and approve it."
+    "pt_terms_file": (
+        "{guard}: the {option} option names {path}, which {why}, so text bound for a public repo cannot be "
+        "judged, and every post to one is denied until it can be. Fix the path in the plugin's {option} "
+        "option (/plugin configure languette@languette) or the file; a file with no terms in it is valid. "
+        "To post without the check, {to_private}."
     ),
-    "pt_home_by_hand": (
-        "{guard}: the text about to be posted to a public repo names the home directory ({hits}), "
-        "and the command is too tangled to rewrite safely. Write `~` in its place by hand and "
-        "resend."
+    "pt_terms_default": (
+        "{guard}: the {option} option is unset, so {path} is read, and it {why}: text bound for a public repo "
+        "cannot be judged, and every post to one is denied until it can be. Fix or remove that file, or set "
+        "the {option} option (/plugin configure languette@languette); a file with no terms in it is valid. "
+        "To post without the check, {to_private}."
+    ),
+    "pt_redacted": (
+        "{guard}: the text about to be posted to a public repo held private detail. It is redacted "
+        "({changes}) and the call goes through with the replacements."
+    ),
+    "pt_by_hand": (
+        "{guard}: the text about to be posted to a public repo holds private detail to redact ({changes}), "
+        "and the command is too tangled to rewrite safely: the same text stands outside what is posted, or "
+        "this Claude Code cannot rewrite a call. Make the substitutions by hand, writing each replacement "
+        "where its term was, and resend."
+    ),
+    "pt_file_redact": (
+        "{guard}: a file in the post ({files}) holds private detail to redact ({changes}), including "
+        "a home directory, a hostname or an address, or a term of your redacted terms file. A redaction "
+        "rewrites the call, never a file's contents. Make the substitutions in the file, then repeat the "
+        "post, or post the text inline. To post without the check, {to_private}."
     ),
     "pt_hits": (
-        "{guard}: the text about to be posted to a public repo contains private term(s) from the denylist: "
+        "{guard}: the text about to be posted to a public repo contains blocked term(s): "
         "{hits}. Private detail does not go on public GitHub, ever -- it stays in GitHub's "
         "history. Either {to_private} and link it from here, or rewrite the body without the term. Do "
         "not paraphrase it into something recognisable."

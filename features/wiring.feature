@@ -52,7 +52,6 @@ Feature: wiring
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
       | guard-bypass-ruleset      | git push origin HEAD:$b       | asks      |
 
-    @planned
     Examples:
       | guard                  | command                       | verdict   |
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
@@ -307,7 +306,6 @@ Feature: wiring
       | guard-secrets | CLAUDE_PLUGIN_OPTION_GUARD_SECRETS | true | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 | denies |
       | guard-bypass-ruleset | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_RULESET | true | git push origin HEAD:$b | asks |
 
-    @planned
     Examples:
       | guard                  | option                                      | value | command                       | verdict |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     |       | gh issue comment 3 -R o/r -b Wanderlust | denies  |

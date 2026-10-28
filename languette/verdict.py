@@ -55,6 +55,7 @@ class Need:
         door          op, session, call   -> guard-github-issues' per-session door, claim or take
                                              (world.World._door)
         send-state    session             -> {"subagents": [names, ids], "read": tool or None}
+        hostname                          -> this machine's name, as the OS gives it
 
     claim, door and worktree arrive write as they read, under one lock or rename:
     they move with the approval spend (#84).
@@ -160,15 +161,20 @@ def context(text):
     return {"additionalContext": text}
 
 
+def allow(reason, updated_input):
+    """Let the call through with its input rewritten: a redaction, never a loosening."""
+    return {"permissionDecision": "allow", "permissionDecisionReason": reason, "updatedInput": updated_input}
+
+
 def verdict(event, findings, mode=None):
     """The one decision for a call, from every guard's finding: the fields of
     hookSpecificOutput, or None for silence. `findings` is [(guard name, result,
-    crashed)] in the order the guards judged. A deny outranks an ask, an ask a
-    bare rewrite, and an ask carries a rewrite along; the first rewrite wins, since two cannot both apply.
+    crashed)] in the order the guards judged. A deny outranks an ask, an ask an
+    allow (a redaction), and an ask carries a rewrite along; the first rewrite wins, since two cannot both apply.
     In a permission `mode` where no one can answer (NO_PROMPT), an ask is a deny that says so."""
     if event != "PreToolUse":                  # state-keeping events: nothing to decide
         return None
-    reasons, asks, notes, rewrites = [], [], [], []
+    reasons, asks, allows, notes, rewrites = [], [], [], [], []
     for name, r, _ in findings:
         if not r:
             continue
@@ -176,6 +182,8 @@ def verdict(event, findings, mode=None):
             reasons.append(r["permissionDecisionReason"])
         if r.get("permissionDecision") == "ask":
             asks.append((name, r["permissionDecisionReason"]))
+        if r.get("permissionDecision") == "allow":
+            allows.append(r["permissionDecisionReason"])
         if "updatedInput" in r:
             rewrites.append(r["updatedInput"])
         if r.get("additionalContext"):
@@ -186,6 +194,10 @@ def verdict(event, findings, mode=None):
         return deny("\n\n".join(say("unattended_ask", guard=n, mode=mode, why=r) for n, r in asks))
     if asks:
         return {**ask("\n\n".join(r for _, r in asks)), **({"updatedInput": rewrites[0]} if rewrites else {})}
+    if allows:
+        out = {"permissionDecision": "allow", "permissionDecisionReason": "\n\n".join(allows),
+               "updatedInput": rewrites[0]}
+        return {**out, "additionalContext": "\n\n".join(notes)} if notes else out
     if notes:
         return context("\n\n".join(notes))
     return None

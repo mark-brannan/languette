@@ -182,26 +182,24 @@ Feature: doctor
   # --- guard-private-terms' files, through the guard's own loader ----------------
   # One row per file, shipped included, so a line the guard would refuse is found
   # here and not at the next public post. features/fixtures/private-terms is the
-  # design's example; the doctor reads it to time each re: line.
+  # design's example; the doctor reads it to time each re: line it accepts. The time is
+  # shown, never the verdict: a re: line is accepted or refused by its shape alone.
 
-  @planned
   Scenario: each terms file gets a row, counting what loaded
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"
     And "~/.config/languette/blocked-terms.tsv" holds the fixture "private-terms/blocked-terms.tsv"
     When the doctor runs
-    Then the "redacted terms" row is ✓ "shipped 10 pairs, 10 re:; ~/.config/languette/redacted-terms.tsv 5 pairs, 1 re:"
-    And the "blocked terms" row is ✓ "~/.config/languette/blocked-terms.tsv 3 terms, 1 re:"
+    Then the "redacted terms" row is ✓ matching "^shipped 9 pairs, 9 re: \(slowest \d+\.\d\d ms: .+\); ~/.config/languette/redacted-terms.tsv 5 pairs, 1 re: \(slowest \d+\.\d\d ms: .+\)$"
+    And the "blocked terms" row is ✓ matching "^~/.config/languette/blocked-terms.tsv 3 terms, 1 re: \(slowest \d+\.\d\d ms: .+\)$"
     And the doctor exits 0
 
-  @planned
   Scenario: no blocked terms file is a warning that says what that means
     Given languette "cd31356ad5db" is installed at user scope
     When the doctor runs
     Then the "blocked terms" row is ! "none at ~/.config/languette/blocked-terms.tsv, and blocked_terms_file is unset: no term is blocked"
-    And the "redacted terms" row is ✓ "shipped 10 pairs, 10 re:; none of your own"
+    And the "redacted terms" row is ✓ matching "^shipped 9 pairs, 9 re: \(slowest \d+\.\d\d ms: .+\); none of your own$"
 
-  @planned
   Scenario Outline: a line the guard would refuse fails the row, naming the file and the line
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/<file>" holds `<text>`
@@ -214,9 +212,16 @@ Feature: doctor
       | redacted-terms.tsv | redacted terms | re:(a+)+$                         | 1 | a quantifier inside a quantified group |
       | redacted-terms.tsv | redacted terms | zephyr-01\n\nre:x*                | 3 | matches the empty string               |
       | blocked-terms.tsv  | blocked terms  | re:[unclosed                      | 1 | does not compile                       |
+      | redacted-terms.tsv | redacted terms | re:.*.*.*.*;                      | 1 | two unbounded repeats in a row over the same characters |
       | blocked-terms.tsv  | blocked terms  | a{TAB}b{TAB}c{TAB}d               | 1 | four columns                           |
 
-  @planned
+  Scenario: a re: with overlapping alternatives in a repeat is refused by its shape, not its speed
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/redacted-terms.tsv" holds `re:(?:a|aa)+x`
+    When the doctor runs
+    Then the "redacted terms" row is ✗ "~/.config/languette/redacted-terms.tsv line 1: overlapping alternatives inside a repeat"
+    And the doctor exits 1
+
   Scenario: a set path that is missing fails the row, as it would fail every public post
     Given languette "cd31356ad5db" is installed at user scope
     And the languette options are `{"redacted_terms_file": "~/no-such.tsv"}`
@@ -224,15 +229,7 @@ Feature: doctor
     Then the "redacted terms" row is ✗ "redacted_terms_file is ~/no-such.tsv, which does not exist: every public post is denied until it does"
     And the doctor exits 1
 
-  @planned
-  Scenario: a re: line slower than its budget over the fixture comment is a warning
-    Given languette "cd31356ad5db" is installed at user scope
-    And "~/.config/languette/redacted-terms.tsv" holds `re:.*.*.*.*;`
-    When the doctor runs
-    Then the "redacted terms" row is ! matching "~/.config/languette/redacted-terms.tsv line 1: \d+ ms over bad-comment.md, budget 5 ms"
-
   # Assisting with configuration: show what a post would become.
-  @planned
   Scenario: the doctor shows what a post would become through the files as loaded
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"
@@ -242,4 +239,12 @@ Feature: doctor
     And it prints "blocked: none"
     When the doctor runs with `--redact` and the fixture "private-terms/bad-comment.md" plus the line "Tested aboard Wanderlust."
     Then it prints "blocked: Wanderlust (the boat's name stays off public repos; say \"the boat\")"
+    And the doctor exits 1
+
+  Scenario: --redact loads the files the installed plugin's options name, as the rows and the guard do
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{"blocked_terms_file": "~/mine.tsv"}`
+    And "~/mine.tsv" holds `Wanderlust`
+    When the doctor runs with `--redact` and the fixture "private-terms/bad-comment.md" plus the line "Tested aboard Wanderlust."
+    Then it prints "blocked: Wanderlust"
     And the doctor exits 1

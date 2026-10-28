@@ -206,7 +206,7 @@ def _no_mark(doctor):
 
 @given(parsers.parse('"{path}" holds `{text}`'))
 def _holds(doctor, path, text):
-    doctor.overrides[doctor.expand(path)] = text.replace("{TAB}", "\t")
+    doctor.overrides[doctor.expand(path)] = text.replace("{TAB}", "\t").replace("\\n", "\n")
 
 
 @given(parsers.parse('"{path}" holds the fixture "{name}"'))

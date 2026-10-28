@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import stat
 import subprocess
 import time
@@ -28,7 +29,7 @@ RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before 
 # A control character: never written into a record line, never read from one.
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 KINDS = frozenset("git gh-api pr-list which read path physical clock ruleset-cache claim worktree run door "
-                  "send-state".split())
+                  "send-state hostname".split())
 ACTS = {"ruleset-keep": "_ruleset_keep", "send-keep": "_send_keep", "worktree-keep": "_wt_keep",
         "worktree-leave": "_wt_leave", "door-open": "_door_open", "door-spend": "_door_spend"}
 DOOR = "languette-guard-github-issues."   # + the session id, under $TMPDIR
@@ -80,6 +81,9 @@ class World:
             return None
         out = r.stdout.strip()
         return out if r.returncode == 0 and out else None
+
+    def _hostname(self):
+        return socket.gethostname()
 
     def _which(self, name):
         return shutil.which(name, path=os.pathsep.join(os.get_exec_path(self.env)))
