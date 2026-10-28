@@ -38,8 +38,9 @@ Assisting means saying what each guard's options do and writing a starting
 file for a guard that has none.
 guard-private-terms is the first: a row per terms file counting only the
 entries in it, the min, max and average time of its `re:` lines, each slow one
-and each refused line named by line number, `--restore-terms` writing the
-default entries without removing yours (planned), and `--redact` printing what
+and each refused line named by line number, `--init-redacted-terms` and
+`--init-blocked-terms` writing a new file, `--restore-redacted-terms` repairing
+the defaults in one without touching yours (planned), and `--redact` printing what
 a post would become, from a file or stdin. Its marks follow the guard,
 except that an empty file is a !.
 
@@ -58,3 +59,5 @@ all of `languette --help`, so one screen shows where the doctor sits.
 
 - Whether `--redact` belongs on the doctor at all, or at the level of `scan`
   as a command of its own. Deferred.
+- Whether a general `init` writes every languette config at once, beside
+  the per-file flags. Open.

@@ -5,15 +5,15 @@ Feature: guard-private-terms
 
   Redact. The posted text has terms replaced and the call is allowed, as a
   secret is redacted. Only the entries in the redacted terms file count. The
-  default entries, which `languette doctor --restore-terms` writes into it: the
+  default entries, which `languette doctor --init-redacted-terms` writes into it: the
   home directory in every spelling (/home/<user>, /Users/<user>,
   /mnt/c/Users/<user>, C:\Users\<user>, $HOME itself) to `~`; this machine's
   hostname, and any name that resolves only on a LAN or a tailnet (.local,
   .lan, .internal, .home, .ts.net), to `<host>`; a private address (RFC 1918,
   CGNAT, link-local, IPv6 unique local) to `<private-ip>`. Not among them: the login name, an email address, a session id, a
   scratchpad or worktree path, a localhost URL; a reader needs those, and your
-  own address or name is one line in your file. To drop a default, delete its
-  line. guard_private_terms turns the whole guard off. It never denies for text it
+  own address or name is one line in your file. To drop a default, comment its
+  line out. guard_private_terms turns the whole guard off. It never denies for text it
   cannot read: it cannot help there, so the call goes through.
 
   Hard block. A short list of terms so sensitive that even a redacted post

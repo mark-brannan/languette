@@ -194,7 +194,7 @@ Feature: doctor
 
   # --- guard-private-terms' files, through the guard's own loader ----------------
   # A row per terms file, counting only the entries in that file; the doctor can write
-  # the default entries into it (--restore-terms) but never counts a set the file lacks.
+  # the default entries into it (--init-redacted-terms) but never counts a set the file lacks.
   # features/fixtures/private-terms is the design's example; the doctor reads it to time
   # each re: line it accepts. The times are shown, never the verdict: a re: line is
   # accepted or refused by its shape alone, and a slow one is a ! warning, exit 0. Every bad line is reported, and the valid
@@ -233,7 +233,7 @@ Feature: doctor
     Given languette "cd31356ad5db" is installed at user scope
     When the doctor runs
     Then the "redacted terms" row is ! "none at ~/.config/languette/redacted-terms.tsv: nothing is redacted"
-    And beneath it "run `languette doctor --restore-terms` to write the defaults" is !
+    And beneath it "run `languette doctor --init-redacted-terms` to write the defaults" is !
     And the doctor exits 0
 
   Scenario: no terms files, with the guard off, is fine
@@ -308,21 +308,62 @@ Feature: doctor
     Then the "redacted terms" row is ✗ "redacted_terms_file is ~/no-such.tsv, which does not exist: every public post is denied until it does"
     And the doctor exits 1
 
-  # Mending configuration: write the default entries, never take one away.
-  Scenario: --restore-terms writes the default redacted terms file when there is none
+  # Mending configuration: a default entry is a copied line tagged default:<name>@<version>
+  # in its comment column; the user's own lines are never touched.
+  Scenario: --init-redacted-terms writes the file with every default entry
     Given languette "cd31356ad5db" is installed at user scope
-    When the doctor runs with `--restore-terms`
+    When the doctor runs with `--init-redacted-terms`
     Then "~/.config/languette/redacted-terms.tsv" holds the default entries
-    And it prints the entries it added
+    And it prints "✓ wrote ~/.config/languette/redacted-terms.tsv (3 defaults)"
     And the doctor exits 0
 
-  Scenario: --restore-terms appends only the default entries the file lacks
+  Scenario: --init-blocked-terms writes the file with a header and no terms
     Given languette "cd31356ad5db" is installed at user scope
-    And "~/.config/languette/redacted-terms.tsv" holds `zephyr-01\tthe boat`
-    When the doctor runs with `--restore-terms`
-    Then "~/.config/languette/redacted-terms.tsv" holds every default entry and the line "zephyr-01\tthe boat" unchanged
-    And no line it held before is removed or edited
-    And running it again adds nothing
+    When the doctor runs with `--init-blocked-terms`
+    Then "~/.config/languette/blocked-terms.tsv" holds a header and no terms
+    And the doctor exits 0
+
+  Scenario Outline: an init never overwrites a file, and names the repair
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/<file>" holds `zephyr-01\tthe boat`
+    When the doctor runs with `<flag>`
+    Then "~/.config/languette/<file>" is unchanged
+    And it prints ✗ "~/.config/languette/<file> exists<fix>"
+    And the doctor exits 1
+
+    Examples:
+      | flag                  | file               | fix                                                      |
+      | --init-redacted-terms | redacted-terms.tsv | ; to repair it: languette doctor --restore-redacted-terms |
+      | --init-blocked-terms  | blocked-terms.tsv  |                                                          |
+
+  Scenario: --restore-redacted-terms adds a missing default in order and leaves the rest alone
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/redacted-terms.tsv" holds every default entry but "host", with "private-ip" commented out, and the line "zephyr-01\tthe boat"
+    When the doctor runs with `--restore-redacted-terms` and answers yes
+    Then it prints the diff before writing
+    And "host" is back where it sits in the defaults' order
+    And "private-ip" is still commented out
+    And the line "zephyr-01\tthe boat" is unchanged
+    And running it again changes nothing
+
+  Scenario: --restore-redacted-terms updates an unedited default and reports an edited one
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/redacted-terms.tsv" holds "home" as an earlier version wrote it, and "host" edited by hand
+    When the doctor runs with `--restore-redacted-terms` and answers yes
+    Then "home" holds the current version
+    And "host" is unchanged, and it prints that "host" was edited by hand
+
+  Scenario: --restore-redacted-terms writes nothing without a yes
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/redacted-terms.tsv" holds every default entry but "host"
+    When the doctor runs with `--restore-redacted-terms` and answers no
+    Then "~/.config/languette/redacted-terms.tsv" is unchanged
+
+  Scenario: --restore-redacted-terms with no file names the init
+    Given languette "cd31356ad5db" is installed at user scope
+    When the doctor runs with `--restore-redacted-terms`
+    Then it prints ✗ "none at ~/.config/languette/redacted-terms.tsv; to create it: languette doctor --init-redacted-terms"
+    And the doctor exits 1
 
   # Assisting with configuration: show what a post would become.
   Scenario: the doctor shows what a post would become through the files as loaded

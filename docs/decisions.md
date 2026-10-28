@@ -171,13 +171,18 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
   allows the call, with the entries in the user's file and nothing else. Hard block denies
   the whole post for a term on a short list, where even a redacted post
   could leak strategy; it reads the text as written, before any redaction.
-- Only the file's entries count; no other set loads at run time.
-  `languette doctor --restore-terms` appends the default entries
-  (`languette/rules/redacted-terms.tsv`) the file lacks, editing no line: the
-  home directory to `~`, this machine's and LAN or tailnet names to `<host>`,
-  a private address to `<private-ip>`. Not a login, email, session id,
-  scratchpad path or localhost URL. Deleting a line drops a default; `!<put>`
-  goes. Only `guard_private_terms` switches; `redact_home_paths` goes.
+- Only the file's entries count; no other set loads at run time. A default
+  entry is a copied line whose comment is `default:<name>@<version>`, from
+  `languette/rules/redacted-terms.tsv`: the home directory to `~`, this
+  machine's and LAN or tailnet names to `<host>`, a private address to
+  `<private-ip>`. Not a login, email, session id, scratchpad path or localhost
+  URL. Commenting a default out turns it off; `!<put>` goes.
+- `languette doctor --init-redacted-terms` writes a missing file with every
+  default, `--init-blocked-terms` one with a header; neither overwrites.
+  `--restore-redacted-terms` repairs a file on a yes, as a diff: it inserts a
+  missing default in order, updates one unedited since its version, reports
+  one edited by hand, comments out a retired one, and leaves commented-out
+  defaults and the user's lines alone. Only `guard_private_terms` switches; `redact_home_paths` goes.
   ([thread](https://github.com/mark-brannan/languette/pull/301#discussion_r4397429263))
 - A redaction is not a guard: it transforms data and has no verdict.
   "Redact" over anonymize, scrub, mask and rewrite; rewrite then allow is
