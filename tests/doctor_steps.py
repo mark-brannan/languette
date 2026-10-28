@@ -13,7 +13,7 @@ import pytest
 from hamcrest import assert_that, contains_string, equal_to, is_not
 from pytest_bdd import given, parsers, then, when
 
-from harness import FakeHome
+from harness import FakeHome, fixture_text
 from languette.doctor import FORGES
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -57,15 +57,16 @@ class Doctor(FakeHome):
         self.stub("claude", f'[ "$*" = "plugin list --json" ] || exit 2\n'
                             f'{"exec cat " + str(listed) if self.claude_ok else "exit 1"}')
 
-    def run(self, cwd):
+    def run(self, cwd, *extra):
         self.write_installs()
         for path, text in self.overrides.items():
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
             Path(path).write_text(text)
         for name, signed in self.signed.items():
             args, lists, _ = FORGES[name]
             out = ("echo a-host" if lists else "") if signed else "echo 'No logins.' >&2" if lists else "exit 1"
             self.stub(name, f'[ "$*" = "{" ".join(args)}" ] || exit 2\n{out}')
-        self.invoke(["doctor"], cwd, os.environ["PATH"])
+        self.invoke(["doctor", *extra], cwd, os.environ["PATH"])
 
 
 @pytest.fixture
@@ -205,12 +206,35 @@ def _no_mark(doctor):
 
 @given(parsers.parse('"{path}" holds `{text}`'))
 def _holds(doctor, path, text):
-    doctor.overrides[doctor.expand(path)] = text
+    doctor.overrides[doctor.expand(path)] = text.replace("{TAB}", "\t")
+
+
+@given(parsers.parse('"{path}" holds the fixture "{name}"'))
+def _holds_fixture(doctor, path, name):
+    doctor.overrides[doctor.expand(path)] = fixture_text(name, str(doctor.home))
 
 
 @when("the doctor runs")
 def _runs(doctor):
     doctor.run(doctor.home / "project")
+
+
+@when(parsers.re(r'the doctor runs with `(?P<flag>--[a-z]+)` and the fixture "(?P<name>[^"]+)"(?: plus the line "(?P<extra>[^"]*)")?'))
+def _runs_with_fixture(doctor, flag, name, extra):
+    post = doctor.aside / "post.md"
+    post.write_text(fixture_text(name, str(doctor.home)) + (f"\n{extra}" if extra else ""))
+    doctor.run(doctor.home / "project", flag, str(post))
+
+
+@then(parsers.re(r'it prints the fixture "(?P<name>[^"]+)"'))
+def _prints_fixture(doctor, name):
+    want = fixture_text(name, str(doctor.home)).strip()
+    assert want in doctor.out, f"{want!r} not in:\n{doctor.out}{doctor.err}"
+
+
+@then(parsers.re(r'it prints "(?P<text>.*)"'))
+def _prints(doctor, text):
+    assert_that(doctor.out, contains_string(text.replace('\\"', '"')))
 
 
 @when(parsers.parse('the doctor runs in "{path}"'))
