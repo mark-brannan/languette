@@ -368,6 +368,7 @@ pip install -r requirements-dev.txt
 python3 -m pytest                       # as each push runs it; --full runs every row
 python3 tests/readme_table.py           # regenerate the table
 shellcheck --severity=warning tests/stubs/*   # as CI runs it
+pipx install --force git+https://github.com/mark-brannan/languette@main   # try main; undo: pipx install --force languette
 ```
 
 Running the tests needs pytest, pytest-bdd, pytest-xdist and PyHamcrest; the hooks do not.
