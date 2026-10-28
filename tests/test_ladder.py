@@ -316,6 +316,8 @@ def feature_commands(files=None):
         t = f.read_text()
         # A feature's description is prose about the guard, not a command it was given.
         t = re.sub(r"^Feature:.*?(?=^\s*(?:Background:|Scenario(?: Outline)?:|Rule:|@|#))", "", t, count=1, flags=re.S | re.M)
+        # A terms file's lines, not a command.
+        t = re.sub(r'terms file holds:\n\s*"""\n.*?\n\s*"""|" holds `[^`\n]*`', "", t, flags=re.S)
         # A docstring is one command; a backtick inside it (big.feature's
         # JavaScript) delimits nothing.
         def docstring(m):
