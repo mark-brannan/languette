@@ -43,7 +43,7 @@ Feature: doctor
     Then the "Claude Code" row is ✓ "plugin cd31356, user scope"
     And beneath it "guards enabled: <on>" is ✓
     And beneath it "guards disabled: <off>" is <mark>
-    And beneath that, one ! line per off guard, "<guard>: " and its one-line description
+    And beneath that, one ! line per off guard, "(off) <guard>: " and its one-line description
 
     Examples:
       | options                                                                                                       | on | off | mark | guard          |
@@ -290,7 +290,7 @@ Feature: doctor
     And "~/.config/languette/redacted-terms.tsv" holds a malformed line 13, an empty-matching re: line 17, a nested-quantifier line 22 and 8 valid re: lines
     When the doctor runs
     Then beneath the "redacted terms" row "line 13", "line 17" and "line 22" are each ✗ with their reasons
-    And beneath it a line is ✓ matching "^8 regular expressions \(min=.*max=.*avg="
+    And beneath it a line is ✗ matching "^10 regular expressions, 2 invalid \(min=\d+\.\d\dms, max=\d+\.\d\dms, avg=\d+\.\d\dms\)$"
     And the doctor exits 1
 
   Scenario: a failed check does not stop the ones after it

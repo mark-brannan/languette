@@ -93,7 +93,7 @@ def _terms(ctx, kind, docstring):
 @given("the redacted terms file holds the default entries")
 def _terms_defaults(ctx):
     f = Path(ctx.mkdtemp()) / "redacted-terms.tsv"
-    shutil.copyfile(terms.SHIPPED, f)
+    shutil.copyfile(terms.DEFAULTS, f)
     ctx.env["CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE"] = str(f)
 
 

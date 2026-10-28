@@ -171,7 +171,7 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
   allows the call, with the entries in the user's file and nothing else. Hard block denies
   the whole post for a term on a short list, where even a redacted post
   could leak strategy; it reads the text as written, before any redaction.
-- Only the file's entries count; nothing shipped loads at run time.
+- Only the file's entries count; no other set loads at run time.
   `languette doctor --restore-terms` appends the default entries
   (`languette/rules/redacted-terms.tsv`) the file lacks, editing no line: the
   home directory to `~`, this machine's and LAN or tailnet names to `<host>`,

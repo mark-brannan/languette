@@ -6,11 +6,11 @@ every mirror of it; the undo is a support ticket, not an edit. So the check
 sits at the moment the text leaves the machine.
 
 Redact: each pair's find is replaced in the posted text alone and the call
-is allowed, as a secret is redacted. Shipped, rules/redacted-terms.tsv: the
+is allowed, as a secret is redacted. The defaults, rules/redacted-terms.tsv: the
 home directory in every spelling to `~`, this machine's name and LAN or
 tailnet names to `<host>`, private addresses to `<private-ip>`. Yours:
 redacted_terms_file, applied after, none puts `<redacted>`; a line `!<put>`
-drops the shipped pairs with that put. A term the command also holds outside
+drops the default pairs with that put. A term the command also holds outside
 the posted text, or inside a file's contents, which a redaction cannot reach,
 is a deny with the fix in the reason.
 
@@ -397,16 +397,16 @@ def check(doc):
     if all_private:
         return None
 
-    # The shipped pairs, then the user's. HOSTNAME is the OS's when the env has none.
+    # The default pairs, then the user's. HOSTNAME is the OS's when the env has none.
     penv = yield from terms.environment(env)
-    shipped = yield from terms.shipped(penv)
+    defaults = yield from terms.defaults(penv)
     mine, refused = yield from _load("redacted", env, penv)
     if refused:
         return refused
     blocked, refused = yield from _load("blocked", env, penv)
     if refused:
         return refused
-    applied = terms.pairs(shipped, mine)
+    applied = terms.pairs(defaults, mine)
 
     # Only the hard block fails closed on text it cannot see.
     gate = any(t.rx for t in blocked)
