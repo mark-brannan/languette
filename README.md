@@ -363,11 +363,11 @@ to Claude Code, and every command goes through. One entry:
 ```
 git clone https://github.com/mark-brannan/languette && cd languette
 sudo apt install shfmt shellcheck
-python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements-dev.txt
+python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements-dev.txt
 python3 -m pytest                       # as each push runs it; --full runs every row
 python3 tests/readme_table.py           # regenerate the table
 shellcheck --severity=warning tests/stubs/*   # as CI runs it
+python3 -m languette doctor             # run this checkout without installing it
 pipx install --force git+https://github.com/mark-brannan/languette@main   # try main; undo: pipx install --force languette
 ```
 
