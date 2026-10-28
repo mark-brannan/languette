@@ -36,10 +36,12 @@ Feature: guard-private-terms
   message added to the deny reason, for the agent, never posted. Pairs apply
   in file order on the running text, shipped then yours. A `re:` find the
   guard would not run is not in shape: one that does not compile, matches the
-  empty string, nests a quantifier inside a quantified group, or holds a
-  backreference; `languette doctor` names the file and the line, and times
-  each line over features/fixtures/private-terms/bad-comment.md. The fixtures
-  there are the design's own example: a comment an agent would post, its
+  empty string, holds a backreference, or has one of the three shapes that
+  backtrack without bound (found by parsing it, never by timing it): a
+  quantifier inside a quantified group, two unbounded repeats in a row over
+  the same characters, or overlapping alternatives inside a repeat.
+  `languette doctor` names the file and the line. The fixtures in
+  features/fixtures/private-terms are the design's own example: a comment an agent would post, its
   redacted twin, and a redacted and a blocked file.
 
   Why. A private repo or notes directory holds details (hostnames,
@@ -497,6 +499,9 @@ Feature: guard-private-terms
       | redacted | redacted_terms_file | re:(a+)+$         | a quantifier inside a quantified group |
       | redacted | redacted_terms_file | re:(a)\\1          | a backreference           |
       | blocked  | blocked_terms_file  | re:(\\d+)*x        | a quantifier inside a quantified group |
+      | redacted | redacted_terms_file | re:.*.*.*.*;      | two unbounded repeats in a row over the same characters |
+      | blocked  | blocked_terms_file  | re:\\w+\\d+x        | two unbounded repeats in a row over the same characters |
+      | redacted | redacted_terms_file | re:(?:a\|aa)+x    | overlapping alternatives inside a repeat |
 
   # Redaction cannot help with text it cannot read, so it lets the call through;
   # only the hard block, with terms to protect, fails closed (the Rule below).

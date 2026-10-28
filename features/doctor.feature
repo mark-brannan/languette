@@ -182,7 +182,7 @@ Feature: doctor
   # --- guard-private-terms' files, through the guard's own loader ----------------
   # One row per file, shipped included, so a line the guard would refuse is found
   # here and not at the next public post. features/fixtures/private-terms is the
-  # design's example; the doctor reads it to time each re: line.
+  # design's example.
 
   Scenario: each terms file gets a row, counting what loaded
     Given languette "cd31356ad5db" is installed at user scope
@@ -211,6 +211,7 @@ Feature: doctor
       | redacted-terms.tsv | redacted terms | re:(a+)+$                         | 1 | a quantifier inside a quantified group |
       | redacted-terms.tsv | redacted terms | zephyr-01\n\nre:x*                | 3 | matches the empty string               |
       | blocked-terms.tsv  | blocked terms  | re:[unclosed                      | 1 | does not compile                       |
+      | redacted-terms.tsv | redacted terms | re:.*.*.*.*;                      | 1 | two unbounded repeats in a row over the same characters |
       | blocked-terms.tsv  | blocked terms  | a{TAB}b{TAB}c{TAB}d               | 1 | four columns                           |
 
   Scenario: a set path that is missing fails the row, as it would fail every public post
@@ -219,12 +220,6 @@ Feature: doctor
     When the doctor runs
     Then the "redacted terms" row is ✗ "redacted_terms_file is ~/no-such.tsv, which does not exist: every public post is denied until it does"
     And the doctor exits 1
-
-  Scenario: a re: line slower than its budget over the fixture comment is a warning
-    Given languette "cd31356ad5db" is installed at user scope
-    And "~/.config/languette/redacted-terms.tsv" holds `re:.*.*.*.*;`
-    When the doctor runs
-    Then the "redacted terms" row is ! matching "~/.config/languette/redacted-terms.tsv line 1: \d+ ms over bad-comment.md, budget 5 ms"
 
   # Assisting with configuration: show what a post would become.
   Scenario: the doctor shows what a post would become through the files as loaded
