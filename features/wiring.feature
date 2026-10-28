@@ -14,7 +14,7 @@ Feature: wiring
       {"commands": [{"id": "walk", "match": [{"cmd": "npm", "args": ["run", "walk"]}],
                      "cost": "long", "approve_label": "Run walk"}]}
       """
-    And the private terms file holds:
+    And the blocked terms file holds:
       """
       Wanderlust
       """
@@ -48,10 +48,14 @@ Feature: wiring
       | guard-infra         | terraform destroy             | denies    |
       | guard-github-issues             | gh issue create -t t -b b     | denies    |
       | prose-budget-commit    | git commit -m x               | warns about "CI fails on this" |
-      | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-duplicate-prs | gh pr create -t t -b "Closes #1" | asks |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
       | guard-bypass-ruleset      | git push origin HEAD:$b       | asks      |
+
+    @planned
+    Examples:
+      | guard                  | command                       | verdict   |
+      | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
 
   Scenario: the hooks.json command for guard-bypass-labels judges an MCP call
     Given the hook is the hooks.json command for "guard-bypass-labels"
@@ -281,18 +285,12 @@ Feature: wiring
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | no    | gh issue create -t t -b b     | denies  |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | true  | gh issue create -t t -b b     | denies  |
       | guard-github-issues             | CLAUDE_PLUGIN_OPTION_GUARD_GITHUB_ISSUES             | 1     | gh issue create -t t -b b     | denies  |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     |       | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS |  | gh pr create -t t -b "Closes #1" | asks |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 0     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 0 | gh pr create -t t -b "Closes #1" | asks |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | False | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | False | gh pr create -t t -b "Closes #1" | asks |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | no | gh pr create -t t -b "Closes #1" | asks |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | true | gh pr create -t t -b "Closes #1" | asks |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 1 | gh pr create -t t -b "Closes #1" | asks |
-      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | warns about "CI fails on this" |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | warns about "CI fails on this" |
       | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | False | git commit -m x               | warns about "CI fails on this" |
@@ -308,6 +306,16 @@ Feature: wiring
       | require-well-formed | CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED | true | echo "unterminated | denies |
       | guard-secrets | CLAUDE_PLUGIN_OPTION_GUARD_SECRETS | true | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 | denies |
       | guard-bypass-ruleset | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_RULESET | true | git push origin HEAD:$b | asks |
+
+    @planned
+    Examples:
+      | guard                  | option                                      | value | command                       | verdict |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     |       | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 0     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | False | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+      | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
 
   # guard-worktrees is opt-in, the reverse of the guards above: it runs only
   # when its option is exactly "true", so a misconfiguration leaves it off.

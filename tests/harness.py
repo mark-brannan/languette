@@ -5,6 +5,7 @@ import json
 import os
 import random
 import shutil
+import socket
 import string
 import subprocess
 import sys
@@ -52,6 +53,18 @@ def scattered(seed, role):
 
 
 
+FIXTURES = ROOT / "features/fixtures/private-terms"
+
+
+def fill_names(text, home):
+    """{HOME}, {USER} (the home directory's last part) and {HOSTNAME} (this machine's), as the fixtures spell them."""
+    return text.replace("{HOME}", home).replace("{USER}", Path(home).name).replace("{HOSTNAME}", socket.gethostname())
+
+
+def fixture_text(name, home):
+    return fill_names((FIXTURES / name).read_text(), home)
+
+
 class Ctx:
     def __init__(self, engine, seed):
         self.engine = engine
@@ -95,10 +108,11 @@ class Ctx:
         return self._doordir
 
     def expand(self, s):
+        s = s.replace("{TAB}", "\t")
         if "{PROJ}" in s:
             assert self.proj, f"test setup: {s!r} names {{PROJ}} but the scenario has no project directory"
             s = s.replace("{PROJ}", str(self.proj))
-        s = s.replace("{HOME}", os.environ["HOME"]).replace("{CWD}", self.default_cwd)
+        s = fill_names(s, os.environ["HOME"]).replace("{CWD}", self.default_cwd)
         s = s.replace("{UP}", "../" * self.default_cwd.count("/"))
         if "{TMP}" in s:
             self.tmp = self.tmp or self.mkdtemp()

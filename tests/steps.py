@@ -13,7 +13,7 @@ from pathlib import Path
 from hamcrest import assert_that, equal_to
 from pytest_bdd import given, parsers, then, when
 
-from harness import IN_PROCESS, ROOT, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
+from harness import IN_PROCESS, ROOT, fixture_text, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
 from matchers import Verdict, asks, denies, is_silent, warns_about
 from languette import run, scan, verdict, world
 
@@ -83,11 +83,18 @@ def _file_committed(ctx, rel):
                      "commit", "-q", "-m", "x", "--", rel], check=True)
 
 
-@given("the private terms file holds:")
-def _terms(ctx, docstring):
-    f = Path(ctx.mkdtemp()) / "private-terms.txt"
+@given(parsers.re(r"the (?P<kind>blocked|redacted) terms file holds:"))
+def _terms(ctx, kind, docstring):
+    f = Path(ctx.mkdtemp()) / f"{kind}-terms.txt"
     f.write_text(ctx.expand(docstring) + "\n")
-    ctx.env["CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE"] = str(f)
+    ctx.env[f"CLAUDE_PLUGIN_OPTION_{kind.upper()}_TERMS_FILE"] = str(f)
+
+
+@given(parsers.re(r'the (?P<kind>blocked|redacted) terms file is the fixture "(?P<name>[^"]+)"'))
+def _terms_fixture(ctx, kind, name):
+    f = Path(ctx.mkdtemp()) / f"{kind}-terms.tsv"
+    f.write_text(fixture_text(name, os.environ["HOME"]))
+    ctx.env[f"CLAUDE_PLUGIN_OPTION_{kind.upper()}_TERMS_FILE"] = str(f)
 
 
 @given("the transcript holds:")
@@ -446,6 +453,13 @@ def _runs_failing(ctx, command):
     _post(ctx, "PostToolUseFailure")
 
 
+@when(parsers.re(r'the agent posts the fixture "(?P<name>[^"]+)"(?: plus the line "(?P<extra>[^"]*)")? as the --body of `(?P<command>.*)`'))
+def _posts_fixture(ctx, name, extra, command):
+    body = fixture_text(name, os.environ["HOME"]) + (f"\n{extra}" if extra else "")
+    ctx.run(ctx.payload(f"{command} --body {shlex.quote(body)}"))
+    _ran(ctx)
+
+
 @when(parsers.re(r"the agent runs `(?P<command>.*)`", flags=re.S))
 def _runs(ctx, command):
     ctx.run(ctx.payload(command))
@@ -790,18 +804,38 @@ def _warns(ctx, text):
     assert_that(ctx.verdict, warns_about(text))
 
 
-@then(parsers.re(r'the guard asks, rewriting the command to [`"](?P<text>.*)[`"]$'))
-def _rewrites(ctx, text):
-    assert ctx.verdict.decision == "ask", ctx.verdict.show()
-    got = ctx.verdict.out.get("updatedInput", {}).get("command")
+DECISION = {"asks": "ask", "allows": "allow"}
+
+
+def _rewritten(ctx, verb, key):
+    assert ctx.verdict.decision == DECISION[verb], ctx.verdict.show()
+    return ctx.verdict.out.get("updatedInput", {}).get(key)
+
+
+@then(parsers.re(r'the guard (?P<verb>asks|allows), rewriting the command to [`"](?P<text>.*)[`"]$'))
+def _rewrites(ctx, verb, text):
+    got = _rewritten(ctx, verb, "command")
     assert got == ctx.expand(text), f"rewritten to {got!r}, want {ctx.expand(text)!r}"
 
 
-@then(parsers.re(r'the guard asks, rewriting the input field "(?P<key>[a-z_]+)" to "(?P<text>.*)"'))
-def _rewrites_field(ctx, key, text):
-    assert ctx.verdict.decision == "ask", ctx.verdict.show()
-    got = ctx.verdict.out.get("updatedInput", {}).get(key)
+@then(parsers.re(r"the guard (?P<verb>asks|allows), rewriting the command to:$"))
+def _rewrites_block(ctx, verb, docstring):
+    got = _rewritten(ctx, verb, "command")
+    assert got == ctx.expand(docstring), f"rewritten to {got!r}, want {ctx.expand(docstring)!r}"
+
+
+@then(parsers.re(r'the guard (?P<verb>asks|allows), rewriting the input field "(?P<key>[a-z_]+)" to "(?P<text>.*)"'))
+def _rewrites_field(ctx, verb, key, text):
+    got = _rewritten(ctx, verb, key)
     assert got == ctx.expand(text), f"{key} rewritten to {got!r}, want {ctx.expand(text)!r}"
+
+
+@then(parsers.re(r'the guard allows, rewriting the --body to the fixture "(?P<name>[^"]+)"'))
+def _rewrites_body(ctx, name):
+    argv = shlex.split(_rewritten(ctx, "allows", "command"))
+    got = argv[argv.index("--body") + 1]
+    want = fixture_text(name, os.environ["HOME"])
+    assert got.rstrip("\n") == want.rstrip("\n"), f"--body became {got!r}, want {want!r}"
 
 
 @then(parsers.re(r'the stub "(?P<name>[a-z-]+)" was called with "(?P<text>.*)"'))
