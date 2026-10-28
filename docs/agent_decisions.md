@@ -473,3 +473,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261027t225901z
 - guard-private-terms: a list file found but empty or not in shape warns and is skipped, like a missing one, rather than denying Undo: make empty/malformed deny again in features/guard-private-terms.feature ([#290](https://github.com/mark-brannan/languette/pull/290))
+
+### 20261028t062225z
+- languette#301: slow-regex scenario stubs the doctor's clock instead of a threshold option (no PR, branch pr301)
