@@ -27,8 +27,6 @@ ROOT = Path(__file__).resolve().parent.parent
 PREFIX = "CLAUDE_PLUGIN_OPTION_"
 OPTIONS = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())["userConfig"]
 SWITCHES = sorted(k for k, v in OPTIONS.items() if v["type"] == "boolean")
-# Declared ahead of the code that reads them; the implementation PR empties this.
-NOT_READ_YET = {"redacted_terms_file", "blocked_terms_file"}
 SET = re.compile(r'(?P<var>CLAUDE_PLUGIN_OPTION_[A-Z0-9_]+) is (?:"(?P<value>.*)"|unset)\Z')
 
 
@@ -86,7 +84,7 @@ READS = _reads()
 GUARDS = {run.option(g): g for _, _, gs in run.GUARDS for g in gs}
 
 
-@pytest.mark.parametrize("name", sorted(set(OPTIONS) - NOT_READ_YET))
+@pytest.mark.parametrize("name", sorted(OPTIONS))
 def test_every_option_is_read_in_one_place(name):
     var = PREFIX + name.upper()
     places = READS.get(var, []) + [p for k, ps in READS.items() if k.endswith("*") and var.startswith(k[:-1])

@@ -173,12 +173,6 @@
       "description": "In issue and PR text posted to a public GitHub repo: redact the shipped pairs (your home directory to ~, this machine's name and LAN or tailnet names to <host>, private addresses to <private-ip>) and the terms in your redacted-terms file, then allow the post; deny the post whole if it names a term from your blocked-terms file. Leave on unless you want that text through unchecked.",
       "default": true
     },
-    "private_terms_file": {
-      "type": "file",
-      "title": "Private terms file (deprecated)",
-      "description": "Deprecated: use blocked_terms_file. A text file of terms that must not appear in text posted to a public GitHub repo: one per line, matched case-insensitively as plain text, # for comments. With no file set, the public-issue guard allows everything.",
-      "required": false
-    },
     "redacted_terms_file": {
       "type": "file",
       "title": "Redacted terms file",

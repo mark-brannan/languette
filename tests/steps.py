@@ -83,11 +83,11 @@ def _file_committed(ctx, rel):
                      "commit", "-q", "-m", "x", "--", rel], check=True)
 
 
-@given("the private terms file holds:")
-def _terms(ctx, docstring):
-    f = Path(ctx.mkdtemp()) / "private-terms.txt"
+@given(parsers.re(r"the (?P<kind>blocked|redacted) terms file holds:"))
+def _terms(ctx, kind, docstring):
+    f = Path(ctx.mkdtemp()) / f"{kind}-terms.txt"
     f.write_text(ctx.expand(docstring) + "\n")
-    ctx.env["CLAUDE_PLUGIN_OPTION_PRIVATE_TERMS_FILE"] = str(f)
+    ctx.env[f"CLAUDE_PLUGIN_OPTION_{kind.upper()}_TERMS_FILE"] = str(f)
 
 
 @given("the transcript holds:")
