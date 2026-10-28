@@ -184,7 +184,6 @@ Feature: doctor
   # here and not at the next public post. features/fixtures/private-terms is the
   # design's example; the doctor reads it to time each re: line.
 
-  @planned
   Scenario: each terms file gets a row, counting what loaded
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"
@@ -194,14 +193,12 @@ Feature: doctor
     And the "blocked terms" row is ✓ "~/.config/languette/blocked-terms.tsv 3 terms, 1 re:"
     And the doctor exits 0
 
-  @planned
   Scenario: no blocked terms file is a warning that says what that means
     Given languette "cd31356ad5db" is installed at user scope
     When the doctor runs
     Then the "blocked terms" row is ! "none at ~/.config/languette/blocked-terms.tsv, and blocked_terms_file is unset: no term is blocked"
     And the "redacted terms" row is ✓ "shipped 10 pairs, 10 re:; none of your own"
 
-  @planned
   Scenario Outline: a line the guard would refuse fails the row, naming the file and the line
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/<file>" holds `<text>`
@@ -216,7 +213,6 @@ Feature: doctor
       | blocked-terms.tsv  | blocked terms  | re:[unclosed                      | 1 | does not compile                       |
       | blocked-terms.tsv  | blocked terms  | a{TAB}b{TAB}c{TAB}d               | 1 | four columns                           |
 
-  @planned
   Scenario: a set path that is missing fails the row, as it would fail every public post
     Given languette "cd31356ad5db" is installed at user scope
     And the languette options are `{"redacted_terms_file": "~/no-such.tsv"}`
@@ -224,7 +220,6 @@ Feature: doctor
     Then the "redacted terms" row is ✗ "redacted_terms_file is ~/no-such.tsv, which does not exist: every public post is denied until it does"
     And the doctor exits 1
 
-  @planned
   Scenario: a re: line slower than its budget over the fixture comment is a warning
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds `re:.*.*.*.*;`
@@ -232,7 +227,6 @@ Feature: doctor
     Then the "redacted terms" row is ! matching "~/.config/languette/redacted-terms.tsv line 1: \d+ ms over bad-comment.md, budget 5 ms"
 
   # Assisting with configuration: show what a post would become.
-  @planned
   Scenario: the doctor shows what a post would become through the files as loaded
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"
