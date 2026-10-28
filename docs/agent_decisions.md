@@ -482,3 +482,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261028t075722z
 - doctor: a terms file that is a directory is named 'is a directory' by the doctor's own isdir, while World._read keeps raising 'is not a regular file', which guard-bypass-labels' feature pins Undo: drop the isdir in terms_rows and change World._read and that feature together ([#305](https://github.com/mark-brannan/languette/pull/305))
+
+### 20261028t075735z
+- doctor: the fixture redacted-terms.tsv holds the default entries as --init-redacted-terms writes them, then the user's lines, so the redacted twin follows with no built-in set; the row counting it says 14 entries and 10 regular expressions Undo: restore the five-line fixture and give the --redact and redacted-twin scenarios a file of their own ([#305](https://github.com/mark-brannan/languette/pull/305))
