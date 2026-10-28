@@ -170,13 +170,25 @@
     "guard_private_terms": {
       "type": "boolean",
       "title": "Keep private terms out of public issues and PRs",
-      "description": "Deny issue and PR text posted to a public GitHub repo that names a term from your private-terms file. Does nothing until you also set the private terms file. Leave on unless you want that text through unchecked.",
+      "description": "In issue and PR text posted to a public GitHub repo: redact the shipped pairs (your home directory to ~, this machine's name and LAN or tailnet names to <host>, private addresses to <private-ip>) and the terms in your redacted-terms file, then allow the post; deny the post whole if it names a term from your blocked-terms file. Leave on unless you want that text through unchecked.",
       "default": true
     },
     "private_terms_file": {
       "type": "file",
-      "title": "Private terms file",
-      "description": "A text file of terms that must not appear in text posted to a public GitHub repo: one per line, matched case-insensitively as plain text, # for comments. With no file set, the public-issue guard allows everything.",
+      "title": "Private terms file (deprecated)",
+      "description": "Deprecated: use blocked_terms_file. A text file of terms that must not appear in text posted to a public GitHub repo: one per line, matched case-insensitively as plain text, # for comments. With no file set, the public-issue guard allows everything.",
+      "required": false
+    },
+    "redacted_terms_file": {
+      "type": "file",
+      "title": "Redacted terms file",
+      "description": "Terms replaced in a post before it leaves, after the shipped pairs. Tab-separated: the find, its replacement (<redacted> when there is none), a comment; an optional header row find/put/comment; # starts a comment; a find is case-insensitive plain text, or a regular expression under a re: prefix; $NAME is that variable's value; a line !<put> drops the shipped pairs with that put. A leading ~ or $HOME is expanded. Unset, $XDG_CONFIG_HOME/languette/redacted-terms.tsv (~/.config by default) is read if present. Set but missing, or found but unreadable or not in this shape, denies public posts until fixed; languette doctor says which line.",
+      "required": false
+    },
+    "blocked_terms_file": {
+      "type": "file",
+      "title": "Blocked terms file",
+      "description": "Terms so sensitive that a post naming one is denied whole. Tab-separated: the find, a message added to the deny reason, a comment; an optional header row find/message/comment; # starts a comment; a find is case-insensitive plain text, or a regular expression under a re: prefix; $NAME is that variable's value. A leading ~ or $HOME is expanded. Unset, $XDG_CONFIG_HOME/languette/blocked-terms.tsv (~/.config by default) is read if present; with neither, no term is blocked. Set but missing, or found but unreadable or not in this shape, denies public posts until fixed; languette doctor says which line.",
       "required": false
     },
     "private_repos": {
