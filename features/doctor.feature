@@ -5,6 +5,12 @@ Feature: doctor
   for `claude` and the forge clients, and this repo as the plugin's install path. The
   doctor sends two probes to the installed hooks as payloads, a command that
   does not parse and a recursive delete of a fake path; nothing runs either.
+  A ✗ never stops a later check: every check that can run does, and the exit
+  code is decided once, after the last row. A check that cannot run because
+  something it needs failed is a ! row saying so, never skipped silently.
+  Rows run in this order: version, shell parser, parse check, fail-closed,
+  Claude Code (its guards beneath it), gh, the other forge clients, redacted
+  terms, blocked terms. A row's detail lines are indented beneath it.
 
   Background:
     Given a fake HOME
@@ -14,14 +20,16 @@ Feature: doctor
     Given languette "cd31356ad5db" is installed at user scope
     And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true}`
     When the doctor runs
-    Then the "Claude Code" row is ✓ "plugin cd31356, user scope; 24 guards on, 0 off"
+    Then the "Claude Code" row is ✓ "plugin cd31356, user scope"
+    And beneath it "guards enabled: 24" is ✓ and "guards disabled: 0" is ✓
     And the "shell parser" row is there
-    And the "Claude Code" row comes before the "version" row
     And the "version" row comes before the "shell parser" row
+    And the "shell parser" row comes before the "parse check" row
+    And the "parse check" row comes before the "fail-closed" row
+    And the "fail-closed" row comes before the "Claude Code" row
+    And the "Claude Code" row comes before the "gh" row
     And the "gh" row is ✓ "signed in"
     And the "parse check" row is ✓ matching "^`echo \"unclosed` was denied: .+, \d+ ms$"
-    And the "parse check" row comes before the "fail-closed" row
-    And the "fail-closed" row comes before the "gh" row
     And the "fail-closed" row is ✓ matching "`rm -rf /fake/languette-doctor` was denied through the hook command as installed, \d+ ms of 600 s"
     And the "version" row is ! "plugin at commit cd31356, from main; not a release"
     And the doctor exits 0
@@ -31,15 +39,18 @@ Feature: doctor
     Given languette "cd31356ad5db" is installed at user scope
     And the languette options are `<options>`
     When the doctor runs
-    Then the "Claude Code" row is ✓ "plugin cd31356, user scope; <counts>"
+    Then the "Claude Code" row is ✓ "plugin cd31356, user scope"
+    And beneath it "guards enabled: <on>" is ✓
+    And beneath it "guards disabled: <off>" is <mark>
+    And beneath that, one ! line per off guard, "<guard>: " and its one-line description
 
     Examples:
-      | options                                           | counts                               |
-      | {"guard_review_threads": true, "guard_signed_comments": true} | 23 guards on, 1 off: guard_worktrees |
-      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_disks": false}   | 23 guards on, 1 off: guard_disks     |
-      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_disks": "false"} | 23 guards on, 1 off: guard_disks     |
-      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_disks": "no"}    | 24 guards on, 0 off                  |
-      | {"guard_worktrees": "yes", "guard_review_threads": true, "guard_signed_comments": true} | 23 guards on, 1 off: guard_worktrees |
+      | options                                                                                                       | on | off | mark | guard          |
+      | {"guard_review_threads": true, "guard_signed_comments": true}                                                 | 23 | 1   | !    | guard_worktrees |
+      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_disks": false}   | 23 | 1   | !    | guard_disks    |
+      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_disks": "false"} | 23 | 1   | !    | guard_disks    |
+      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_disks": "no"}    | 24 | 0   | ✓    |                |
+      | {"guard_worktrees": "yes", "guard_review_threads": true, "guard_signed_comments": true}                       | 23 | 1   | !    | guard_worktrees |
 
   Scenario: gh signed out is a warning, not a failure
     Given languette "cd31356ad5db" is installed at user scope
@@ -162,7 +173,8 @@ Feature: doctor
     And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true}`
     And claude plugin list fails
     When the doctor runs
-    Then the "Claude Code" row is ✓ "plugin cd31356, user scope; 24 guards on, 0 off"
+    Then the "Claude Code" row is ✓ "plugin cd31356, user scope"
+    And beneath it "guards enabled: 24" is ✓
     And the doctor exits 0
 
   Scenario Outline: what the doctor cannot read is a warning row, never a traceback
@@ -180,31 +192,50 @@ Feature: doctor
       | ~/.claude/plugins/installed_plugins.json | {"plugins": {"languette@languette": 3}} | installed_plugins.json has a shape the doctor does not know |
 
   # --- guard-private-terms' files, through the guard's own loader ----------------
-  # One row per file, shipped included, so a line the guard would refuse is found
-  # here and not at the next public post. features/fixtures/private-terms is the
-  # design's example; the doctor reads it to time each re: line it accepts. The time is
-  # shown, never the verdict: a re: line is accepted or refused by its shape alone.
+  # A row per terms file, counting only the entries in that file; the doctor can write
+  # the default entries into it (--restore-terms) but never counts a set the file lacks.
+  # features/fixtures/private-terms is the design's example; the doctor reads it to time
+  # each re: line it accepts. The times are shown, never the verdict: a re: line is
+  # accepted or refused by its shape alone. Every bad line is reported, and the valid
+  # ones are still loaded and timed.
 
-  Scenario: each terms file gets a row, counting what loaded
+  Scenario: a terms file gets a row, its path and entry count, and the timings of its re: lines
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"
     And "~/.config/languette/blocked-terms.tsv" holds the fixture "private-terms/blocked-terms.tsv"
     When the doctor runs
-    Then the "redacted terms" row is ✓ matching "^shipped 9 pairs, 9 re: \(slowest \d+\.\d\d ms: .+\); ~/.config/languette/redacted-terms.tsv 5 pairs, 1 re: \(slowest \d+\.\d\d ms: .+\)$"
-    And the "blocked terms" row is ✓ matching "^~/.config/languette/blocked-terms.tsv 3 terms, 1 re: \(slowest \d+\.\d\d ms: .+\)$"
+    Then the "redacted terms" row is ✓ "enabled"
+    And beneath it "~/.config/languette/redacted-terms.tsv (5 entries)" is ✓
+    And beneath it a line is ✓ matching "^1 regular expressions \(min=\d+\.\d\d ?ms, max=\d+\.\d\d ?ms, avg=\d+\.\d\d ?ms\)$"
+    And the "blocked terms" row is ✓ "enabled"
+    And beneath it "~/.config/languette/blocked-terms.tsv (3 entries)" is ✓
+    And the doctor exits 0
+
+  Scenario: a re: slower than the threshold is listed on its own line, with its line number and its first characters
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/redacted-terms.tsv" holds a re: line 4 that takes longer than the threshold
+    When the doctor runs
+    Then beneath the "redacted terms" row a line is ! matching "^slow regular expressions \(> \d+\.\dms\)$"
+    And beneath that, "line 4:" and the first 30 characters of the find, ending in "…" when cut, and its time in ms
     And the doctor exits 0
 
   Scenario: no blocked terms file is a warning that says what that means
     Given languette "cd31356ad5db" is installed at user scope
     When the doctor runs
     Then the "blocked terms" row is ! "none at ~/.config/languette/blocked-terms.tsv, and blocked_terms_file is unset: no term is blocked"
-    And the "redacted terms" row is ✓ matching "^shipped 9 pairs, 9 re: \(slowest \d+\.\d\d ms: .+\); none of your own$"
 
-  Scenario Outline: a line the guard would refuse fails the row, naming the file and the line
+  Scenario: no redacted terms file is a warning that names the fix
+    Given languette "cd31356ad5db" is installed at user scope
+    When the doctor runs
+    Then the "redacted terms" row is ! "none at ~/.config/languette/redacted-terms.tsv: nothing is redacted"
+    And beneath it "run `languette doctor --restore-terms` to write the defaults" is !
+    And the doctor exits 0
+
+  Scenario Outline: a line the guard would refuse fails the row, naming the line
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/<file>" holds `<text>`
     When the doctor runs
-    Then the "<row>" row is ✗ "~/.config/languette/<file> line <n>: <why>"
+    Then beneath the "<row>" row "line <n>: <why>" is ✗
     And the doctor exits 1
 
     Examples:
@@ -214,12 +245,22 @@ Feature: doctor
       | blocked-terms.tsv  | blocked terms  | re:[unclosed                      | 1 | does not compile                       |
       | redacted-terms.tsv | redacted terms | re:.*.*.*.*;                      | 1 | two unbounded repeats in a row over the same characters |
       | blocked-terms.tsv  | blocked terms  | a{TAB}b{TAB}c{TAB}d               | 1 | four columns                           |
+      | redacted-terms.tsv | redacted terms | re:(?:a\|aa)+x                    | 1 | overlapping alternatives inside a repeat |
 
-  Scenario: a re: with overlapping alternatives in a repeat is refused by its shape, not its speed
+  Scenario: every bad line is listed, and the valid re: lines are still timed
     Given languette "cd31356ad5db" is installed at user scope
-    And "~/.config/languette/redacted-terms.tsv" holds `re:(?:a|aa)+x`
+    And "~/.config/languette/redacted-terms.tsv" holds a malformed line 13, an empty-matching re: line 17, a nested-quantifier line 22 and 8 valid re: lines
     When the doctor runs
-    Then the "redacted terms" row is ✗ "~/.config/languette/redacted-terms.tsv line 1: overlapping alternatives inside a repeat"
+    Then beneath the "redacted terms" row "line 13", "line 17" and "line 22" are each ✗ with their reasons
+    And beneath it a line is ✓ matching "^8 regular expressions \(min=.*max=.*avg="
+    And the doctor exits 1
+
+  Scenario: a failed check does not stop the ones after it
+    When the doctor runs
+    Then the "Claude Code" row is ✗ "languette is not installed for this directory"
+    And the "redacted terms" row is there
+    And the "blocked terms" row is there
+    And the doctor prints a last line counting the ✗ rows and giving the exit code, such as "2 problems; exit 1"
     And the doctor exits 1
 
   Scenario: a set path that is missing fails the row, as it would fail every public post
@@ -228,6 +269,22 @@ Feature: doctor
     When the doctor runs
     Then the "redacted terms" row is ✗ "redacted_terms_file is ~/no-such.tsv, which does not exist: every public post is denied until it does"
     And the doctor exits 1
+
+  # Mending configuration: write the default entries, never take one away.
+  Scenario: --restore-terms writes the default redacted terms file when there is none
+    Given languette "cd31356ad5db" is installed at user scope
+    When the doctor runs with `--restore-terms`
+    Then "~/.config/languette/redacted-terms.tsv" holds the default entries
+    And it prints the entries it added
+    And the doctor exits 0
+
+  Scenario: --restore-terms appends only the default entries the file lacks
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/redacted-terms.tsv" holds `zephyr-01\tthe boat`
+    When the doctor runs with `--restore-terms`
+    Then "~/.config/languette/redacted-terms.tsv" holds every default entry and the line "zephyr-01\tthe boat" unchanged
+    And no line it held before is removed or edited
+    And running it again adds nothing
 
   # Assisting with configuration: show what a post would become.
   Scenario: the doctor shows what a post would become through the files as loaded
@@ -240,6 +297,12 @@ Feature: doctor
     When the doctor runs with `--redact` and the fixture "private-terms/bad-comment.md" plus the line "Tested aboard Wanderlust."
     Then it prints "blocked: Wanderlust (the boat's name stays off public repos; say \"the boat\")"
     And the doctor exits 1
+
+  Scenario: --redact reads stdin when it is given no file, or "-"
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"
+    When the doctor runs with `--redact` and the fixture "private-terms/bad-comment.md" on stdin
+    Then it prints the fixture "private-terms/bad-comment.redacted.md"
 
   Scenario: --redact loads the files the installed plugin's options name, as the rows and the guard do
     Given languette "cd31356ad5db" is installed at user scope
