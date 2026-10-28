@@ -14,7 +14,7 @@ Feature: wiring
       {"commands": [{"id": "walk", "match": [{"cmd": "npm", "args": ["run", "walk"]}],
                      "cost": "long", "approve_label": "Run walk"}]}
       """
-    And the blocked terms file holds:
+    And the private terms file holds:
       """
       Wanderlust
       """

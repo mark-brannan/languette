@@ -95,7 +95,6 @@ class Ctx:
         return self._doordir
 
     def expand(self, s):
-        s = s.replace("{TAB}", "\t")
         if "{PROJ}" in s:
             assert self.proj, f"test setup: {s!r} names {{PROJ}} but the scenario has no project directory"
             s = s.replace("{PROJ}", str(self.proj))
