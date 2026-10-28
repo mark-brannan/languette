@@ -7,7 +7,8 @@ Feature: doctor
   does not parse and a recursive delete of a fake path; nothing runs either.
   A ✗ never stops a later check: every check that can run does, and the exit
   code is decided once, after the last row. A check that cannot run because
-  something it needs failed is a ! row saying so, never skipped silently.
+  something it needs failed is a ! row saying so, never skipped silently,
+  except fail-closed: no hook to probe means no protection, so it is ✗.
   Rows run in this order: version, shell parser, parse check, fail-closed,
   Claude Code (its guards beneath it), gh, the other forge clients, redacted
   terms, blocked terms. A row's detail lines are indented beneath it.
@@ -196,7 +197,7 @@ Feature: doctor
   # the default entries into it (--restore-terms) but never counts a set the file lacks.
   # features/fixtures/private-terms is the design's example; the doctor reads it to time
   # each re: line it accepts. The times are shown, never the verdict: a re: line is
-  # accepted or refused by its shape alone. Every bad line is reported, and the valid
+  # accepted or refused by its shape alone, and a slow one is a ! warning, exit 0. Every bad line is reported, and the valid
   # ones are still loaded and timed.
 
   Scenario: a terms file gets a row, its path and entry count, and the timings of its re: lines
@@ -206,17 +207,18 @@ Feature: doctor
     When the doctor runs
     Then the "redacted terms" row is ✓ "enabled"
     And beneath it "~/.config/languette/redacted-terms.tsv (5 entries)" is ✓
-    And beneath it a line is ✓ matching "^1 regular expressions \(min=\d+\.\d\d ?ms, max=\d+\.\d\d ?ms, avg=\d+\.\d\d ?ms\)$"
+    And beneath it a line is ✓ matching "^1 regular expression \(min=\d+\.\d\dms, max=\d+\.\d\dms, avg=\d+\.\d\dms\)$"
     And the "blocked terms" row is ✓ "enabled"
     And beneath it "~/.config/languette/blocked-terms.tsv (3 entries)" is ✓
     And the doctor exits 0
 
   Scenario: a re: slower than the threshold is listed on its own line, with its line number and its first characters
     Given languette "cd31356ad5db" is installed at user scope
-    And "~/.config/languette/redacted-terms.tsv" holds a re: line 4 that takes longer than the threshold
+    And "~/.config/languette/redacted-terms.tsv" holds `a\nb\nc\nre:(?:Wanderlust|Wanderer)\s+aboard\b`
+    And the doctor's clock times the re: on line 4 at 7.20 ms and every other at 0.02 ms
     When the doctor runs
     Then beneath the "redacted terms" row a line is ! matching "^slow regular expressions \(> \d+\.\dms\)$"
-    And beneath that, "line 4:" and the first 30 characters of the find, ending in "…" when cut, and its time in ms
+    And beneath that, "line 4:  re:(?:Wanderlust|Wanderer)\s+a…  7.20 ms"
     And the doctor exits 0
 
   Scenario: no blocked terms file is a warning that says what that means
@@ -260,7 +262,7 @@ Feature: doctor
     Then the "Claude Code" row is ✗ "languette is not installed for this directory"
     And the "redacted terms" row is there
     And the "blocked terms" row is there
-    And the doctor prints a last line counting the ✗ rows and giving the exit code, such as "2 problems; exit 1"
+    And the last line is "2 problems; exit 1"
     And the doctor exits 1
 
   Scenario: a set path that is missing fails the row, as it would fail every public post
@@ -304,11 +306,17 @@ Feature: doctor
     And it then prints everything `languette --help` prints
     And the doctor exits 0
 
-  Scenario: --redact reads stdin when it is given no file, or "-"
+  Scenario Outline: --redact reads stdin when it is given no file, or "-"
     Given languette "cd31356ad5db" is installed at user scope
     And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"
-    When the doctor runs with `--redact` and the fixture "private-terms/bad-comment.md" on stdin
+    When the doctor runs with `<args>` and the fixture "private-terms/bad-comment.md" on stdin
     Then it prints the fixture "private-terms/bad-comment.redacted.md"
+    And the doctor exits 0
+
+    Examples:
+      | args       |
+      | --redact   |
+      | --redact - |
 
   Scenario: --redact loads the files the installed plugin's options name, as the rows and the guard do
     Given languette "cd31356ad5db" is installed at user scope

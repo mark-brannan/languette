@@ -17,12 +17,12 @@ helps write a config that works.
 
 ## What it does
 
-1. **Checks protection and its dependencies:** one ✓, ! or ✗ row per check, detail lines indented beneath it; any ✗ exits non-zero. A ✗ never stops a later check; the exit code is decided after the last row.
+1. **Checks protection and its dependencies:** a ✓, ! or ✗ row per check, details beneath; any ✗ exits non-zero.
 2. **Diagnoses every config** through the guard's own loader. (planned)
 3. **Offers the fix** as a diff, applied only on a yes. (planned)
 4. **Assists with configuration,** not only repair. (planned)
 
-The checks run in order: version, shell parser, parse-check and fail-closed
+The checks run in order, and a ✗ never stops a later one: version, shell parser, parse-check and fail-closed
 probes, the install with its guards beneath it, the forge clients, the terms
 files. `shfmt`, the preferred parser, has top billing; without it the doctor
 names the rung that reads commands instead. `gh` is optional; without it guards ask the user. Every other forge client installed gets a
