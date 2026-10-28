@@ -62,7 +62,7 @@ def fill_names(text, home):
 
 
 def fixture_text(name, home):
-    return fill_names((FIXTURES / name).read_text(), home)
+    return fill_names((FIXTURES / name.removeprefix(FIXTURES.name + "/")).read_text(), home)
 
 
 class Ctx:
@@ -165,7 +165,8 @@ class Ctx:
             # TMPDIR fresh per scenario, so a guard's per-session file starts
             # empty; PATH and the stub log as the stubs need.
             on = {k: "true" for k in OPT_INS if k not in self.env}
-            env = {"HOME": os.environ["HOME"], "TMPDIR": self.doordir(), **on, **self.scenario_env()}
+            env = {"HOME": os.environ["HOME"], "USER": Path(os.environ["HOME"]).name, "TMPDIR": self.doordir(), **on,
+                   **self.scenario_env()}
             if self.bare or self.stubs:
                 env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
             if self.stub_log:
@@ -276,7 +277,7 @@ class FakeHome:
     def invoke(self, args, cwd, path):
         """Run `python3 -m languette *args` in `cwd` with `path` after the stubs' directory on PATH."""
         env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "LANGUETTE_"))}
-        env.update(HOME=str(self.home), PATH=f"{self.bin}{os.pathsep}{path}", TMPDIR=str(self.aside),
+        env.update(HOME=str(self.home), USER=self.home.name, PATH=f"{self.bin}{os.pathsep}{path}", TMPDIR=str(self.aside),
                    PYTHONPATH=str(ROOT))
         self.before = self.snapshot()
         r = subprocess.run([sys.executable, "-m", "languette", *args], cwd=cwd, env=env, capture_output=True,

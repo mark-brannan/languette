@@ -505,17 +505,36 @@ MESSAGES = {
         "same command assigns before it, after any cd in it, with . and .. collapsed; a variable set in "
         "an earlier command is invisible here, so spell the path out."
     ),
-    "pt_home": (
-        "{guard}: the text about to be posted to a public repo names the home directory. Post "
-        "`~` in its place. The rewrite does this; check it and approve it."
+    "pt_terms_file": (
+        "{guard}: the {option} option names {path}, which {why}, so text bound for a public repo cannot be "
+        "judged, and every post to one is denied until it can be. Fix the path in the plugin's {option} "
+        "option (/plugin configure languette@languette) or the file; a file with no terms in it is valid. "
+        "To post without the check, {to_private}."
     ),
-    "pt_home_by_hand": (
-        "{guard}: the text about to be posted to a public repo names the home directory ({hits}), "
-        "and the command is too tangled to rewrite safely. Write `~` in its place by hand and "
-        "resend."
+    "pt_terms_default": (
+        "{guard}: the {option} option is unset, so {path} is read, and it {why}: text bound for a public repo "
+        "cannot be judged, and every post to one is denied until it can be. Fix or remove that file, or set "
+        "the {option} option (/plugin configure languette@languette); a file with no terms in it is valid. "
+        "To post without the check, {to_private}."
+    ),
+    "pt_redacted": (
+        "{guard}: the text about to be posted to a public repo held private detail. It is redacted "
+        "({changes}) and the call goes through with the replacements."
+    ),
+    "pt_by_hand": (
+        "{guard}: the text about to be posted to a public repo holds private detail to redact ({changes}), "
+        "and the command is too tangled to rewrite safely: the same text stands outside what is posted, or "
+        "this Claude Code cannot rewrite a call. Make the substitutions by hand, writing each replacement "
+        "where its term was, and resend."
+    ),
+    "pt_file_redact": (
+        "{guard}: the file {files} is posted, and it holds private detail to redact ({changes}), including "
+        "a home directory, a hostname or an address, or a term of your redacted terms file. A redaction "
+        "rewrites the call, never a file's contents. Make the substitutions in the file, then repeat the "
+        "post, or post the text inline. To post without the check, {to_private}."
     ),
     "pt_hits": (
-        "{guard}: the text about to be posted to a public repo contains private term(s) from the denylist: "
+        "{guard}: the text about to be posted to a public repo contains blocked term(s): "
         "{hits}. Private detail does not go on public GitHub, ever -- it stays in GitHub's "
         "history. Either {to_private} and link it from here, or rewrite the body without the term. Do "
         "not paraphrase it into something recognisable."

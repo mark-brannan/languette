@@ -774,7 +774,7 @@ def _denies(ctx):
 
 @then(parsers.re(r'the guard denies, naming "(?P<text>.*)"'))
 def _denies_naming(ctx, text):
-    assert_that(ctx.verdict, denies(naming=ctx.expand(text)))
+    assert_that(ctx.verdict, denies(naming=ctx.expand(text).replace('\\"', '"')))
 
 
 @then(parsers.re(r'the guard denies, not naming "(?P<text>.*)"'))
