@@ -43,7 +43,7 @@ def _in(items):
         elif op is C.LITERAL:
             out.add(chr(av))
         elif op is C.RANGE:
-            out |= {chr(c) for c in range(av[0], av[1] + 1) if c < 0x250}
+            out |= {chr(c) for c in range(av[0], min(av[1], 0x24F) + 1)}
         elif op is C.CATEGORY:
             kind = re.compile(_CATEGORY[re.sub(r"^CATEGORY_(?:UNI_|LOC_)?", "", av.name)])
             out |= {c for c in _ALPHA if kind.match(c)}

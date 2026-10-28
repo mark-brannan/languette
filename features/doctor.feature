@@ -190,15 +190,15 @@ Feature: doctor
     And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"
     And "~/.config/languette/blocked-terms.tsv" holds the fixture "private-terms/blocked-terms.tsv"
     When the doctor runs
-    Then the "redacted terms" row is ✓ "shipped 9 pairs, 9 re:; ~/.config/languette/redacted-terms.tsv 5 pairs, 1 re:"
-    And the "blocked terms" row is ✓ "~/.config/languette/blocked-terms.tsv 3 terms, 1 re:"
+    Then the "redacted terms" row is ✓ matching "^shipped 9 pairs, 9 re: \(slowest \d+\.\d\d ms: .+\); ~/.config/languette/redacted-terms.tsv 5 pairs, 1 re: \(slowest \d+\.\d\d ms: .+\)$"
+    And the "blocked terms" row is ✓ matching "^~/.config/languette/blocked-terms.tsv 3 terms, 1 re: \(slowest \d+\.\d\d ms: .+\)$"
     And the doctor exits 0
 
   Scenario: no blocked terms file is a warning that says what that means
     Given languette "cd31356ad5db" is installed at user scope
     When the doctor runs
     Then the "blocked terms" row is ! "none at ~/.config/languette/blocked-terms.tsv, and blocked_terms_file is unset: no term is blocked"
-    And the "redacted terms" row is ✓ "shipped 9 pairs, 9 re:; none of your own"
+    And the "redacted terms" row is ✓ matching "^shipped 9 pairs, 9 re: \(slowest \d+\.\d\d ms: .+\); none of your own$"
 
   Scenario Outline: a line the guard would refuse fails the row, naming the file and the line
     Given languette "cd31356ad5db" is installed at user scope
@@ -239,4 +239,12 @@ Feature: doctor
     And it prints "blocked: none"
     When the doctor runs with `--redact` and the fixture "private-terms/bad-comment.md" plus the line "Tested aboard Wanderlust."
     Then it prints "blocked: Wanderlust (the boat's name stays off public repos; say \"the boat\")"
+    And the doctor exits 1
+
+  Scenario: --redact loads the files the installed plugin's options name, as the rows and the guard do
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{"blocked_terms_file": "~/mine.tsv"}`
+    And "~/mine.tsv" holds `Wanderlust`
+    When the doctor runs with `--redact` and the fixture "private-terms/bad-comment.md" plus the line "Tested aboard Wanderlust."
+    Then it prints "blocked: Wanderlust"
     And the doctor exits 1

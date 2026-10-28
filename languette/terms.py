@@ -12,7 +12,9 @@ find is that variable's value in the env given, a literal inside a `re:`; a
 line naming a variable that is unset or empty is kept but matches nothing. In
 the redacted file a line `!<put>` drops every shipped pair with that put.
 
-Pure: the caller reads the text and supplies the hostname. Standard library only.
+The parsing is pure. The loading is a generator that yields the Needs for the
+read and the hostname, which the guard and the doctor both drive. Standard
+library only.
 """
 
 import os
@@ -20,6 +22,7 @@ import re
 from collections import namedtuple
 
 from languette import reshape
+from languette.verdict import Need
 
 # kind -> (the option, the default file, the second column's name)
 KINDS = {"redacted": ("redacted_terms_file", "redacted-terms.tsv", "put"),
@@ -46,13 +49,18 @@ def option_name(kind):
     return KINDS[kind][0]
 
 
+def option_env(option):
+    """The environment variable Claude Code gives a plugin option."""
+    return "CLAUDE_PLUGIN_OPTION_" + option.upper()
+
+
 def where(kind, env):
     """(path, set): where the kind's file is read from and whether the user's option named it.
     A leading `~` or `$HOME` in the option is expanded; with the option unset or empty it is
     $XDG_CONFIG_HOME/languette/<file>, ~/.config by default. "" when there is no home to look in."""
     option, name, _ = KINDS[kind]
     home = env.get("HOME") or ""
-    value = env.get("CLAUDE_PLUGIN_OPTION_" + option.upper()) or ""
+    value = env.get(option_env(option)) or ""
     if value:
         m = re.match(r"(?:~|\$HOME|\$\{HOME\})(?=/|\Z)", value)
         return (home + value[m.end():] if m else value), True
@@ -103,6 +111,33 @@ def parse(text, kind, env):
         rx = re.compile(pattern if is_re else re.escape(pattern), re.I)
         out.append(Term(find, put, None if unset else rx, is_re, False, pattern))
     return out
+
+
+def environment(env):
+    """`env` with $HOSTNAME as the terms read it: the env's own, else the OS's."""
+    return {**env, "HOSTNAME": env.get("HOSTNAME") or (yield Need("hostname"))}
+
+
+def shipped(penv):
+    """The shipped redacted pairs."""
+    return parse((yield Need("read", SHIPPED)), "redacted", penv)
+
+
+def load(kind, env, penv):
+    """(the kind's terms, its path, whether an option named it, the exception that stops the guard
+    judging by it or None). The terms are None when there is no file to read: an unset option with
+    nothing at the default path, which is no error."""
+    path, named = where(kind, env)
+    if not path:
+        return None, "", named, None
+    try:
+        return parse((yield Need("read", path, MAX_READ)), kind, penv), path, named, None
+    except BadTerms as e:
+        return None, path, named, e
+    except Exception as e:  # noqa: BLE001 -- the world's own: missing, a directory, unreadable
+        if not named and isinstance(e, (FileNotFoundError, NotADirectoryError)):
+            return None, path, named, None
+        return None, path, named, e
 
 
 def pairs(shipped, mine):

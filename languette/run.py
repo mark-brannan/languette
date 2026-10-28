@@ -115,7 +115,7 @@ def wired(event, tool):
             for g in gs]
 
 
-def _drive(r, world, acts):
+def drive(r, world, acts):
     """A guard's finding: `r` itself, or what generator `r` returns once every Need it
     yields is answered. Each Act it yields goes on `acts`."""
     if not inspect.isgenerator(r):
@@ -142,7 +142,7 @@ def _drive(r, world, acts):
 def _finding(g, doc, world, acts):
     """(g's finding on `doc`, whether it crashed)."""
     try:
-        return _drive(g.check(doc), world, acts), False
+        return drive(g.check(doc), world, acts), False
     except Exception as e:  # noqa: BLE001
         return deny(say("guard_crashed", guard=g.NAME, kind=type(e).__name__, err=e)), True
 
@@ -171,7 +171,7 @@ def _project_rules(world, payload, env):
     if env.get(record.RAW) == "true":
         return ()
     try:
-        return _drive(guard_secrets.project_rules(payload, env), world, [])
+        return drive(guard_secrets.project_rules(payload, env), world, [])
     except Exception:  # noqa: BLE001 -- a malformed list costs the record its text, never the verdict
         return None
 

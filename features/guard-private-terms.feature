@@ -609,6 +609,18 @@ Feature: guard-private-terms
       | redacted |
       | blocked  |
 
+  # A term naming an unset variable matches nothing, so a file of only those has no
+  # terms to protect: text the guard cannot see is not a reason to deny.
+  @also_guard-github-issues
+  Scenario: a blocked file whose only term names an unset variable fails nothing closed
+    Given the blocked terms file holds:
+      """
+      $CLIENT_CODENAME
+      """
+    And CLIENT_CODENAME is unset
+    When the agent runs `gh issue create -R o/r -t x -b "$(date)"`
+    Then the guard is silent
+
   # Current thinking: Claude Code does not expand a plugin option, so the
   # guard does, and settings need no machine-specific absolute path.
   Scenario Outline: the blocked terms file option may start with ~ or $HOME

@@ -18,7 +18,6 @@ import json
 import os
 import re
 import shutil
-import socket
 import subprocess
 import sys
 import time
@@ -236,6 +235,21 @@ def _env_value(v):
     return "true" if v is True else "false" if v is False else v if isinstance(v, str) else json.dumps(v)
 
 
+def _options(files, user_path, inst):
+    """The installed plugin's options from the user's settings file; Unreadable when it will not say."""
+    user = files[user_path]
+    if isinstance(user, Unreadable):
+        raise user
+    return _dig(user, ["pluginConfigs", inst.get("id") or "languette@languette", "options"],
+                f"pluginConfigs in {_tilde(user_path)}")
+
+
+def _option_env(options):
+    """Each option as the environment variable Claude Code gives the plugin's hooks."""
+    return {terms.option_env(k): _env_value(v) for k, v in options.items()
+            if isinstance(k, str) and re.fullmatch(r"\w+", k) and v is not None}
+
+
 def gates(hooks):
     """Option name -> its gate, `=` (on unless false) or `!=` (on only if true), as run.py
     reads them, and the first hook of each probed guard, from a hooks.json object. A
@@ -297,11 +311,7 @@ def check(cwd):
         elif inst.get("enabled") is False:
             rows.append((FAIL, "Claude Code", f"{where}, is disabled: claude plugin enable {inst.get('id')}"))
         try:
-            user = files[user_path]
-            if isinstance(user, Unreadable):
-                raise user
-            options = _dig(user, ["pluginConfigs", inst.get("id") or "languette@languette", "options"],
-                           f"pluginConfigs in {_tilde(user_path)}")
+            options = _options(files, user_path, inst)
         except Unreadable as e:
             options, opt_problem = {}, str(e)
         else:
@@ -328,9 +338,7 @@ def check(cwd):
                 not_run[guard] = "the plugin is disabled, so its hooks do not run; the probe did not run"
             elif not is_on(found.get(key, "="), options.get(key)):
                 not_run[guard] = f"{guard} is off, so `{sent}` would go through; the probe did not run"
-        env = {**base_env, "CLAUDE_PLUGIN_ROOT": root,
-               **{f"CLAUDE_PLUGIN_OPTION_{k.upper()}": _env_value(v) for k, v in options.items()
-                  if isinstance(k, str) and re.fullmatch(r"\w+", k) and v is not None}}
+        env = {**base_env, "CLAUDE_PLUGIN_ROOT": root, **_option_env(options)}
     elif hand:
         names = ", ".join(_tilde(p) for p in hand)
         count = len({m for hs in hand.values() for h in hs for m in re.findall(r"--guard ([\w-]+)", h["command"])})
@@ -409,49 +417,63 @@ def check(cwd):
 
 # --- guard-private-terms' files, through the guard's own loader --------------
 
-def _terms_env(options):
-    """The guard's environment for the terms files: this one, the installed plugin's two options,
-    and this machine's name for $HOSTNAME."""
-    env = {**os.environ, "HOME": str(_home())}
-    for kind in terms.KINDS:
-        name = terms.option_name(kind)
-        if isinstance(options.get(name), str):
-            env["CLAUDE_PLUGIN_OPTION_" + name.upper()] = options[name]
-    env["HOSTNAME"] = env.get("HOSTNAME") or socket.gethostname()
-    return env
+# What each accepted re: is timed over; shown, never the verdict.
+SAMPLE = Path(__file__).resolve().parent.parent / "features/fixtures/private-terms/bad-comment.md"
 
 
-def _load_terms(kind, env):
-    """(the kind's terms, its path, whether an option named it, why the guard would refuse it or
-    None); the terms are None when there is no file to read."""
+def _terms(options):
+    """(the shipped terms, the redacted terms, the blocked terms) as the guard loads them, each of
+    the last two (terms or None, path, whether an option named it, the exception or None). The
+    options are the installed plugin's, as the guard's environment carries them."""
+    from languette.run import drive          # run.py exits when a guard will not import
     from languette.world import World
-    path, named = terms.where(kind, env)
-    if not path:
-        return None, "", named, None
-    try:
-        return terms.parse(World(env, {})._read(path, terms.MAX_READ), kind, env), path, named, None
-    except terms.BadTerms as e:
-        return None, path, named, str(e)
-    except (OSError, ValueError) as e:
-        if not named and isinstance(e, (FileNotFoundError, NotADirectoryError)):
-            return None, path, named, None
-        return None, path, named, terms.why_not(e)
+    env = {**os.environ, "HOME": str(_home()), **_option_env(options)}
+    world = World(env, {})
+
+    def run_(gen):
+        return drive(gen, world, [])
+    penv = run_(terms.environment(env))
+    return (run_(terms.shipped(penv)),) + tuple(run_(terms.load(kind, env, penv)) for kind in terms.KINDS)
 
 
-def _counts(found, noun):
+def _why(err):
+    return str(err) if isinstance(err, terms.BadTerms) else terms.why_not(err)
+
+
+def _slowest(found, text):
+    """(milliseconds, the find) of the slowest accepted re: over text, or None when there is none."""
+    best = None
+    for t in found:
+        if t.is_re and t.rx:
+            start = time.perf_counter()
+            t.rx.sub("", text)
+            ms = (time.perf_counter() - start) * 1000
+            best = max(best or (0, ""), (ms, t.find))
+    return best
+
+
+def _counts(found, noun, text):
     lines = [t for t in found if not t.drop]
-    return f"{len(lines)} {noun}{'' if len(lines) == 1 else 's'}, {sum(t.is_re for t in lines)} re:"
+    slow = _slowest(lines, text) if text is not None else None
+    find = slow[1] if slow and len(slow[1]) <= 40 else slow and slow[1][:39] + "…"
+    timed = f" (slowest {slow[0]:.2f} ms: {find})" if slow else ""
+    return f"{len(lines)} {noun}{'' if len(lines) == 1 else 's'}, {sum(t.is_re for t in lines)} re:{timed}"
 
 
 def terms_rows(options):
     """A row for the redacted terms, shipped included, and one for the blocked terms: what loaded,
-    or the line the guard would refuse, which would deny every public post."""
-    env = _terms_env(options)
-    shipped = terms.parse(Path(terms.SHIPPED).read_text(encoding="utf-8"), "redacted", env)
+    with each accepted re: timed, or the line the guard would refuse, which would deny every
+    public post."""
+    shipped, *loaded = _terms(options)
+    try:
+        sample = SAMPLE.read_text(encoding="utf-8")
+    except OSError:
+        sample = None
     rows = []
     for kind, label, noun in (("redacted", "redacted terms", "pair"), ("blocked", "blocked terms", "term")):
-        found, path, named, why = _load_terms(kind, env)
+        found, path, named, err = loaded[list(terms.KINDS).index(kind)]
         option, where = terms.option_name(kind), _tilde(path)
+        why = _why(err) if err else None
         if why and why.startswith("line "):
             rows.append((FAIL, label, f"{where} {why}"))
         elif why:
@@ -459,29 +481,27 @@ def terms_rows(options):
             rows.append((FAIL, label, f"{option} is {where}, which {why}: every public post is denied until it {until}"
                          if named else f"{where} {why}: every public post is denied until it loads"))
         elif kind == "redacted":
-            mine = "none of your own" if found is None else f"{where} {_counts(found, noun)}"
-            rows.append((OK, label, f"shipped {_counts(shipped, noun)}; {mine}"))
+            mine = "none of your own" if found is None else f"{where} {_counts(found, noun, sample)}"
+            rows.append((OK, label, f"shipped {_counts(shipped, noun, sample)}; {mine}"))
         elif found is None:
             rows.append((WARN, label, f"none at {where}, and {option} is unset: no term is blocked"))
         else:
-            rows.append((OK, label, f"{where} {_counts(found, noun)}"))
+            rows.append((OK, label, f"{where} {_counts(found, noun, sample)}"))
     return rows
 
 
-def redact(file):
+def redact(file, options):
     """Print `file` as a post would leave through the files as loaded, then which blocked terms it
     holds. Exits 1 when any, or when a file would not load."""
-    env = _terms_env({})
     try:
         text = Path(file).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as e:
         print(f"{FAIL} {file} {terms.why_not(e)}")
         return 1
-    shipped = terms.parse(Path(terms.SHIPPED).read_text(encoding="utf-8"), "redacted", env)
-    mine, blocked = (_load_terms(kind, env) for kind in ("redacted", "blocked"))
-    for found, path, _, why in (mine, blocked):
-        if why:
-            print(f"{FAIL} {_tilde(path)} {why}")
+    shipped, mine, blocked = _terms(options)
+    for _, path, _, err in (mine, blocked):
+        if err:
+            print(f"{FAIL} {_tilde(path)} {_why(err)}")
             return 1
     print(terms.redact(text, terms.pairs(shipped, mine[0] or [])).rstrip("\n"))
     hits = terms.hits(text, blocked[0] or [])
@@ -489,9 +509,17 @@ def redact(file):
     return 1 if hits else 0
 
 
+def installed_options(cwd):
+    """The options of the plugin in effect for cwd, {} where there is none or its settings will not say."""
+    files = settings_files(cwd)
+    try:
+        inst = in_effect(installs(files), cwd)
+        return _options(files, _home() / ".claude/settings.json", inst) if inst else {}
+    except Unreadable:
+        return {}
+
+
 def main(redact_file=None):
-    if redact_file:
-        return redact(redact_file)
     try:
         sys.stdout.reconfigure(errors="replace")
     except (AttributeError, ValueError):
@@ -501,6 +529,8 @@ def main(redact_file=None):
     except OSError as e:
         print(f"{FAIL} {'doctor':<13} the current directory is unreadable ({e.strerror or e})")
         return 1
+    if redact_file:
+        return redact(redact_file, installed_options(cwd))
     rows = check(cwd)
     for mark, label, text in rows:
         print(f"{mark} {label:<13} {text}")

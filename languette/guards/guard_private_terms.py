@@ -337,19 +337,11 @@ def _load(kind, env, penv):
     """(the terms of the kind's file, None), or (None, the deny) for a file the guard will not
     judge by: one the option names that is missing, or any found that is not readable text
     or not in shape. Unset with no file at the default path is no terms."""
-    path, named = terms.where(kind, env)
+    found, path, named, err = yield from terms.load(kind, env, penv)
+    if err is None:
+        return found or [], None
+    why = f"is not in shape: {err}" if isinstance(err, terms.BadTerms) else terms.why_not(err)
     option = terms.option_name(kind)
-    if not path:
-        return [], None
-    try:
-        text = yield Need("read", path, terms.MAX_READ)
-        return terms.parse(text, kind, penv), None
-    except terms.BadTerms as e:
-        why = f"is not in shape: {e}"
-    except Exception as e:  # noqa: BLE001 -- the world's own: missing, a directory, unreadable
-        if not named and isinstance(e, (FileNotFoundError, NotADirectoryError)):
-            return [], None
-        why = terms.why_not(e)
     if named:
         return None, deny(say("pt_terms_file", guard=NAME, option=option, path=path, why=why, to_private=TO_PRIVATE))
     return None, deny(say("pt_terms_default", guard=NAME, option=option, path=path, why=why, to_private=TO_PRIVATE))
@@ -406,8 +398,8 @@ def check(doc):
         return None
 
     # The shipped pairs, then the user's. HOSTNAME is the OS's when the env has none.
-    penv = {**env, "HOSTNAME": env.get("HOSTNAME") or (yield Need("hostname"))}
-    shipped = terms.parse((yield Need("read", terms.SHIPPED)), "redacted", penv)
+    penv = yield from terms.environment(env)
+    shipped = yield from terms.shipped(penv)
     mine, refused = yield from _load("redacted", env, penv)
     if refused:
         return refused
@@ -417,7 +409,7 @@ def check(doc):
     applied = terms.pairs(shipped, mine)
 
     # Only the hard block fails closed on text it cannot see.
-    gate = bool(blocked)
+    gate = any(t.rx for t in blocked)
     unseen = next((v for k, v in meta if k == "UNSEEN"), None)
     if gate and unseen is not None:
         return deny(say("pt_unseen", guard=NAME, unseen=unseen, to_private=TO_PRIVATE))

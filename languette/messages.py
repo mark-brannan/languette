@@ -528,7 +528,7 @@ MESSAGES = {
         "where its term was, and resend."
     ),
     "pt_file_redact": (
-        "{guard}: the file {files} is posted, and it holds private detail to redact ({changes}), including "
+        "{guard}: a file in the post ({files}) holds private detail to redact ({changes}), including "
         "a home directory, a hostname or an address, or a term of your redacted terms file. A redaction "
         "rewrites the call, never a file's contents. Make the substitutions in the file, then repeat the "
         "post, or post the text inline. To post without the check, {to_private}."
