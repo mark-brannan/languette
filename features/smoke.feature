@@ -54,8 +54,8 @@ Feature: smoke
 
     Examples:
       | gh            | row                               |
-      | signed out    | ^not signed in; the stacked-base  |
-      | not installed | ^not installed or not answering;  |
+      | signed out    | ^installed, not signed in         |
+      | not installed | ^not installed                    |
 
   Scenario: the doctor on a fresh machine, where nothing is installed
     Given a machine with shfmt and bash

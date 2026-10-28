@@ -124,6 +124,11 @@ MESSAGES = {
         "this machine sees until someone checks the old branch back out. Use a worktree "
         "instead:\n  {prog} worktree add -b <branch> <path> main\nthen cd into it and work there."
     ),
+    "wt_chezmoi": (
+        "{guard}: {hits} overwrites or removes files in $HOME without chezmoi's own prompt: a forced "
+        "apply replaces every file changed there since the last sync, destroy removes the target, its "
+        "source entry and its state, and purge deletes the source directory, uncommitted edits included."
+    ),
     "wt_git_missing_checkout": (
         "{guard}: git is missing, so a checkout/switch can't be checked against $HOME. This is a "
         "gate and fails closed."
@@ -243,6 +248,11 @@ MESSAGES = {
         "{why} `git reset --hard origin/<this branch>` passes only when it runs on its own, from a linked "
         "worktree or the session's scratchpad with no cd or -C, on a clean tree, and the branch tracks "
         "that same name or nothing."
+    ),
+    "wl_stow_adopt": (
+        "`stow --adopt` moves each file that conflicts from the target directory into the package, "
+        "overwriting the repo's copy; it survives only if committed. Commit or stash the package first; "
+        "if adopting is meant, the user confirms it."
     ),
     "cron_remove": "`crontab -r` is blocked: it deletes the whole crontab with no undo. {way_user}",
     "rule_deny": "`{cmd}` is blocked by rule `{id}` in {file}: {why}. {way_user}",

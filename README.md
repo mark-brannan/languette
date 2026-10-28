@@ -103,7 +103,8 @@ Each guard checks for one kind of hazard:
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
 - [`guard-secrets`](languette/guards/guard_secrets.py): a pasted credential
 - [`guard-worktrees`](features/guard-worktrees.feature): opt-in; a branch switch in a `$HOME`
-  that is a worktree, or a reach into another session's worktree
+  that is a worktree, chezmoi's forced apply, `destroy` and `purge` (an ask), or a reach into
+  another session's worktree
 - [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
 - [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
@@ -116,7 +117,7 @@ Each guard checks for one kind of hazard:
   remote branch an open PR is based on (GitHub silently closes the PR)
 - [`guard-duplicate-prs`](features/guard-duplicate-prs.feature): a second open PR on one issue
 - [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
-  `stash pop`, force-push, `reset --hard` and other moves that throw work away
+  `stash pop`, force-push, `reset --hard`, `stow --adopt` and other moves that throw work away
 - [`guard-protected-services`](features/guard-protected-services.feature): `systemctl stop postgresql`, for the services you list
 - [`prose-budget-commit`](features/prose-budget-commit.feature): a `git commit` whose
   staged prose runs over the repo's word budgets
@@ -214,7 +215,7 @@ first's two controls, `guard_worktrees_checkout_home` and
 
 ### One setting per `guard-git-work-loss` rule
 
-`guard_git_work_loss=false` skips all five rules. To keep four, turn off one:
+`guard_git_work_loss=false` skips all six rules. To keep five, turn off one:
 
 | Setting | Rule it switches off |
 | --- | --- |
@@ -223,6 +224,7 @@ first's two controls, `guard_worktrees_checkout_home` and
 | `guard_git_work_loss_force_push` | a bare force push; a force push to or delete of main |
 | `guard_git_work_loss_discard` | `reset --hard`, `checkout .`, `restore .`, `clean -f` |
 | `guard_git_work_loss_branch_delete` | `branch -D`, `branch --delete --force` |
+| `guard_git_work_loss_adopt` | `stow --adopt` (asks) |
 
 ### Allowing more for `guard-recursive-delete`
 

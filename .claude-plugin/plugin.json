@@ -52,6 +52,12 @@
       "description": "Deny git branch -D and --delete --force. Leave on unless you want this git command through unchecked. Has no effect while guard_git_work_loss is false.",
       "default": true
     },
+    "guard_git_work_loss_adopt": {
+      "type": "boolean",
+      "title": "Ask before stow --adopt",
+      "description": "Ask before stow --adopt, which overwrites the package's files with the copies in the target. Leave on unless you want this command through unchecked. Has no effect while guard_git_work_loss is false.",
+      "default": true
+    },
     "require_well_formed": {
       "type": "boolean",
       "title": "Deny a command that does not parse",
@@ -252,12 +258,12 @@
     "guard_worktrees": {
       "type": "boolean",
       "title": "Guard worktrees: no branch switch in $HOME, no reach into another session's worktree",
-      "description": "Opt-in, off by default. Two controls. Deny a git checkout or switch that would change the branch checked out in your home directory, for a $HOME that is itself a work tree (a bare repository over $HOME, or a dotfile manager such as yadm); deny any command or file edit that reaches into a linked git worktree other than the session's own, and EnterWorktree(path=...). Turn on if $HOME is a worktree or you run several sessions against one repo.",
+      "description": "Opt-in, off by default. Two controls. Deny a git checkout or switch that would change the branch checked out in your home directory, for a $HOME that is itself a work tree (a bare repository over $HOME, or a dotfile manager such as yadm), and ask before chezmoi's forced apply, destroy or purge; deny any command or file edit that reaches into a linked git worktree other than the session's own, and EnterWorktree(path=...). Turn on if $HOME is a worktree or you run several sessions against one repo.",
       "default": false
     },
     "guard_worktrees_checkout_home": {
       "type": "boolean",
-      "title": "Guard worktrees: control for a branch switch in $HOME",
+      "title": "Guard worktrees: control for a branch switch or chezmoi overwrite in $HOME",
       "description": "On by default; applies only when guard_worktrees is on. Set false to keep only the other control.",
       "default": true
     },

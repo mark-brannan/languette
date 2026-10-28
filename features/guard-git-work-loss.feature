@@ -16,12 +16,17 @@ Feature: guard-git-work-loss
   throw away uncommitted work, as `reset --hard` does, and `branch -D` throws
   away unmerged work (`-d` refuses; use that). On a clean working tree the
   discards (checkout, restore, clean, `reset --hard`) have nothing to lose and
-  pass. A git wrapper such as `yadm` is treated as `git`.
+  pass. A git wrapper such as `yadm` or `vcsh` is treated as `git`. `stow --adopt` asks:
+  it moves each conflicting file from the target directory into the package,
+  overwriting the repo's copy, which survives only if committed. `stow -D` and
+  `-R` alone only remove or replace links and pass; so does a dry run (`-n`).
+  Stow need not be installed: the command is recognised by its shape, `--adopt`
+  being any prefix of it (`--ado`), wherever it stands among the package names.
 
   Each rule has its own switch, the plugin options
-  guard_git_work_loss_blanket_staging, _stash, _force_push, _discard and
-  _branch_delete; a rule is skipped only when its option is exactly `false`.
-  The whole-guard option guard_git_work_loss=false skips all five. git takes
+  guard_git_work_loss_blanket_staging, _stash, _force_push, _discard,
+  _branch_delete and _adopt; a rule is skipped only when its option is exactly `false`.
+  The whole-guard option guard_git_work_loss=false skips all six. git takes
   any unambiguous prefix of a long option (`--har` is `--hard`), so the guard
   does too.
 
@@ -55,6 +60,7 @@ Feature: guard-git-work-loss
       | git add -uz src/                        | denies    | the same, in a cluster            |
       | git add --ign src/                      | denies    | an ambiguous prefix               |
       | yadm add -A                             | denies    |                                   |
+      | vcsh dots add -A                        | denies    | vcsh names its repository first   |
       | cd foo && git add -A && git commit -m x | denies    | in a chain                        |
       | git -C /some/dir add -A                 | denies    | git -C                            |
       | git commit -a -m "x"                    | denies    |                                   |
@@ -268,6 +274,41 @@ Feature: guard-git-work-loss
     And the working directory is "{TMP}/plain"
     When the agent runs `git checkout .`
     Then the guard denies
+
+  Scenario Outline: stow --adopt asks; stow without it, or only deleting, does not
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                               | verdict   | note                                         |
+      | stow --adopt zsh                      | asks      | adopt before the package                     |
+      | stow zsh --adopt                      | asks      | adopt after the package                      |
+      | stow zsh --adopt vim                  | asks      | adopt between packages                       |
+      | stow --ado zsh                        | asks      | a unique prefix                              |
+      | stow -d dotfiles -t ~ --adopt zsh     | asks      | with options that take a value               |
+      | stow -vS --adopt zsh                  | asks      | a bundled cluster                            |
+      | stow --dir=dotfiles --adopt zsh       | asks      | a glued value                                |
+      | stow -R --adopt zsh                   | asks      | a restow stows again, adopting               |
+      | stow -D a -S b --adopt                | asks      | b is stowed                                  |
+      | sudo /usr/bin/stow --adopt zsh        | asks      | behind a wrapper, by path                    |
+      | sh -c 'stow --adopt zsh'              | asks      | in a shell body                              |
+      | stow --adopt -- zsh                   | asks      | packages after --                            |
+      | stow zsh                              | is silent | no adopt                                     |
+      | stow -D zsh                           | is silent | only removes links                           |
+      | stow -R zsh                           | is silent | only replaces links                          |
+      | stow -D --adopt zsh                   | is silent | nothing is stowed                            |
+      | stow --adopt -D zsh vim               | is silent | the same, adopt first                        |
+      | stow --delete --adopt zsh             | is silent | the same, long                               |
+      | stow -n --adopt zsh                   | is silent | a dry run                                    |
+      | stow --simulate --adopt zsh           | is silent | a dry run                                    |
+      | stow --adopt --help                   | is silent | usage                                        |
+      | stow -d --adopt                       | is silent | --adopt is -d's value, not the option        |
+      | stow -d --adopt zsh                   | is silent | the same, with a package: no adopt           |
+      | echo stow --adopt zsh                 | is silent | prose                                        |
+      | grep stow --adopt notes.txt           | is silent | a search names stow, it does not run it      |
+      | man stow --adopt zsh                  | asks      | man is not prose (its pager runs a command)  |
+      | stow -t adopt zsh                     | is silent | adopt as a value, not the option             |
+      | git commit -m 'stow --adopt zsh'      | is silent | a commit message                             |
 
   Scenario Outline: force-deleting a branch is denied
     When the agent runs `<command>`
@@ -502,6 +543,7 @@ Feature: guard-git-work-loss
       | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_FORCE_PUSH      | git push --force origin foo |
       | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_DISCARD         | git reset --hard            |
       | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_BRANCH_DELETE   | git branch -D foo           |
+      | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_ADOPT           | stow --adopt zsh            |
 
   @awk_only
   Scenario Outline: a rule's own setting, on, denies its command
@@ -515,6 +557,15 @@ Feature: guard-git-work-loss
       | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_FORCE_PUSH      | git push --force origin foo |
       | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_DISCARD         | git reset --hard            |
       | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_BRANCH_DELETE   | git branch -D foo           |
+
+  Scenario Outline: a rule's own setting, on, asks for what it asks about
+    Given <setting> is "true"
+    When the agent runs `<command>`
+    Then the guard asks
+
+    Examples:
+      | setting                                              | command                     |
+      | CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_ADOPT           | stow --adopt zsh            |
 
   Scenario Outline: turning one rule off leaves the others denying
     Given CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_BLANKET_STAGING is "false"

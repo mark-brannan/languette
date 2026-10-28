@@ -33,14 +33,18 @@ _OPENER = re.compile(r"(?<!<)<<-?[ \t]*(?:[A-Za-z_]|" + _DPART + r")(?:[A-Za-z0-
 _ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _WS = re.compile(r"[ \t\n]")
 
-GIT = re.compile(r"(?:^|/)(?:git|yadm)\Z")
+# The tools that run git. home: its work tree is always $HOME, wherever it runs.
+# repo: it takes the name of one of its repositories before the git arguments.
+Wrapper = namedtuple("Wrapper", "home repo")
+GIT_WRAPPERS = {"git": Wrapper(False, False), "yadm": Wrapper(True, False), "vcsh": Wrapper(True, True)}
+GIT = re.compile(r"(?:^|/)(?:" + "|".join(GIT_WRAPPERS) + r")\Z")
 GH = re.compile(r"(?:^|/)gh\Z")
 # A word that is cd, pushd or popd: the builtins that move the working directory.
 CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 # git's global options that take the next word as their value.
 GIT_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
-PROSE = frozenset("grep egrep fgrep rg ag ack echo printf git yadm gh glab sed awk jq yq "
-                  "cat tee test [ diff sort head tail wc tr cut less more".split())
+PROSE = frozenset("grep egrep fgrep rg ag ack echo printf gh glab sed awk jq yq "
+                  "cat tee test [ diff sort head tail wc tr cut less more".split()) | frozenset(GIT_WRAPPERS)
 # Process tools name a script to find it, not to run it.
 PROSE_PROCESS = PROSE | frozenset("pkill pgrep killall ps lsof fuser which type".split())
 LAUNCH = frozenset("npx bunx pnpm yarn bun".split())
@@ -1230,17 +1234,23 @@ def texts_of_command(text, prose=PROSE, read=None):
     return out
 
 
+def _repo_word(s, a, i):
+    """Whether the word at i is the repository name a wrapper such as vcsh takes after its own word."""
+    return i > a and s.k[i - 1] == "w" and GIT.search(s.w[i - 1]) is not None and git_wrapper(s.w[i - 1])[1].repo
+
+
 def cmd_index(s, a, b, cmd, nested, parents=None, prose=PROSE):
     """Index in a..b of the word that is the command `cmd` (a compiled regex)
     describes, or None. Top level: any word counts unless the word before it
-    matches `parents`, or the segment is led by a prose consumer and no segment
+    matches `parents` or is a wrapper's repository name, or the segment is led by a prose consumer and no segment
     is a shell. Nested: only the command position, past assignments, wrappers
     with their options, and shell keywords."""
     if not nested:
         c = seg_cmd(s, a, b)
         for i in range(a, b + 1):
             if (s.k[i] == "w" and cmd.search(s.w[i]) and
-                    not (i > a and s.k[i - 1] == "w" and parents is not None and parents.search(s.w[i - 1]))):
+                    not (i > a and s.k[i - 1] == "w" and parents is not None and
+                         (parents.search(s.w[i - 1]) or _repo_word(s, a, i - 1)))):
                 return i
             if i == c and s.w[c] in prose and not s.shellseg:
                 return None
@@ -1266,21 +1276,110 @@ def cmd_index(s, a, b, cmd, nested, parents=None, prose=PROSE):
     return None
 
 
+def git_wrapper(word):
+    """(name, row) of the GIT_WRAPPERS entry a word that GIT matched names."""
+    name = word.rsplit("/", 1)[-1]
+    return name, GIT_WRAPPERS[name]
+
+
+# vcsh's own verbs, each with the abbreviations vcsh accepts for it. A word in this
+# table after `vcsh` is a verb, never a repository name.
+VCSH_VERBS = {v: v for v in (
+    "clone commit delete enter foreach help init list list-tracked list-tracked-by list-untracked "
+    "pull push rename run status upgrade version which write-gitignore").split()}
+for _v, _abbr in {"clone": "clon clo cl", "commit": "commi comm com co ci", "delete": "delet dele del de",
+                  "enter": "ente ent en", "help": "hel he", "init": "ini in", "pull": "pul", "push": "pus",
+                  "rename": "renam rena ren re", "run": "ru", "status": "statu stat sta st",
+                  "upgrade": "upgrad upgra upgr up", "version": "versio versi vers ver ve", "which": "whi wh",
+                  "write-gitignore": "write writ wri wr"}.items():
+    VCSH_VERBS.update(dict.fromkeys(_abbr.split(), _v))
+# The verbs that run git in every repository: vcsh hands `commit` its arguments and
+# runs a bare `git pull` or `git push` in each.
+VCSH_ALL = frozenset("commit pull push".split())
+
+
+def _git_walk(s, g, b):
+    """(repository, subcommand index, indexes of the global option words) of the git call at g.
+    A wrapper that takes a repository names it before the git arguments, or after `run`;
+    `vcsh <verb>` is not a git call (the subcommand is beyond b) except the verbs that run
+    git: `commit`, `pull` and `push` in every repository (repository None), `foreach [-p] <git
+    arguments>` likewise (`foreach -g <command>` only when the command is git), and `run <repo> git ...`."""
+    opts = []
+
+    def take(i):
+        while i <= b and s.w[i].startswith("-"):
+            opts.append(i)
+            i += 1 + (s.w[i] in GIT_VALUE)
+        return i
+
+    i = take(g + 1)
+    if not git_wrapper(s.w[g])[1].repo or i > b:
+        return None, i, opts
+    verb = VCSH_VERBS.get(s.w[i])
+    if verb is None:
+        return s.w[i], take(i + 1), opts
+    if verb in VCSH_ALL:
+        return None, i, opts
+    repo, j = None, i + 1
+    if verb == "foreach":
+        # vcsh's getopts "gp": -g and -p flags (clustered too), then the command. Without -g
+        # vcsh puts `git` before it, so the next word is the subcommand, in every repository.
+        general = False
+        while j <= b and s.k[j] == "w" and re.fullmatch(r"-[gp]+", s.w[j]):
+            general = general or "g" in s.w[j]
+            j += 1
+        if j <= b and s.w[j] == "--":
+            j += 1
+        if not general:
+            return None, take(j), opts
+    elif verb == "run":
+        repo, j = (s.w[j] if j <= b else None), j + 1
+    else:
+        return None, b + 1, opts
+    if j <= b and s.k[j] == "w" and _base(s.w[j]) == "git":
+        return repo, take(j + 1), opts
+    return repo, b + 1, opts
+
+
+def git_call(s, g, b):
+    """(repository, index of the subcommand word) of the git call at g, past its global options;
+    the index is beyond b when the segment ends first or the call is no git call. The repository
+    is the name a wrapper such as vcsh takes, None when it takes none or acts on every one."""
+    repo, sub, _ = _git_walk(s, g, b)
+    return repo, sub
+
+
 def git_subcommand(s, g, b):
-    """The index of the subcommand word of the git call at g, past its global options;
-    beyond b when the segment ends first."""
-    i = g + 1
-    while i <= b and s.w[i].startswith("-"):
-        i += 1 + (s.w[i] in GIT_VALUE)
-    return i
+    """The index of the subcommand word of the git call at g, past its global options
+    (and the repository name a wrapper takes); beyond b when the segment ends first."""
+    return git_call(s, g, b)[1]
+
+
+def git_verb(wrapper, word):
+    """The subcommand `word` names after the wrapper word: vcsh's abbreviation of a verb is the verb."""
+    return VCSH_VERBS.get(word, word) if git_wrapper(wrapper)[1].repo else word
 
 
 def git_options(s, g, sub):
     """The index of each global option word of the git call at g, before its subcommand at sub."""
-    i = g + 1
-    while i < sub:
-        yield i
-        i += 1 + (s.w[i] in GIT_VALUE)
+    return iter(_git_walk(s, g, sub - 1)[2])
+
+
+def wrapper_git(wrapper, repo, env):
+    """(program, leading arguments) that run plain git for a call by `wrapper` (its word) on `repo`, or
+    None when no such call can be made safely. A guard never runs vcsh, whose verbs change the
+    system: it runs git against the repository's own git dir, the one vcsh keeps under
+    $XDG_CONFIG_HOME/vcsh/repo.d (VCSH_REPO_D and vcsh's config file are not read), with the work
+    tree at $HOME. A name that is a vcsh verb or a path, or an environment that does not say where, is None."""
+    name, row = git_wrapper(wrapper)
+    if not row.repo:
+        return name, ()
+    home = env.get("HOME") or ""
+    conf = env.get("XDG_CONFIG_HOME") or (home and home + "/.config")
+    if (not repo or repo in VCSH_VERBS or "/" in repo or repo[0] in ".-"
+            or not home.startswith("/") or not conf.startswith("/")):
+        return None
+    return "git", (f"--git-dir={conf}/vcsh/repo.d/{repo}.git", f"--work-tree={home}")
 
 
 def segments(doc, prose=PROSE):

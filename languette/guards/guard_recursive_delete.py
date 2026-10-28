@@ -27,7 +27,7 @@ GENERATED_NAMES = ("node_modules", "dist", "coverage", ".pio")
 
 _FIND = re.compile(r"(?:^|/)find\Z")
 _RM = re.compile(r"(?:^|/)rm\Z")
-_RM_PARENTS = re.compile(r"^(?:git|yadm|svn|hg|jj|gsutil)\Z")
+_RM_PARENTS = re.compile(r"^(?:" + "|".join(sw.GIT_WRAPPERS) + r"|svn|hg|jj|gsutil)\Z")
 
 
 class _Judge:

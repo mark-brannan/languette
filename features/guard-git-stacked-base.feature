@@ -49,6 +49,7 @@ Feature: guard-git-stacked-base
       | git push --delete origin claude/base-branch              | --delete before the remote    |
       | git push origin --delete claude/spare claude/base-branch | one of several refs is a base |
       | yadm push origin --delete claude/base-branch             | yadm is git                   |
+      | vcsh dots push origin --delete claude/base-branch        | vcsh is git                   |
 
   Scenario Outline: deleting the head branch of an open PR is denied
     When the agent runs `<command>`
