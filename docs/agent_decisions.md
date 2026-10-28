@@ -476,3 +476,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261028t062225z
 - languette#301: slow-regex scenario stubs the doctor's clock instead of a threshold option (no PR, branch pr301)
+
+### 20261028t075711z
+- doctor: a default entry's version in default:<name>@<version> is a 7-hex sha1 of the default's finds and puts, not a counter, so an edit by hand is told from an outdated copy with no table of past texts Undo: a counter per name in languette/rules/redacted-terms.tsv and a table of past texts ([#305](https://github.com/mark-brannan/languette/pull/305))
