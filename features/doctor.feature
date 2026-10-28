@@ -182,7 +182,8 @@ Feature: doctor
   # --- guard-private-terms' files, through the guard's own loader ----------------
   # One row per file, shipped included, so a line the guard would refuse is found
   # here and not at the next public post. features/fixtures/private-terms is the
-  # design's example.
+  # design's example; the doctor reads it to time each re: line it accepts. The time is
+  # shown, never the verdict: a re: line is accepted or refused by its shape alone.
 
   Scenario: each terms file gets a row, counting what loaded
     Given languette "cd31356ad5db" is installed at user scope
@@ -213,6 +214,13 @@ Feature: doctor
       | blocked-terms.tsv  | blocked terms  | re:[unclosed                      | 1 | does not compile                       |
       | redacted-terms.tsv | redacted terms | re:.*.*.*.*;                      | 1 | two unbounded repeats in a row over the same characters |
       | blocked-terms.tsv  | blocked terms  | a{TAB}b{TAB}c{TAB}d               | 1 | four columns                           |
+
+  Scenario: a re: with overlapping alternatives in a repeat is refused by its shape, not its speed
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/redacted-terms.tsv" holds `re:(?:a|aa)+x`
+    When the doctor runs
+    Then the "redacted terms" row is ✗ "~/.config/languette/redacted-terms.tsv line 1: overlapping alternatives inside a repeat"
+    And the doctor exits 1
 
   Scenario: a set path that is missing fails the row, as it would fail every public post
     Given languette "cd31356ad5db" is installed at user scope
