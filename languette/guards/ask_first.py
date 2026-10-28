@@ -41,6 +41,7 @@ of sending the agent to ask.
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
+from languette.secrets import quote
 from languette.verdict import NO_QUESTION, Refuse, approve, deny
 
 NAME = "ask-first"
@@ -109,9 +110,10 @@ def check(doc):
         return deny(say("loop", guard=NAME, what=", ".join(f"`{c['id']}`" for c in looped),
                         then="Run it once, on its own."))
 
+    shown = quote(doc) or say("command_withheld")
     approved, done = yield from approve(
         {c["approve_label"]: runs[c["id"]] for c in hits},
-        lambda e: say("transcript_unreadable", guard=NAME, err=e, cmd=cmd.strip(),
+        lambda e: say("transcript_unreadable", guard=NAME, err=e, cmd=shown,
                       then="Ask the user to run it themselves."))
     if done:
         return done[0]
@@ -123,9 +125,9 @@ def check(doc):
         cheaper = say("ask_first_cheaper", cheaper=c["cheaper"]) if c.get("cheaper") else ""
         if doc.mode in NO_QUESTION:  # any other mode, unknown or missing included, stays an ask
             parts.append(say("ask_first_unattended", id=c["id"], path=path, mode=doc.mode, cost=c["cost"],
-                             cheaper=cheaper, cmd=cmd.strip()))
+                             cheaper=cheaper, cmd=shown))
             continue
         parts.append(say("ask_first_need", id=c["id"], path=path,
                          times=(say("ask_first_times", n=runs[c["id"]], have=have) if runs[c["id"]] > 1 else ""),
-                         cost=c["cost"], cheaper=cheaper, cmd=cmd.strip(), label=c["approve_label"]))
+                         cost=c["cost"], cheaper=cheaper, cmd=shown, label=c["approve_label"]))
     return deny(say("judged", guard=NAME, why="\n\n".join(parts)))
