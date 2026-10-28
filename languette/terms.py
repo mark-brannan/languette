@@ -51,11 +51,11 @@ Default = namedtuple("Default", "find put about")
 
 
 class BadTerms(Exception):
-    """A line the guard would refuse: its number (1-based) and why."""
+    """A line the guard would refuse: its number (1-based), why, and whether it was a `re:` find."""
 
-    def __init__(self, line, why):
+    def __init__(self, line, why, is_re=False):
         super().__init__(f"line {line}: {why}")
-        self.line, self.why = line, why
+        self.line, self.why, self.is_re = line, why, is_re
 
 
 def option_name(kind):
@@ -118,7 +118,7 @@ def entries(text, kind, env):
         pattern, unset = _value(find[3:] if is_re else find, is_re, env)
         why = reshape.refusal(pattern) if is_re else "matches the empty string" if not pattern else None
         if why:
-            yield n, line, BadTerms(n, why)
+            yield n, line, BadTerms(n, why, is_re)
             continue
         rx = re.compile(pattern if is_re else re.escape(pattern), re.I)
         yield n, line, Term(find, put, None if unset else rx, is_re, pattern)
@@ -313,10 +313,11 @@ def restore(text, groups):
     for name, mine in by_name.items():
         if name in groups:
             continue
-        for i, _, off, _ in mine:
-            if not off:
-                edits[i] = ["# " + lines[i]]
-        notes.append(f"{name}: no longer a default, so commented out")
+        live = [i for i, _, off, _ in mine if not off]
+        for i in live:
+            edits[i] = ["# " + lines[i]]
+        if live:
+            notes.append(f"{name}: no longer a default, so commented out")
     out = []
     for i, line in enumerate(lines):
         out += inserts.get(i, [])

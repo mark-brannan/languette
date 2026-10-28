@@ -496,7 +496,7 @@ def _file_lines(kind, text, path, penv):
     for n, raw, err in bad:
         first = raw if len(raw) <= FIRST else raw[:FIRST - 1] + "…"
         out.append(line(FAIL, f"line {n}: {err.why}", line("", first)))
-    invalid = sum(raw.startswith("re:") for _, raw, _ in bad)
+    invalid = sum(err.is_re for _, _, err in bad)
     res = sum(t.is_re for t in good) + invalid
     if res:
         try:
@@ -633,8 +633,11 @@ def restore(options):
     if answer.strip().lower() not in ("y", "yes"):
         print(f"{WARN} {where} left as it was")
         return 0
+    # Whole or untouched: a cut-off write would leave the only file that redacts half gone.
+    tmp = f"{path}.{os.getpid()}.tmp"
     try:
-        Path(path).write_text(new, encoding="utf-8")
+        Path(tmp).write_text(new, encoding="utf-8")
+        os.replace(tmp, path)
     except OSError as e:
         print(f"{FAIL} {where} cannot be written ({e.strerror or e})")
         return 1
