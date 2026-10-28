@@ -31,8 +31,8 @@ under `.languette/`. A config its guard would refuse is a ✗ row naming the
 file, the entry and why. A config that switches every command to deny is
 reported first.
 
-The fix is offered interactively at a terminal, or through a flag where
-there is none. Where the right fix is the user's call, it asks with the choices. It writes nothing without a yes.
+The fix is offered at a terminal, or through a flag where
+there is none. Where the fix is the user's call, it asks with the choices. It writes nothing without a yes.
 
 Assisting means saying what each guard's options do and writing a starting
 file for a guard that has none.
