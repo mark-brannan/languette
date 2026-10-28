@@ -25,6 +25,13 @@ packages = ["languette", "languette.guards"]
 # Each guard's shipped rule file (docs/design/guard-rules.md).
 languette = ["rules/*.json", "rules/*.tsv"]
 
+# `pytest --cov` reads this. `patch = subprocess` measures the hooks.json
+# commands the hook scenarios run as child processes, not only in-process code.
+[tool.coverage.run]
+source = ["languette"]
+branch = true
+patch = ["subprocess"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-markers -n auto"
