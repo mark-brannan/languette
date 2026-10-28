@@ -43,10 +43,8 @@ Assisting means saying what each guard's options are and what a given choice
 would ask or deny, and writing a starting file for a guard that has none.
 guard-private-terms is the first: a row per terms file, shipped
 one included, through the guard's loader, a refused line named, each accepted
-`re:` timed over `features/fixtures/private-terms/bad-comment.md` and the
-slowest shown in the row (display only, never the verdict), and `--redact <file>`
-printing what a post would become and which terms block it, through the same
-loader and the plugin's options as the rows.
+`re:` timed over `features/fixtures/private-terms/bad-comment.md`, shown only,
+and `--redact <file>` printing what a post would become and which terms block it.
 
 ## Limits
 
