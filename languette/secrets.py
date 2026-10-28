@@ -293,12 +293,9 @@ def mask(text, extra=(), texts=None):
     return (None if lost else out), len(secret)
 
 
-WITHHELD = "<command withheld: it holds a secret that cannot be masked in place>"
-
-
 def quote(doc):
     """The command as a guard's reason may quote it: masked as the record masks
-    it, or WITHHELD when a secret cannot be placed. Without the project's own
+    it, or None when a secret cannot be placed. Without the project's own
     rules, which are read by a gather step a guard does not run."""
     text, _ = mask(doc.text, texts=doc_scans(doc))
-    return WITHHELD if text is None else text.strip()
+    return None if text is None else text.strip()
