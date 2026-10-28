@@ -59,7 +59,10 @@ jobs:
       # smoke_steps.py builds its own PATHs and venvs: the smoke job runs it.
       # pytest-xdist on min(4, cores) workers: pyproject's -n auto, capped in tests/conftest.py.
       # --cov reads pyproject's [tool.coverage.run]; the report feeds the coverage job.
+      # Absolute, so hook child processes (cwd elsewhere) write where the combine reads.
       - run: python -m pytest -q --cov --cov-report=xml
+        env:
+          COVERAGE_FILE: ${{ github.workspace }}/.coverage
       # On main too: main's report at a PR's merge base is what the total's delta is measured against.
       - if: github.event_name == 'pull_request' || github.event_name == 'push'
         uses: actions/upload-artifact@v7.0.2
@@ -158,7 +161,7 @@ jobs:
       contents: read
       actions: read
       pull-requests: write
-    uses: mark-brannan/.github/.github/workflows/coverage.yml@claude/coverage-workflow
+    uses: mark-brannan/.github/.github/workflows/coverage.yml@main
 
   ci-gate:
     needs: [nonempty, pr-title, tests, smoke, shellcheck, prose-budget, new-guard-names]
