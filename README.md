@@ -97,7 +97,8 @@ Each guard checks for one kind of hazard:
 - [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`, `sh <(curl ..)`,
   `eval "$(wget ..)"`
 - [`guard-private-terms`](#settings-for-guard-private-terms): a blocked term
-  posted to a public repo; home paths and your terms redacted first
+  posted to a public repo; home paths, this machine's name, private
+  addresses and your terms redacted first
 - [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
@@ -253,14 +254,18 @@ export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 
 | Setting | Holds | Example |
 |---|---|---|
-| `blocked_terms_file` | terms that deny the whole post, one per line, case-insensitive | `~/.config/languette/blocked-terms.txt` |
-| `redacted_terms_file` | terms replaced before the post leaves, one per line, a tab then the replacement | `~/.config/languette/redacted-terms.txt` |
+| `blocked_terms_file` | terms that deny the whole post: the term, a tab, a message for the agent | `~/.config/languette/blocked-terms.tsv` |
+| `redacted_terms_file` | terms replaced before the post leaves: the term, a tab, the replacement | `~/.config/languette/redacted-terms.tsv` |
 | `private_repos` | repos whose posts are never scanned, comma-separated | `you/notes,you/scratch` |
 
-Unset, both read from `~/.config/languette/`; a path set but missing, or a
-file that does not load, denies public posts until fixed. Without a blocked
-terms file no term is blocked; home paths are still redacted unless
-`redact_home_paths` is false.
+Both files are one tab-separated format, `#` comments, case-insensitive, a
+regular expression under `re:`. Unset, both read from `~/.config/languette/`;
+a path set but missing, or a file that does not load, denies public posts
+until fixed, and `languette doctor` says which line. Without a blocked terms
+file no term is blocked. The shipped pairs always run:
+[`languette/rules/redacted-terms.tsv`](languette/rules/redacted-terms.tsv), and
+[`features/fixtures/private-terms/`](features/fixtures/private-terms/) shows a
+comment an agent would post beside what leaves.
 
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
 comma-separated; empty, the default, guards no label. A label that waives a CI

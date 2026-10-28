@@ -169,23 +169,46 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 - No environment variable configures languette. One is a last resort, for a
   pressing need with real design intent behind it.
 - guard-private-terms is two behaviours. Redact replaces terms in text bound
-  for a public repo and allows the call: shipped, the home directory ($HOME
-  and its other spellings, /home/<user>, /Users/<user>, /mnt/c/Users/<user>)
-  to `~`, under the `redact_home_paths` boolean; the user's own terms from
-  the redacted terms file. Hard block denies the whole post for a term on a
-  short list of really sensitive terms, where even a redacted post could
-  leak concepts or strategy.
+  for a public repo and allows the call: the shipped pairs, then the user's
+  own from the redacted terms file. Hard block denies the whole post for a
+  term on a short list of really sensitive terms, where even a redacted post
+  could leak concepts or strategy.
+- The shipped redactions are a file in the shipped tier,
+  `languette/rules/redacted-terms.tsv`, not a boolean each: the home
+  directory in every spelling (/home, /Users, /mnt/c/Users, C:\Users, $HOME)
+  to `~`; this machine's hostname and a name on a LAN or tailnet (.local,
+  .lan, .internal, .home, .ts.net) to `<host>`; a private address (RFC 1918,
+  CGNAT, link-local, IPv6 unique local) to `<private-ip>`. Only
+  `guard_private_terms` switches; `redact_home_paths` goes. Not shipped: the
+  login name, an email address, a session id, a scratchpad or worktree path,
+  a localhost URL; a reader needs those, and one's own address is a line in
+  one's file. The false positive of a machine named like a word is accepted.
+  A line `!<put>` in the user's file drops every shipped pair with that put:
+  current thinking, pending the repo tier.
 - The step is a redaction, not a guard: it transforms data and has no
   verdict. "Redact" over anonymize (a person's identity, overclaims), scrub,
   mask, and rewrite (the rule action, a mechanism). Rewrite then allow is the
   action for redaction.
-- Two files, both plain text: one term per line, `#` comments,
-  case-insensitive, a term `$NAME` the variable's value. The redacted terms
-  file's optional second column, after a tab, is the replacement; none puts
-  `<redacted>`. Options `redacted_terms_file` and `blocked_terms_file`;
-  unset, `$XDG_CONFIG_HOME/languette/redacted-terms.txt` and
-  `blocked-terms.txt` are read if present. Pencil: the names without `_file`;
-  a limited, fast pattern syntax in a term.
+- Two files, one tab-separated format: find, put, comment, the last two
+  optional; an optional header row of the literal column names; `#`
+  comments; case-insensitive plain text, or a regular expression under a
+  `re:` prefix, Python's syntax, the put literal; `$NAME` the variable's
+  value, quoted inside a `re:` find, `$HOSTNAME` asked of the OS when unset.
+  In the redacted file the put is the replacement, `<redacted>` when none; in
+  the blocked file it is a message added to the deny reason, for the agent.
+  Pairs apply in file order, shipped then the user's. Options
+  `redacted_terms_file` and `blocked_terms_file`; unset,
+  `$XDG_CONFIG_HOME/languette/redacted-terms.tsv` and `blocked-terms.tsv`
+  are read if present. Pencil: the names without `_file`.
+- A `re:` line the guard would not run is not in shape and refused at load,
+  on purpose: does not compile, matches the empty string, a quantifier
+  inside a quantified group, a backreference. A post never hangs on a
+  pattern. `languette doctor` reads both files through the guard's loader,
+  one row each, names a refused line, times each `re:` over the fixture
+  comment against a budget, and `--redact <file>` shows what a post would
+  become. The fixture, `features/fixtures/private-terms/`, is the design's
+  own example and the docs' and the doctor's: a comment an agent would post,
+  its redacted twin, a redacted and a blocked file.
 - A path the user set is a promise. Set but missing, or found but unreadable,
   a directory or not in shape, denies this guard's public-bound posts,
   naming the option and the fix. Unset with no default file is silent; a file

@@ -4,13 +4,18 @@ Feature: guard-private-terms
   a flag value, a heredoc, a file, an MCP field.
 
   Redact. The posted text has terms replaced and the call is allowed, as a
-  secret is redacted. Shipped: the home directory, $HOME or another spelling
-  of it (/home/<user>, /Users/<user>, /mnt/c/Users/<user>, <user> the login
-  name), to `~`; the redact_home_paths option turns that off. Yours: the
-  redacted terms file, one term per line, matched as the blocked terms are,
-  with an optional second column after a tab, the replacement; a term with
-  none is replaced by `<redacted>`. On by default, needs no configuration:
-  the home rule runs whether or not either file is set, and
+  secret is redacted. Shipped, in languette/rules/redacted-terms.tsv: the
+  home directory in every spelling (/home/<user>, /Users/<user>,
+  /mnt/c/Users/<user>, C:\Users\<user>, $HOME itself) to `~`; this machine's
+  hostname, and any name that resolves only on a LAN or a tailnet (.local,
+  .lan, .internal, .home, .ts.net), to `<host>`; a private address (RFC 1918,
+  CGNAT, link-local, IPv6 unique local) to `<private-ip>`. Not shipped, on the
+  maintainer's call: the login name, an email address, a session id, a
+  scratchpad or worktree path, a localhost URL; a reader needs those, and your
+  own address or name is one line in your file. Yours: the redacted terms file,
+  the same format, applied after the shipped pairs; a line `!<put>` drops
+  every shipped pair with that put, so this network's addresses may go out
+  as written (current thinking). On by default, needs no configuration, and
   guard_private_terms turns the whole guard off. It never denies for text it
   cannot read: it cannot help there, so the call goes through.
 
@@ -18,10 +23,24 @@ Feature: guard-private-terms
   could leak a concept or a strategy (a company name, a code name). A hit
   denies the whole post. Only this half fails closed on text it cannot see.
 
-  Both files are plain text: one term per line, `#` starts a comment, a blank
-  line is skipped, and a term is matched as case-insensitive plain text. A
-  term spelled `$NAME` is that environment variable's value in the hook's
-  environment; unset or empty it matches nothing.
+  Both files are one format, tab-separated: the find, then an optional put,
+  then an optional comment; a first line `find<TAB>put<TAB>comment` (or
+  `message` for the blocked file) is a header and is skipped; `#` starts a
+  comment line, a blank line is skipped, a fourth column is not in shape. A
+  find is matched as case-insensitive plain text, or as a regular expression
+  when it starts with `re:`, Python's syntax, the put a literal. `$NAME` in a
+  find is that environment variable's value in the hook's environment, quoted
+  as a literal inside a `re:` find; unset or empty it matches nothing, except
+  `$HOSTNAME`, which is asked of the OS. In the redacted file the put is the
+  replacement, `<redacted>` when there is none; in the blocked file it is a
+  message added to the deny reason, for the agent, never posted. Pairs apply
+  in file order on the running text, shipped then yours. A `re:` find the
+  guard would not run is not in shape: one that does not compile, matches the
+  empty string, nests a quantifier inside a quantified group, or holds a
+  backreference; `languette doctor` names the file and the line, and times
+  each line over features/fixtures/private-terms/bad-comment.md. The fixtures
+  there are the design's own example: a comment an agent would post, its
+  redacted twin, and a redacted and a blocked file.
 
   Why. A private repo or notes directory holds details (hostnames,
   service URLs, account identifiers, project code names) that must not reach the
@@ -69,7 +88,7 @@ Feature: guard-private-terms
   Current thinking: an option expands a leading `~` or `$HOME` itself, since
   Claude Code does not expand plugin options, so settings need no
   machine-specific absolute path; with an option unset or empty, the guard
-  reads $XDG_CONFIG_HOME/languette/redacted-terms.txt or blocked-terms.txt,
+  reads $XDG_CONFIG_HOME/languette/redacted-terms.tsv or blocked-terms.tsv,
   ~/.config when XDG_CONFIG_HOME is unset, if it exists, which is how a CI
   job or a cloud VM provisions either, from a secret say; no languette
   environment variable is read. Unset with no file at the default path is
@@ -245,28 +264,103 @@ Feature: guard-private-terms
 
   Scenario Outline: another spelling of the home directory is redacted too, another user's is not
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
-    When the agent runs `gh issue comment 3 -R o/r -b <path>/x`
+    When the agent runs `gh issue comment 3 -R o/r -b '<path>/x'`
     Then the guard <verdict>
 
     @also_guard-signed-comments
     Examples:
       | path                    | verdict                                                                  |
-      | /home/{USER}            | allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"     |
-      | /Users/{USER}           | allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"     |
-      | /mnt/c/Users/{USER}     | allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x"     |
+      | /home/{USER}            | allows, rewriting the command to "gh issue comment 3 -R o/r -b '~/x'"    |
+      | /Users/{USER}           | allows, rewriting the command to "gh issue comment 3 -R o/r -b '~/x'"    |
+      | /mnt/c/Users/{USER}     | allows, rewriting the command to "gh issue comment 3 -R o/r -b '~/x'"    |
+      | C:\\Users\\{USER}       | allows, rewriting the command to "gh issue comment 3 -R o/r -b '~/x'"    |
+      | C:/Users/{USER}         | allows, rewriting the command to "gh issue comment 3 -R o/r -b '~/x'"    |
       | /home/someone-else      | is silent                                                                |
 
-  Scenario Outline: the redact_home_paths option turns the home rule off
+  # --- the shipped file: this machine's name, private names and addresses ----------
+
+  Scenario Outline: this machine's hostname, and a name that resolves only on a LAN or tailnet, is redacted to <host>
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
-    And CLAUDE_PLUGIN_OPTION_REDACT_HOME_PATHS is "<value>"
-    When the agent runs `gh issue comment 3 -R o/r -b {HOME}/x`
+    When the agent runs `gh issue comment 3 -R o/r -b "seen on <name>"`
     Then the guard <verdict>
 
     @also_guard-signed-comments
     Examples:
-      | value | verdict                                                              |
-      | true  | allows, rewriting the command to "gh issue comment 3 -R o/r -b \~/x" |
-      | false | is silent                                                            |
+      | name                        | verdict                                                                       |
+      | {HOSTNAME}                  | allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <host>"` |
+      | {HOSTNAME}.tail1234.ts.net  | allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <host>"` |
+      | nas.local                   | allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <host>"` |
+      | printer.lan                 | allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <host>"` |
+      | db.internal                 | allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <host>"` |
+      | {HOSTNAME}-01               | is silent                                                                     |
+      | example.com                 | is silent                                                                     |
+      | ts.net                      | is silent                                                                     |
+
+  # A hyphen or a dot continues a name: the machine zephyr leaves zephyr-01 alone.
+  # The maintainer accepts the false positive of a machine named like a word.
+  Scenario Outline: a private address is redacted to <private-ip>, a public one or a range is not
+    Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    When the agent runs `gh issue comment 3 -R o/r -b "curl http://<address>:8080/health"`
+    Then the guard <verdict>
+
+    @also_guard-signed-comments
+    Examples:
+      | address        | verdict                                                                                        |
+      | 10.0.0.5       | allows, rewriting the command to `gh issue comment 3 -R o/r -b "curl http://<private-ip>:8080/health"` |
+      | 192.168.1.1    | allows, rewriting the command to `gh issue comment 3 -R o/r -b "curl http://<private-ip>:8080/health"` |
+      | 172.16.0.1     | allows, rewriting the command to `gh issue comment 3 -R o/r -b "curl http://<private-ip>:8080/health"` |
+      | 172.31.255.255 | allows, rewriting the command to `gh issue comment 3 -R o/r -b "curl http://<private-ip>:8080/health"` |
+      | 100.64.0.1     | allows, rewriting the command to `gh issue comment 3 -R o/r -b "curl http://<private-ip>:8080/health"` |
+      | 100.127.1.1    | allows, rewriting the command to `gh issue comment 3 -R o/r -b "curl http://<private-ip>:8080/health"` |
+      | 169.254.1.1    | allows, rewriting the command to `gh issue comment 3 -R o/r -b "curl http://<private-ip>:8080/health"` |
+      | 8.8.8.8        | is silent                                                                                      |
+      | 172.32.0.1     | is silent                                                                                      |
+      | 100.128.0.1    | is silent                                                                                      |
+      | v10.0.0.5      | is silent                                                                                      |
+
+  @also_guard-signed-comments
+  Scenario: a range is left as written, an IPv6 unique local address is not
+    Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    When the agent runs `gh issue comment 3 -R o/r -b "10.0.0.0/8 excluded; fd12:3456::1 on the tailnet"`
+    Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "10.0.0.0/8 excluded; <private-ip> on the tailnet"`
+
+  @also_guard-signed-comments
+  Scenario: a line !<put> in your file drops every shipped pair with that put
+    Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    And the redacted terms file holds:
+      """
+      !<private-ip>{TAB}{TAB}this network's addresses may go out as written
+      """
+    When the agent runs `gh issue comment 3 -R o/r -b "10.0.0.5 under {HOME}/x"`
+    Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "10.0.0.5 under ~/x"`
+
+  # --- the fixture: one comment an agent would post, and what leaves ---------------
+  # features/fixtures/private-terms holds the design's own example. The harness
+  # fills {USER}, {HOME} and {HOSTNAME} in both files before comparing.
+
+  @also_guard-signed-comments
+  Scenario: the fixture comment leaves as its redacted twin
+    Given the redacted terms file is the fixture "redacted-terms.tsv"
+    And the blocked terms file is the fixture "blocked-terms.tsv"
+    When the agent posts the fixture "bad-comment.md" as the --body of `gh pr comment 3 -R o/r`
+    Then the guard allows, rewriting the --body to the fixture "bad-comment.redacted.md"
+
+  @also_guard-signed-comments
+  Scenario: a blocked term in the fixture comment denies it whole, naming the term and its message
+    Given the redacted terms file is the fixture "redacted-terms.tsv"
+    And the blocked terms file is the fixture "blocked-terms.tsv"
+    When the agent posts the fixture "bad-comment.md" plus the line "Tested aboard Wanderlust, acct-4471." as the --body of `gh pr comment 3 -R o/r`
+    Then the guard denies, naming "Wanderlust"
+    And the guard denies, naming "say \"the boat\""
+    And the guard denies, naming "acct-4471"
+    And the guard denies, naming "the 44xx accounts are the client's"
+
+  @also_guard-signed-comments
+  Scenario: a blocked term with no message is named alone
+    Given the blocked terms file is the fixture "blocked-terms.tsv"
+    When the agent runs `gh pr comment 3 -R o/r -b "ssh gateway.home.example"`
+    Then the guard denies, naming "gateway.home.example"
+    And the guard denies, not naming "say"
 
   # --- the redacted terms file: your own terms, beside the shipped home rule ----------
 
@@ -274,10 +368,12 @@ Feature: guard-private-terms
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     And the redacted terms file holds:
       """
-      # the term, a tab, its replacement; with none, <redacted>
-      zephyr-01{TAB}<host>
+      find{TAB}put{TAB}comment
+      # the find, a tab, its put, a tab, a comment; with no put, <redacted>
+      zephyr-01{TAB}<host>{TAB}the dev box
 
       acct-9931
+      re:acct-\d{4}{TAB}<account>
       """
     When the agent runs `gh issue comment 3 -R o/r -b "<text>"`
     Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "<posted>"`
@@ -288,19 +384,21 @@ Feature: guard-private-terms
       | seen on zephyr-01 at {HOME}/x | seen on <host> at ~/x |
       | Zephyr-01 again               | <host> again          |
       | billed to acct-9931           | billed to <redacted>  |
+      | mirrored to ACCT-1234         | mirrored to <account> |
+      | acct-12345 is not four digits | acct-<account>5 is not four digits |
 
+  # The header is the literal column names and nothing else is.
   @also_guard-signed-comments
-  Scenario: with redact_home_paths off, the redacted terms file still applies
+  Scenario: a first line that is not the header is a term
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
-    And CLAUDE_PLUGIN_OPTION_REDACT_HOME_PATHS is "false"
     And the redacted terms file holds:
       """
-      zephyr-01{TAB}<host>
+      find{TAB}<x>
       """
-    When the agent runs `gh issue comment 3 -R o/r -b "seen on zephyr-01 at {HOME}/x"`
-    Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <host> at {HOME}/x"`
+    When the agent runs `gh issue comment 3 -R o/r -b "find it"`
+    Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "<x> it"`
 
-  Scenario Outline: a term spelled $NAME is that variable's value, in either file; unset or empty, it matches nothing
+  Scenario Outline: a term spelled $NAME is that variable's value, in either file; unset or empty, it matches nothing, except $HOSTNAME, asked of the OS
     Given the <file> terms file holds:
       """
       $PT_HOST
@@ -317,6 +415,13 @@ Feature: guard-private-terms
       | blocked  | zephyr-01 | denies, naming "zephyr-01"                                                           |
       | blocked  |           | is silent                                                                            |
 
+  @also_guard-signed-comments
+  Scenario: $HOSTNAME unset in the environment is still this machine's name
+    Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
+    And HOSTNAME is unset
+    When the agent runs `gh issue comment 3 -R o/r -b "seen on {HOSTNAME}"`
+    Then the guard allows, rewriting the command to `gh issue comment 3 -R o/r -b "seen on <host>"`
+
   # The home is this scenario's own directory, so the default path is too.
   Scenario Outline: the redacted terms file is found by the option, ~ expanded, else at the default path
     Given HOME is "{TMP}/h"
@@ -332,9 +437,9 @@ Feature: guard-private-terms
     @also_guard-signed-comments
     Examples:
       | file                                   | option                |
-      | pt-redacted.txt                        | ~/pt-redacted.txt     |
-      | pt-redacted.txt                        | $HOME/pt-redacted.txt |
-      | .config/languette/redacted-terms.txt   |                       |
+      | pt-redacted.tsv                        | ~/pt-redacted.tsv     |
+      | pt-redacted.tsv                        | $HOME/pt-redacted.tsv |
+      | .config/languette/redacted-terms.tsv   |                       |
 
   @also_guard-signed-comments
   Scenario: XDG_CONFIG_HOME moves the default path of the redacted terms file
@@ -343,7 +448,7 @@ Feature: guard-private-terms
     And XDG_CONFIG_HOME is "{TMP}/xdg"
     And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     And CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE is unset
-    And the file "{TMP}/xdg/languette/redacted-terms.txt" holds:
+    And the file "{TMP}/xdg/languette/redacted-terms.tsv" holds:
       """
       zephyr-01{TAB}<host>
       """
@@ -357,7 +462,7 @@ Feature: guard-private-terms
     And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     And the file "<file>" holds:
       """
-      zephyr-01{TAB}<host>{TAB}a third column
+      zephyr-01{TAB}<host>{TAB}a comment{TAB}a fourth column
       """
     And CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE is "<option>"
     When the agent runs `gh issue comment 3 -R o/r -b "all public"`
@@ -366,10 +471,32 @@ Feature: guard-private-terms
     @also_guard-signed-comments
     Examples:
       | file                                         | option                |
-      | {TMP}/h/pt-bad.txt                           | {TMP}/h/no-such.txt   |
-      | {TMP}/h/pt-bad.txt                           | {TMP}/h               |
-      | {TMP}/h/pt-bad.txt                           | {TMP}/h/pt-bad.txt    |
-      | {TMP}/h/.config/languette/redacted-terms.txt |                       |
+      | {TMP}/h/pt-bad.tsv                           | {TMP}/h/no-such.tsv   |
+      | {TMP}/h/pt-bad.tsv                           | {TMP}/h               |
+      | {TMP}/h/pt-bad.tsv                           | {TMP}/h/pt-bad.tsv    |
+      | {TMP}/h/.config/languette/redacted-terms.tsv |                       |
+
+  # A regular expression the guard would not run is refused at load, on purpose:
+  # a post must never hang on a pattern. The deny names the file and the line.
+  Scenario Outline: a re: line that does not compile or could run away is not in shape
+    Given the <file> terms file holds:
+      """
+      zephyr-01
+      <line>
+      """
+    When the agent runs `gh issue comment 3 -R o/r -b "all public"`
+    Then the guard denies, naming "<option>"
+    And the guard denies, naming "line 2"
+    And the guard denies, naming "<why>"
+
+    @also_guard-signed-comments
+    Examples:
+      | file     | option              | line              | why                       |
+      | redacted | redacted_terms_file | re:[unclosed      | does not compile          |
+      | redacted | redacted_terms_file | re:x*             | matches the empty string  |
+      | redacted | redacted_terms_file | re:(a+)+$         | a quantifier inside a quantified group |
+      | redacted | redacted_terms_file | re:(a)\\1          | a backreference           |
+      | blocked  | blocked_terms_file  | re:(\\d+)*x        | a quantifier inside a quantified group |
 
   # Redaction cannot help with text it cannot read, so it lets the call through;
   # only the hard block, with terms to protect, fails closed (the Rule below).
@@ -446,7 +573,7 @@ Feature: guard-private-terms
   # A path the user set is a promise; see the redacted terms file above.
   Scenario Outline: a blocked terms file that is missing or a directory denies a public post, naming the option
     Given HOME is "{TMP}/h"
-    And the directory "{TMP}/h/.config/languette/blocked-terms.txt"
+    And the directory "{TMP}/h/.config/languette/blocked-terms.tsv"
     And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is "<option>"
     When the agent runs `gh issue create -R o/r -t t -b "all public"`
     Then the guard denies, naming "blocked_terms_file"
@@ -500,7 +627,7 @@ Feature: guard-private-terms
   Scenario: with the option unset, a blocked terms file at the default path is read
     Given HOME is "{TMP}/h"
     And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
-    And the file "{TMP}/h/.config/languette/blocked-terms.txt" holds:
+    And the file "{TMP}/h/.config/languette/blocked-terms.tsv" holds:
       """
       Wanderlust
       """
@@ -515,7 +642,7 @@ Feature: guard-private-terms
     And the directory "{TMP}/h"
     And XDG_CONFIG_HOME is "{TMP}/xdg"
     And CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
-    And the file "{TMP}/xdg/languette/blocked-terms.txt" holds:
+    And the file "{TMP}/xdg/languette/blocked-terms.tsv" holds:
       """
       Wanderlust
       """
@@ -891,8 +1018,8 @@ Feature: guard-private-terms
       Then the guard denies, naming "home directory"
 
     # A longer path that merely starts with $HOME is not $HOME: a plain replace
-    # would corrupt it (~2 is a different user). Scar from an earlier
-    # review.
+    # would corrupt it (~2 is a different user). Scar from an earlier review; the
+    # shipped re: lines end in (?![\w.-]) for it.
     Scenario Outline: a path that only starts with the home directory is not redacted
       When the agent runs `gh issue comment 3 -R o/r -b '<text>'`
       Then the guard is silent

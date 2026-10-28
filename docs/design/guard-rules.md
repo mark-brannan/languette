@@ -83,9 +83,9 @@ literal span, never across a quote boundary; a find that would cross one is
 a deny. The new bytes are parsed and judged again by every rule; a rewrite
 that still matches a deny is a deny. A redaction is then allowed, Verdict
 carrying the rewrite; any other rewrite is asked about, before and after in
-the reason. guard-private-terms' redactions, `$HOME` to `~` shipped and the user's
-redacted terms file, are the first rules on it; secret redaction and host, user and
-address shapes are others.
+the reason. guard-private-terms' redactions are the first rules on it: the shipped
+`rules/redacted-terms.tsv` (home, host and address shapes) and the user's
+redacted terms file, the same format; secret redaction is another.
 
 ## Plan from the rules
 

@@ -41,6 +41,11 @@ writes nothing without a yes.
 
 Assisting means saying what each guard's options are and what a given choice
 would ask or deny, and writing a starting file for a guard that has none.
+guard-private-terms is the first: its two files get a row each through the
+guard's own loader, a refused line is named, each `re:` is timed over
+`features/fixtures/private-terms/bad-comment.md` against a budget, and
+`--redact <file>` prints what that post would become and which terms would
+block it. (planned)
 
 ## Limits
 

@@ -36,7 +36,7 @@ OTHER_OPTIONS = {"redacted_terms_file": "file", "blocked_terms_file": "file", "p
                  "record_decisions": "boolean", "record_raw_commands": "boolean"}
 # Per-rule switches inside one guard: boolean, on by default.
 RULE_OPTIONS = {f"guard_git_work_loss_{r}" for r in ("blanket_staging", "stash", "force_push", "discard", "branch_delete", "adopt")} | {
-    "guard_worktrees_checkout_home", "guard_worktrees_foreign", "redact_home_paths"}
+    "guard_worktrees_checkout_home", "guard_worktrees_foreign"}
 # Guards that also judge file-editing tools and EnterWorktree, so they match more than Bash.
 WIDE_MATCHER = {"guard-worktrees": "Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree"}
 

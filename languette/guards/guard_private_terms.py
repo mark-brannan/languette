@@ -5,21 +5,26 @@ Once a private term is in a public issue or PR it is in GitHub's history and
 every mirror of it; the undo is a support ticket, not an edit. So the check
 sits at the moment the text leaves the machine.
 
-Redact: each term in a list is replaced in the posted text alone and the call
-is allowed, as a secret is redacted. Shipped: the home directory ($HOME,
-/home/<user>, /Users/<user>, /mnt/c/Users/<user>) to `~`, under
-redact_home_paths. Yours: redacted_terms_file, one term per line, a tab then
-the replacement, none puts `<redacted>`; a term `$NAME` is that variable's
-value, unset it matches nothing. A term the command also holds outside the
-posted text, or inside a file's contents, which a redaction cannot reach, is a
-deny with the fix in the reason.
+Redact: each pair's find is replaced in the posted text alone and the call
+is allowed, as a secret is redacted. Shipped, rules/redacted-terms.tsv: the
+home directory in every spelling to `~`, this machine's name and LAN or
+tailnet names to `<host>`, private addresses to `<private-ip>`. Yours:
+redacted_terms_file, applied after, none puts `<redacted>`; a line `!<put>`
+drops the shipped pairs with that put. A term the command also holds outside
+the posted text, or inside a file's contents, which a redaction cannot reach,
+is a deny with the fix in the reason.
 
 Hard block: a hit on a term from blocked_terms_file denies the whole post; the
-reason names the terms that hit. No file, no hard block.
+reason names the terms that hit and each term's message. No file, no hard
+block.
 
-Both files are plain text, `#` comments, case-insensitive. Either option
-expands a leading `~` or `$HOME`; unset or empty, the guard reads
-$XDG_CONFIG_HOME/languette/blocked-terms.txt or redacted-terms.txt (~/.config
+Both files are one tab-separated format: find, put, comment, an optional
+header row, `#` comments, case-insensitive plain text or a regular expression
+under `re:`, `$NAME` the variable's value, `$HOSTNAME` asked of the OS when
+unset. A `re:` the guard would not run (no compile, matches empty, nested
+quantifier, backreference) is not in shape. Either option expands a leading
+`~` or `$HOME`; unset or empty, the guard reads
+$XDG_CONFIG_HOME/languette/blocked-terms.tsv or redacted-terms.tsv (~/.config
 by default) if it exists. A path set is a promise: set but missing, or found
 but unreadable, a directory or not in shape, denies every public-bound post
 this guard judges, naming the option and the fix. A file with no terms is

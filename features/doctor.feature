@@ -178,3 +178,62 @@ Feature: doctor
       | ~/.claude/settings.json                  | {not json               | ~/.claude/settings.json is not JSON, so which guards are on is unknown |
       | ~/.claude/settings.json                  | {"pluginConfigs": []}   | pluginConfigs in ~/.claude/settings.json has a shape the doctor does not know |
       | ~/.claude/plugins/installed_plugins.json | {"plugins": {"languette@languette": 3}} | installed_plugins.json has a shape the doctor does not know |
+
+  # --- guard-private-terms' files, through the guard's own loader ----------------
+  # One row per file, shipped included, so a line the guard would refuse is found
+  # here and not at the next public post. features/fixtures/private-terms is the
+  # design's example; the doctor reads it to time each re: line.
+
+  Scenario: each terms file gets a row, counting what loaded
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"
+    And "~/.config/languette/blocked-terms.tsv" holds the fixture "private-terms/blocked-terms.tsv"
+    When the doctor runs
+    Then the "redacted terms" row is ✓ "shipped 10 pairs, 10 re:; ~/.config/languette/redacted-terms.tsv 5 pairs, 1 re:"
+    And the "blocked terms" row is ✓ "~/.config/languette/blocked-terms.tsv 3 terms, 1 re:"
+    And the doctor exits 0
+
+  Scenario: no blocked terms file is a warning that says what that means
+    Given languette "cd31356ad5db" is installed at user scope
+    When the doctor runs
+    Then the "blocked terms" row is ! "none at ~/.config/languette/blocked-terms.tsv, and blocked_terms_file is unset: no term is blocked"
+    And the "redacted terms" row is ✓ "shipped 10 pairs, 10 re:; none of your own"
+
+  Scenario Outline: a line the guard would refuse fails the row, naming the file and the line
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/<file>" holds `<text>`
+    When the doctor runs
+    Then the "<row>" row is ✗ "~/.config/languette/<file> line <n>: <why>"
+    And the doctor exits 1
+
+    Examples:
+      | file               | row            | text                              | n | why                                    |
+      | redacted-terms.tsv | redacted terms | re:(a+)+$                         | 1 | a quantifier inside a quantified group |
+      | redacted-terms.tsv | redacted terms | zephyr-01\n\nre:x*                | 3 | matches the empty string               |
+      | blocked-terms.tsv  | blocked terms  | re:[unclosed                      | 1 | does not compile                       |
+      | blocked-terms.tsv  | blocked terms  | a\tb\tc\td                        | 1 | four columns                           |
+
+  Scenario: a set path that is missing fails the row, as it would fail every public post
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{"redacted_terms_file": "~/no-such.tsv"}`
+    When the doctor runs
+    Then the "redacted terms" row is ✗ "redacted_terms_file is ~/no-such.tsv, which does not exist: every public post is denied until it does"
+    And the doctor exits 1
+
+  Scenario: a re: line slower than its budget over the fixture comment is a warning
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/redacted-terms.tsv" holds `re:(\w+\s?)+;`
+    When the doctor runs
+    Then the "redacted terms" row is ! matching "~/.config/languette/redacted-terms.tsv line 1: \d+ ms over bad-comment.md, budget 5 ms"
+
+  # Assisting with configuration: show what a post would become.
+  Scenario: the doctor shows what a post would become through the files as loaded
+    Given languette "cd31356ad5db" is installed at user scope
+    And "~/.config/languette/redacted-terms.tsv" holds the fixture "private-terms/redacted-terms.tsv"
+    And "~/.config/languette/blocked-terms.tsv" holds the fixture "private-terms/blocked-terms.tsv"
+    When the doctor runs with `--redact` and the fixture "private-terms/bad-comment.md"
+    Then it prints the fixture "private-terms/bad-comment.redacted.md"
+    And it prints "blocked: none"
+    When the doctor runs with `--redact` and the fixture "private-terms/bad-comment.md" plus the line "Tested aboard Wanderlust."
+    Then it prints "blocked: Wanderlust (the boat's name stays off public repos; say \"the boat\")"
+    And the doctor exits 1
