@@ -46,6 +46,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
+from languette.secrets import quote
 from languette.verdict import approve, deny
 
 NAME = "guard-infra"
@@ -313,7 +314,7 @@ def check(doc):
                         then="Run it once, on its own, after looking at what it would remove."))
     approved, done = yield from approve(
         {RULES[r][0]: len(found[r]) for r in found},
-        lambda e: say("transcript_unreadable", guard=NAME, err=e, cmd=cmd.strip(),
+        lambda e: say("transcript_unreadable", guard=NAME, err=e, cmd=quote(doc),
                       then="Ask the user to run it themselves."))
     if done:
         return done[0]
@@ -323,7 +324,7 @@ def check(doc):
         n, have = len(found[r]), len(approved[label])
         if have >= n:
             continue
-        parts.append(say("infra_need", cmd=cmd.strip(), what=what, rule=r,
+        parts.append(say("infra_need", cmd=quote(doc), what=what, rule=r,
                          times=(say("infra_times", n=n, have=have) if n > 1 else ""),
                          cost=cost, instead=instead.format(tool=found[r][0]), label=label))
     return deny(say("judged", guard=NAME, why="\n\n".join(parts)))

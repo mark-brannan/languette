@@ -201,6 +201,11 @@ def scans(cmd):
             + [Text(h) for h in sw.heredoc_bodies(body)])
 
 
+def doc_scans(doc):
+    """scans() from the document's own scans, so no text is read twice in a call."""
+    return [doc.scan(text) for text, _ in doc.texts()] + [Text(h) for h in doc.heredoc_bodies()]
+
+
 def findings(scan, extra=(), mask_only=False):
     """Every Finding in scan's words: each known shape in a word, or, when it
     holds none, at most one context finding. `extra` is the caller's own rules
@@ -247,3 +252,53 @@ def shown(scan, f, keep=4):
     little of a short value and never the whole of any."""
     a, b = f.span
     return word_text(scan, f.index)[a:a + min(keep, (b - a) // 4)] + "…"
+
+
+MASK = "<secret>"
+MIN_MASKED = 8      # a shorter secret is not swapped in place; the text is dropped
+
+
+def mask(text, extra=(), texts=None):
+    """(text with each secret in it replaced by MASK, how many distinct ones),
+    by the detector guard-secrets uses, with the project's own rules (`extra`). The text is the command as written, so
+    quoting, spacing and heredocs survive: each word a finding names is swapped
+    for its redacted form where it stands, or, when the shell unquoted it so it
+    does not stand as read, just the secret in it is. Text is None when a
+    secret is nowhere in the command as spelled (`"gh""p_..."`, `\\g`), or is
+    shorter than MIN_MASKED (swapping "a" would rewrite every "a" in the
+    command): it cannot be placed, so a record with a hole beats one with a
+    secret or a command that no longer reads as it ran."""
+    out, secret, lost = text, set(), False
+    for s in (scans(text) if texts is None else texts):
+        found = findings(s, extra, mask_only=True)
+        redacted = redact(s, found, MASK)
+        for i in sorted({f.index for f in found}):
+            word = word_text(s, i)
+            if any(f.index == i and f.span[1] - f.span[0] < MIN_MASKED for f in found):
+                continue
+            if word in out:
+                out = out.replace(word, redacted[i])
+                secret.update(word_text(s, f.index)[slice(*f.span)] for f in found if f.index == i)
+        for f in found:
+            value = word_text(s, f.index)[slice(*f.span)]
+            if value in secret:
+                continue
+            secret.add(value)
+            if len(value) < MIN_MASKED:
+                lost = True
+            elif value in out:
+                out = out.replace(value, MASK)
+            else:
+                lost = True
+    return (None if lost else out), len(secret)
+
+
+WITHHELD = "<command withheld: it holds a secret that cannot be masked in place>"
+
+
+def quote(doc):
+    """The command as a guard's reason may quote it: masked as the record masks
+    it, or WITHHELD when a secret cannot be placed. Without the project's own
+    rules, which are read by a gather step a guard does not run."""
+    text, _ = mask(doc.text, texts=doc_scans(doc))
+    return WITHHELD if text is None else text.strip()

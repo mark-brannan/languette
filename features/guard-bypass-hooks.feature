@@ -25,6 +25,12 @@ Feature: guard-bypass-hooks
     And the guard denies, naming "Skip hooks once"
     And the guard denies, naming "fix what the blocking hook reported"
 
+  @also_guard-secrets @also_guard-bypass-ruleset
+  Scenario: a credential in the denied command is not quoted back whole
+    When the agent runs `GH_TOKEN=ghp_WIGVIY73i8FbiZaMfOrZmcKUHMmOPgxrVYyx git push --no-verify`
+    Then the guard denies, naming "git push --no-verify"
+    And the guard denies, not naming "ghp_WIGVIY73i8FbiZaMfOrZmcKUHMmOPgxrVYyx"
+
   Scenario Outline: skipping the hooks is denied however it is spelled
     When the agent runs `<command>`
     Then the guard denies
