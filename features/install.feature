@@ -24,6 +24,7 @@ Feature: install
     And claude was asked only:
       """
       plugin list --json
+      plugin list --json
       """
     And install exits 0
 
@@ -55,6 +56,12 @@ Feature: install
     When install runs
     Then the install "redacted terms" row is ✓ "wrote ~/.config/languette/redacted-terms.tsv (3 defaults)"
     And the redacted terms file starts with the redacted header
+    And install exits 0
+
+  Scenario: an installed plugin still gets the default redacted terms file
+    Given claude lists languette "cd31356ad5db" installed at user scope
+    When install runs
+    Then the install "redacted terms" row is ✓ "wrote ~/.config/languette/redacted-terms.tsv (3 defaults)"
     And install exits 0
 
   Scenario: a redacted terms file that cannot be written fails the install

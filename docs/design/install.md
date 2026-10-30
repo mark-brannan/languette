@@ -25,13 +25,13 @@ alone protects nothing, and the doctor says so in its first row.
 
 ## install
 
-Idempotent. When the host is already wired it says so and writes nothing.
-Where the host can write for it, it writes nothing itself; where it must
+Idempotent. When the host is already wired it says so and changes nothing in the
+host. Where the host can write for it, it writes nothing itself; where it must
 write, it shows the diff first (planned: #102). It finds its own root from
 the executable, never from a host's environment variable. A host it cannot
 reach is a ✗ row naming the by-hand path. One row per step, in the doctor's
-marks; exit non-zero on any ✗. A fresh install also writes the default
-redacted terms file, where the installed plugin's options say the
+marks; exit non-zero on any ✗. Install, wired already or not, also writes
+the default redacted terms file, the one file it writes itself, where the installed plugin's options say the
 guard reads it, as `languette doctor --init-redacted-terms` does, when there
 is none; a file already there is left alone.
 

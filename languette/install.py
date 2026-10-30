@@ -6,9 +6,9 @@ The package install (pipx, brew) puts `languette` on PATH; the guards reach
 Claude Code as its plugin, through languette's own plugin marketplace. So this
 writes no plugin file itself: it asks the `claude` command to add the marketplace
 and install the plugin, and only Claude Code writes those. The one file it
-writes is the default redacted terms file, where there is none, after a fresh plugin
-install. When the plugin is already installed for this directory, it runs neither
-command, writes nothing, and says so. Like the doctor, it
+writes is the default redacted terms file, where there is none, plugin already
+installed or not. When the plugin is already installed for this directory, it
+runs neither command and says so. Like the doctor, it
 sits outside the guard pipeline: no guard imports it and it imports no guard.
 Standard library only.
 """
@@ -96,7 +96,7 @@ def claude_rows(cwd):
                                       f"claude plugin enable {inst.get('id') or PLUGIN}")]
     if inst:
         return [(OK, "Claude Code", f"plugin {doctor._version(inst)} already installed, "
-                                    f"{inst.get('scope', '?')} scope; nothing written")]
+                                    f"{inst.get('scope', '?')} scope; nothing written")] + doctor.default_terms_rows(cwd)
     # A marketplace of the same name from elsewhere would serve its own languette@languette.
     rows, source = [], _marketplace(claude)
     if source is None:
