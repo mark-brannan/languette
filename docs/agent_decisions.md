@@ -527,3 +527,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t084706z
 - deny-always fails closed when the cwd is not a directory, as ask-first does Undo: return no finding when it cannot look ([#314](https://github.com/mark-brannan/languette/pull/314))
+
+### 20261030t084732z
+- Internal names: languette/engine.py, engine.Guard, messages sudo_root and rules_cannot_look Undo: rename ([#314](https://github.com/mark-brannan/languette/pull/314))
