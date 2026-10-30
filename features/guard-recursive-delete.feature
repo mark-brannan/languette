@@ -182,7 +182,7 @@ Feature: guard-recursive-delete
       | {HOME}/project     | rm -rf {HOME}/.claude/worktrees/foo                  | denies    | not a worktree directory of this project        |
       | {HOME}/project     | rm -rf {HOME}/project/.claude/worktrees              | is silent | the directory itself                            |
 
-    @also_ask-first
+    @also_ask-first @also_deny-always
     Examples:
       | cwd                | command                                              | verdict   | note                                            |
       | {HOME}/project/sub | rm -rf {HOME}/project/.claude/worktrees/x            | is silent | an absolute worktree, from a deeper cwd         |
