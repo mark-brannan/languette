@@ -118,48 +118,12 @@ _ANY = re.compile(r"(?:^|/)(?:" + "|".join(sorted(TOOLS | sw.LAUNCH)) + r")(?:@[
 _LAUNCHER = re.compile(r"(?:^|/)(?:" + "|".join(sorted(sw.LAUNCH)) + r")\Z")
 HELP = frozenset("-h -help --help".split())
 
-# Options that take the next word as their value, and so must not be
-# mistaken for the subcommand. Unknown options are read as flags.
-VALUED = {
-    "terragrunt": "--terragrunt-config --config --terragrunt-working-dir --working-dir --terragrunt-download-dir "
-                  "--download-dir --terragrunt-iam-role --iam-assume-role --terragrunt-parallelism --parallelism "
-                  "--terragrunt-include-dir --queue-include-dir --terragrunt-exclude-dir --queue-exclude-dir "
-                  "--terragrunt-log-level --log-level --terragrunt-source --source",
-    "pulumi": "--color --cwd -C --profiling --tracing --memprofilerate --verbose -v",
-    "cdk": "-a --app -c --context -p --plugin --profile -r --role-arn -o --output --proxy --ca-bundle-path "
-           "--toolkit-stack-name --build --lookups --notices",
-    "aws": "--profile --region --endpoint-url --output --query --ca-bundle --cli-read-timeout "
-           "--cli-connect-timeout --color --cli-binary-format",
-    "kubectl": "-n --namespace --context --kubeconfig --cluster --user -s --server --token --as --as-group "
-               "--as-uid --certificate-authority --client-certificate --client-key --cache-dir "
-               "--request-timeout --tls-server-name --username --password --profile --profile-output "
-               "--log-flush-frequency -v --v --vmodule",
-    "helm": "-n --namespace --kube-context --kubeconfig --kube-apiserver --kube-token --kube-as-user "
-            "--kube-as-group --kube-ca-file --kube-tls-server-name --registry-config --repository-cache "
-            "--repository-config --burst-limit --qps",
-}
-VALUED = {k: frozenset(v.split()) for k, v in VALUED.items()}
-
 
 def _name(word):
     """The tool a command word names: its basename, without an @version."""
     b = word.rsplit("/", 1)[-1]
     b = b.split("@", 1)[0] if "@" in b[1:] else b
     return "cdk" if b == "aws-cdk" else b
-
-
-def _pos(rest, valued=frozenset()):
-    """The non-option words of `rest`, skipping the value of an option in
-    `valued`."""
-    out, skip = [], False
-    for w in rest:
-        if skip:
-            skip = False
-        elif w in valued:
-            skip = True
-        elif not w.startswith("-"):
-            out.append(w)
-    return out
 
 
 def _flag(rest, *names):
@@ -189,7 +153,7 @@ def _after(rest, name):
 
 
 def _terraform(rest):
-    sub = (_pos(rest) or [None])[0]
+    sub = (sw.operands(rest) or [None])[0]
     if sub == "destroy" or (sub == "apply" and _on(_flag(rest, "destroy"))):
         return "terraform-destroy"
     if sub == "apply" and _on(_flag(rest, "auto-approve")):
@@ -198,15 +162,8 @@ def _terraform(rest):
 
 def _terragrunt(rest):
     """Terraform, after terragrunt's own options and the run-all forms."""
-    words, skip = [], False
-    for w in rest:
-        if skip:
-            skip = False
-        elif w in VALUED["terragrunt"]:
-            skip = True
-        else:
-            words.append(w)
-    pos = _pos(words)
+    words = sw.operands(rest, sw.PROGRAMS["terragrunt"]["valued"], options=True)
+    pos = sw.operands(words)
     if pos and pos[0] in ("run-all", "run"):
         words = words[words.index(pos[0]) + 1:]
     elif pos and pos[0] in ("destroy-all", "apply-all"):
@@ -215,7 +172,7 @@ def _terragrunt(rest):
 
 
 def _pulumi(rest):
-    sub = (_pos(rest, VALUED["pulumi"]) or [None])[0]
+    sub = (sw.operands(rest, sw.PROGRAMS["pulumi"]["valued"]) or [None])[0]
     if _on(_flag(rest, "preview-only")):
         return None
     if sub in ("destroy", "down"):
@@ -226,7 +183,7 @@ def _pulumi(rest):
 
 
 def _cdk(rest):
-    sub = (_pos(rest, VALUED["cdk"]) or [None])[0]
+    sub = (sw.operands(rest, sw.PROGRAMS["cdk"]["valued"]) or [None])[0]
     if sub == "destroy":
         return "cdk-destroy"
     if sub == "deploy" and _after(rest, "require-approval") == "never":
@@ -234,7 +191,7 @@ def _cdk(rest):
 
 
 def _aws(rest):
-    pos = _pos(rest, VALUED["aws"])
+    pos = sw.operands(rest, sw.PROGRAMS["aws"]["valued"])
     service, op = (pos + [None, None])[:2]
     dry = _on(_flag(rest, "dry-run"))
     if op == "terminate-instances" and not dry:
@@ -248,7 +205,7 @@ def _aws(rest):
 
 
 def _kubectl(rest):
-    if (_pos(rest, VALUED["kubectl"]) or [None])[0] != "delete":
+    if (sw.operands(rest, sw.PROGRAMS["kubectl"]["valued"]) or [None])[0] != "delete":
         return None
     dry = _flag(rest, "dry-run")
     if dry is None or dry not in ("", "client", "server", "true"):
@@ -256,13 +213,13 @@ def _kubectl(rest):
 
 
 def _helm(rest):
-    if (_pos(rest, VALUED["helm"]) or [None])[0] in ("uninstall", "delete", "del", "un") \
+    if (sw.operands(rest, sw.PROGRAMS["helm"]["valued"]) or [None])[0] in ("uninstall", "delete", "del", "un") \
             and not _on(_flag(rest, "dry-run")):
         return "helm-uninstall"
 
 
 def _delete(rule):
-    return lambda rest: rule if "delete" in _pos(rest) else None
+    return lambda rest: rule if "delete" in sw.operands(rest) else None
 
 
 JUDGE = {"terraform": _terraform, "tofu": _terraform, "terragrunt": _terragrunt, "pulumi": _pulumi, "cdk": _cdk, "aws": _aws,

@@ -96,10 +96,8 @@ class _Judge:
         paths.judge_segments(self, scans)
 
 
-_MALFORMED = ("LANGUETTE_RM_ALLOW is malformed ({}). Recursive rm and find -delete are "
-              "blocked until it is fixed or unset; other commands run. It must be a colon-separated "
-              "list of directory names (dist) or absolute paths (/srv/scratch), using only letters, "
-              "digits and . _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.")
+def _malformed(guard, err):
+    return say("rm_malformed", guard=guard, err=err)
 
 
 def _verdict(targets, home, bases, physical, extra_roots=(), extra_names=()):
@@ -120,18 +118,10 @@ def _verdict(targets, home, bases, physical, extra_roots=(), extra_names=()):
     for abs_, kind, raw in targets:
         what = f"find {raw} -delete" if kind == "find" else f"rm -r {raw}"
         if not allowed(abs_):
-            return deny(
-                f"`{what}` is blocked: only the scratchpad, /tmp, agent worktrees and the generated "
-                "directories in GENERATED_NAMES in languette/guards/guard_recursive_delete.py (node_modules, dist, coverage, .pio ...) may be removed "
-                f"recursively, and {abs_} is none of those. `git status --short {raw}` and `git clean -n {raw}` "
-                "show what is there; `git rm` tracked files by path, and hand anything untracked to the user "
-                "-- a directory they own can hold downloads and logs no session knows about.")
+            return deny(say("rd_not_allowed", what=what, raw=raw, abs_=abs_))
         phys = physical(abs_)
         if phys != abs_ and not allowed(phys):
-            return deny(
-                f"`{what}` is blocked: {abs_} resolves through a symlink to {phys}, which is not a generated "
-                "directory, the scratchpad, /tmp or an agent worktree. rm follows a trailing slash into the "
-                "link's target.")
+            return deny(say("rd_symlink_out", what=what, abs_=abs_, phys=phys))
     return None
 
 
@@ -139,5 +129,5 @@ _PARSE_ALLOW = functools.partial(paths.parse_allow, bare_names=True)
 
 
 def check(doc):
-    return (yield from paths.check_targets(doc, NAME, _Judge, "LANGUETTE_RM_ALLOW", _PARSE_ALLOW, _MALFORMED,
+    return (yield from paths.check_targets(doc, NAME, _Judge, "LANGUETTE_RM_ALLOW", _PARSE_ALLOW, _malformed,
                                            _verdict))

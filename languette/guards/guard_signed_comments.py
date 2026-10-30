@@ -53,7 +53,6 @@ _MUTATION = re.compile(r"\b(?:addComment|addPullRequestReviewComment|addPullRequ
                        r"updateDiscussionComment)\b")
 _COMMENTS = re.compile(r"(?:^|/)(?:comments|reviews)(?:/|\Z)")
 _FROM_DOC = re.compile(r"\$\(\s*cat\s+(?:-\s+)?HEREDOC(\d+)\s*\)")
-_VAR = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
 _HOME = re.compile(r"(?:~|\$HOME|\$\{HOME\})(?=/|\Z)")
 _MARK = " HEREDOC "
 # The two lines a body needs, shown in every reason, with the payload's session hex.
@@ -99,7 +98,7 @@ class _Read:
         self.posts = []
         for text, nested in doc.texts(text=stripped):
             s = self.s = doc.scan(text)
-            self.cd = self.cd or any(s.k[i] == "w" and s.w[i] in ("cd", "pushd", "popd") for i in range(len(s.w)))
+            self.cd = self.cd or sw.cd_present(s)
             for a, b in s.segments():
                 if a <= b:
                     self.segment(a, b, nested)
@@ -116,7 +115,7 @@ class _Read:
             return self.doc(int(m.group(1)))
         if "$(" in v or "`" in v:
             return ("opaque", f"the body is built at run time ({_short(v)})")
-        m = _VAR.match(v)
+        m = sw.VAR_REF.match(v)
         if m:
             name = m.group(1) or m.group(2)
             # A shell assignment, not a gh field (-f NAME=...) of the same name.
