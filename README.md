@@ -249,8 +249,10 @@ first's two controls, `guard_worktrees_checkout_home` and
 ### Allowing more for `guard-recursive-delete`
 
 Built in: the generated directories `node_modules`, `dist`, `coverage` and
-`.pio`, and the agent's own places, `/tmp`, `~/.local/state/claude-tmpdir`
-and `~/.claude/worktrees`. To allow more, set `LANGUETTE_RM_ALLOW` to a
+`.pio`, and the agent's own places: `/tmp`, the host's temporary directory
+(`$CLAUDE_CODE_TMPDIR`, else `$TMPDIR`) and the host's worktree directory,
+`<project>/.claude/worktrees`, for the project the host names
+(`$CLAUDE_PROJECT_DIR`) and the one a worktree session stands in. To allow more, set `LANGUETTE_RM_ALLOW` to a
 colon-separated list. It adds to the built-in lists and never replaces them;
 unset or empty changes nothing.
 

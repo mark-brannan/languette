@@ -102,9 +102,9 @@ _MALFORMED = ("LANGUETTE_RM_ALLOW is malformed ({}). Recursive rm and find -dele
               "digits and . _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.")
 
 
-def _verdict(targets, home, physical, extra_roots=(), extra_names=()):
+def _verdict(targets, home, bases, physical, extra_roots=(), extra_names=()):
     names = GENERATED_NAMES + tuple(extra_names)
-    roots = paths.own_roots(home, physical, extra_roots)
+    roots = paths.own_roots(bases, physical, extra_roots)
 
     def is_generated(p):
         if p.startswith(home + "/"):

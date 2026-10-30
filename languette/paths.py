@@ -110,16 +110,31 @@ def parse_allow(value, home, home_p, physical, bare_names=False):
     return roots, names, None
 
 
-def own_bases(home):
-    """Where the agent works and nothing of the user's lives, as written."""
-    return ["/tmp", home + "/.local/state/claude-tmpdir", home + "/.claude/worktrees"]
+def host_tmp_roots(env):
+    """Where the host keeps its scratch directories: its temporary directory
+    (CLAUDE_CODE_TMPDIR), else the system's (TMPDIR), else /tmp."""
+    named = [d.rstrip("/") for d in (env.get("CLAUDE_CODE_TMPDIR"), env.get("TMPDIR")) if d and d.startswith("/")]
+    return [d for d in dict.fromkeys(named) if d] + ["/tmp"]
 
 
-def own_roots(home, physical, extra=()):
+def own_bases(env, cwd):
+    """Where the agent works and nothing of the user's lives, as written: /tmp,
+    the host's scratch roots, and the host's worktree directory,
+    <project>/.claude/worktrees, for the project the host names (CLAUDE_PROJECT_DIR)
+    and for the one the session stands in when it runs inside a worktree. A scratch
+    root that is / or holds $HOME is not the agent's own."""
+    home = env.get("HOME", "")
+    tmp = [d for d in host_tmp_roots(env) if d != home and not home.startswith(d + "/")]
+    proj = (env.get("CLAUDE_PROJECT_DIR") or "").rstrip("/")
+    i = cwd.find("/.claude/worktrees/")
+    wt = ([proj + "/.claude/worktrees"] if proj.startswith("/") else []) + ([cwd[:i] + "/.claude/worktrees"] if i >= 0 else [])
+    return list(dict.fromkeys(["/tmp"] + tmp + wt))
+
+
+def own_roots(bases, physical, extra=()):
     """own_bases, as written and as the filesystem has them (/tmp is
     /private/tmp on macOS); `physical` maps a path to its physical answer."""
-    base = own_bases(home)
-    return base + [physical(r) for r in base] + list(extra)
+    return bases + [physical(r) for r in bases] + list(extra)
 
 
 def physical_of(answers):
@@ -202,7 +217,7 @@ def parse_targets(doc, name, judge, allow_var):
     command and gathers its targets; `allow_var` names the env var of extra
     allowed paths. "found" is a finding parse alone comes to."""
     payload, env = doc.payload, doc.env
-    out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None}
+    out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None, "bases": []}
     if doc.text is None:
         return out
     cwd = payload["cwd"]
@@ -215,7 +230,7 @@ def parse_targets(doc, name, judge, allow_var):
         walker.run(doc)
     except Refuse as e:
         out["refused"] = str(e)
-    out.update(home=home, allow=env.get(allow_var) or None, targets=walker.targets)
+    out.update(home=home, allow=env.get(allow_var) or None, targets=walker.targets, bases=own_bases(env, cwd))
     return out
 
 
@@ -230,7 +245,7 @@ def plan_targets(parsed, parse_allow):
         want.append(home)
         parse_allow(parsed["allow"], home, home, lambda p: want.append(p) or p)
     if parsed["refused"] is None and parsed["targets"]:
-        want += own_bases(home) + [t for t, _, _ in parsed["targets"]]
+        want += parsed["bases"] + [t for t, _, _ in parsed["targets"]]
     return [Need("physical", p) for p in dict.fromkeys(want)]
 
 
@@ -239,7 +254,7 @@ def judge_targets(parsed, answers, name, parse_allow, malformed, verdict):
     themselves: a malformed allow var (`malformed`, a template its error fills)
     is context when there is nothing to judge and a deny otherwise; a refused
     parse is a deny. Past that, `verdict(targets, home, physical, *extras)`
-    judges the targets, extras being what parse_allow found besides its error
+    judges the targets, `bases` being own_bases, extras being what parse_allow found besides its error
     (none when the allow var is unset)."""
     if parsed["found"] or parsed["home"] is None:
         return parsed["found"]
@@ -255,7 +270,7 @@ def judge_targets(parsed, answers, name, parse_allow, malformed, verdict):
         return deny(f"{name}: " + allow_msg)
     if refused is not None:
         return deny(refused)
-    return verdict(parsed["targets"], home, physical, *extras)
+    return verdict(parsed["targets"], home, parsed["bases"], physical, *extras)
 
 
 def check_targets(doc, name, judge, allow_var, parse_allow, malformed, verdict):
