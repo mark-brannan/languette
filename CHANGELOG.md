@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.11](https://github.com/mark-brannan/languette/compare/v0.0.10...v0.0.11) (2026-10-30)
+
+
+### Features
+
+* **install:** write the default redacted terms file when there is none ([#308](https://github.com/mark-brannan/languette/issues/308)) ([648a194](https://github.com/mark-brannan/languette/commit/648a194174d112499d658696bb072d83a6c996ce))
+
+
+### Bug Fixes
+
+* **paths:** read the agent's own scratch and worktree roots from the host ([#311](https://github.com/mark-brannan/languette/issues/311)) ([c24b2b3](https://github.com/mark-brannan/languette/commit/c24b2b3c65ec611e25de38d4a551b6779951ad51))
+
 ## [0.0.10](https://github.com/mark-brannan/languette/compare/v0.0.9...v0.0.10) (2026-10-28)
 
 
