@@ -48,7 +48,7 @@ KNOWN_PAYLOAD_READS = {"guard_bypass_labels": 2, "guard_cross_session_send": 8, 
 # Answers whose text is anything but a messages.say call, at most, per guard.
 KNOWN_INLINE_TEXT = {"ask_first": 2, "guard_bypass_labels": 12, "guard_bypass_ruleset": 10, "guard_cross_session_send": 2,
                      "guard_duplicate_prs": 4, "guard_git_work_loss": 20, "guard_permissions": 1,
-                     "guard_recursive_delete": 2, "guard_secrets": 9, "guard_worktrees": 2,
+                     "guard_secrets": 9, "guard_worktrees": 2,
                      "prose_budget_commit": 1}
 
 
