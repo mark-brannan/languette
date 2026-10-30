@@ -512,3 +512,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t083010z
 - bypass-ruleset watches main and master only when no remote HEAD ref exists Undo: put FALLBACK back into the list in _judge ([#313](https://github.com/mark-brannan/languette/pull/313))
+
+### 20261030t083026z
+- reset --hard accepts any remote/branch, verified by _own_upstream Undo: pin the remote to origin in _upstream_target ([#313](https://github.com/mark-brannan/languette/pull/313))
