@@ -113,6 +113,9 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
   state, review threads, a transcript) is the exception, not the shape.
 - Current thinking, not settled: guards trend toward a rules engine with a
   few deep special cases.
+- 2026-10-30: guard-sudo and deny-always enter by the rules-engine design's
+  stage 2 (#198), with no `ready` issue; #314 merges with its config as
+  listed ([#314](https://github.com/mark-brannan/languette/pull/314)).
 
 ## Base-case guard names: 2026-10-09
 
