@@ -515,3 +515,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t083026z
 - reset --hard accepts any remote/branch, verified by _own_upstream Undo: pin the remote to origin in _upstream_target ([#313](https://github.com/mark-brannan/languette/pull/313))
+
+### 20261030t083040z
+- work-loss push reads every remote's HEAD ref Undo: parse the remote in _push and pass it to default_branches ([#313](https://github.com/mark-brannan/languette/pull/313))
