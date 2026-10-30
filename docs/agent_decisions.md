@@ -497,3 +497,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t074317z
 - docs/design/guard-rules.md untouched: stage 1 has not fully landed Undo: edit Path there ([#310](https://github.com/mark-brannan/languette/pull/310))
+
+### 20261030t074338z
+- Names cd_present, operands, VAR_REF in scan Undo: rename ([#310](https://github.com/mark-brannan/languette/pull/310))
