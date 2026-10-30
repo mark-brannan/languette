@@ -524,3 +524,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t084605z
 - Shipped rule sets are RULE_SET dicts shaped as JSON in languette/rules/<guard>.py, Python data for now Undo: move each RULE_SET into a .json file and json.load it ([#314](https://github.com/mark-brannan/languette/pull/314))
+
+### 20261030t084706z
+- deny-always fails closed when the cwd is not a directory, as ask-first does Undo: return no finding when it cannot look ([#314](https://github.com/mark-brannan/languette/pull/314))
