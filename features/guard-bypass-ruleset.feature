@@ -50,8 +50,21 @@ Feature: guard-bypass-ruleset
       | command                                       | note                               |
       | echo ok; git push origin --no-verify main     | after a separator, with a flag     |
 
-  Scenario Outline: main and master are watched even after the agent moves the remote's HEAD
+  # The default branch is the remote's HEAD ref; main and master are watched beside it,
+  # since a moved HEAD adds a branch and never removes one.
+  Scenario Outline: the remote HEAD's branch and main and master are all watched
     Given the remote HEAD of "{TMP}/r" points at "zzz"
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command               | verdict                                  |
+      | git push origin zzz   | denies, naming "requires a pull request" |
+      | git push --all origin | denies, naming "requires a pull request" |
+      | git push origin main  | denies, naming "requires a pull request" |
+
+  Scenario Outline: main and master are watched when the repository has no remote HEAD
+    Given the remote HEAD of "{TMP}/r" is removed
     When the agent runs `<command>`
     Then the guard denies, naming "requires a pull request"
 

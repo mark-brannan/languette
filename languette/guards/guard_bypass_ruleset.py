@@ -42,6 +42,7 @@ import re
 from urllib.parse import quote
 
 from languette import scan as sw
+from languette.refs import default_branches
 from languette.messages import say
 from languette.verdict import Act, Need, Refuse, ask, deny
 
@@ -59,7 +60,6 @@ _PIPE = ("|", "|&")
 # The openers among the keywords that lead a segment, and the closers.
 _OPEN = {"if": False, "while": True, "until": True, "for": True, "select": True}   # keyword -> a loop
 _CLOSE = frozenset("fi done".split())
-_FALLBACK = ("main", "master")
 # Text that can set a variable without naming it literally, or change what an unquoted $NAME
 # expands to: ANSI and locale quoting, arithmetic, indirection, IFS, and the builtins that take a
 # variable's name as a value.
@@ -488,10 +488,10 @@ def _judge(p, env):
         remote = remote or "origin"
     url = remote if ("/" in remote or ":" in remote) else (yield from _git(p, env, "remote", "get-url", "--push",
                                                                            remote))
-    head = yield from _git(p, env, "symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD")
-    defaults = list(_FALLBACK)
-    if head and "/" in head and head.split("/", 1)[1] not in defaults:
-        defaults.insert(0, head.split("/", 1)[1])
+
+    def read(*argv):
+        return (yield from _git(p, env, *argv))
+    defaults = yield from default_branches(read, remote)
     hits = defaults if ALL in dsts else [d for d in dsts if d in defaults]
     if not hits:
         return None
