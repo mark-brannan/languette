@@ -217,8 +217,7 @@ meant. Spent approvals are kept beside the session transcript, in
 
 ## Deny always
 
-A repo lists the commands it forbids in `.languette/deny-always.json`, each
-with the reason the agent is told:
+A repo lists the commands it forbids in `.languette/deny-always.json`:
 
 ```json
 {"rules": [{"id": "prod-db",
@@ -226,11 +225,8 @@ with the reason the agent is told:
   "why": "production is reached through the release job, never by hand"}]}
 ```
 
-A match is written as ask-first's, and `{"cmd": "terraform"}` alone forbids
-the whole program; `"at": "command"` counts the word only where it runs,
-not as another command's argument. The file is found as ask-first's is; with
-none, the guard is silent, and one that doesn't load denies every command
-until it is fixed.
+Matches, lookup and a broken file work as for ask-first; `{"cmd":
+"terraform"}` alone forbids the whole program.
 
 ## Configuration
 
