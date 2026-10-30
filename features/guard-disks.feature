@@ -110,6 +110,46 @@ Feature: guard-disks
       | mkfs.ext4 /dev/sdb1        | hand them the exact command                        |
       | echo x > /dev/sda          | hand them the exact command                        |
 
+  Scenario Outline: the host's scratch and worktree areas are the agent's own, where the host names them
+    Given CLAUDE_CODE_TMPDIR is "<tmp>"
+    And CLAUDE_PROJECT_DIR is "<project>"
+    And the working directory is "{HOME}/project"
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | tmp                 | project        | command                                    | verdict   | note                                     |
+      | {HOME}/scratch      | {HOME}/project | mkfs -t ext4 {HOME}/scratch/x.img          | is silent | the host's temporary directory           |
+      | {HOME}/scratch      | {HOME}/project | mkswap {HOME}/project/.claude/worktrees/w/swap.img | is silent | the project's worktree directory |
+      | {HOME}/scratch      | {HOME}/project | mkfs -t ext4 {HOME}/.local/state/claude-tmpdir/x.img | denies  | a path only one machine used             |
+      | {HOME}/scratch      | {HOME}/project | mkswap {HOME}/.claude/worktrees/w/swap.img | denies    | not a worktree directory of this project |
+      | {HOME}              | {HOME}/project | mkfs -t ext4 {HOME}/x.img                  | denies    | a temporary directory that is $HOME is not the agent's own |
+
+  Scenario Outline: a scratch root the host names is not the agent's own when it is, or links to, $HOME or /
+    Given the symlink "{TMP}/link" to "<lands>"
+    And CLAUDE_CODE_TMPDIR is "<tmp>"
+    And the working directory is "{HOME}/project"
+    When the agent runs `mkfs -t ext4 {HOME}/project/x.img`
+    Then the guard denies, naming "outside the scratchpad"
+
+    Examples:
+      | tmp           | lands  | note                          |
+      | {TMP}/link    | {HOME} | a link to $HOME               |
+      | {TMP}/link    | /      | a link to /                   |
+      | {HOME}        | {HOME} | $HOME itself                  |
+      | /             | /      | / itself                      |
+
+  Scenario Outline: the working directory inside a host worktree names the worktree directory
+    Given the directory "{HOME}/repo/.claude/worktrees/w/src"
+    And the working directory is "{HOME}/repo/.claude/worktrees/w/src"
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                                         | verdict   | note                              |
+      | mkswap {HOME}/repo/.claude/worktrees/v/swap.img | is silent | a sibling worktree                |
+      | mkswap {HOME}/repo/swap.img                     | denies    | the repository around it          |
+
   Scenario Outline: an image file in the agent's own area, a device that is only read, and anything that does not write a disk
     Given the working directory is "<cwd>"
     When the agent runs `<command>`
@@ -133,8 +173,6 @@ Feature: guard-disks
       | {HOME}/project | ls /dev/sda                                      |                                                |
       | {HOME}/project | mkfs.ext4 -F /tmp/disk.img                       | an image file in /tmp                          |
       | {HOME}/project | mkfs.ext4 -F -L data /tmp/disk.img 1024          | a label and a block count                      |
-      | {HOME}/project | mkfs -t ext4 {HOME}/.local/state/claude-tmpdir/x.img | the scratchpad                              |
-      | {HOME}/project | mkswap {HOME}/.claude/worktrees/w/swap.img       | an agent worktree                              |
       | {HOME}/project | wipefs /tmp/disk.img                             |                                                |
       | {HOME}/project | shred -u /tmp/scratch.txt                        |                                                |
       | {HOME}/project | shred -n 3 -z /tmp/a /tmp/b                      |                                                |

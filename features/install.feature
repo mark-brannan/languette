@@ -1,7 +1,8 @@
 Feature: install
   `languette install` wires languette into Claude Code through its own plugin
-  marketplace and writes nothing itself: it asks the `claude` command, and
-  only Claude Code writes. Rows in the doctor's format, a non-zero exit on
+  marketplace and writes no plugin file itself: it asks the `claude` command,
+  and only Claude Code writes that. It writes the default redacted terms file
+  where there is none. Rows in the doctor's format, a non-zero exit on
   any ✗. Each scenario runs it in "{HOME}/project" against a fake HOME, with
   a stub `claude` first on PATH that records every command it is asked.
   {SOURCE} is the marketplace's source, {REPO} on its release branch.
@@ -22,6 +23,7 @@ Feature: install
     Then the install "Claude Code" row is ✓ "plugin cd31356 already installed, user scope; nothing written"
     And claude was asked only:
       """
+      plugin list --json
       plugin list --json
       """
     And install exits 0
@@ -46,9 +48,33 @@ Feature: install
       plugin marketplace list --json
       plugin marketplace add {SOURCE}
       plugin install languette@languette
+      plugin list --json
       """
     And install exits 0
-    And the fake HOME is as it was before install
+
+  Scenario: a fresh install writes the default redacted terms file
+    When install runs
+    Then the install "redacted terms" row is ✓ "wrote ~/.config/languette/redacted-terms.tsv (3 defaults)"
+    And the redacted terms file starts with the redacted header
+    And install exits 0
+
+  Scenario: an installed plugin still gets the default redacted terms file
+    Given claude lists languette "cd31356ad5db" installed at user scope
+    When install runs
+    Then the install "redacted terms" row is ✓ "wrote ~/.config/languette/redacted-terms.tsv (3 defaults)"
+    And install exits 0
+
+  Scenario: a redacted terms file that cannot be written fails the install
+    Given the redacted terms path is a file, not a directory
+    When install runs
+    Then the install "redacted terms" row is ✗ "~/.config/languette/redacted-terms.tsv cannot be written (Not a directory)"
+    And install exits 1
+
+  Scenario: a redacted terms file already there is left as it is
+    Given the redacted terms file holds "zephyr-01\tthe boat"
+    When install runs
+    Then the redacted terms file is unchanged
+    And install exits 0
 
   Scenario: a marketplace already added is not added again
     Given claude lists the languette marketplace
@@ -59,6 +85,7 @@ Feature: install
       plugin list --json
       plugin marketplace list --json
       plugin install languette@languette
+      plugin list --json
       """
     And install exits 0
 

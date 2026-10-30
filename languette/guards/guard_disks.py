@@ -192,36 +192,36 @@ class _Judge:
 
 
 def parse(doc):
-    """The command's targets, or the finding parse alone comes to: (finding, home, targets)."""
+    """The command's targets, or the finding parse alone comes to: (finding, home, targets, bases)."""
     payload, env = doc.payload, doc.env
     if doc.text is None:
-        return None, None, []
+        return None, None, [], []
     cwd = payload["cwd"]
     home = env.get("HOME", "")
     if not home.startswith("/"):
-        return deny(say("home_not_absolute", guard=NAME)), None, []
+        return deny(say("home_not_absolute", guard=NAME)), None, [], []
 
     judge = _Judge(cwd, home)
     try:
         judge.run(doc)
     except Refuse as e:
-        return deny(say("judged", guard=NAME, why=e)), None, []
-    return None, home, judge.targets
+        return deny(say("judged", guard=NAME, why=e)), None, [], []
+    return None, home, judge.targets, paths.own_bases(env, cwd)
 
 
 def plan(parsed):
-    found, home, targets = parsed
+    found, home, targets, bases = parsed
     if found or not targets:
         return []
-    return [Need("physical", p) for p in dict.fromkeys(paths.own_bases(home) + [t for t, _, _ in targets])]
+    return [Need("physical", p) for p in dict.fromkeys([home] + paths.base_needs(bases) + [t for t, _, _ in targets])]
 
 
 def judge(parsed, answers):
-    found, home, targets = parsed
+    found, home, targets, bases = parsed
     if found or not targets:
         return found
     physical = paths.physical_of(answers)
-    roots = paths.own_roots(home, physical)
+    roots = paths.own_roots(home, bases, physical)
     for abs_, what, raw in targets:
         if not paths.under(abs_, roots):
             kind = "a device node" if abs_.startswith("/dev/") else "outside the scratchpad, /tmp and agent worktrees"

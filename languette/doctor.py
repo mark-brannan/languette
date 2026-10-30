@@ -581,15 +581,13 @@ def _defaults():
     return terms.defaults(Path(terms.DEFAULTS).read_text(encoding="utf-8"))
 
 
-def init(kind, options):
-    """Write the kind's file where the guard reads it, never over one that exists: the redacted
-    file with every default, the blocked one with a header and no terms."""
+def write_initial(kind, options):
+    """(mark, text): write the kind's file where the guard reads it, the redacted file with every
+    default, the blocked one with a header and no terms; None where a file is already there."""
     path, _ = terms.where(kind, _env(options))
-    where = _tilde(path)
     if os.path.lexists(path):
-        repair = "; to repair it: languette doctor --restore-redacted-terms" if kind == "redacted" else ""
-        print(f"{FAIL} {where} exists{repair}")
-        return 1
+        return None
+    where = _tilde(path)
     if kind == "redacted":
         groups = _defaults()
         body, what = terms.initial(groups), f"{len(groups)} defaults"
@@ -600,10 +598,30 @@ def init(kind, options):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         Path(path).write_text(body, encoding="utf-8")
     except OSError as e:
-        print(f"{FAIL} {where} cannot be written ({e.strerror or e})")
-        return 1
-    print(f"{OK} wrote {where} ({what})")
-    return 0
+        return FAIL, f"{where} cannot be written ({e.strerror or e})"
+    return OK, f"wrote {where} ({what})"
+
+
+def default_terms_rows(cwd):
+    """[(mark, label, text)]: the default redacted terms file written where the installed plugin's
+    options say the guard reads it, as --init-redacted-terms does; a file already there is left
+    alone and says nothing."""
+    options = installed_options(cwd)
+    if not terms.where("redacted", _env(options))[0]:
+        return []
+    done = write_initial("redacted", options)
+    return [(done[0], "redacted terms", done[1])] if done else []
+
+
+def init(kind, options):
+    """Write the kind's file, never over one that exists."""
+    done = write_initial(kind, options)
+    if done is None:
+        path, _ = terms.where(kind, _env(options))
+        repair = "; to repair it: languette doctor --restore-redacted-terms" if kind == "redacted" else ""
+        done = FAIL, f"{_tilde(path)} exists{repair}"
+    print(f"{done[0]} {done[1]}")
+    return 1 if done[0] == FAIL else 0
 
 
 def restore(options):

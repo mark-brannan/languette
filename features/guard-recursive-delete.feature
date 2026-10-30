@@ -158,6 +158,62 @@ Feature: guard-recursive-delete
       | cwd                                 | command                         | note                                                      |
       | {HOME}/.local/state/claude-tmpdir/x | cd ~/project; rm -rf examples   | a cd moves the target out of the scratchpad               |
 
+  Scenario Outline: the host's scratch and worktree areas are the agent's own, where the host names them
+    Given CLAUDE_CODE_TMPDIR is "{HOME}/scratch"
+    And CLAUDE_PROJECT_DIR is "{HOME}/project"
+    And the working directory is "<cwd>"
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | cwd                | command                                              | verdict   | note                                            |
+      | {HOME}/project     | rm -rf {HOME}/scratch/anything                       | is silent | the host's temporary directory                  |
+      | {HOME}/project     | rm -rf {HOME}/project/.claude/worktrees/foo          | is silent | the project's worktree directory                |
+      | {HOME}/project     | rm -rf ~/project/.claude/worktrees/foo               | is silent | ~/ spelled out                                  |
+      | {HOME}/project     | rm -rf {HOME}/.local/state/claude-tmpdir/anything    | denies    | a path only one machine used                    |
+      | {HOME}/project     | rm -rf {HOME}/.claude/worktrees/foo                  | denies    | not a worktree directory of this project        |
+      | {HOME}/project     | rm -rf {HOME}/project/.claude/worktrees              | is silent | the directory itself                            |
+
+    @also_ask-first
+    Examples:
+      | cwd                | command                                              | verdict   | note                                            |
+      | {HOME}/project/sub | rm -rf {HOME}/project/.claude/worktrees/x            | is silent | an absolute worktree, from a deeper cwd         |
+
+  Scenario: a worktree directory that is itself a link to a directory under $HOME does not make that directory the agent's own
+    Given the directory "{HOME}/project/.claude"
+    And the directory "{HOME}/Documents"
+    And the symlink "{HOME}/project/.claude/worktrees" to "{HOME}/Documents"
+    And CLAUDE_PROJECT_DIR is "{HOME}/project"
+    And the working directory is "{HOME}/project"
+    When the agent runs `rm -rf {HOME}/Documents`
+    Then the guard denies, naming "is none of those"
+
+  Scenario Outline: a scratch root the host names is not the agent's own when it is, or links to, $HOME or /
+    Given the symlink "{TMP}/link" to "<lands>"
+    And CLAUDE_CODE_TMPDIR is "<tmp>"
+    And the working directory is "{HOME}/project"
+    When the agent runs `rm -rf {HOME}/project/examples`
+    Then the guard denies, naming "is none of those"
+
+    Examples:
+      | tmp           | lands  | note                          |
+      | {TMP}/link    | {HOME} | a link to $HOME               |
+      | {TMP}/link    | /      | a link to /                   |
+      | {HOME}        | {HOME} | $HOME itself                  |
+      | /             | /      | / itself                      |
+      | {HOME}/..     | /      | a spelling that holds $HOME   |
+
+  Scenario Outline: the working directory inside a host worktree names the worktree directory
+    Given the directory "{HOME}/repo/.claude/worktrees/w/src"
+    And the working directory is "{HOME}/repo/.claude/worktrees/w/src"
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                                          | verdict   | note                       |
+      | rm -rf {HOME}/repo/.claude/worktrees/v           | is silent | a sibling worktree         |
+      | rm -rf {HOME}/repo/examples                      | denies    | the repository around it   |
+
   Scenario Outline: generated directories, the agent's own areas, and anything that is not a recursive rm
     Given the working directory is "<cwd>"
     When the agent runs `<command>`
@@ -169,9 +225,7 @@ Feature: guard-recursive-delete
       | {HOME}/project     | rm -rf ./dist coverage                               | is silent |                                                 |
       | {HOME}/project     | rm -rf dist/assets                                   | is silent | a component of the path is allowlisted          |
       | {HOME}/project     | rm -rf -- dist                                       | is silent |                                                 |
-      | {HOME}/project     | rm -rf {HOME}/.local/state/claude-tmpdir/anything    | is silent | the scratchpad                                  |
       | {HOME}/project     | rm -rf /tmp/whatever                                 | is silent | /tmp is the agent's                             |
-      | {HOME}/project     | rm -rf ~/.claude/worktrees/foo                       | is silent | an agent worktree                               |
       | {HOME}/project     | rm foo.txt                                           | is silent | not recursive                                   |
       | {HOME}/project     | rm -f a b                                            | is silent |                                                 |
       | {HOME}/project     | for f in *.log; do rm "$f"; done                     | is silent |                                                 |
@@ -205,7 +259,6 @@ Feature: guard-recursive-delete
       | cwd                | command                                              | verdict   | note                                            |
       | /opt/proj          | rm -rf dist                                          | is silent | a generated name nested under /                 |
       | {HOME}/project/sub | rm -rf dist                                          | is silent | from a deeper cwd                               |
-      | {HOME}/project/sub | rm -rf {HOME}/.claude/worktrees/x                    | is silent | an absolute worktree, from a deeper cwd         |
 
   Scenario: a heredoc body is not run
     When the agent runs:
@@ -645,7 +698,7 @@ Feature: guard-recursive-delete
       | "build:.next:out"       | rm -rf proj/.next                 | is silent                         | one of several names                |
       | "build:.next"           | rm -rf proj/examples              | denies, naming "is none of those" | names not listed stay denied        |
       | "build"                 | rm -rf proj/node_modules          | is silent                         | built-in names survive a value      |
-      | "build"                 | rm -rf {HOME}/.claude/worktrees/x | is silent                         | built-in roots survive a value      |
+      | "build"                 | rm -rf /tmp/x                     | is silent                         | built-in roots survive a value      |
       | "build"                 | rm -rf {HOME}/build               | denies, naming "is none of those" | an added name directly under $HOME  |
       | "/srv/agent-area"       | rm -rf /srv/agent-area/x          | is silent                         | an absolute path is added as a root |
       | "/srv/agent-area/"      | rm -rf /srv/agent-area/x          | is silent                         |                                     |

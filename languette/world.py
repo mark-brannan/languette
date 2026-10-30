@@ -19,6 +19,8 @@ import subprocess
 import time
 from urllib.parse import quote
 
+from languette import paths
+
 GIT_TIMEOUT = 5
 GH_TIMEOUT = 10
 PR_LIST_TIMEOUT = 25                # past the `timeout 20` guard-git-stacked-base wraps gh pr list in
@@ -341,8 +343,7 @@ class World:
 
     def _wt_scratchpad(self, sid):
         """The session's scratchpad directory, or None."""
-        for root in (self.env.get("CLAUDE_CODE_TMPDIR") or "/nonexistent", self.env.get("TMPDIR") or "/nonexistent",
-                     os.path.join(self.env.get("HOME") or "", ".local/state/claude-tmpdir")):
+        for root in paths.host_tmp_roots(self.env):
             for d in sorted(glob.glob(os.path.join(glob.escape(root), "claude-*", "*", glob.escape(sid), "scratchpad"))):
                 if os.path.isdir(d):
                     return d

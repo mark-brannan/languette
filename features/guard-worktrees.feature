@@ -841,13 +841,13 @@ Feature: guard-worktrees
       When the agent runs `git -C {TMP}/ywt/theirs status`
       Then the guard denies, naming "git --git-dir={TMP}/yadm/repo.git worktree add {TMP}/scratch/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/<name>"
 
-    Scenario: with no CLAUDE_CODE_TMPDIR the recipe finds the scratchpad under the state directory
+    Scenario: with no CLAUDE_CODE_TMPDIR the recipe finds the scratchpad under TMPDIR
       Given the session is "aaaaaaaa-1111-4222-8333-444444444444"
-      And HOME is "{TMP}/home"
-      And the directory "{TMP}/home/.local/state/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad"
+      And TMPDIR is "{TMP}/tmpdir"
+      And the directory "{TMP}/tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad"
       And CLAUDE_CODE_TMPDIR is unset
       When the agent runs `git -C {TMP}/repo/.claude/worktrees/theirs status`
-      Then the guard denies, naming "worktree add {TMP}/home/.local/state/claude-tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/<name>"
+      Then the guard denies, naming "worktree add {TMP}/tmpdir/claude-1000/proj/aaaaaaaa-1111-4222-8333-444444444444/scratchpad/<name>"
 
     # --- "own" is sticky ----------------------------------------------
 
