@@ -206,3 +206,5 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 - A redaction transforms data, so a per-repo rule may loosen one a wider tier
   applies. Current thinking. ([thread](https://github.com/mark-brannan/languette/pull/290#discussion_r4395034528))
 - Spec: [features/guard-private-terms.feature](../features/guard-private-terms.feature).
+- 2026-10-30: for now, a missing default terms file is regenerated; its
+  long-term source is open ([thread](https://github.com/mark-brannan/languette/pull/308#discussion_r4397429263)).
