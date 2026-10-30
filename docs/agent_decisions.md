@@ -518,3 +518,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t083040z
 - work-loss push reads every remote's HEAD ref Undo: parse the remote in _push and pass it to default_branches ([#313](https://github.com/mark-brannan/languette/pull/313))
+
+### 20261030t083053z
+- default-branch reader lives in new languette/refs.py Undo: move default_branches into paths.py ([#313](https://github.com/mark-brannan/languette/pull/313))
