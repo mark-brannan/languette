@@ -509,3 +509,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t075641z
 - a session in a host worktree owns the whole project .claude/worktrees directory; CLAUDE_PROJECT_DIR names the project whose worktree directory counts, so the old home-level worktrees directory no longer counts unless the project is HOME ([#311](https://github.com/mark-brannan/languette/pull/311))
+
+### 20261030t083010z
+- bypass-ruleset watches main and master only when no remote HEAD ref exists Undo: put FALLBACK back into the list in _judge ([#313](https://github.com/mark-brannan/languette/pull/313))
