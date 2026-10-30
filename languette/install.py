@@ -4,9 +4,11 @@ any ✗. Only Claude Code is a host today; other hosts are planned (#5).
 
 The package install (pipx, brew) puts `languette` on PATH; the guards reach
 Claude Code as its plugin, through languette's own plugin marketplace. So this
-writes nothing itself: it asks the `claude` command to add the marketplace and
-install the plugin, and only Claude Code writes. When the plugin is already
-installed for this directory, it runs neither and says so. Like the doctor, it
+writes no plugin file itself: it asks the `claude` command to add the marketplace
+and install the plugin, and only Claude Code writes those. The one file it
+writes is the default redacted terms file, where there is none, plugin already
+installed or not. When the plugin is already installed for this directory, it
+runs neither command and says so. Like the doctor, it
 sits outside the guard pipeline: no guard imports it and it imports no guard.
 Standard library only.
 """
@@ -94,7 +96,7 @@ def claude_rows(cwd):
                                       f"claude plugin enable {inst.get('id') or PLUGIN}")]
     if inst:
         return [(OK, "Claude Code", f"plugin {doctor._version(inst)} already installed, "
-                                    f"{inst.get('scope', '?')} scope; nothing written")]
+                                    f"{inst.get('scope', '?')} scope; nothing written")] + doctor.default_terms_rows(cwd)
     # A marketplace of the same name from elsewhere would serve its own languette@languette.
     rows, source = [], _marketplace(claude)
     if source is None:
@@ -114,7 +116,7 @@ def claude_rows(cwd):
     r, problem = _claude(claude, "plugin", "install", PLUGIN)
     if problem or r.returncode != 0:
         return rows + [(FAIL, "Claude Code", problem or _first_line(r))]
-    return rows + [(OK, "Claude Code", "plugin installed, user scope; run languette doctor")]
+    return rows + [(OK, "Claude Code", "plugin installed, user scope; run languette doctor")] + doctor.default_terms_rows(cwd)
 
 
 def main(host="claude"):
