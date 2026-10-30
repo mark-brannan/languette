@@ -81,35 +81,23 @@ def _git_push(s, a, b, nested, out):
 
 def _gh_api(s, a, b, nested, out):
     g = sw.cmd_index(s, a, b, GH, nested)
-    if g is None:
+    v = sw.gh_verb(s, g + 1, b) if g is not None else None
+    if v is None or sw.word(s, v) != "api":
         return
-    is_api = is_del = False
-    for i in range(g + 1, b + 1):
-        if s.k[i] != "w":
-            continue
-        w = s.w[i]
-        is_api = is_api or w == "api"
-        if w in ("-X", "--method") and i + 1 <= b and s.k[i + 1] == "w" and s.w[i + 1].upper() == "DELETE":
-            is_del = True
-        if w.upper() in ("-XDELETE", "--METHOD=DELETE"):
-            is_del = True
-    if not (is_api and is_del):
+    api = sw.gh_api(s, v + 1, b)
+    if api.method != "DELETE" or "refs/heads/" not in api.path:
         return
-    for i in range(g + 1, b + 1):
-        if s.k[i] != "w" or "refs/heads/" not in s.w[i]:
-            continue
-        w = s.w[i]
-        # The endpoint names its repository; {owner}/{repo} is the cwd's.
-        repo = "?"
-        if "{owner}/{repo}/" in w:
-            repo = "-"
-        else:
-            m = _REPO.search(w)
-            if m:
-                rest = re.sub(r"^/?repos/", "", m.group(0)).rstrip("/")
-                if not _UNRESOLVED.search(rest):
-                    repo = rest
-        _emit(out, repo, w[w.index("refs/heads/") + len("refs/heads/"):])
+    # The endpoint names its repository; {owner}/{repo} is the cwd's.
+    repo, w = "?", api.path
+    if "{owner}/{repo}/" in w:
+        repo = "-"
+    else:
+        m = _REPO.search(w)
+        if m:
+            rest = re.sub(r"^/?repos/", "", m.group(0)).rstrip("/")
+            if not _UNRESOLVED.search(rest):
+                repo = rest
+    _emit(out, repo, w[w.index("refs/heads/") + len("refs/heads/"):])
 
 
 def deletions(doc):

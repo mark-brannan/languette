@@ -49,9 +49,6 @@ _GH_WRITES = frozenset("create new edit close reopen delete transfer comment mer
 # echoes PR text, a release or gist its body, a repo its README.
 _GH_VIEWS = {"run": ("view", "download"), "release": ("view", "download"), "gist": ("view",),
              "repo": ("view",), "workflow": ("view",)}
-_API_METHOD = re.compile(r"(?:-X|--method=?)(.*)")
-_API_FIELDS = frozenset(sw.GH_API_FIELDS + ("--input",))
-_API_FIELDS_GLUED = ("-f", "-F", "--field=", "--raw-field=", "--input=")
 # An MCP tool is a read unless its name is clearly a write: a write verb and no read verb.
 _MCP_READ = frozenset("read get list search fetch query find view download export retrieve".split())
 _MCP_WRITE = frozenset("write create update delete add remove push merge set edit post send submit close assign "
@@ -67,14 +64,12 @@ _REF = re.compile(r" \[[^\]\n]*\]\Z")
 _WAY_OUT = say("cross_session_way_out")
 
 
-def _gh_reads(words):
-    """Does `gh <words>` read issue, PR, search or API content, or view a run, release, gist, repo or workflow?"""
-    i = 0
-    while i < len(words) and words[i].startswith("-"):
-        i += 2 if words[i] in sw.GH_REPO_FLAGS else 1
-    if i >= len(words):
+def _gh_reads(s, lo, hi):
+    """Does `gh` with words lo..hi read issue, PR, search or API content, or view a run, release, gist, repo or workflow?"""
+    i = sw.gh_verb(s, lo, hi)
+    if i is None:
         return False
-    sub, rest = words[i], words[i + 1:]
+    sub, rest = sw.word(s, i), [sw.word(s, j) for j in range(i + 1, hi + 1)]
     if sub == "search":
         return True
     if sub in ("issue", "pr") or sub in _GH_VIEWS:
@@ -82,16 +77,11 @@ def _gh_reads(words):
                      and not (j and rest[j - 1] in sw.GH_REPO_FLAGS)), None)
         return verb not in _GH_WRITES if sub in ("issue", "pr") else verb in _GH_VIEWS[sub]
     if sub == "api":
-        method = None
-        for j, w in enumerate(rest):
-            m = _API_METHOD.fullmatch(w)
-            if m:
-                method = (m.group(1) or (rest[j + 1] if j + 1 < len(rest) else "")).upper()
-        if method in ("POST", "PUT", "PATCH", "DELETE"):
+        api = sw.gh_api(s, i + 1, hi)
+        if api.method in ("POST", "PUT", "PATCH", "DELETE"):
             return False
-        graphql = any(w.lstrip("/") == "graphql" for w in rest)
-        fields = any(w in _API_FIELDS or w.startswith(_API_FIELDS_GLUED) for w in rest)
-        if method is None and fields and not graphql:
+        graphql = api.path == "graphql"
+        if api.method == "" and api.sends and not graphql:
             return False                       # gh api sends fields as a POST
         return not (graphql and any("mutation" in w for w in rest))
     return False
@@ -111,8 +101,8 @@ def bash_read(doc):
             g = sw.cmd_index(s, a, b, sw.GH, nested) if a <= b else None
             if g is None:
                 continue
-            words = [sw.word(s, i) for i in range(g + 1, b + 1)]
-            if _gh_reads(words):
+            if _gh_reads(s, g + 1, b):
+                words = [sw.word(s, i) for i in range(g + 1, b + 1)]
                 return "`gh " + " ".join(sw.operands(words, sw.PROGRAMS["gh api"]["valued"])[:2]) + "`"
     return None
 

@@ -169,6 +169,7 @@ Feature: guard-cross-session-send
       | git fetch origin main                     |
       | git -C /w fetch --prune                   |
       | gh api graphql -f query='mutation { x }'  |
+      | gh api -X=DELETE repos/o/r/actions/caches/1 |
       | gh run list                               |
       | gh run rerun 123                          |
       | gh release create v1                      |
