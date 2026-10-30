@@ -494,3 +494,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t074302z
 - Valued tables only one guard reads stay with it (chezmoi, git worktree add, git commit, gh pr create) Undo: move them in a follow-up ([#310](https://github.com/mark-brannan/languette/pull/310))
+
+### 20261030t074317z
+- docs/design/guard-rules.md untouched: stage 1 has not fully landed Undo: edit Path there ([#310](https://github.com/mark-brannan/languette/pull/310))
