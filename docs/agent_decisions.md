@@ -491,3 +491,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t074251z
 - Subcommand program descriptions use a two-word key in sw.PROGRAMS (git push, gh api), valued only Undo: rename the keys ([#310](https://github.com/mark-brannan/languette/pull/310))
+
+### 20261030t074302z
+- Valued tables only one guard reads stay with it (chezmoi, git worktree add, git commit, gh pr create) Undo: move them in a follow-up ([#310](https://github.com/mark-brannan/languette/pull/310))
