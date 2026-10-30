@@ -97,22 +97,6 @@ def _gh_reads(words):
     return False
 
 
-_VALUED = frozenset(sw.GH_REPO_FLAGS + sw.GH_METHOD_FLAGS) | _API_FIELDS | sw.GH_API_VALUED
-
-
-def _operands(words):
-    """The words that are neither options nor an option's value."""
-    out, skip = [], False
-    for w in words:
-        if skip:
-            skip = False
-        elif w in _VALUED:
-            skip = True
-        elif not w.startswith("-"):
-            out.append(w)
-    return out
-
-
 def bash_read(doc):
     """What the Bash command fetched from the network, or None: a curl or wget
     anywhere among its words, fetch as the command run, or a `gh` read."""
@@ -129,7 +113,7 @@ def bash_read(doc):
                 continue
             words = [sw.word(s, i) for i in range(g + 1, b + 1)]
             if _gh_reads(words):
-                return "`gh " + " ".join(_operands(words)[:2]) + "`"
+                return "`gh " + " ".join(sw.operands(words, sw.PROGRAMS["gh api"]["valued"])[:2]) + "`"
     return None
 
 

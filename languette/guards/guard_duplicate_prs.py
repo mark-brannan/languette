@@ -153,7 +153,7 @@ def posts(doc):
     out, cd = [], False
     for text, nested in doc.texts():
         s = doc.scan(text)
-        if any(s.k[i] == "w" and s.w[i] in ("cd", "pushd", "popd") for i in range(len(s.w))):
+        if sw.cd_present(s):
             cd = True
         for a, b in s.segments():
             if a > b:

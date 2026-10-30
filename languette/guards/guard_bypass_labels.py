@@ -299,7 +299,7 @@ def _bash(f, doc, cmd, cwd, env, depth=0, alone=True):
     scans = [(doc.scan(t), nested) for t, nested in doc.texts(text=cmd)]
     bodies = doc.heredocs(cmd)
     ctx = {"cwd": cwd, "env": env, "bodies": bodies, "files": f.files, "wanted": f.wanted,
-           "moved": any(k == "w" and w in ("cd", "pushd", "popd") for s, _ in scans for k, w in zip(s.k, s.w)),
+           "moved": any(sw.cd_present(s) for s, _ in scans),
            "alone": alone and sw.alone(scans, sw.GH)}
     for s, nested in scans:
         for a, b in s.segments():

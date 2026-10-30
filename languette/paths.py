@@ -236,7 +236,7 @@ def plan_targets(parsed, parse_allow):
 
 def judge_targets(parsed, answers, name, parse_allow, malformed, verdict):
     """The judge of a guard that judges target paths, up to the targets
-    themselves: a malformed allow var (`malformed`, a template its error fills)
+    themselves: a malformed allow var (`malformed`, a function of the guard name and the error, returning its text)
     is context when there is nothing to judge and a deny otherwise; a refused
     parse is a deny. Past that, `verdict(targets, home, physical, *extras)`
     judges the targets, extras being what parse_allow found besides its error
@@ -247,12 +247,12 @@ def judge_targets(parsed, answers, name, parse_allow, malformed, verdict):
     extras, allow_err = [], None
     if parsed["allow"]:
         *extras, allow_err = parse_allow(parsed["allow"], home, physical(home), physical)
-    allow_msg = malformed.format(allow_err) if allow_err else None
+    allow_msg = malformed(name, allow_err) if allow_err else None
     refused = parsed["refused"]
     if refused is None and not parsed["targets"]:
-        return context(f"{name}: " + allow_msg) if allow_msg else None
+        return context(allow_msg) if allow_msg else None
     if allow_msg:
-        return deny(f"{name}: " + allow_msg)
+        return deny(allow_msg)
     if refused is not None:
         return deny(refused)
     return verdict(parsed["targets"], home, physical, *extras)
