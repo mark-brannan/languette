@@ -32,6 +32,8 @@ _DPART = r"""'[^'\n]*'|"[^"\n]*"|\\."""
 _OPENER = re.compile(r"(?<!<)<<-?[ \t]*(?:[A-Za-z_]|" + _DPART + r")(?:[A-Za-z0-9_]|" + _DPART + r")*")
 _ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _WS = re.compile(r"[ \t\n]")
+# A word's run-time part that names one variable: $NAME or ${NAME}, the name in group 1 or 2.
+VAR_REF = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
 
 # The tools that run git. home: its work tree is always $HOME, wherever it runs.
 # repo: it takes the name of one of its repositories before the git arguments.
@@ -948,6 +950,28 @@ def seg_cmd(s, a, b):
     return None
 
 
+def cd_present(s):
+    """True when some plain word of scan s is cd, pushd or popd, wherever it
+    stands: a guard that does not follow the working directory gives up on
+    the word alone."""
+    return any(k == "w" and CD.match(w) for k, w in zip(s.k, s.w))
+
+
+def operands(words, valued=(), options=False):
+    """`words` less each option in `valued` and the word after it, its value;
+    the other options stay only when `options`. An option outside `valued` is
+    read as a flag. `valued` is a program description's (PROGRAMS)."""
+    out, skip = [], False
+    for w in words:
+        if skip:
+            skip = False
+        elif w in valued:
+            skip = True
+        elif options or not w.startswith("-"):
+            out.append(w)
+    return out
+
+
 def word(s, i):
     """The text of word i: q for a quoted word holding whitespace (the w list
     has $Q there), w for any other."""
@@ -1585,6 +1609,29 @@ PROGRAMS = {
                                    "--quiet --regexp --verbose --version --wait --ignore-case".split()),
                 "unit": "operand", "pattern": "name", "regex": {"-r", "--regexp"}, "fold": {"-I", "--ignore-case"},
                 "signal": True, "opaque": True},
+    # Descriptions that name only `valued`, read by operands(): an option outside it is a flag.
+    "terragrunt": {"valued": frozenset(
+        "--terragrunt-config --config --terragrunt-working-dir --working-dir --terragrunt-download-dir "
+        "--download-dir --terragrunt-iam-role --iam-assume-role --terragrunt-parallelism --parallelism "
+        "--terragrunt-include-dir --queue-include-dir --terragrunt-exclude-dir --queue-exclude-dir "
+        "--terragrunt-log-level --log-level --terragrunt-source --source".split())},
+    "pulumi": {"valued": frozenset("--color --cwd -C --profiling --tracing --memprofilerate --verbose -v".split())},
+    "cdk": {"valued": frozenset("-a --app -c --context -p --plugin --profile -r --role-arn -o --output --proxy "
+                                "--ca-bundle-path --toolkit-stack-name --build --lookups --notices".split())},
+    "aws": {"valued": frozenset("--profile --region --endpoint-url --output --query --ca-bundle --cli-read-timeout "
+                                "--cli-connect-timeout --color --cli-binary-format".split())},
+    "kubectl": {"valued": frozenset(
+        "-n --namespace --context --kubeconfig --cluster --user -s --server --token --as --as-group "
+        "--as-uid --certificate-authority --client-certificate --client-key --cache-dir "
+        "--request-timeout --tls-server-name --username --password --profile --profile-output "
+        "--log-flush-frequency -v --v --vmodule".split())},
+    "helm": {"valued": frozenset("-n --namespace --kube-context --kubeconfig --kube-apiserver --kube-token "
+                                 "--kube-as-user --kube-as-group --kube-ca-file --kube-tls-server-name "
+                                 "--registry-config --repository-cache --repository-config --burst-limit "
+                                 "--qps".split())},
+    # A push takes any unambiguous prefix of a long option; --exec is --receive-pack.
+    "git push": {"valued": frozenset("-o --push-option --repo --receive-pack --exec".split())},
+    "gh api": {"valued": frozenset(GH_REPO_FLAGS + GH_METHOD_FLAGS + GH_API_FIELDS + ("--input",)) | GH_API_VALUED},
 }
 _SIGNAL = re.compile(r"-(?:[0-9]+|(?:SIG)?[A-Z][A-Z0-9+-]+)\Z")
 

@@ -34,11 +34,7 @@ ANSWERS = {"Refuse", "deny", "ask", "context"}
 # A constant two or more guards keep: the names, as one set each; a found set
 # must fall inside one of these.
 KNOWN_TWICE = {
-    frozenset({"guard_bypass_labels.GH", "guard_bypass_ruleset._GH", "guard_cross_session_send._GH",
-               "guard_duplicate_prs.GH", "guard_github_issues.GH", "guard_private_terms.GH",
-               "guard_review_threads.GH", "guard_signed_comments.GH"}),
     frozenset({"guard_bypass_ruleset._GITHUB", "guard_duplicate_prs._GITHUB"}),
-    frozenset({"guard_bypass_ruleset._VAR", "guard_signed_comments._VAR"}),
     frozenset({"guard_permissions._FIND", "guard_recursive_delete._FIND"}),
 }
 # Reads of a DOCUMENT_FIELDS key from the payload, at most, per guard.
