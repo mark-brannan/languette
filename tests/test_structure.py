@@ -24,7 +24,7 @@ from hamcrest import assert_that, empty, equal_to
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {f.stem: importlib.import_module(f"languette.guards.{f.stem}")
           for f in sorted((ROOT / "languette" / "guards").glob("*.py")) if f.stem != "__init__"}
-SHARED = {m: importlib.import_module(f"languette.{m}") for m in ("scan", "paths", "verdict", "document", "secrets")}
+SHARED = {m: importlib.import_module(f"languette.{m}") for m in ("scan", "paths", "verdict", "document", "secrets", "refs")}
 
 # The fields of the call Document reads once; a guard reads them from the Document.
 DOCUMENT_FIELDS = {"tool_name", "tool_input", "hook_event_name", "permission_mode"}

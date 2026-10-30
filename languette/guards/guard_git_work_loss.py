@@ -231,7 +231,16 @@ def _default(branches):
     return re.compile(r"(?:refs/heads/)?(?:" + "|".join(map(re.escape, branches)) + r")\Z")
 
 
-def _push(a, branches):
+def _push_may_hurt(a):
+    """Whether a push could force, lease, delete or colon-refspec: only then does the default branch matter."""
+    return any(t.startswith((":", "+", "--force", "--delete")) or _pfx(t, "--force") or _pfx(t, "--delete")
+               or _has(t, "f") or _has(t, "d") for t in a)
+
+
+def _push(doc, a):
+    if not _push_may_hurt(a):
+        return
+    branches = yield from _default_branches(doc)
     main = _default(branches)
     force = lease = delete = False
     protected_branch = ""  # the default branch this push targets, or "" if none
@@ -544,7 +553,7 @@ def _segment(doc, s, a, b, nested, env):
         elif sub == "stash":
             _stash(args)
         elif sub == "push":
-            _push(args, (yield from _default_branches(doc)))
+            (yield from _push(doc, args))
         elif sub in ("checkout", "restore"):
             _discard(sub, args)
         elif sub == "clean":
