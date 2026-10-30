@@ -1421,7 +1421,8 @@ def segments(doc, prose=PROSE):
 # Command rules: docs/design/guard-rules.md, "Command rules". A rule's match is
 # a command word (`cmd`, by basename) and any of: `args`, a run of its
 # non-option words; `script`, a later word that is it or ends in `/script`;
-# `flags`, short option letters each present in a short-option cluster.
+# `flags`, short option letters each present in a short-option cluster;
+# `at: "command"`, the word only where it runs, never as another command's operand.
 _CLUSTER = re.compile(r"-[A-Za-z]+")
 
 
@@ -1469,6 +1470,8 @@ class BadRules(ValueError):
 
 
 _MATCH_KEYS = ("args", "cmd", "flags", "script")
+# A match the rules engine reads (languette/engine.py): `at` too, and `cmd` alone is the whole program.
+ENGINE_MATCH_KEYS = (*_MATCH_KEYS, "at")
 
 
 def _listed(v, what, each=r".+", of="non-empty strings"):
@@ -1476,13 +1479,15 @@ def _listed(v, what, each=r".+", of="non-empty strings"):
         raise BadRules(f"{what} must be a non-empty list of {of}")
 
 
-def _check_match(m, w):
-    if not isinstance(m, dict) or set(m) - set(_MATCH_KEYS):
-        raise BadRules(f"{w} must be an object holding only {', '.join(_MATCH_KEYS)}")
+def _check_match(m, w, keys=_MATCH_KEYS):
+    if not isinstance(m, dict) or set(m) - set(keys):
+        raise BadRules(f"{w} must be an object holding only {', '.join(keys)}")
     if not isinstance(m.get("cmd"), str) or not re.fullmatch(r"[A-Za-z0-9._+-]+", m["cmd"]):
         raise BadRules(f"{w}.cmd must be a bare command name")
-    if not {"args", "script", "flags"} & set(m):
+    if keys is _MATCH_KEYS and not {"args", "script", "flags"} & set(m):
         raise BadRules(f"{w} needs args or script (or flags), or it would match every {m['cmd']}")
+    if "at" in m and m["at"] != "command":
+        raise BadRules(f'{w}.at must be "command"')
     if "args" in m:
         _listed(m["args"], f"{w}.args")
     if "flags" in m:
@@ -1491,11 +1496,12 @@ def _check_match(m, w):
         raise BadRules(f"{w}.script must be a non-empty path")
 
 
-def load_rules(cfg, key, keys=(), check=None, many=False, taken=(), nonempty=False):
+def load_rules(cfg, key, keys=(), check=None, many=False, taken=(), nonempty=False, match_keys=_MATCH_KEYS):
     """The one loader of command rules: the rules of `cfg[key]`, a read rule file, or BadRules
     naming the fault. A rule is an object with an `id` (unique, and not one of `taken`), a
     `match` and the other `keys` the guard names; `check(rule, where)` is the guard's own test
-    of one rule. `match` is one entry, or with `many` a list of them; an entry is checked here."""
+    of one rule. `match` is one entry, or with `many` a list of them; an entry is checked here,
+    against `match_keys` (ENGINE_MATCH_KEYS for the rules engine's)."""
     if not isinstance(cfg, dict) or set(cfg) != {key} or not isinstance(cfg[key], list) or (nonempty and not cfg[key]):
         raise BadRules(f'the top level must be {{"{key}": [...]}}' + (" with at least one rule" if nonempty else ""))
     seen = set(taken)
@@ -1515,21 +1521,25 @@ def load_rules(cfg, key, keys=(), check=None, many=False, taken=(), nonempty=Fal
             check(r, where)
         m = r.get("match")
         if not many:
-            _check_match(m, f"{where}.match")
+            _check_match(m, f"{where}.match", match_keys)
         elif not isinstance(m, list) or not m:
             raise BadRules(f"{where}.match must be a non-empty list")
         else:
             for i, e in enumerate(m):
-                _check_match(e, f"{where}.match[{i}]")
+                _check_match(e, f"{where}.match[{i}]", match_keys)
     return cfg[key]
 
 
 def _word_hit(doc, match, prose, launchers):
-    """(how many times the command runs `match`, whether any text holds a LOOP word)."""
+    """(how many times the command runs `match`, whether any text holds a LOOP word). With
+    `at: "command"`, only the command position counts, as in a nested text, and no launcher."""
+    placed = match.get("at") == "command"
+    launchers = launchers and not placed
     names = {match["cmd"]} | (LAUNCH if launchers else set()) | (PM if match["cmd"] in PM else set())
     rx = re.compile(r"(?:^|/)(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\Z")
     n, (segs, loop) = 0, segments(doc, prose)
     for s, a, b, nested in segs:
+        nested = nested or placed
         g = cmd_index(s, a, b, rx, nested, prose=prose)
         # cmd_index stops at the first launcher; a later word may be the command.
         while g is not None:

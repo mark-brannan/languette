@@ -106,7 +106,6 @@ Feature: guard-secrets
       | DB_PASSWORD=secret ./run                                       | too short to be judged                 |
       | export AUTH_TOKEN_FILE=/run/secrets/token                      | a path                                 |
       | docker login -u me --password-stdin < pw.txt                   | the safe way                           |
-      | sudo -u root ls                                                | -u names a user, no password           |
       | bypass=Zq9kLm2pQ7rXv4Tn ./run                                  | ends in pass, not a key: gitleaks:allow |
       | compass=Zq9kLm2pQ7rXv4Tn ./run                                 | ends in pass, not a key: gitleaks:allow |
       | curl "https://example.com/v1?page=2&per_page=100"            | a query with no credential key         |
@@ -115,6 +114,11 @@ Feature: guard-secrets
       | mysql -u root -phunter2 db                                     | masked in a decision record, never judged here |
       | echo Zq9kLm2pQ7rXv4TnWb8Yc3Hd5Fg6Js1Ae0Ux                      | a long mixed run: masked in a record, never judged here: gitleaks:allow |
       | echo done                                                      |                                        |
+
+    @also_guard-sudo
+    Examples:
+      | command                                                        | note                                   |
+      | sudo -u root ls                                                | -u names a user, no password           |
 
   Scenario: the project's own patterns extend the list
     Given a project directory

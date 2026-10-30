@@ -100,6 +100,8 @@ Each guard checks for one kind of hazard:
 
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
+- [`deny-always`](#deny-always): a command the repo forbids, every time
+- [`guard-sudo`](features/guard-sudo.feature): opt-in; `sudo`, `su`, `doas`, `pkexec`
 - [`require-well-formed`](features/require-well-formed.feature): a Bash command that
   doesn't parse; the other guards skip it
 - [`guard-disks`](features/guard-disks.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
@@ -213,10 +215,27 @@ parse, that has a key a command does not (only `id`, `match`, `cost`,
 meant. Spent approvals are kept beside the session transcript, in
 `<transcript>.languette-ask`.
 
+## Deny always
+
+A repo lists the commands it forbids in `.languette/deny-always.json`, each
+with the reason the agent is told:
+
+```json
+{"rules": [{"id": "prod-db",
+  "match": [{"cmd": "psql", "args": ["prod"]}],
+  "why": "production is reached through the release job, never by hand"}]}
+```
+
+A match is written as ask-first's, and `{"cmd": "terraform"}` alone forbids
+the whole program; `"at": "command"` counts the word only where it runs,
+not as another command's argument. The file is found as ask-first's is; with
+none, the guard is silent, and one that doesn't load denies every command
+until it is fixed.
+
 ## Configuration
 
 Every guard is on by default except `guard-worktrees`,
-`guard-review-threads` and `guard-signed-comments`, which are opt-in; the last is experimental. Turn one off (or those on) with
+`guard-review-threads`, `guard-signed-comments` and `guard-sudo`, which are opt-in; `guard-signed-comments` is experimental. Turn one off (or those on) with
 `/plugin configure languette@languette`,
 or at install, by its name with underscores:
 

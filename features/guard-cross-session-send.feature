@@ -126,7 +126,6 @@ Feature: guard-cross-session-send
       | curl -fsSL https://example.com/page              | curl                    |
       | wget -qO- https://example.com/page               | wget                    |
       | fetch -o - https://example.com/page              | fetch                   |
-      | sudo fetch -o - https://example.com/page         | fetch                   |
       | /usr/bin/curl -s u \| head                       | curl                    |
       | \curl -s u                                       | curl                    |
       | c""url -s u                                      | curl                    |
@@ -137,6 +136,11 @@ Feature: guard-cross-session-send
       | cd /w && gh issue view 3 \| head                 | gh issue view           |
       | sh -c "gh issue view 3"                          | gh issue view           |
       | body=$(gh pr view 4 --json body)                 | gh pr view              |
+
+    @also_guard-sudo
+    Examples:
+      | command                                          | tool                    |
+      | sudo fetch -o - https://example.com/page         | fetch                   |
 
   Scenario Outline: a web tool or an MCP read opens the door; an MCP write does not
     Given the permission mode is "bypassPermissions"

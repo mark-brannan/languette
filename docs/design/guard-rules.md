@@ -35,6 +35,8 @@ it onto the engine changes how it is written, never what it decides.
 - `match` selects calls: a command word and its non-option words, as
   ask-first writes them today, with flags, a tool name, a path or a text
   pattern. The scanner sees through wrappers, chains, `sh -c` and launchers.
+  A command word may be held to where it runs, never another command's
+  argument (`apt-get install sudo` is not `sudo`).
 - `when` is predicates over the matched words and over facts, under `all`,
   `any` and `not`. Absent, the match alone decides.
 - `action` and `why`: the verdict, and the message key that explains it.
@@ -127,12 +129,10 @@ list; what it built is then described above.
 1. The registry: the shared selectors first (the `gh api` walk, cd
    tracking, word-live, the valued-option tables), each landing with the
    guards that repeat it moved onto it.
-2. deny-always and guard-sudo as rule sets alone: the measure of what a new
-   guard costs.
-3. The command guards move, smallest first; then the text guards, whose
+2. The command guards move, smallest first; then the text guards, whose
    `secret_rules`, term list and label list are already data.
-4. The stateful guards: their rules move, their handlers stay code.
-5. The repo tier, once its bounds are decided.
+3. The stateful guards: their rules move, their handlers stay code.
+4. The repo tier, once its bounds are decided.
 
 Lines, from the survey: ~3000 of guard code become data plus engine, ~1500
 stay code, ~2000 are messages and stay where they are.

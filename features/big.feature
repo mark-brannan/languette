@@ -9,6 +9,10 @@ Feature: big
   (`pytest --full`), nightly and on dispatch. A row here earns its place by
   reaching a construct no smaller row on the shfmt rung does.
 
+  # guard-sudo, an opt-in, is left off: these ran sudo, and are here for their shape.
+  Background:
+    Given CLAUDE_PLUGIN_OPTION_GUARD_SUDO is unset
+
 
   Scenario: a real ssh call, sudo sh -c around a shell function with case and arithmetic, is let through
     When the agent runs:

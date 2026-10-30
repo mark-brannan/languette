@@ -30,7 +30,6 @@ Feature: guard-permissions
       | chmod -R -x src                 | is none of those               | a mode that begins with a dash                  |
       | chmod --reference=ref -R src    | is none of those               | with --reference there is no mode operand       |
       | chmod -R 755 -- src             | is none of those               |                                                 |
-      | sudo chown -R root /srv/x       | is none of those               |                                                 |
       | timeout 5 chmod -R 755 src      | is none of those               |                                                 |
       | chmod -R 755 /tmp/x ~/project   | is none of those               | one target the user's is enough                 |
       | chmod -R 755 /                  | root of the filesystem         | never /                                         |
@@ -46,6 +45,11 @@ Feature: guard-permissions
       | xargs chmod -R 755              | no target is visible           | xargs hides the target                          |
       | chmod -R 755 /tmp/x/.git        | inside a .git                  | even in /tmp: a repository's own store          |
       | chmod -R 755 ~/.claude/worktrees/w/.git | inside a .git          | even in an agent worktree                       |
+
+    @also_guard-sudo
+    Examples:
+      | command                         | naming                         | note                                            |
+      | sudo chown -R root /srv/x       | is none of those               |                                                 |
 
   Scenario Outline: chmod 777 is denied outside the agent's own area
     When the agent runs `<command>`
@@ -141,18 +145,22 @@ Feature: guard-permissions
       | command                              | verdict                             | note                                   |
       | env -C /etc chmod -R 755 .           | denies, naming "`cd` earlier"       | GNU env -C                             |
       | env --chdir=/etc chmod -R 755 .      | denies, naming "`cd` earlier"       |                                        |
-      | sudo -D /etc chmod -R 755 .          | denies, naming "`cd` earlier"       | sudo -D                                |
-      | sudo --chdir /etc chown -R me sub    | denies, naming "`cd` earlier"       |                                        |
       | env -C/etc chmod -R 755 .            | denies, naming "`cd` earlier"       | the value attached                     |
-      | sudo -D/etc chmod -R 755 .           | denies, naming "`cd` earlier"       |                                        |
-      | sudo -nD /etc chmod -R 755 .         | denies, naming "`cd` earlier"       | a short cluster                        |
       | env -iC /etc chmod -R 755 .          | denies, naming "`cd` earlier"       |                                        |
       | env --chd=/etc chmod -R 755 .        | denies, naming "`cd` earlier"       | a getopt prefix of --chdir             |
+      | env -C /etc chmod -R 755 /tmp/x      | is silent                           | an absolute target is still judged     |
+      | env FOO=1 chmod -R 755 .             | is silent                           | env without a chdir option             |
+
+    @also_guard-sudo
+    Examples:
+      | command                              | verdict                             | note                                   |
+      | sudo -D /etc chmod -R 755 .          | denies, naming "`cd` earlier"       | sudo -D                                |
+      | sudo --chdir /etc chown -R me sub    | denies, naming "`cd` earlier"       |                                        |
+      | sudo -D/etc chmod -R 755 .           | denies, naming "`cd` earlier"       |                                        |
+      | sudo -nD /etc chmod -R 755 .         | denies, naming "`cd` earlier"       | a short cluster                        |
       | sudo -R /srv chmod -R 755 .          | denies, naming "`cd` earlier"       | sudo -R is a chroot: `.` moves too     |
       | sudo -u root chmod -R 755 .          | is silent                           | -u takes root as its value             |
       | sudo -E chmod -R 755 .               | is silent                           | chmod's own -R is not sudo's           |
-      | env -C /etc chmod -R 755 /tmp/x      | is silent                           | an absolute target is still judged     |
-      | env FOO=1 chmod -R 755 .             | is silent                           | env without a chdir option             |
       | sudo chmod -R 755 .                  | is silent                           | /tmp is the working directory          |
 
   Scenario: a sweep is judged where it lands, not by the working directory it began in

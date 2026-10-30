@@ -18,7 +18,6 @@ Feature: guard-disks
       | command                                | naming                       | note                                       |
       | dd if=disk.img of=/dev/sda             | is a device node             |                                            |
       | dd if=x of=/dev/nvme0n1p2 bs=4M        | is a device node             |                                            |
-      | sudo dd if=x of=/dev/disk2             | is a device node             |                                            |
       | dd of=/dev/../dev/sda                  | is a device node             | a .. segment is applied, not trusted       |
       | dd of=/dev/mapper/vg-root if=x         | is a device node             | any node under /dev that is not a sink     |
       | dd if=x of=$DEV                        | glob, brace or variable      | an unresolved target could be a device     |
@@ -33,7 +32,6 @@ Feature: guard-disks
       | echo x >\|/dev/sda                     | writes onto a disk device    | clobber                                    |
       | echo x >"/dev/sda"                     | writes onto a disk device    | quoted                                     |
       | cat disk.img \| tee /dev/sda           | writes onto a disk device    | tee                                        |
-      | cat disk.img \| sudo tee -a /dev/vda   | writes onto a disk device    |                                            |
       | sh -c 'cat disk.img > /dev/sda'        | writes onto a disk device    | nested text is scanned                     |
       | cat disk.img > /dev//sda               | writes onto a disk device    | the path is judged as the filesystem sees it |
       | cat disk.img > /dev/./sda              | writes onto a disk device    |                                            |
@@ -44,6 +42,12 @@ Feature: guard-disks
       | echo x > /dev/mem                      | writes onto a disk device    | memory and RAM devices                     |
       | echo x \| tee /dev/kmem                | writes onto a disk device    |                                            |
       | echo x > /dev/zram0                    | writes onto a disk device    |                                            |
+
+    @also_guard-sudo
+    Examples:
+      | command                                | naming                       | note                                       |
+      | sudo dd if=x of=/dev/disk2             | is a device node             |                                            |
+      | cat disk.img \| sudo tee -a /dev/vda   | writes onto a disk device    |                                            |
 
   Scenario Outline: a relative path after a cd that may land in /dev cannot be followed, so it is denied
     When the agent runs `<command>`
@@ -60,10 +64,7 @@ Feature: guard-disks
       | cd - && cat x > sda                     | denies, naming "`cd` earlier"               |                                        |
       | popd && cat x > sda                     | denies, naming "`cd` earlier"               |                                        |
       | env -C /dev dd if=x of=sda              | denies, naming "`cd` earlier"               | env -C changes the directory too       |
-      | sudo -D /dev tee sda                    | denies, naming "`cd` earlier"               | sudo -D                                |
       | env -C/dev dd if=x of=sda               | denies, naming "`cd` earlier"               | the value attached                     |
-      | sudo -nD /dev tee sda                   | denies, naming "`cd` earlier"               | a short cluster                        |
-      | sudo -u root tee sda                    | is silent                                   | -u takes root as its value             |
       | cd /dev && cat x > /dev/sda             | denies, naming "writes onto a disk device"  | an absolute path is still judged       |
       | cd /dev && cat x > /tmp/out             | is silent                                   | an absolute path outside /dev          |
       | cd build && echo x > out.log            | is silent                                   | a cd that lands elsewhere              |
@@ -73,6 +74,13 @@ Feature: guard-disks
       | abcd /dev && cat x > sda                | is silent                                   | a command whose name ends in cd is not cd |
       | /usr/bin/cd /dev && cat x > sda         | is silent                                   | a cd program cannot move the shell     |
 
+    @also_guard-sudo
+    Examples:
+      | command                                 | verdict                                     | note                                   |
+      | sudo -D /dev tee sda                    | denies, naming "`cd` earlier"               | sudo -D                                |
+      | sudo -nD /dev tee sda                   | denies, naming "`cd` earlier"               | a short cluster                        |
+      | sudo -u root tee sda                    | is silent                                   | -u takes root as its value             |
+
   Scenario Outline: mkfs, wipefs and shred are denied on anything but the agent's own area
     When the agent runs `<command>`
     Then the guard denies, naming "<naming>"
@@ -81,7 +89,6 @@ Feature: guard-disks
       | command                                    | naming                                       | note                                    |
       | mkfs.ext4 /dev/sdb1                        | is a device node                             |                                         |
       | mkfs -t ext4 /dev/sdb1                     | is a device node                             | -t takes a value                        |
-      | sudo mkfs.vfat -F 32 /dev/mmcblk0p1        | is a device node                             |                                         |
       | mkswap /dev/sda2                           | is a device node                             |                                         |
       | mke2fs -L data /dev/sdc                    | is a device node                             |                                         |
       | mkfs.ext4 disk.img                         | outside the scratchpad, /tmp and agent worktrees | a file in the project is the user's |
@@ -99,6 +106,11 @@ Feature: guard-disks
       | shred *.txt                                | glob or brace expansion                      |                                         |
       | shred ../x                                 | `..` segment                                 |                                         |
       | cd x && shred y                            | `cd` earlier                                 |                                         |
+
+    @also_guard-sudo
+    Examples:
+      | command                                    | naming                                       | note                                    |
+      | sudo mkfs.vfat -F 32 /dev/mmcblk0p1        | is a device node                             |                                         |
 
   Scenario Outline: the denial names the safe path
     When the agent runs `<command>`

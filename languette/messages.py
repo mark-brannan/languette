@@ -262,6 +262,15 @@ MESSAGES = {
         "{file} is invalid: {err}. Every Bash command is denied until it is fixed, because the guard "
         "cannot tell what it was meant to cover. Fix the file, or tell the user."
     ),
+    "rules_cannot_look": (
+        "the payload's cwd {cwd!r} is not a directory, so the repo's list cannot be found. "
+        "A gate that cannot look fails closed: retry from the project directory."
+    ),
+    # A rule set's messages (languette/rules/): filled with the command word matched and way_user.
+    "sudo_root": (
+        "`{cmd}` is blocked: it runs the command as root, and an agent works as the user, never as root. "
+        "{way_user}"
+    ),
     "host_power": "`{what}` is blocked: it takes the machine down, with the user's session on it. {way_user}",
     "host_ctl": (
         "`systemctl {verb}` is blocked: it takes down the host or a service the "

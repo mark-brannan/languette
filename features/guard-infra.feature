@@ -86,7 +86,6 @@ Feature: guard-infra
         | terragrunt --terragrunt-working-dir infra destroy              | terragrunt's own valued option first          |
         | terragrunt destroy-all                                         | terragrunt's old spelling                     |
         | timeout 1h terraform destroy                                   | wrapper                                       |
-        | sudo -u deploy kubectl delete -f app.yaml                      | sudo                                          |
         | cd infra && terraform destroy                                  | chain                                         |
         | terraform plan; terraform destroy                              | later in a ; chain                            |
         | sh -c "terraform destroy"                                      | sh -c nests                                   |
@@ -118,6 +117,11 @@ Feature: guard-infra
         | helm del web                                                   | del alias                                     |
         | helm un web                                                    | un alias                                      |
         | helm uninstall web --dry-run=false                             | dry-run switched off                          |
+
+      @also_guard-sudo
+      Examples:
+        | command                                                        | note                                          |
+        | sudo -u deploy kubectl delete -f app.yaml                      | sudo                                          |
 
       @also_guard-recursive-delete
       Examples:

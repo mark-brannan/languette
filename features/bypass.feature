@@ -9,7 +9,9 @@ Feature: bypass
   shows as XPASS. The verdicts there are proposals, not decisions. Every other
   scenario is allowed by design and fails CI when a guard stops allowing it.
 
+  # guard-sudo, an opt-in, is left off: with it on, `sudo ufw status` is denied as any sudo is.
   Scenario Outline: reading the agent's own controls is allowed
+    Given CLAUDE_PLUGIN_OPTION_GUARD_SUDO is unset
     When the agent runs `<command>`
     Then the guard is silent
 
