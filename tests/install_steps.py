@@ -111,6 +111,16 @@ def _terms_held(installer, text):
     installer.held = f.read_text()
 
 
+@given("the redacted terms path is a file, not a directory")
+def _terms_blocked(installer):
+    (installer.home / ".config").write_text("")
+
+
+@then("the redacted terms file starts with the redacted header")
+def _terms_header(installer):
+    assert_that((installer.home / TERMS).read_text(), contains_string("find\t"))
+
+
 @then("the redacted terms file is unchanged")
 def _terms_unchanged(installer):
     assert_that((installer.home / TERMS).read_text(), equal_to(installer.held))
