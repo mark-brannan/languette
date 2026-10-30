@@ -503,3 +503,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t075616z
 - own places fall back to /tmp alone when the host names no scratch or worktree root ([#311](https://github.com/mark-brannan/languette/pull/311))
+
+### 20261030t075630z
+- a host-named own root that is empty, /, HOME or an ancestor of HOME, as written or as the filesystem has it, is dropped; a base's physical form is trusted only as an alias of that base; /tmp is exempt from the ancestor test ([#311](https://github.com/mark-brannan/languette/pull/311))
