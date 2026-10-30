@@ -38,6 +38,7 @@ Feature: deny-always
       | grep terraform notes.md              | is silent                                                   | prose names it, never runs it     |
       | ansible-playbook site.yml            | denies, naming "rule `no-ansible`"                          |                                   |
       | pip install ansible-playbook         | is silent                                                   | at command: an argument passes    |
+      | ls \| xargs ansible-playbook         | denies, naming "rule `no-ansible`"                          | behind a program that runs one    |
 
   Scenario Outline: a list that does not load denies every command, naming the file and the fault
     Given the file ".languette/deny-always.json" holds:

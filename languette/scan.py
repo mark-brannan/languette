@@ -1530,9 +1530,33 @@ def load_rules(cfg, key, keys=(), check=None, many=False, taken=(), nonempty=Fal
     return cfg[key]
 
 
+# Programs that run a command they are given: past one of these, `at: "command"` reads every
+# later word as it would without `at`, since where their command starts is theirs to say.
+_RUNS_A_COMMAND = EXEC | WRAP | LOOP | LAUNCH | _FIND_WRAPPERS | frozenset(
+    "setsid ionice stdbuf chroot flock strace ltrace unshare nsenter runuser chrt taskset".split())
+
+
+def _placed_index(s, a, b, rx):
+    """Index in a..b of the word `rx` describes where it runs: the command word, past
+    assignments, or once that word is a program that runs a command, any later word."""
+    i = a
+    while i <= b and s.k[i] == "w" and _ASSIGN.match(s.w[i]):
+        i += 1
+    if i > b or s.k[i] != "w":
+        return None
+    if rx.search(s.w[i]):
+        return i
+    if _base(s.w[i]) == "find":                # find's -exec and kin start a command of their own
+        return next((j for k in range(i + 1, b) if s.k[k] == "w" and s.w[k] in _FIND_EXECS
+                     for j in [_placed_index(s, k + 1, b, rx)] if j is not None), None)
+    if _base(s.w[i]) not in _RUNS_A_COMMAND:
+        return None
+    return next((j for j in range(i + 1, b + 1) if s.k[j] == "w" and rx.search(s.w[j])), None)
+
+
 def _word_hit(doc, match, prose, launchers):
     """(how many times the command runs `match`, whether any text holds a LOOP word). With
-    `at: "command"`, only the command position counts, as in a nested text, and no launcher."""
+    `at: "command"`, a word another command takes as its argument does not count (_placed_index)."""
     placed = match.get("at") == "command"
     launchers = launchers and not placed
     names = {match["cmd"]} | (LAUNCH if launchers else set()) | (PM if match["cmd"] in PM else set())
@@ -1540,7 +1564,7 @@ def _word_hit(doc, match, prose, launchers):
     n, (segs, loop) = 0, segments(doc, prose)
     for s, a, b, nested in segs:
         nested = nested or placed
-        g = cmd_index(s, a, b, rx, nested, prose=prose)
+        g = _placed_index(s, a, b, rx) if placed else cmd_index(s, a, b, rx, nested, prose=prose)
         # cmd_index stops at the first launcher; a later word may be the command.
         while g is not None:
             if _hit(match, _base(s.w[g]), s.w[g + 1:b + 1]):

@@ -81,18 +81,22 @@ Feature: guard-permissions
       | find . -execdir chgrp staff {} +                | denies    | -execdir                                |
       | find . -ok chmod 600 {} \;                      | denies    | -ok                                     |
       | find -exec chmod 600 {} +                       | denies    | no start path                           |
-      | find /etc -exec sudo chmod 777 {} \;            | denies    | a wrapper between -exec and chmod       |
       | find . -exec env FOO=1 chmod 644 {} +           | denies    |                                         |
       | find . -exec nice chmod 644 {} +                | denies    |                                         |
-      | find . -exec sudo -u root chown me {} +         | denies    | a wrapper with an option and a value    |
       | find ~/project -exec sh -c 'chmod 644 "$0"' {} \; | denies | a shell running chmod                   |
-      | find /tmp/x -exec sudo chmod 644 {} \;          | is silent | the start path is the agent's           |
       | find /tmp/x -exec sh -c 'chmod 644 "$0"' {} \;  | is silent |                                         |
-      | find . -exec sudo grep -l mode {} +             | is silent | a wrapper around something else         |
       | find /tmp/x -exec chmod 644 {} +                | is silent | the start path is the agent's           |
       | find /tmp/x -exec chmod -R 755 {} +             | is silent |                                         |
       | find /tmp/x -exec chmod 644 ~/project/f {} \;   | denies    | and a target of its own is judged too   |
       | find . -name '*.sh' -exec grep -l chmod {} +    | is silent | chmod is an argument of grep            |
+
+    @also_guard-sudo
+    Examples:
+      | command                                         | verdict   | note                                    |
+      | find /etc -exec sudo chmod 777 {} \;            | denies    | a wrapper between -exec and chmod       |
+      | find . -exec sudo -u root chown me {} +         | denies    | a wrapper with an option and a value    |
+      | find /tmp/x -exec sudo chmod 644 {} \;          | is silent | the start path is the agent's           |
+      | find . -exec sudo grep -l mode {} +             | is silent | a wrapper around something else         |
 
     @also_guard-recursive-delete
     Examples:

@@ -27,6 +27,10 @@ Feature: guard-sudo
       | printf x \| sudo tee /etc/motd          | `sudo`      | the second command of a pipe          |
       | sh -c "sudo ls"                         | `sudo`      | inside sh -c                          |
       | echo "$(sudo cat /etc/shadow)"          | `sudo`      | inside a command substitution         |
+      | ls \| xargs sudo rm                     | `sudo`      | behind a program that runs a command  |
+      | setsid sudo ls                          | `sudo`      | behind a program that runs a command  |
+      | npx sudo ls                             | `sudo`      | behind a launcher                     |
+      | find . -name x -exec sudo rm {} \;      | `sudo`      | find -exec                            |
 
   Scenario: a guard-sudo denial names the safe path
     When the agent runs `sudo ls`
@@ -41,7 +45,6 @@ Feature: guard-sudo
       | apt-get install sudo                | an argument, not the command           |
       | man sudo                            |                                        |
       | which doas                          |                                        |
-      | npx cowsay sudo                     | no launcher runs it                    |
       | echo sudo                           |                                        |
       | git commit -m "drop sudo from ci"   |                                        |
       | grep -r pkexec .                    |                                        |
