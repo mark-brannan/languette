@@ -506,3 +506,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t075630z
 - a host-named own root that is empty, /, HOME or an ancestor of HOME, as written or as the filesystem has it, is dropped; a base's physical form is trusted only as an alias of that base; /tmp is exempt from the ancestor test ([#311](https://github.com/mark-brannan/languette/pull/311))
+
+### 20261030t075641z
+- a session in a host worktree owns the whole project .claude/worktrees directory; CLAUDE_PROJECT_DIR names the project whose worktree directory counts, so the old home-level worktrees directory no longer counts unless the project is HOME ([#311](https://github.com/mark-brannan/languette/pull/311))
