@@ -213,7 +213,7 @@ def plan(parsed):
     found, home, targets, bases = parsed
     if found or not targets:
         return []
-    return [Need("physical", p) for p in dict.fromkeys(bases + [t for t, _, _ in targets])]
+    return [Need("physical", p) for p in dict.fromkeys([home] + bases + [t for t, _, _ in targets])]
 
 
 def judge(parsed, answers):
@@ -221,7 +221,7 @@ def judge(parsed, answers):
     if found or not targets:
         return found
     physical = paths.physical_of(answers)
-    roots = paths.own_roots(bases, physical)
+    roots = paths.own_roots(home, bases, physical)
     for abs_, what, raw in targets:
         if not paths.under(abs_, roots):
             kind = "a device node" if abs_.startswith("/dev/") else "outside the scratchpad, /tmp and agent worktrees"

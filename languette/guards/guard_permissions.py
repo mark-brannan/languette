@@ -150,7 +150,7 @@ _MALFORMED = ("LANGUETTE_PERM_ALLOW is malformed ({}). Recursive chown, chgrp an
 
 
 def _verdict(targets, home, bases, physical, extra_roots=()):
-    roots = paths.own_roots(bases, physical, extra_roots)
+    roots = paths.own_roots(home, bases, physical, extra_roots)
     for abs_, what, raw in targets:
         if not paths.under(abs_, roots):
             return deny(say("perm_not_allowed", what=what, raw=raw, abs_=abs_, way_out=_WAY_OUT))

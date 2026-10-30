@@ -125,6 +125,20 @@ Feature: guard-disks
       | {HOME}/scratch      | {HOME}/project | mkswap {HOME}/.claude/worktrees/w/swap.img | denies    | not a worktree directory of this project |
       | {HOME}              | {HOME}/project | mkfs -t ext4 {HOME}/x.img                  | denies    | a temporary directory that is $HOME is not the agent's own |
 
+  Scenario Outline: a scratch root the host names is not the agent's own when it is, or links to, $HOME or /
+    Given the symlink "{TMP}/link" to "<lands>"
+    And CLAUDE_CODE_TMPDIR is "<tmp>"
+    And the working directory is "{HOME}/project"
+    When the agent runs `mkfs -t ext4 {HOME}/project/x.img`
+    Then the guard denies, naming "outside the scratchpad"
+
+    Examples:
+      | tmp           | lands  | note                          |
+      | {TMP}/link    | {HOME} | a link to $HOME               |
+      | {TMP}/link    | /      | a link to /                   |
+      | {HOME}        | {HOME} | $HOME itself                  |
+      | /             | /      | / itself                      |
+
   Scenario Outline: the working directory inside a host worktree names the worktree directory
     Given the directory "{HOME}/repo/.claude/worktrees/w/src"
     And the working directory is "{HOME}/repo/.claude/worktrees/w/src"

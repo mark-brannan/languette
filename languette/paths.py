@@ -121,20 +121,31 @@ def own_bases(env, cwd):
     """Where the agent works and nothing of the user's lives, as written: /tmp,
     the host's scratch roots, and the host's worktree directory,
     <project>/.claude/worktrees, for the project the host names (CLAUDE_PROJECT_DIR)
-    and for the one the session stands in when it runs inside a worktree. A scratch
-    root that is / or holds $HOME is not the agent's own."""
-    home = env.get("HOME", "")
-    tmp = [d for d in host_tmp_roots(env) if d != home and not home.startswith(d + "/")]
+    and for the one the session stands in when it runs inside a worktree. What
+    the host names is judged in own_roots."""
     proj = (env.get("CLAUDE_PROJECT_DIR") or "").rstrip("/")
     i = cwd.find("/.claude/worktrees/")
     wt = ([proj + "/.claude/worktrees"] if proj.startswith("/") else []) + ([cwd[:i] + "/.claude/worktrees"] if i >= 0 else [])
-    return list(dict.fromkeys(["/tmp"] + tmp + wt))
+    return list(dict.fromkeys(["/tmp"] + host_tmp_roots(env) + wt))
 
 
-def own_roots(bases, physical, extra=()):
+def own_roots(home, bases, physical, extra=()):
     """own_bases, as written and as the filesystem has them (/tmp is
-    /private/tmp on macOS); `physical` maps a path to its physical answer."""
-    return bases + [physical(r) for r in bases] + list(extra)
+    /private/tmp on macOS); `physical` maps a path to its physical answer.
+    A base the host names is dropped when it is empty, /, $HOME or holds $HOME,
+    as written or as the filesystem has it: a link to $HOME is not the agent's
+    own. A base's physical form counts only as an alias of that base. /tmp is
+    the agent's own wherever $HOME lies."""
+    homes = {home, physical(home)}
+
+    def fits(p, tmp):
+        return p not in ("", "/") and p not in homes and (tmp or not any(h.startswith(p + "/") for h in homes))
+    roots = []
+    for b in bases:
+        tmp = b == "/tmp"
+        if fits(b, tmp):
+            roots += [b] + [p for p in (physical(b),) if fits(p, tmp)]
+    return roots + list(extra)
 
 
 def physical_of(answers):
@@ -245,7 +256,7 @@ def plan_targets(parsed, parse_allow):
         want.append(home)
         parse_allow(parsed["allow"], home, home, lambda p: want.append(p) or p)
     if parsed["refused"] is None and parsed["targets"]:
-        want += parsed["bases"] + [t for t, _, _ in parsed["targets"]]
+        want += [home] + parsed["bases"] + [t for t, _, _ in parsed["targets"]]
     return [Need("physical", p) for p in dict.fromkeys(want)]
 
 
