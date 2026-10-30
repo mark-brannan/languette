@@ -128,7 +128,7 @@ Feature: guard-git-work-loss
       | git push --force-with-lease --delete origin main                  | denies    | deleting main, lease or not |
 
   # The default branch is the remote's HEAD ref, whatever the remote is called;
-  # main and master are the fallback when the repository has no such ref.
+  # main and master are always watched beside it: a moved HEAD adds a branch, never removes one.
   Scenario Outline: the default branch a force to asks about is the one the remote HEAD names
     Given a clone of "https://example.com/r.git" at "{TMP}/r" on branch "feat"
     And the remote HEAD of "{TMP}/r" points at "trunk"
@@ -140,7 +140,7 @@ Feature: guard-git-work-loss
       | command                                         | verdict   | note                              |
       | git push --force-with-lease origin trunk        | asks      | the remote HEAD's branch          |
       | git push --force-with-lease origin HEAD:trunk   | asks      | by refspec                        |
-      | git push --force-with-lease origin main         | is silent | main is not what the remote names |
+      | git push --force-with-lease origin main         | asks      | main stays watched, a moved HEAD cannot drop it |
 
   Scenario Outline: the remote HEAD is read whatever the remote is called
     Given a clone of "https://example.com/r.git" at "{TMP}/r" on branch "feat"
@@ -153,7 +153,7 @@ Feature: guard-git-work-loss
     Examples:
       | command                                          | verdict   |
       | git push --force-with-lease upstream trunk       | asks      |
-      | git push --force-with-lease upstream main        | is silent |
+      | git push --force-with-lease upstream main        | asks      |
 
   Scenario Outline: main and master are the default branch when the repository has no remote HEAD
     Given a clone of "https://example.com/r.git" at "{TMP}/r" on branch "feat"

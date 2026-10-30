@@ -7,8 +7,8 @@ features/guard-git-work-loss.feature.
                     inside the tree: pathspec magic, globs and shell expansions do not
   stash pop/drop    pop, a bare drop, clear: the stash stack is shared across worktrees
   force push        bare --force / -f / +refspec; --force-with-lease to the default branch asks;
-                    deleting it. The default branch is the remote's HEAD ref, main and master
-                    when the repository has none
+                    deleting it. The default branches are the remotes' HEAD refs and main and master
+                    beside them (a moved HEAD adds a branch, never removes one)
   discard           git checkout . / git restore . / git clean -f / git reset --hard
                     (allowed when `git status --porcelain` (config-proof) in the payload's cwd is empty;
                     reset --hard to <remote>/<current branch> too, where an agent works)
@@ -419,7 +419,7 @@ def _nothing_to_lose(doc, sub, args):
 def _default_branches(doc):
     """The default branches of the repository at the payload's cwd, as the remotes' HEAD refs
     name them (all remotes, a push's remote being as likely a URL or an alias); main and master
-    when no cwd, no repository or no such ref."""
+    always beside them. Read in the payload's cwd; a push aimed elsewhere (-C, cd, GIT_DIR) still has main and master."""
     cwd = doc.payload.get("cwd")
     if not isinstance(cwd, str) or not cwd.startswith("/"):
         return FALLBACK

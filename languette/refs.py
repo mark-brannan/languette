@@ -4,11 +4,13 @@ The default branch is read from the remote's HEAD ref (refs/remotes/<remote>/HEA
 never presumed. A guard hands in how it asks git; the answer is a Need the world
 performs, so a guard stays pure."""
 
-FALLBACK = ("main", "master")      # when the repository cannot say
+FALLBACK = ("main", "master")      # always protected, beside what a remote HEAD names
 
 
 def default_branches(ask, remote=None):
-    """The default branches the remote HEAD refs name, as a tuple; FALLBACK when none does.
+    """The default branches to protect: those the remote HEAD refs name, then main and master.
+
+    A HEAD ref is a local ref the agent can move, so it adds a branch, never removes one.
 
     `ask(*git_args)` is a generator that returns git's stdout, or None on a failure. With
     `remote`, only that remote's HEAD is read; without it, every remote's, so a repository
@@ -21,4 +23,4 @@ def default_branches(ask, remote=None):
         base = name.removesuffix("HEAD")
         if base != name and target.startswith(base) and len(target) > len(base):
             found.append(target[len(base):])
-    return tuple(dict.fromkeys(found)) or FALLBACK
+    return tuple(dict.fromkeys([*found, *FALLBACK]))

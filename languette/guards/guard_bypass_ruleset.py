@@ -22,8 +22,9 @@ as if that literal were written in its place. GitHub's
 "upgrade to Pro" answer is not a failure: a private repo on a free plan
 cannot carry rules, so there is nothing to bypass.
 
-The default branch is the remote's HEAD as git last fetched it; main and
-master are watched only when the repository has no such ref. A `cd` is followed, `~/` read as
+The default branch is the remote's HEAD as git last fetched it, and main
+and master beside it: that HEAD is a local ref the agent can move, so it may
+add a branch to watch, never take one away. A `cd` is followed, `~/` read as
 HOME and `-C $NAME/...` read as `-C` takes a literal refspec. A subshell's cd
 ends with it. A cd the shell may undo another way (in a group, as an element
 of a pipeline, in an and-or list that is backgrounded or carries on past
