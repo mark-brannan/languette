@@ -533,3 +533,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t084748z
 - guard-rules.md: stage 2 leaves Path there; the match bullet notes a word held to where it runs Undo: revert the hunk ([#314](https://github.com/mark-brannan/languette/pull/314))
+
+### 20261030t084820z
+- A rule's match is a list of entries, any of which selects, as ask-first writes it; the design sketch's any-object is left standing beside it Undo: accept an any-object in engine.load ([#314](https://github.com/mark-brannan/languette/pull/314))
