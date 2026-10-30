@@ -488,3 +488,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261028t075750z
 - doctor: the trailer line is printed on every run, '0 problems; exit 0' included; --restore-redacted-terms with nothing to change says so and exits 0 without asking, and a no leaves the file and exits 0 Undo: print the trailer only when a ✗ is there; exit 1 on a no ([#305](https://github.com/mark-brannan/languette/pull/305))
+
+### 20261030t074251z
+- Subcommand program descriptions use a two-word key in sw.PROGRAMS (git push, gh api), valued only Undo: rename the keys ([#310](https://github.com/mark-brannan/languette/pull/310))
