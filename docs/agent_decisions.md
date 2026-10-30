@@ -500,3 +500,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t074338z
 - Names cd_present, operands, VAR_REF in scan Undo: rename ([#310](https://github.com/mark-brannan/languette/pull/310))
+
+### 20261030t075616z
+- own places fall back to /tmp alone when the host names no scratch or worktree root ([#311](https://github.com/mark-brannan/languette/pull/311))
