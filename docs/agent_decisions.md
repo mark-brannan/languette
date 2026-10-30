@@ -530,3 +530,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261030t084732z
 - Internal names: languette/engine.py, engine.Guard, messages sudo_root and rules_cannot_look Undo: rename ([#314](https://github.com/mark-brannan/languette/pull/314))
+
+### 20261030t084748z
+- guard-rules.md: stage 2 leaves Path there; the match bullet notes a word held to where it runs Undo: revert the hunk ([#314](https://github.com/mark-brannan/languette/pull/314))
