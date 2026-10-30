@@ -100,9 +100,9 @@ def _malformed(guard, err):
     return say("rm_malformed", guard=guard, err=err)
 
 
-def _verdict(targets, home, physical, extra_roots=(), extra_names=()):
+def _verdict(targets, home, bases, physical, extra_roots=(), extra_names=()):
     names = GENERATED_NAMES + tuple(extra_names)
-    roots = paths.own_roots(home, physical, extra_roots)
+    roots = paths.own_roots(home, bases, physical, extra_roots)
 
     def is_generated(p):
         if p.startswith(home + "/"):

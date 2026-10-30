@@ -147,8 +147,8 @@ def _malformed(guard, err):
     return say("perm_malformed", guard=guard, err=err)
 
 
-def _verdict(targets, home, physical, extra_roots=()):
-    roots = paths.own_roots(home, physical, extra_roots)
+def _verdict(targets, home, bases, physical, extra_roots=()):
+    roots = paths.own_roots(home, bases, physical, extra_roots)
     for abs_, what, raw in targets:
         if not paths.under(abs_, roots):
             return deny(say("perm_not_allowed", what=what, raw=raw, abs_=abs_, way_out=_WAY_OUT))

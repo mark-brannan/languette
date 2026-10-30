@@ -95,6 +95,21 @@ Feature: guard-permissions
       | command                                         | verdict   | note                                    |
       | find . -name '*.log' -delete                    | is silent | not a permission change                 |
 
+  Scenario Outline: the host's scratch and worktree areas are the agent's own, where the host names them
+    Given CLAUDE_CODE_TMPDIR is "{HOME}/scratch"
+    And CLAUDE_PROJECT_DIR is "{HOME}/project"
+    And the working directory is "{HOME}/project"
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                                                | verdict   | note                                       |
+      | chmod -R 755 {HOME}/scratch/x                          | is silent | the host's temporary directory             |
+      | chmod -R 755 {HOME}/project/.claude/worktrees/w/src    | is silent | the project's worktree directory           |
+      | chmod -R 755 ~/project/.claude/worktrees/w/src         | is silent | ~/ spelled out                             |
+      | chmod -R 755 {HOME}/.local/state/claude-tmpdir/x       | denies    | a path only one machine used               |
+      | chmod -R 755 {HOME}/.claude/worktrees/w/src            | denies    | not a worktree directory of this project   |
+
   Scenario Outline: a permission change that is not a sweep, and the agent's own areas, pass
     Given the working directory is "<cwd>"
     When the agent runs `<command>`
@@ -110,9 +125,6 @@ Feature: guard-permissions
       | {HOME}/project                      | chmod -x run.sh                             | a mode that begins with a dash          |
       | {HOME}/project                      | chmod -R 755 /tmp/x                         | /tmp is the agent's                     |
       | {HOME}/project                      | chown -R me /tmp/a /tmp/b                   |                                         |
-      | {HOME}/project                      | chmod -R 755 {HOME}/.local/state/claude-tmpdir/x | the scratchpad                     |
-      | {HOME}/project                      | chmod -R 755 {HOME}/.claude/worktrees/w/src | an agent worktree                       |
-      | {HOME}/project                      | chmod -R 755 ~/.claude/worktrees/w/src      | ~/ spelled out                          |
       | /tmp                                | chmod -R 755 .                              | the working directory is the agent's    |
       | /tmp                                | chmod -R 755 sub dir                        | relative targets resolve to /tmp        |
       | {HOME}/project                      | git commit -m "chmod -R 777 everything"     | prose that names it is not it           |
