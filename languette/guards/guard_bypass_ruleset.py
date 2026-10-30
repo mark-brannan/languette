@@ -22,9 +22,8 @@ as if that literal were written in its place. GitHub's
 "upgrade to Pro" answer is not a failure: a private repo on a free plan
 cannot carry rules, so there is nothing to bypass.
 
-The default branch is the remote's HEAD as git last fetched it, and main
-and master beside it: that HEAD is a local ref the agent can move, so it may
-add a branch to watch, never take one away. A `cd` is followed, `~/` read as
+The default branch is the remote's HEAD as git last fetched it; main and
+master are watched only when the repository has no such ref. A `cd` is followed, `~/` read as
 HOME and `-C $NAME/...` read as `-C` takes a literal refspec. A subshell's cd
 ends with it. A cd the shell may undo another way (in a group, as an element
 of a pipeline, in an and-or list that is backgrounded or carries on past
@@ -42,6 +41,7 @@ import re
 from urllib.parse import quote
 
 from languette import scan as sw
+from languette.refs import default_branches
 from languette.messages import say
 from languette.verdict import Act, Need, Refuse, ask, deny
 
@@ -59,7 +59,6 @@ _PIPE = ("|", "|&")
 # The openers among the keywords that lead a segment, and the closers.
 _OPEN = {"if": False, "while": True, "until": True, "for": True, "select": True}   # keyword -> a loop
 _CLOSE = frozenset("fi done".split())
-_FALLBACK = ("main", "master")
 # Text that can set a variable without naming it literally, or change what an unquoted $NAME
 # expands to: ANSI and locale quoting, arithmetic, indirection, IFS, and the builtins that take a
 # variable's name as a value.
@@ -488,10 +487,10 @@ def _judge(p, env):
         remote = remote or "origin"
     url = remote if ("/" in remote or ":" in remote) else (yield from _git(p, env, "remote", "get-url", "--push",
                                                                            remote))
-    head = yield from _git(p, env, "symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD")
-    defaults = list(_FALLBACK)
-    if head and "/" in head and head.split("/", 1)[1] not in defaults:
-        defaults.insert(0, head.split("/", 1)[1])
+
+    def read(*argv):
+        return (yield from _git(p, env, *argv))
+    defaults = yield from default_branches(read, remote)
     hits = defaults if ALL in dsts else [d for d in dsts if d in defaults]
     if not hits:
         return None

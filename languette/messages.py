@@ -247,7 +247,7 @@ MESSAGES = {
         "changes, deletions included."
     ),
     "wl_reset_upstream": (
-        "{why} `git reset --hard origin/<this branch>` passes only when it runs on its own, from a linked "
+        "{why} `git reset --hard <remote>/<this branch>` passes only when it runs on its own, from a linked "
         "worktree or the session's scratchpad with no cd or -C, on a clean tree, and the branch tracks "
         "that same name or nothing."
     ),
