@@ -50,7 +50,6 @@ TTL = 3600
 
 _EXPORT = frozenset("export declare typeset".split())
 _GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
-_PUSH_VALUED = frozenset("-o --push-option --repo --receive-pack --exec".split())
 _ALL = frozenset("--all --branches --mirror".split())
 _UNREADABLE = re.compile(r"[$`*?\[{]")
 _GITHUB = re.compile(r"github\.com(?::\d+)?[:/]+([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?\Z", re.IGNORECASE)
@@ -61,8 +60,6 @@ _PIPE = ("|", "|&")
 _OPEN = {"if": False, "while": True, "until": True, "for": True, "select": True}   # keyword -> a loop
 _CLOSE = frozenset("fi done".split())
 _FALLBACK = ("main", "master")
-# A refspec's one run-time part: $NAME or ${NAME}, nothing else.
-_VAR = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
 # Text that can set a variable without naming it literally, or change what an unquoted $NAME
 # expands to: ANSI and locale quoting, arithmetic, indirection, IFS, and the builtins that take a
 # variable's name as a value.
@@ -123,7 +120,7 @@ class _Literals:
         """Word j, in the segment that starts at start, with its one $NAME replaced by NAME's
         literal, or None."""
         w = self.s.w[j]
-        m = _VAR.search(w)
+        m = sw.VAR_REF.search(w)
         if self.off or self.s.k[j] != "w" or w.count("$") != 1 or "`" in w or not m:
             return None
         name = m.group(1) or m.group(2)
@@ -238,7 +235,7 @@ def _push(s, a, b, nested, here, lits=None):
             return None                        # a deletion is other guards'
         elif _opt(x, "--dry-run") or re.match(r"-[^o-]*n", x):
             dry = True                         # a dry run pushes nothing
-        if x in _PUSH_VALUED or (_opt(x, "--repo") and "=" not in x):
+        if x in sw.PROGRAMS["git push"]["valued"] or (_opt(x, "--repo") and "=" not in x):
             i += 1
         i += 1
     if dry:

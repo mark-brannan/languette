@@ -105,9 +105,8 @@ class _Meta:
                 self.add("HDTXT", line)
         for text, nested in doc.texts():
             s = self.s = doc.scan(text)
-            for i in range(len(s.w)):
-                if s.k[i] == "w" and s.w[i] in ("cd", "pushd", "popd"):
-                    self.add("CD")
+            if sw.cd_present(s):
+                self.add("CD")
             for a, b in s.segments():
                 if a <= b:
                     self.segment(a, b, nested)
@@ -212,7 +211,7 @@ class _Meta:
                 for i in range(lo, hi + 1):
                     if s.k[i] == "w" and sw._ASSIGN.match(s.w[i]):
                         self.assign(s.w[i], s.live[i])
-            elif c is not None and s.w[c] in ("cd", "pushd", "popd"):
+            elif c is not None and sw.CD.match(s.w[c]):
                 self.cdto(c, lo, hi)
         g = sw.cmd_index(s, lo, hi, sw.GH, nested)
         if g is None or g + 1 > hi:
