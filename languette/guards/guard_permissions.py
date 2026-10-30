@@ -143,10 +143,8 @@ class _Judge:
         paths.judge_segments(self, scans)
 
 
-_MALFORMED = ("LANGUETTE_PERM_ALLOW is malformed ({}). Recursive chown, chgrp and chmod, and "
-              "chmod 777, are blocked until it is fixed or unset; other commands run. It must be a "
-              "colon-separated list of absolute paths (/srv/scratch), using only letters, digits and "
-              ". _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.")
+def _malformed(guard, err):
+    return say("perm_malformed", guard=guard, err=err)
 
 
 def _verdict(targets, home, physical, extra_roots=()):
@@ -161,5 +159,5 @@ def _verdict(targets, home, physical, extra_roots=()):
 
 
 def check(doc):
-    return (yield from paths.check_targets(doc, NAME, _Judge, "LANGUETTE_PERM_ALLOW", _parse_allow, _MALFORMED,
+    return (yield from paths.check_targets(doc, NAME, _Judge, "LANGUETTE_PERM_ALLOW", _parse_allow, _malformed,
                                            _verdict))
