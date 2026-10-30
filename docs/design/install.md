@@ -30,7 +30,9 @@ Where the host can write for it, it writes nothing itself; where it must
 write, it shows the diff first (planned: #102). It finds its own root from
 the executable, never from a host's environment variable. A host it cannot
 reach is a ✗ row naming the by-hand path. One row per step, in the doctor's
-marks; exit non-zero on any ✗.
+marks; exit non-zero on any ✗. A fresh install also writes the default
+redacted terms file, as `languette doctor --init-redacted-terms` does, when
+there is none; a file already there is left alone.
 
 ## doctor
 

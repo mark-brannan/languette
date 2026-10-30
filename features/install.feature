@@ -48,7 +48,17 @@ Feature: install
       plugin install languette@languette
       """
     And install exits 0
-    And the fake HOME is as it was before install
+
+  Scenario: a fresh install writes the default redacted terms file
+    When install runs
+    Then the install "redacted terms" row is ✓ "wrote ~/.config/languette/redacted-terms.tsv (3 defaults)"
+    And install exits 0
+
+  Scenario: a redacted terms file already there is left as it is
+    Given the redacted terms file holds "zephyr-01\tthe boat"
+    When install runs
+    Then the redacted terms file is unchanged
+    And install exits 0
 
   Scenario: a marketplace already added is not added again
     Given claude lists the languette marketplace

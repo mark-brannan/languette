@@ -581,15 +581,14 @@ def _defaults():
     return terms.defaults(Path(terms.DEFAULTS).read_text(encoding="utf-8"))
 
 
-def init(kind, options):
-    """Write the kind's file where the guard reads it, never over one that exists: the redacted
-    file with every default, the blocked one with a header and no terms."""
+def initial(kind, options):
+    """(mark, text): write the kind's file where the guard reads it, never over one that exists: the
+    redacted file with every default, the blocked one with a header and no terms."""
     path, _ = terms.where(kind, _env(options))
     where = _tilde(path)
     if os.path.lexists(path):
         repair = "; to repair it: languette doctor --restore-redacted-terms" if kind == "redacted" else ""
-        print(f"{FAIL} {where} exists{repair}")
-        return 1
+        return FAIL, f"{where} exists{repair}"
     if kind == "redacted":
         groups = _defaults()
         body, what = terms.initial(groups), f"{len(groups)} defaults"
@@ -600,10 +599,24 @@ def init(kind, options):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         Path(path).write_text(body, encoding="utf-8")
     except OSError as e:
-        print(f"{FAIL} {where} cannot be written ({e.strerror or e})")
-        return 1
-    print(f"{OK} wrote {where} ({what})")
-    return 0
+        return FAIL, f"{where} cannot be written ({e.strerror or e})"
+    return OK, f"wrote {where} ({what})"
+
+
+def default_terms_rows():
+    """[(mark, label, text)]: the default redacted terms file written where there is none, as
+    --init-redacted-terms does; a file already there is left alone and says nothing."""
+    path, _ = terms.where("redacted", _env({}))
+    if not path or os.path.lexists(path):
+        return []
+    mark, text = initial("redacted", {})
+    return [(mark, "redacted terms", text)]
+
+
+def init(kind, options):
+    mark, text = initial(kind, options)
+    print(f"{mark} {text}")
+    return 1 if mark == FAIL else 0
 
 
 def restore(options):

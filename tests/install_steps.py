@@ -9,7 +9,7 @@ import shlex
 from pathlib import Path
 
 import pytest
-from hamcrest import assert_that, contains_string, equal_to
+from hamcrest import assert_that, contains_string, equal_to, not_
 from pytest_bdd import given, parsers, then, when
 
 from harness import FakeHome
@@ -98,6 +98,23 @@ def _foreign_after_add(installer, repo):
 @given(parsers.parse('claude plugin marketplace add fails with "{err}"'))
 def _add_fails(installer, err):
     installer.add = (1, err + "\n")
+
+
+TERMS = ".config/languette/redacted-terms.tsv"
+
+
+@given(parsers.parse('the redacted terms file holds "{text}"'))
+def _terms_held(installer, text):
+    f = installer.home / TERMS
+    f.parent.mkdir(parents=True)
+    f.write_text(text.replace("\\t", "\t"))
+    installer.held = f.read_text()
+
+
+@then("the redacted terms file is unchanged")
+def _terms_unchanged(installer):
+    assert_that((installer.home / TERMS).read_text(), equal_to(installer.held))
+    assert_that(installer.out, not_(contains_string("redacted terms")))
 
 
 @when("install runs")
