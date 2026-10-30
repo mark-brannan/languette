@@ -134,8 +134,10 @@ def own_roots(home, bases, physical, extra=()):
     /private/tmp on macOS); `physical` maps a path to its physical answer.
     A base the host names is dropped when it is empty, /, $HOME or holds $HOME,
     as written or as the filesystem has it: a link to $HOME is not the agent's
-    own. A base's physical form counts only as an alias of that base. /tmp is
-    the agent's own wherever $HOME lies."""
+    own. A base's physical form counts only as an alias of that base, and only when
+    its last segment is not itself a link (its parents may be: /tmp is /private/tmp),
+    else a link the agent makes would turn any directory into its own. /tmp is the
+    agent's own wherever $HOME lies."""
     homes = {home, physical(home)}
 
     def fits(p, tmp):
@@ -144,8 +146,15 @@ def own_roots(home, bases, physical, extra=()):
     for b in bases:
         tmp = b == "/tmp"
         if fits(b, tmp):
-            roots += [b] + [p for p in (physical(b),) if fits(p, tmp)]
+            p = physical(b)
+            keep = tmp or p == physical(os.path.dirname(b)) + "/" + os.path.basename(b)
+            roots += [b] + [p for p in (p,) if keep and fits(p, tmp)]
     return roots + list(extra)
+
+
+def base_needs(bases):
+    """The paths own_roots asks the disk about: each base and its directory."""
+    return [p for b in bases for p in (b, os.path.dirname(b))]
 
 
 def physical_of(answers):
@@ -256,7 +265,7 @@ def plan_targets(parsed, parse_allow):
         want.append(home)
         parse_allow(parsed["allow"], home, home, lambda p: want.append(p) or p)
     if parsed["refused"] is None and parsed["targets"]:
-        want += [home] + parsed["bases"] + [t for t, _, _ in parsed["targets"]]
+        want += [home] + base_needs(parsed["bases"]) + [t for t, _, _ in parsed["targets"]]
     return [Need("physical", p) for p in dict.fromkeys(want)]
 
 
@@ -264,7 +273,7 @@ def judge_targets(parsed, answers, name, parse_allow, malformed, verdict):
     """The judge of a guard that judges target paths, up to the targets
     themselves: a malformed allow var (`malformed`, a template its error fills)
     is context when there is nothing to judge and a deny otherwise; a refused
-    parse is a deny. Past that, `verdict(targets, home, physical, *extras)`
+    parse is a deny. Past that, `verdict(targets, home, bases, physical, *extras)`
     judges the targets, `bases` being own_bases, extras being what parse_allow found besides its error
     (none when the allow var is unset)."""
     if parsed["found"] or parsed["home"] is None:

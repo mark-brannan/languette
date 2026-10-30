@@ -213,7 +213,7 @@ def plan(parsed):
     found, home, targets, bases = parsed
     if found or not targets:
         return []
-    return [Need("physical", p) for p in dict.fromkeys([home] + bases + [t for t, _, _ in targets])]
+    return [Need("physical", p) for p in dict.fromkeys([home] + paths.base_needs(bases) + [t for t, _, _ in targets])]
 
 
 def judge(parsed, answers):

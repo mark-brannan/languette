@@ -179,6 +179,15 @@ Feature: guard-recursive-delete
       | cwd                | command                                              | verdict   | note                                            |
       | {HOME}/project/sub | rm -rf {HOME}/project/.claude/worktrees/x            | is silent | an absolute worktree, from a deeper cwd         |
 
+  Scenario: a worktree directory that is itself a link to a directory under $HOME does not make that directory the agent's own
+    Given the directory "{HOME}/project/.claude"
+    And the directory "{HOME}/Documents"
+    And the symlink "{HOME}/project/.claude/worktrees" to "{HOME}/Documents"
+    And CLAUDE_PROJECT_DIR is "{HOME}/project"
+    And the working directory is "{HOME}/project"
+    When the agent runs `rm -rf {HOME}/Documents`
+    Then the guard denies, naming "is none of those"
+
   Scenario Outline: a scratch root the host names is not the agent's own when it is, or links to, $HOME or /
     Given the symlink "{TMP}/link" to "<lands>"
     And CLAUDE_CODE_TMPDIR is "<tmp>"

@@ -1178,6 +1178,7 @@
  "tests/test_features.py::test_a_working_directory_this_guard_cannot_resolve_is_silent_and_the_engine_does_not_run[cd nonexistent-dir-xyz && git commit -m x-an unresolvable cd target]": {"git": 3},
  "tests/test_features.py::test_a_working_directory_this_guard_cannot_resolve_is_silent_and_the_engine_does_not_run[git -C nonexistent-dir-xyz commit -m x-an unresolvable -C target]": {"git": 2},
  "tests/test_features.py::test_a_worktree_another_session_added_is_still_foreign": {"git": 9},
+ "tests/test_features.py::test_a_worktree_directory_that_is_itself_a_link_to_a_directory_under_home_does_not_make_that_directory_the_agents_own": {"git": 2},
  "tests/test_features.py::test_a_worktree_reached_by_no_vouched_route_is_own_only_while_the_shell_stands_in_it": {"git": 7},
  "tests/test_features.py::test_a_worktree_the_session_added_is_its_own_in_a_later_call[{TMP}/other-clone-git -C {TMP}/repo worktree add -b added7 .claude/worktrees/added7]": {"git": 15},
  "tests/test_features.py::test_a_worktree_the_session_added_is_its_own_in_a_later_call[{TMP}/repo/.claude/worktrees/mine-cd ..; git worktree add --detach added7 HEAD]": {"git": 15},
