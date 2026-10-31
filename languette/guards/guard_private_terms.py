@@ -44,7 +44,7 @@ never its path; for MCP, every string in tool_input. Each term is matched
 case-insensitively as plain text.
 
 The target repo is --repo/-R, GH_REPO=, a positional URL or owner/repo#n, the
-gh api path, or MCP owner/repo; failing those, the origin of the cwd, unless
+gh api path, or MCP owner/repo; failing those, the cwd's remote (the branch's upstream, else the only one, else origin), unless
 the command runs a `cd`. A graphql mutation's repo is unknown. Unknown is
 judged; only when every target is in private_repos does the text go unjudged.
 
@@ -59,6 +59,7 @@ import re
 from languette import paths
 from languette import scan as sw
 from languette import terms
+from languette.refs import remote_url
 from languette.messages import say
 from languette.verdict import Need, allow, deny
 
@@ -391,7 +392,7 @@ def check(doc):
         if repo == "?":
             repo = ""
         elif repo == "-":
-            repo = "" if cd else ((yield Need("git", "git", cwd, "remote", "get-url", "origin")) or "")
+            repo = "" if cd else ((yield from remote_url(cwd)) or "")
         if not _is_private(sw.norm_repo(repo), env):
             all_private = False
     if all_private:

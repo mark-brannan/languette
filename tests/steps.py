@@ -333,6 +333,18 @@ def _tracks(ctx, branch, path, upstream):
     subprocess.run(["git", "-C", d, "config", f"branch.{branch}.merge", f"refs/heads/{name}"], check=True)
 
 
+@given(parsers.parse('the branch "{branch}" of "{path}" tracks nothing'))
+def _tracks_nothing(ctx, branch, path):
+    d = ctx.expand(path)
+    for key in ("remote", "merge"):
+        subprocess.run(["git", "-C", d, "config", "--unset", f"branch.{branch}.{key}"], check=True)
+
+
+@given(parsers.parse('"{path}" has a remote "{name}" at "{url}"'))
+def _add_remote(ctx, path, name, url):
+    subprocess.run(["git", "-C", ctx.expand(path), "remote", "add", name, url], check=True)
+
+
 def _engine(ctx, command):
     # The prose_budget_command option names the engine.
     ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = command

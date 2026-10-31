@@ -76,7 +76,7 @@ Feature: guard-private-terms
 
   The target repo is --repo/-R, GH_REPO=, a positional issue or PR URL or
   `owner/repo#n`, the `gh api` path, or MCP owner/repo; failing those, the
-  origin of the payload's cwd, unless the command also runs `cd`, in which
+  remote of the payload's cwd (the branch's upstream, else the only one, else origin), unless the command also runs `cd`, in which
   case it is unknown. A graphql mutation names its target by node id, so its
   repo is always unknown, never the cwd's. Unknown is scanned. Only a repo
   listed in the private_repos option (comma-separated owner/name, default
@@ -839,6 +839,35 @@ Feature: guard-private-terms
       Examples:
         | cwd              | command                                                                                                              | verdict   |
         | {TMP}/public     | gh issue create --repo you/notes -t x -b Wanderlust && gh issue comment 3 --repo o/r -b Wanderlust                   | denies    |
+
+    @also_guard-github-issues
+    Scenario Outline: with one remote, whatever its name, that remote decides
+      Given a clone of "<url>" at "{TMP}/w" on branch "main"
+      And the remote of "{TMP}/w" is renamed to "fork"
+      And the working directory is "{TMP}/w"
+      When the agent runs `gh issue create -t x -b "aboard Wanderlust"`
+      Then the guard <verdict>
+
+      Examples:
+        | url                          | verdict   |
+        | git@github.com:you/notes.git | is silent |
+        | https://github.com/o/r.git   | denies    |
+
+    @also_guard-github-issues
+    Scenario Outline: with several remotes, the branch's upstream remote decides, else origin
+      Given a clone of "<origin>" at "{TMP}/w" on branch "main"
+      And "{TMP}/w" has a remote "mine" at "<mine>"
+      And the branch "main" of "{TMP}/w" <tracking>
+      And the working directory is "{TMP}/w"
+      When the agent runs `gh issue create -t x -b "aboard Wanderlust"`
+      Then the guard <verdict>
+
+      Examples:
+        | origin                       | mine                         | tracking          | verdict   |
+        | https://github.com/o/r.git   | git@github.com:you/notes.git | tracks "mine/main" | is silent |
+        | git@github.com:you/notes.git | https://github.com/o/r.git   | tracks "mine/main" | denies    |
+        | https://github.com/o/r.git   | git@github.com:you/notes.git | tracks nothing    | denies    |
+        | git@github.com:you/notes.git | https://github.com/o/r.git   | tracks nothing    | is silent |
 
     # --- reads and clean text pass ------------------------------------------------
 
