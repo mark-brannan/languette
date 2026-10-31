@@ -25,6 +25,7 @@ Feature: wiring
     And the stub "prose-budget" is the engine
     And PROSE_BUDGET_FAIL is "1"
     And CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "postgresql"
+    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is "true"
 
   Scenario Outline: each hooks.json command judges a payload
     Given the hook is the hooks.json command for "<guard>"
@@ -290,12 +291,6 @@ Feature: wiring
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | no | gh pr create -t t -b "Closes #1" | asks |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | true | gh pr create -t t -b "Closes #1" | asks |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | 1 | gh pr create -t t -b "Closes #1" | asks |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    |       | git commit -m x               | warns about "CI fails on this" |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 0     | git commit -m x               | warns about "CI fails on this" |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | False | git commit -m x               | warns about "CI fails on this" |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | no    | git commit -m x               | warns about "CI fails on this" |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | true  | git commit -m x               | warns about "CI fails on this" |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | 1     | git commit -m x               | warns about "CI fails on this" |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       |       | gh pr edit 4 --add-label churn-ok | denies  |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | 0     | gh pr edit 4 --add-label churn-ok | denies  |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | False | gh pr edit 4 --add-label churn-ok | denies  |

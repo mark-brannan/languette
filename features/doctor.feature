@@ -19,7 +19,7 @@ Feature: doctor
 
   Scenario: a plugin install whose hooks deny both probes
     Given languette "cd31356ad5db" is installed at user scope
-    And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true}`
+    And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true}`
     When the doctor runs
     Then the "Claude Code" row is ✓ "plugin cd31356, user scope"
     And beneath it "guards enabled: 26" is ✓ and "guards disabled: 0" is ✓
@@ -47,11 +47,11 @@ Feature: doctor
 
     Examples:
       | options                                                                                                       | on | off | mark | guard          |
-      | {"guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true}                                                 | 25 | 1   | !    | guard_worktrees |
-      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "guard_disks": false}   | 25 | 1   | !    | guard_disks    |
-      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "guard_disks": "false"} | 25 | 1   | !    | guard_disks    |
-      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "guard_disks": "no"}    | 26 | 0   | ✓    |                |
-      | {"guard_worktrees": "yes", "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true}                       | 25 | 1   | !    | guard_worktrees |
+      | {"guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true}                                                 | 25 | 1   | !    | guard_worktrees |
+      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true, "guard_disks": false}   | 25 | 1   | !    | guard_disks    |
+      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true, "guard_disks": "false"} | 25 | 1   | !    | guard_disks    |
+      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true, "guard_disks": "no"}    | 26 | 0   | ✓    |                |
+      | {"guard_worktrees": "yes", "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true}                       | 25 | 1   | !    | guard_worktrees |
 
   Scenario: gh signed out is a warning, not a failure
     Given languette "cd31356ad5db" is installed at user scope
@@ -171,7 +171,7 @@ Feature: doctor
 
   Scenario: without the claude CLI the doctor reads installed_plugins.json
     Given languette "cd31356ad5db" is installed at user scope
-    And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true}`
+    And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true}`
     And claude plugin list fails
     When the doctor runs
     Then the "Claude Code" row is ✓ "plugin cd31356, user scope"
