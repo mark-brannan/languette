@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.0.13](https://github.com/mark-brannan/languette/compare/v0.0.12...v0.0.13) (2026-10-31)
+
+
+### Features
+
+* **guards:** name the remote HEAD's branch in the worktree recipe ([#327](https://github.com/mark-brannan/languette/issues/327)) ([2c229f9](https://github.com/mark-brannan/languette/commit/2c229f9050fd8bda017859e02659cedd5fc0a04a))
+* **guards:** read the repo's remote from the branch's upstream ([#323](https://github.com/mark-brannan/languette/issues/323)) ([f906f6d](https://github.com/mark-brannan/languette/commit/f906f6d5a5ac578cda352e7abdbf5e07eeb7ed74))
+* **prose-budget:** make the prose-budget commit warning opt-in ([#324](https://github.com/mark-brannan/languette/issues/324)) ([fd5f86d](https://github.com/mark-brannan/languette/commit/fd5f86d9153d0ea42f78144bb5b9d9427dc1c00c))
+
+
+### Bug Fixes
+
+* **guards:** drop pray from the MCP write verbs ([#319](https://github.com/mark-brannan/languette/issues/319)) ([221cfdb](https://github.com/mark-brannan/languette/commit/221cfdb8e27188e2ceafda8d7c89b92edfece97c)), closes [#278](https://github.com/mark-brannan/languette/issues/278)
+* **paths:** read the host's configuration directory from CLAUDE_CONFIG_DIR ([#322](https://github.com/mark-brannan/languette/issues/322)) ([57c2240](https://github.com/mark-brannan/languette/commit/57c224073b4b606533a5b3f5f71199223e8b5740)), closes [#278](https://github.com/mark-brannan/languette/issues/278)
+
+
+### Documentation
+
+* **decisions:** guard-sudo and deny-always enter by [#198](https://github.com/mark-brannan/languette/issues/198) stage 2 ([#316](https://github.com/mark-brannan/languette/issues/316)) ([98decb3](https://github.com/mark-brannan/languette/commit/98decb36a7205d8dc50b4da42159759375744589))
+* **messages:** list the message catalog by code prefix ([#320](https://github.com/mark-brannan/languette/issues/320)) ([05c7935](https://github.com/mark-brannan/languette/commit/05c7935ba9171f3b827b7bb970301fe433c92284))
+* **research:** measure the record as command history, and draft the cost rules ([#321](https://github.com/mark-brannan/languette/issues/321)) ([1bed7d2](https://github.com/mark-brannan/languette/commit/1bed7d29947094cfd4c3b89066d1a75613cba928))
+
 ## [0.0.12](https://github.com/mark-brannan/languette/compare/v0.0.11...v0.0.12) (2026-10-31)
 
 
