@@ -139,8 +139,8 @@ Each guard checks for one kind of hazard:
 - [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
   `stash pop`, force-push, `reset --hard`, `stow --adopt` and other moves that throw work away
 - [`guard-protected-services`](features/guard-protected-services.feature): `systemctl stop postgresql`, for the services you list
-- [`prose-budget-commit`](features/prose-budget-commit.feature): a `git commit` whose
-  staged prose runs over the repo's word budgets. Opt-in: set `prose_budget_commit` to true where CI runs prose-budget.
+- [`prose-budget-commit`](features/prose-budget-commit.feature): opt-in; a `git commit` whose
+  staged prose runs over the repo's word budgets
 - `guard-databases` (planned)
 - `guard-protected-paths` (planned)
 
