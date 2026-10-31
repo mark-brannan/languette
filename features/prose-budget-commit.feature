@@ -38,6 +38,7 @@ Feature: prose-budget-commit
     Given a project directory
     And the working directory is "{PROJ}"
     And the stub "prose-budget" is the engine
+    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is "true"
 
   Scenario Outline: a commit is judged, and detected however it is spelled
     Given PROSE_BUDGET_FAIL is "1"
@@ -394,5 +395,29 @@ Feature: prose-budget-commit
   Scenario: with no engine configured or on PATH the guard is silent
     Given no engine is configured
     And PATH holds only "sh"
+    When the agent runs `git commit -m x`
+    Then the guard is silent
+
+  # Opt-in: the warning runs only when the option is exactly "true", so an
+  # install that never set it stays silent, as does any other value.
+  Scenario Outline: the option stays off for any value but true
+    Given PROSE_BUDGET_FAIL is "1"
+    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is "<value>"
+    When the agent runs `git commit -m x`
+    Then the guard is silent
+
+    Examples:
+      | value |
+      |       |
+      | false |
+      | 0     |
+      | True  |
+      | no    |
+      | 1     |
+      | yes   |
+
+  Scenario: the option unset leaves the guard silent
+    Given PROSE_BUDGET_FAIL is "1"
+    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is unset
     When the agent runs `git commit -m x`
     Then the guard is silent

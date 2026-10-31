@@ -358,10 +358,13 @@ def check(cwd):
                 claude = (WARN, "Claude Code", f"{where}; {hooks_problem or opt_problem}, so which guards "
                                                "are on is unknown", [])
             else:
-                off = sorted(k for k, g in found.items() if not is_on(g, options.get(k)))
+                on = [k for k, g in found.items() if is_on(g, options.get(k))]
+                # Disabled: a default-on guard turned off, or an opt-in set to a value that leaves it off.
+                off = sorted(k for k, g in found.items() if k not in on and (
+                    g == "=" or options.get(k) is not None and _env_value(options[k]) != "false"))
                 titles = _titles(root)
                 claude = (OK, "Claude Code", where, [
-                    line(OK, f"guards enabled: {len(found) - len(off)}"),
+                    line(OK, f"guards enabled: {len(on)}"),
                     line(WARN if off else OK, f"guards disabled: {len(off)}",
                          *(line(WARN, f"(off) {k}: {titles.get(k, '')}".rstrip()) for k in off))])
         for _, guard, sent in PROBES:
