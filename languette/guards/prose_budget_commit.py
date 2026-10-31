@@ -27,6 +27,7 @@ from languette import scan as sw
 from languette.verdict import Need, context
 
 NAME = "prose-budget-commit"
+OPT_IN = "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT"   # off unless set to true: the warning is for repos whose CI runs prose-budget
 OPTION = "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"
 DEFAULT = "prose-budget"
 ENGINE_TIMEOUT = 50                 # under Claude Code's 60 s hook timeout; past it the engine counts as crashed
