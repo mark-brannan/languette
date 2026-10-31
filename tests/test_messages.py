@@ -62,4 +62,4 @@ def test_a_blank_with_braces_in_it_is_filled_as_text():
 def test_the_listing_page_is_the_catalog():
     from languette.messages import listing
     page = ROOT.parent / "docs" / "messages.md"
-    assert_that(page.read_text(), equal_to(listing() + "\n"), "regenerate: python -m languette.messages > docs/messages.md")
+    assert_that(page.read_text(), equal_to(listing()), "regenerate: python -m languette.messages > docs/messages.md")
