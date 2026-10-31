@@ -879,6 +879,14 @@ Feature: guard-private-terms
       When the agent runs `gh issue create -t x -b "aboard Wanderlust"`
       Then the guard denies, naming "Wanderlust"
 
+    @also_guard-github-issues
+    Scenario: a remote gh was told to resolve to another repo leaves the target unknown, even with one remote
+      Given a clone of "git@github.com:you/notes.git" at "{TMP}/w" on branch "main"
+      And "{TMP}/w" has remote.origin.gh-resolved "other/public-repo"
+      And the working directory is "{TMP}/w"
+      When the agent runs `gh issue create -t x -b "aboard Wanderlust"`
+      Then the guard denies, naming "Wanderlust"
+
     # --- reads and clean text pass ------------------------------------------------
 
     Scenario Outline: a read, clean text, or no command at all is silent
