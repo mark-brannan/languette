@@ -72,7 +72,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.refs import default_branches
+from languette.refs import remote_heads
 from languette.verdict import Act, Need, Refuse, ask, context, deny
 
 NAME = "guard-worktrees"
@@ -330,22 +330,21 @@ class _Ask(Exception):
 
 
 def _generic(prog, cwd):
-    """The deny for a branch switch in $HOME. Its recipe names the remote HEAD's branch, read
-    here and only on this path; `<base>` where the repository names none or a name the shell would read as more than a word."""
-    seen = []
+    """The deny for a branch switch in $HOME. For plain `git`, its recipe names the remote
+    HEAD's branch, read here and only on this path; `<base>` for a wrapper (its repository is not
+    the working directory's), where the repository names none, or a name the shell would read as
+    more than a word."""
+    base = "<base>"
 
     def ask(*argv):
-        out = yield from _git(cwd, *argv)
-        seen.append(out)
-        return out
-    base = "<base>"
+        return (yield from _git(cwd, *argv))
     if cwd:
         try:
-            found = yield from default_branches(ask)
+            heads = yield from remote_heads(ask)
         except Exception:  # noqa: BLE001
-            found = ()
-        if any(seen) and found and re.fullmatch(r"[A-Za-z0-9._][A-Za-z0-9._/-]*", found[0]):
-            base = found[0]
+            heads = ()
+        if heads and re.fullmatch(r"[A-Za-z0-9._][A-Za-z0-9._/-]*", heads[0]):
+            base = heads[0]
     return Refuse(say("wt_checkout_home", guard=NAME, prog=prog, base=base))
 
 
@@ -410,7 +409,7 @@ def _checkout_home(doc):
     changed = False
     for ev in events:
         if ev[0] == "DENY":
-            raise (yield from _generic(ev[1], cwd))
+            raise (yield from _generic(ev[1], None))
         if ev[0] == "FS":
             changed = True
         elif ev[0] == "ENV":
