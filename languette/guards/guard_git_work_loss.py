@@ -6,11 +6,12 @@ features/guard-git-work-loss.feature.
                     is allowed where an agent works (below), when every path resolves strictly
                     inside the tree: pathspec magic, globs and shell expansions do not
   stash pop/drop    pop, a bare drop, clear: the stash stack is shared across worktrees
-  force push        bare --force / -f / +refspec; --force-with-lease to main or master asks;
-                    deleting main
+  force push        bare --force / -f / +refspec; --force-with-lease to the default branch asks;
+                    deleting it. The default branches are the remotes' HEAD refs and main and master
+                    beside them (a moved HEAD adds a branch, never removes one)
   discard           git checkout . / git restore . / git clean -f / git reset --hard
                     (allowed when `git status --porcelain` (config-proof) in the payload's cwd is empty;
-                    reset --hard to origin/<current branch> too, where an agent works)
+                    reset --hard to <remote>/<current branch> too, where an agent works)
   branch -D         and --delete --force
   stow --adopt      asks: it moves each conflicting file from the target into the package,
                     overwriting the repo's copy; -D and -R alone only touch links
@@ -38,6 +39,7 @@ import re
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
+from languette.refs import FALLBACK, default_branches
 from languette.verdict import Need, Refuse, ask, deny
 
 
@@ -61,7 +63,6 @@ _WHOLE = re.compile(r"(?:\.|\./|\./\*|:/|:/\.|\*)\Z")
 # A pathspec the guard cannot resolve to one place: magic (`:(top)`, `:/`, `:!x`, `:^x`), a glob,
 # or a word the shell expands ($PWD, $(pwd), `pwd`, ~, {a,b}).
 _UNRESOLVED = re.compile(r"\A[:~]|[$`*?\[{}]")
-_MAIN = re.compile(r"(?:refs/heads/)?(?:main|master)\Z")
 STATUS_TIMEOUT = 5
 STOW = re.compile(r"(?:^|/)stow\Z")
 # stow's own option table (its Getopt::Long spec): long name -> takes a value. Like git, stow
@@ -226,9 +227,23 @@ def _stash(a):
                      "Name the entry: `git stash drop stash@{n}` after finding it by tag.")
 
 
-def _push(a):
+def _default(branches):
+    return re.compile(r"(?:refs/heads/)?(?:" + "|".join(map(re.escape, branches)) + r")\Z")
+
+
+def _push_may_hurt(a):
+    """Whether a push could force, lease, delete or colon-refspec: only then does the default branch matter."""
+    return any(t.startswith((":", "+", "--force", "--delete")) or _pfx(t, "--force") or _pfx(t, "--delete")
+               or _has(t, "f") or _has(t, "d") for t in a)
+
+
+def _push(doc, a):
+    if not _push_may_hurt(a):
+        return
+    branches = yield from _default_branches(doc)
+    main = _default(branches)
     force = lease = delete = False
-    protected_branch = ""  # the main/master branch this push targets, or "" if none
+    protected_branch = ""  # the default branch this push targets, or "" if none
     for t in a:
         if t.startswith("--force-with-lease=") or (t.startswith("--force-") and (
                 _pfx(t, "--force-with-lease") or _pfx(t, "--force-if-includes"))):
@@ -240,14 +255,15 @@ def _push(a):
             delete = True
         elif t.startswith("+"):
             force = True
-        elif t.startswith(":") and _MAIN.match(_dst(t)):
+        elif t.startswith(":") and main.match(_dst(t)):
             delete = True
             protected_branch = _dst(t).removeprefix("refs/heads/")
-        elif not t.startswith("-") and _MAIN.match(_dst(t)):
+        elif not t.startswith("-") and main.match(_dst(t)):
             protected_branch = _dst(t).removeprefix("refs/heads/")
     if force:
         raise Refuse("bare `git push --force` is blocked. Rebasing a session branch is the one legitimate force: "
-                     "use `--force-with-lease origin <branch>`, never to `main` or `master`.")
+                     "use `--force-with-lease <remote> <branch>`, never to the default branch "
+                     f"({', '.join(branches)}).")
     if protected_branch and delete:
         raise Refuse(f"`{protected_branch}` is protected: deleting it is blocked. Rebased work reaches it through a pull request.")
     if protected_branch and lease:
@@ -347,27 +363,28 @@ def _where_agents_work(doc, cwd):
 
 
 def _upstream_target(args):
-    """The branch X of `reset --hard origin/X`, given only --hard and -q beside it; else None."""
+    """(R, X) of `reset --hard R/X`, given only --hard and -q beside it; else None."""
     refs = [t for t in args if not t.startswith("-")]
     flags = [t for t in args if t.startswith("-")]
-    if len(refs) != 1 or not refs[0].startswith("origin/") or len(refs[0]) == len("origin/"):
+    remote, _, branch = refs[0].partition("/") if len(refs) == 1 else ("", "", "")
+    if not remote or not branch:
         return None
     if not all(_pfx(t, "--hard") or t == "-q" or _pfx(t, "--quiet") for t in flags):
         return None
-    return refs[0][len("origin/"):]
+    return remote, branch
 
 
-def _own_upstream(cwd, branch):
-    """True when HEAD is refs/heads/<branch>, origin/<branch> resolves to the remote-tracking
+def _own_upstream(cwd, remote, branch):
+    """True when HEAD is refs/heads/<branch>, <remote>/<branch> resolves to the remote-tracking
     ref of that name (not a local ref or tag that shadows it), and the branch tracks that
     ref or nothing. Read from git, not from @{u} alone."""
     rc, out, _ = yield Need("run", cwd, STATUS_TIMEOUT, "git", "rev-parse", "--symbolic-full-name",
-                            "HEAD", "origin/" + branch)
-    if rc != 0 or out.split() != ["refs/heads/" + branch, "refs/remotes/origin/" + branch]:
+                            "HEAD", f"{remote}/{branch}")
+    if rc != 0 or out.split() != ["refs/heads/" + branch, f"refs/remotes/{remote}/{branch}"]:
         return False
     rc, out, _ = yield Need("run", cwd, STATUS_TIMEOUT, "git", "for-each-ref", "--format=%(upstream)",
                             "refs/heads/" + branch)
-    return rc == 0 and out.strip() in ("", "refs/remotes/origin/" + branch)
+    return rc == 0 and out.strip() in ("", f"refs/remotes/{remote}/{branch}")
 
 
 def _nothing_to_lose(doc, sub, args):
@@ -376,7 +393,7 @@ def _nothing_to_lose(doc, sub, args):
     tree (the status is read before the command runs), the payload's cwd is a git work
     tree with a clean status and no file marked assume-unchanged or skip-worktree, and
     the discard is not one that reaches past the status (clean -x) or drops a commit
-    (reset to a ref). The one reset to a ref that passes is to origin/<current branch>,
+    (reset to a ref). The one reset to a ref that passes is to <remote>/<current branch>,
     where agents work (_where_agents_work, _own_upstream); it drops any commit the branch
     has ahead of that remote, which this check does not look for (the reflog keeps them).
     Any failure to ask is False."""
@@ -394,7 +411,7 @@ def _nothing_to_lose(doc, sub, args):
     if _reaimed(scans):
         return False
     try:
-        if upstream and not ((yield from _where_agents_work(doc, cwd)) and (yield from _own_upstream(cwd, upstream))):
+        if upstream and not ((yield from _where_agents_work(doc, cwd)) and (yield from _own_upstream(cwd, *upstream))):
             return False
         rc, out, _ = yield Need("run", cwd, STATUS_TIMEOUT, "git", "-c", "status.showUntrackedFiles=all", "status", "--porcelain",
                            "--untracked-files=all", "--ignore-submodules=none")
@@ -406,6 +423,23 @@ def _nothing_to_lose(doc, sub, args):
     except Exception:  # noqa: BLE001
         return False
     return rc == 0 and not any(e[:1].islower() or e[:1] == "S" for e in out.split("\0") if e)
+
+
+def _default_branches(doc):
+    """The default branches of the repository at the payload's cwd, as the remotes' HEAD refs
+    name them (all remotes, a push's remote being as likely a URL or an alias); main and master
+    always beside them. Read in the payload's cwd; a push aimed elsewhere (-C, cd, GIT_DIR) still has main and master."""
+    cwd = doc.payload.get("cwd")
+    if not isinstance(cwd, str) or not cwd.startswith("/"):
+        return FALLBACK
+
+    def ask(*argv):
+        rc, out, _ = yield Need("run", cwd, STATUS_TIMEOUT, "git", *argv)
+        return out if rc == 0 else None
+    try:
+        return (yield from default_branches(ask))
+    except Exception:  # noqa: BLE001
+        return FALLBACK
 
 
 def _staging_where_agents_work(doc, names, msg):
@@ -519,7 +553,7 @@ def _segment(doc, s, a, b, nested, env):
         elif sub == "stash":
             _stash(args)
         elif sub == "push":
-            _push(args)
+            (yield from _push(doc, args))
         elif sub in ("checkout", "restore"):
             _discard(sub, args)
         elif sub == "clean":

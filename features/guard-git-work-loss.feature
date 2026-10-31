@@ -10,7 +10,7 @@ Feature: guard-git-work-loss
   in a parallel session's files. The stash stack is shared across worktrees,
   so a pop, a bare drop or a clear can take another session's entry; apply
   and drop by sha pass. Force push is bare `--force`, `-f` or a `+refspec`
-  anywhere, `--force-with-lease` to main or master (asks), or deleting main;
+  anywhere, `--force-with-lease` to the default branch (asks), or deleting it;
   rebasing a session branch, with `--force-with-lease` to that branch, is the
   one legitimate force. `git checkout .`, `git restore .` and `git clean -f`
   throw away uncommitted work, as `reset --hard` does, and `branch -D` throws
@@ -126,6 +126,47 @@ Feature: guard-git-work-loss
       | command                                                           | verdict   | note                     |
       | git push --force-with-lease origin :main                          | denies    | deleting main, lease or not |
       | git push --force-with-lease --delete origin main                  | denies    | deleting main, lease or not |
+
+  # The default branch is the remote's HEAD ref, whatever the remote is called;
+  # main and master are always watched beside it: a moved HEAD adds a branch, never removes one.
+  Scenario Outline: the default branch a force to asks about is the one the remote HEAD names
+    Given a clone of "https://example.com/r.git" at "{TMP}/r" on branch "feat"
+    And the remote HEAD of "{TMP}/r" points at "trunk"
+    And the working directory is "{TMP}/r"
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                                         | verdict   | note                              |
+      | git push --force-with-lease origin trunk        | asks      | the remote HEAD's branch          |
+      | git push --force-with-lease origin HEAD:trunk   | asks      | by refspec                        |
+      | git push --force-with-lease origin main         | asks      | main stays watched, a moved HEAD cannot drop it |
+
+  Scenario Outline: the remote HEAD is read whatever the remote is called
+    Given a clone of "https://example.com/r.git" at "{TMP}/r" on branch "feat"
+    And the remote HEAD of "{TMP}/r" points at "trunk"
+    And the remote of "{TMP}/r" is renamed to "upstream"
+    And the working directory is "{TMP}/r"
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                                          | verdict   |
+      | git push --force-with-lease upstream trunk       | asks      |
+      | git push --force-with-lease upstream main        | asks      |
+
+  Scenario Outline: main and master are the default branch when the repository has no remote HEAD
+    Given a clone of "https://example.com/r.git" at "{TMP}/r" on branch "feat"
+    And the remote HEAD of "{TMP}/r" is removed
+    And the working directory is "{TMP}/r"
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                                          | verdict   |
+      | git push --force-with-lease origin main          | asks      |
+      | git push --force-with-lease origin master        | asks      |
+      | git push --force-with-lease origin trunk         | is silent |
 
   Scenario Outline: discarding uncommitted work is denied
     When the agent runs `<command>`
@@ -755,7 +796,7 @@ Feature: guard-git-work-loss
   # origin/<the branch checked out>, read from git; a branch whose upstream is
   # set to another name is not resetting to its own. The tree must be clean, as
   # for a bare discard, and the reset must run on its own.
-  Rule: where an agent works, `git reset --hard origin/<current branch>` passes on a clean tree
+  Rule: where an agent works, `git reset --hard <remote>/<current branch>` passes on a clean tree
 
     Background:
       Given a clone of "https://example.com/r.git" at "{TMP}/repo" on branch "main"
@@ -792,6 +833,12 @@ Feature: guard-git-work-loss
         | cd {TMP}/repo/.claude/worktrees/feat && git reset --hard origin/feat | a cd moves the tree |
         | git -C {TMP}/repo reset --hard origin/feat      | -C names another tree                 |
         | git reset --hard --recurse-submodules origin/feat | an option the guard does not weigh  |
+
+    Scenario: a reset to the branch's own remote passes when the remote is not called origin
+      Given the remote of "{TMP}/repo" is renamed to "upstream"
+      And the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `git reset --hard upstream/feat`
+      Then the guard is silent
 
     Scenario: a reset to the branch's own remote is denied when the branch tracks another name
       Given the branch "feat" of "{TMP}/repo" tracks "origin/main"

@@ -314,6 +314,17 @@ def _remote_head(ctx, path, branch):
                    check=True)
 
 
+@given(parsers.parse('the remote HEAD of "{path}" is removed'))
+def _remote_head_removed(ctx, path):
+    subprocess.run(["git", "-C", ctx.expand(path), "symbolic-ref", "--delete", "refs/remotes/origin/HEAD"],
+                   check=True)
+
+
+@given(parsers.parse('the remote of "{path}" is renamed to "{name}"'))
+def _remote_renamed(ctx, path, name):
+    subprocess.run(["git", "-C", ctx.expand(path), "remote", "rename", "origin", name], check=True)
+
+
 @given(parsers.parse('the branch "{branch}" of "{path}" tracks "{upstream}"'))
 def _tracks(ctx, branch, path, upstream):
     d = ctx.expand(path)
