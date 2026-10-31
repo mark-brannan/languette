@@ -72,6 +72,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
+from languette.refs import default_branches
 from languette.verdict import Act, Need, Refuse, ask, context, deny
 
 NAME = "guard-worktrees"
@@ -328,8 +329,24 @@ class _Ask(Exception):
     asks about. A later control's deny still outranks it."""
 
 
-def _generic(prog):
-    return Refuse(say("wt_checkout_home", guard=NAME, prog=prog))
+def _generic(prog, cwd):
+    """The deny for a branch switch in $HOME. Its recipe names the remote HEAD's branch, read
+    here and only on this path; `<base>` where the repository names none."""
+    seen = []
+
+    def ask(*argv):
+        out = yield from _git(cwd, *argv)
+        seen.append(out)
+        return out
+    base = "<base>"
+    if cwd:
+        try:
+            found = yield from default_branches(ask)
+        except Exception:  # noqa: BLE001
+            found = ()
+        if any(seen) and found:
+            base = found[0]
+    return Refuse(say("wt_checkout_home", guard=NAME, prog=prog, base=base))
 
 
 def _checkout_home(doc):
@@ -393,7 +410,7 @@ def _checkout_home(doc):
     changed = False
     for ev in events:
         if ev[0] == "DENY":
-            raise _generic(ev[1])
+            raise (yield from _generic(ev[1], cwd))
         if ev[0] == "FS":
             changed = True
         elif ev[0] == "ENV":
@@ -439,7 +456,7 @@ def _checkout_home(doc):
                 unpinned = unpinned or changed or miss or not res or (blind and not _HOMEISH.match(tv))
                 for r in res:
                     if (tk == "GITDIR" and (yield from gitdir_is_home(r))) or (tk == "WORKTREE" and r == home):
-                        raise _generic("git")
+                        raise (yield from _generic("git", cwd))
             if unpinned:
                 raise Refuse(say("wt_repo_unclear", guard=NAME))
             # --git-dir pins where the command resolves; -C moved the bases; --work-tree does neither.
@@ -455,7 +472,7 @@ def _checkout_home(doc):
                 continue
             for d in bases:
                 if (yield from targets_home(d)):
-                    raise _generic("git")
+                    raise (yield from _generic("git", cwd))
     if asks:
         raise _Ask(asks)
     return note
