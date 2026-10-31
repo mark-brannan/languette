@@ -34,6 +34,7 @@ import os
 import re
 
 from languette import scan as sw
+from languette.paths import config_dir
 from languette.messages import say
 from languette.verdict import NO_PROMPT, NO_QUESTION, Act, Need, ask, deny
 
@@ -220,9 +221,8 @@ def check(doc):
     if to and isinstance(state, dict) and to in state.get("subagents", ()):
         return None
     if to and not _REF.search(to) and sid is not None:
-        home = env.get("HOME") or ""
         try:
-            team = yield Need("read", os.path.join(home, ".claude", "teams", f"session-{sid[:8]}", "config.json"))
+            team = yield Need("read", os.path.join(config_dir(env), "teams", f"session-{sid[:8]}", "config.json"))
             if to in _teammates(team):
                 return None
         except Exception:  # noqa: BLE001 -- no team, or one this guard cannot read: no teammates known
