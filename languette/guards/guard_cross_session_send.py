@@ -53,7 +53,7 @@ _GH_VIEWS = {"run": ("view", "download"), "release": ("view", "download"), "gist
 _MCP_READ = frozenset("read get list search fetch query find view download export retrieve".split())
 _MCP_WRITE = frozenset("write create update delete add remove push merge set edit post send submit close assign "
                        "request fork transfer lock unlock move rename upload put patch insert reply resolve "
-                       "dismiss approve label star unstar archive restore withdraw pray".split())
+                       "dismiss approve label star unstar archive restore withdraw".split())
 # Modes where an ask would pass the call unseen. dontAsk is left out: it falls
 # through to the ask path, where verdict turns the ask into a deny.
 _UNSEEN_ASK = NO_PROMPT - NO_QUESTION

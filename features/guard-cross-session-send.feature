@@ -157,6 +157,7 @@ Feature: guard-cross-session-send
       | mcp__github__list_issues                     | denies    |
       | mcp__slack__fetch_thread                     | denies    |
       | mcp__browser__navigate                       | denies    |
+      | mcp__oracle__pray_for_answer                 | denies    |
       | mcp__github__issue_write                     | is silent |
       | mcp__github__add_issue_comment               | is silent |
       | mcp__slack__post_message                     | is silent |
