@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.12](https://github.com/mark-brannan/languette/compare/v0.0.11...v0.0.12) (2026-10-31)
+
+
+### Features
+
+* **engine:** deny-always and guard-sudo as rule sets alone, with the engine that reads them ([#314](https://github.com/mark-brannan/languette/issues/314)) ([2a0d635](https://github.com/mark-brannan/languette/commit/2a0d6351d489437227ef9d0d61825c75611beed7))
+* **guards:** read the default branch and remote from the remote HEAD ref ([#313](https://github.com/mark-brannan/languette/issues/313)) ([b903d25](https://github.com/mark-brannan/languette/commit/b903d253d34f6bc6b9e50137f85f8572954c5866))
+
 ## [0.0.11](https://github.com/mark-brannan/languette/compare/v0.0.10...v0.0.11) (2026-10-30)
 
 
