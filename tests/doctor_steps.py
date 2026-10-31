@@ -28,6 +28,7 @@ PLUGIN_ID = "languette@languette"
 class Doctor(FakeHome):
     def __init__(self):
         super().__init__("doctor", ("project/sub", ".claude/plugins"))
+        self.cfg = self.home / ".claude"        # the host's configuration directory
         self.installs = []
         self.claude_ok = True
         self.signed = {"gh": True}         # forge client -> signed in; absent ones get no stub
@@ -37,11 +38,11 @@ class Doctor(FakeHome):
         return s.replace("{HOME}", str(self.home)).replace("~/", f"{self.home}/")
 
     def settings(self):
-        p = self.home / ".claude/settings.json"
+        p = self.cfg / "settings.json"
         return json.loads(p.read_text()) if p.exists() else {}
 
     def write_settings(self, s):
-        (self.home / ".claude/settings.json").write_text(json.dumps(s))
+        (self.cfg / "settings.json").write_text(json.dumps(s))
 
     def stub(self, name, body):
         f = self.bin / name
@@ -54,7 +55,7 @@ class Doctor(FakeHome):
         by_id = {}
         for i in self.installs:
             by_id.setdefault(i["id"], []).append({k: v for k, v in i.items() if k not in ("id", "enabled")})
-        (self.home / ".claude/plugins/installed_plugins.json").write_text(json.dumps({"version": 2, "plugins": by_id}))
+        (self.cfg / "plugins/installed_plugins.json").write_text(json.dumps({"version": 2, "plugins": by_id}))
         if any(not i["enabled"] for i in self.installs):
             s = self.settings()
             s.setdefault("enabledPlugins", {})[PLUGIN_ID] = False
@@ -123,6 +124,13 @@ def _fake_home(doctor):
 def _forge_signed(doctor, name, state):
     assert name in FORGES, f"{name} is not a forge client the doctor knows"
     doctor.signed[name] = state == "in"
+
+
+@given(parsers.parse('the host\'s configuration directory is "{path}"'))
+def _config_dir(doctor, path):
+    doctor.cfg = Path(doctor.expand(path))
+    (doctor.cfg / "plugins").mkdir(parents=True)
+    doctor.env["CLAUDE_CONFIG_DIR"] = str(doctor.cfg)
 
 
 @given("claude plugin list fails")
