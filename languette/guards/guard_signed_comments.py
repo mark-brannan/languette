@@ -5,12 +5,11 @@ Experimental: the convention is one workflow's; the general shape is issue #194.
 
 An agent may post under the user's own login, and then without a mark a review bot and
 the next agent read its reply as the user's own words. The body's first line
-begins with `🤖 ` and its last non-empty line is `🤖 <model> · <effort> ·
-<eight hex>`; the hex is the payload's session id's, when it has one. Both
-are settings: signed_comments_opening is the text the first line starts with,
-and signed_comments_signature a regular expression the last line matches
-whole, its `{session}` the payload's eight hex (any eight without one). Unset
-or empty is the default; a signature that does not compile is a deny.
+begins with signed_comments_opening and its last non-empty line matches
+signed_comments_signature, a regular expression the whole line matches, its
+`{session}` the payload's first eight hex (any eight without one). Both
+default to empty: an empty one checks nothing for its part, and with both
+empty the guard is silent. A signature that does not compile is a deny.
 
 Fires on Bash `gh pr comment`, `gh issue comment`, `gh pr review` with a body,
 `gh pr|issue close|reopen --comment`, `gh api` writing a body to a path with a
@@ -44,8 +43,6 @@ TOOLS = re.compile(rf"(?:Bash|mcp__.*__(?:{_MCP}))\Z")
 _MCP_TOOL = re.compile(rf"mcp__.*__(?:{_MCP})\Z")
 OPENING = "CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING"
 SIGNATURE = "CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE"
-FIRST = "🤖 "
-SIGNED = r"🤖 \S+ · (?:low|medium|high|xhigh|max|-) · {session}"
 _ANY_HEX = "[0-9a-f]{8}"
 _MUTATION = re.compile(r"\b(?:addComment|addPullRequestReviewComment|addPullRequestReviewThreadReply|"
                        r"addPullRequestReview|submitPullRequestReview|updateIssueComment|"
@@ -55,8 +52,6 @@ _COMMENTS = re.compile(r"(?:^|/)(?:comments|reviews)(?:/|\Z)")
 _FROM_DOC = re.compile(r"\$\(\s*cat\s+(?:-\s+)?HEREDOC(\d+)\s*\)")
 _HOME = re.compile(r"(?:~|\$HOME|\$\{HOME\})(?=/|\Z)")
 _MARK = " HEREDOC "
-# The two lines a body needs, shown in every reason, with the payload's session hex.
-_EXAMPLE = "🤖 Fixed in a03793a: …\n\n🤖 claude-opus-5-5 · high · {hex}"
 # gh's verbs that post a comment, and the flags that carry its body.
 _VERBS = {("pr", "comment"): "b", ("issue", "comment"): "b", ("pr", "review"): "b",
           ("pr", "close"): "c", ("pr", "reopen"): "c", ("issue", "close"): "c", ("issue", "reopen"): "c"}
@@ -250,22 +245,24 @@ def check(doc):
         return None
     sid = payload.get("session_id")
     hexid = sid[:8] if isinstance(sid, str) and re.fullmatch(r"[0-9a-f]{8}", sid[:8]) else None
-    first, pattern = env.get(OPENING) or FIRST, env.get(SIGNATURE) or SIGNED
-    try:
-        # One for this session, one for any: a line only the second matches names another session.
-        sig = re.compile(pattern.replace("{session}", hexid or _ANY_HEX))
-        loose = re.compile(pattern.replace("{session}", _ANY_HEX))
-    except re.error as e:
-        return deny(say("signature_not_regex", guard=NAME, pattern=pattern, err=e))
-    if first == FIRST and pattern == SIGNED:
-        example = _EXAMPLE.format(hex=hexid or "<first 8 hex of the session id>")
-        signed = f"A signed body:\n\n{example}"
-        shape = (f"Start the first line with `{FIRST}` and end with the line `🤖 <model id> · "
-                 f"<low|medium|high|xhigh|max|-> · <first 8 hex of the session id>`:\n\n{example}")
-    else:
-        shape = (f"Start the first line with `{first}` and end with a line that matches `{pattern}` whole"
-                 + (", where {session} is the first 8 hex of the session id." if "{session}" in pattern else "."))
-        signed = "A signed body, as the settings have it: " + shape[0].lower() + shape[1:]
+    first, pattern = env.get(OPENING) or "", env.get(SIGNATURE) or ""
+    if not first and not pattern:
+        return None
+    sig = loose = None
+    if pattern:
+        try:
+            # One for this session, one for any: a line only the second matches names another session.
+            sig = re.compile(pattern.replace("{session}", hexid or _ANY_HEX))
+            loose = re.compile(pattern.replace("{session}", _ANY_HEX))
+        except re.error as e:
+            return deny(say("signature_not_regex", guard=NAME, pattern=pattern, err=e))
+    want = ([f"start the first line with `{first}`"] if first else []) + (
+        [f"end with a line that matches `{pattern}` whole"
+         + (", where {session} is the first 8 hex of the session id" if "{session}" in pattern else "")]
+        if pattern else [])
+    need = " and ".join(want)
+    shape = need[0].upper() + need[1:] + "."
+    signed = f"A signed body, as the settings have it: {need}."
     cwd = payload.get("cwd")
     home = env.get("HOME") or ""
     files = {}
@@ -377,9 +374,9 @@ def check(doc):
                     continue           # nothing posted as text: gh refuses it, or a review posts no comment
                 lines = body.split("\n")
                 last = ([ln.rstrip() for ln in lines if ln.strip()] or [""])[-1]
-                if not lines[0].startswith(first):
+                if first and not lines[0].startswith(first):
                     problems.append(f"the first line does not start with `{first}`: `{_short(lines[0])}`")
-                if sig.fullmatch(last):
+                if not sig or sig.fullmatch(last):
                     continue
                 if loose.fullmatch(last):
                     problems.append(f"the last line's hex is not this session's ({hexid}): `{_short(last)}`")

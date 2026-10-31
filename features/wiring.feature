@@ -438,6 +438,14 @@ Feature: wiring
     When the agent runs `gh pr comment 3 -R o/r -b Done`
     Then the guard is silent
 
+  Scenario: with the opt-in signed-comments guard on and both options unset, the hooks.json command checks nothing
+    Given the hook is the hooks.json command for "guard-signed-comments"
+    And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "true"
+    And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING is unset
+    And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is unset
+    When the agent runs `gh pr comment 3 -R o/r -b Done`
+    Then the guard is silent
+
   Scenario Outline: the opt-in signed-comments guard stays silent for any value but true
     Given the hook is the hooks.json command for "guard-signed-comments"
     And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "<value>"
