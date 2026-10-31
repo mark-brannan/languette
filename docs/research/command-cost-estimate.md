@@ -223,10 +223,12 @@ path argument's class: `disk` (`/`), `home` (`~`, `$HOME`, `~/*`, `..`),
 | container | `{"any": [{"cmd": "docker", "args": ["run"]}, {"cmd": "docker", "args": ["compose", "up"]}]}` | | `inf` |
 | parallel | any of the above | `{"any": [{"option-value-in": ["-n", "auto"]}, {"flags": ["-j", "--parallel"]}]}` | cores `all` |
 | release | any build | `{"flags": ["--release", "-O3", "--no-cache"]}` | one wall band up |
-| capped | any | `{"any": [{"flags": ["-maxdepth"]}, {"wrapper": "timeout"}, {"piped-to": "head"}]}` | caps wall at the limit |
+| capped | any | `{"wrapper": "timeout"}` | caps wall at the limit |
 | long-lived | `{"any": [{"cmd": "sleep"}, {"cmd": "watch"}, {"cmd": "tail", "flags": ["-f"]}]}` | | wall only, cores `0` |
 | media | `{"any": [{"cmd": "ffmpeg"}, {"cmd": "xz", "flags": ["-9"]}, {"cmd": "zstd", "flags": ["-19"]}]}` | | `m`, `1` |
 | loop | any | `{"in-loop-body": true}` | the body's band, times the matches |
+
+`-maxdepth` bounds depth and `| head` stops the producer only once it has written enough lines, so neither caps wall time: they leave the band unchanged, and `capped` matches `timeout` alone.
 
 What the format lacks, by rule:
 
@@ -236,7 +238,7 @@ What the format lacks, by rule:
 | Combining bands | parallel, release, capped, loop | findings combine by tightening today; bands need max for wall, a raise for release, a min for a cap, a product for a loop |
 | A path argument's class | the three walks | `path` names a `gh api` path today; a walker's path arguments need their own selector, and `scope` over it |
 | A wrapper's words | capped | the scanner sees through `timeout`; the rule needs the wrapper and its argument, not only the program inside |
-| Pipe position | walk-stdin, capped | whether the matched program reads stdin, and what reads its output |
+| Pipe position | walk-stdin | whether the matched program reads stdin, and what reads its output |
 | A flag without a value | parallel | `-j` bare and `-j8` differ; `flags` cannot say "no value" |
 | Loop context | loop | whether the segment sits in a `for` or `while` body |
 | History | all `?` rows | a fact that reads past durations under the normal-form key; that is a Need kind, which the format already has |
