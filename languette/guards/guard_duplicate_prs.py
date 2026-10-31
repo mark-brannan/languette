@@ -18,7 +18,7 @@ fixed, resolve, resolves, resolved; an optional colon; then `#N`,
 already on that issue: deny, naming both, unless this body says
 `Supersedes` or `Replaces` that PR, in the same reference forms. The repo of
 a bare `#N` is --repo/-R, GH_REPO=, or the MCP owner/repo; failing those,
-the origin of the cwd, unless the command runs a `cd`.
+the cwd's remote (the only one, else the one gh resolves), unless the command runs a `cd`.
 
 GitHub that cannot answer (gh missing, signed out, offline, an error), a
 timeline page filled with no open PR on it (an older one may sit past it),
@@ -33,6 +33,7 @@ import re
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
+from languette.refs import remote_url
 from languette.verdict import Need, Refuse, ask, deny
 
 NAME = "guard-duplicate-prs"
@@ -233,7 +234,7 @@ def _slug(repo, cd, cwd):
         return r if re.fullmatch(rf"{_NAME}/{_NAME}", r) else None
     if cd or not cwd:
         return None
-    url = yield Need("git", "git", cwd, "remote", "get-url", "origin")
+    url = yield from remote_url(cwd)
     m = _GITHUB.search(url or "")
     return sw.norm_repo(f"{m.group(1)}/{m.group(2)}") if m else None
 

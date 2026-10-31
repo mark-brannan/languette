@@ -333,6 +333,22 @@ def _tracks(ctx, branch, path, upstream):
     subprocess.run(["git", "-C", d, "config", f"branch.{branch}.merge", f"refs/heads/{name}"], check=True)
 
 
+@given(parsers.parse('"{path}" marks the remote "{name}" as gh\'s default'))
+def _gh_resolved(ctx, path, name):
+    if name != "-":
+        subprocess.run(["git", "-C", ctx.expand(path), "config", f"remote.{name}.gh-resolved", "base"], check=True)
+
+
+@given(parsers.parse('"{path}" has a remote "{name}" at "{url}"'))
+def _add_remote(ctx, path, name, url):
+    subprocess.run(["git", "-C", ctx.expand(path), "remote", "add", name, url], check=True)
+
+
+@given(parsers.parse('"{path}" has remote.{name}.gh-resolved "{value}"'))
+def _gh_resolved_value(ctx, path, name, value):
+    subprocess.run(["git", "-C", ctx.expand(path), "config", f"remote.{name}.gh-resolved", value], check=True)
+
+
 def _engine(ctx, command):
     # The prose_budget_command option names the engine.
     ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = command
