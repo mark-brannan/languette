@@ -23,7 +23,7 @@ IN_PROCESS = {"python": ("awk",), "shfmt": ("shfmt",)}   # engine -> scan.RUNGS
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "LANGUETTE_PERM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
          "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH", "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND",
-         "CLAUDE_CODE_TMPDIR", "GH_RULES", "GH_PROTECTION", "GH_TIMELINE", "GH_LOGIN", "GH_THREADS", "XDG_CACHE_HOME", "XDG_CONFIG_HOME")
+         "CLAUDE_CODE_TMPDIR", "CLAUDE_CONFIG_DIR", "GH_RULES", "GH_PROTECTION", "GH_TIMELINE", "GH_LOGIN", "GH_THREADS", "XDG_CACHE_HOME", "XDG_CONFIG_HOME")
 
 
 _REAL_HOME = os.environ.get("HOME")
@@ -273,6 +273,7 @@ class FakeHome:
         self.aside = Path(tempfile.mkdtemp(prefix=f"languette-{kind}-"))   # stubs and copies, outside HOME
         self.bin = self.aside / "bin"
         self.bin.mkdir()
+        self.env = {}                          # set in the run's environment, over HOME and the rest
         self.out = self.err = self.code = self.before = None
 
     def snapshot(self):
@@ -283,7 +284,7 @@ class FakeHome:
         `stdin` as its input, nothing when None."""
         env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "LANGUETTE_")) and k not in SCRUB}
         env.update(HOME=str(self.home), USER=self.home.name, PATH=f"{self.bin}{os.pathsep}{path}", TMPDIR=str(self.aside),
-                   PYTHONPATH=str(ROOT))
+                   PYTHONPATH=str(ROOT), **self.env)
         self.before = self.snapshot()
         r = subprocess.run([sys.executable, "-m", "languette", *args], cwd=cwd, env=env, capture_output=True,
                            text=True, timeout=60, input=stdin or "")
