@@ -348,7 +348,7 @@ wl_stow_adopt: `stow --adopt` moves each file that conflicts from the target dir
 
 ```
 wt_checkout_home: {guard}: `checkout`/`switch` in $HOME switches the branch every shell and session on this machine sees until someone checks the old branch back out. Use a worktree instead:
-      {prog} worktree add -b <branch> <path> main
+      {prog} worktree add -b <branch> <path> {base}
     then cd into it and work there.
 wt_chezmoi: {guard}: {hits} overwrites or removes files in $HOME without chezmoi's own prompt: a forced apply replaces every file changed there since the last sync, destroy removes the target, its source entry and its state, and purge deletes the source directory, uncommitted edits included.
 wt_git_missing_checkout: {guard}: git is missing, so a checkout/switch can't be checked against $HOME. This is a gate and fails closed.
