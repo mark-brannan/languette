@@ -1,7 +1,10 @@
 @python
 Feature: guard-signed-comments
   A comment an agent posts to GitHub is signed as an agent's. The body's
-  first line begins with `🤖 ` and its last non-empty line is the signature,
+  first line begins with the opening setting and its last non-empty line
+  matches the signature setting; both are empty by default, and an empty one
+  checks nothing for its part. This feature's Background sets the sample
+  convention, the robot emoji and a space, then
   `🤖 <model id> · <low|medium|high|xhigh|max|-> · <eight lowercase hex>`: the
   model, its effort, and the first eight hex of the session id, checked
   against the payload's when it carries one.
@@ -26,6 +29,10 @@ Feature: guard-signed-comments
   from one. A body built at run time from anything else is denied, as
   guard-private-terms denies it, with the fix in the reason: write it
   literally, in a heredoc or a --body-file.
+
+  Background:
+    Given CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING is "🤖 "
+    And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is "🤖 \S+ · (?:low|medium|high|xhigh|max|-) · {session}"
 
   Rule: a signed comment posts
 
@@ -99,7 +106,7 @@ Feature: guard-signed-comments
 
     Scenario Outline: every route to a comment is read
       When the agent runs `<command>`
-      Then the guard denies, naming "🤖 claude-opus-5-5 · high ·"
+      Then the guard denies, naming "end with a line that matches"
 
       Examples:
         | command                                                                                                                     |
@@ -307,7 +314,7 @@ Feature: guard-signed-comments
         | gh api graphql -f query="$q"                                                                                    |
         | gh api graphql -f query='mutation { resolveReviewThread(input:{threadId:"T"}) { thread { isResolved } } }'      |
 
-  Rule: the opening and the signature are settings
+  Rule: the opening and the signature are settings, empty by default and then unchecked
 
     Scenario: a custom signature posts a body it matches and denies one it does not
       Given CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is "Signed: \S+ \(\w+\)"
@@ -374,18 +381,29 @@ Feature: guard-signed-comments
       Then the guard denies, naming "the signed_comments_signature setting"
       And the guard denies, naming "is not a regular expression"
 
-    Scenario: an empty setting is the default
+    Scenario: an empty setting checks nothing for its part
       Given CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING is ""
-      And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is ""
       When the agent runs:
         """
-        gh pr comment 1 -b "🤖 Done.
+        gh pr comment 1 -b "Done.
 
         🤖 claude-opus-5-5 · high · 5a74df74"
         """
       Then the guard is silent
+      When the agent runs `gh pr comment 1 -b "🤖 Done."`
+      Then the guard denies, naming "the last line is not the signature"
+      Given CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING is "🤖 "
+      And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is ""
+      When the agent runs `gh pr comment 1 -b "Done."`
+      Then the guard denies, naming "the first line does not start with"
+      When the agent runs `gh pr comment 1 -b "🤖 Done."`
+      Then the guard is silent
+
+    Scenario: with both settings empty no comment is checked
+      Given CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING is ""
+      And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is ""
       When the agent runs `gh pr comment 1 -b "Replacement is the intent"`
-      Then the guard denies, naming "🤖 claude-opus-5-5 · high ·"
+      Then the guard is silent
 
   Scenario: a payload without an absolute working directory is denied before the guard judges
     Given the working directory is "relative/dir"

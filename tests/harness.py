@@ -77,7 +77,11 @@ class Ctx:
         self.process_dir = scattered(seed, "process")
         # name -> value, or None for unset. The guard's own default guards no label, so
         # scenarios that expect guard-bypass-labels to fire start from a configured list.
-        self.env = {"CLAUDE_PLUGIN_OPTION_BYPASS_LABELS": "churn-ok,mixed-loops-ok"}
+        self.env = {"CLAUDE_PLUGIN_OPTION_BYPASS_LABELS": "churn-ok,mixed-loops-ok",
+                    # Empty by default, and then unchecked; a sample convention so the guard judges here.
+                    "CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING": "🤖 ",
+                    "CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE":
+                        r"🤖 \S+ · (?:low|medium|high|xhigh|max|-) · {session}"}
         self.proj = self.tmp = self.stub_log = self.bare = self.cache = None
         self.project_env = True
         self.stubs = False
