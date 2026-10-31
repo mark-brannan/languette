@@ -139,7 +139,7 @@ Each guard checks for one kind of hazard:
 - [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
   `stash pop`, force-push, `reset --hard`, `stow --adopt` and other moves that throw work away
 - [`guard-protected-services`](features/guard-protected-services.feature): `systemctl stop postgresql`, for the services you list
-- [`prose-budget-commit`](features/prose-budget-commit.feature): a `git commit` whose
+- [`prose-budget-commit`](features/prose-budget-commit.feature): opt-in; a `git commit` whose
   staged prose runs over the repo's word budgets
 - `guard-databases` (planned)
 - `guard-protected-paths` (planned)
@@ -231,7 +231,8 @@ Matches, lookup and a broken file work as for ask-first; `{"cmd":
 ## Configuration
 
 Every guard is on by default except `guard-worktrees`,
-`guard-review-threads`, `guard-signed-comments` and `guard-sudo`, which are opt-in; `guard-signed-comments` is experimental, and checks a signature only for the settings you give it: `signed_comments_opening` and `signed_comments_signature` are empty by default, and empty checks nothing. Turn one off (or those on) with
+`guard-review-threads`, `guard-signed-comments`, `guard-sudo` and
+`prose-budget-commit`, which are opt-in; `guard-signed-comments` is experimental, and checks a signature only for the settings you give it: `signed_comments_opening` and `signed_comments_signature` are empty by default, and empty checks nothing. Turn one off (or those on) with
 `/plugin configure languette@languette`,
 or at install, by its name with underscores:
 

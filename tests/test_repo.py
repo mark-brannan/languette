@@ -28,7 +28,7 @@ GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-ba
           "guard-secrets", "guard-review-threads", "guard-signed-comments",
           "guard-duplicate-prs", "deny-always", "guard-sudo"}
 # Guards that are off unless the user turns them on: their option defaults to false.
-OPT_IN = {"guard_worktrees", "guard_review_threads", "guard_signed_comments", "guard_sudo"}
+OPT_IN = {"guard_worktrees", "guard_review_threads", "guard_signed_comments", "guard_sudo", "prose_budget_commit"}
 # Options that are not a guard's on/off toggle: name -> type.
 OTHER_OPTIONS = {"redacted_terms_file": "file", "blocked_terms_file": "file", "private_repos": "string", "bypass_labels": "string", "review_thread_logins": "string",
                  "protected_services": "string", "prose_budget_command": "string",
