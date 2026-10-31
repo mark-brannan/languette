@@ -611,7 +611,7 @@ def listing():
            "Generated: regenerate with `python -m languette.messages > docs/messages.md`.", ""]
     for prefix in sorted(groups):
         out += [f"## {prefix}", "", "```"]
-        out += [f"{code}: {template}" for code, template in groups[prefix]]
+        out += [f"{code}: " + template.replace("\n", "\n    ") for code, template in groups[prefix]]
         out += ["```", ""]
     return "\n".join(out)
 

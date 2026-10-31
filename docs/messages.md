@@ -60,8 +60,8 @@ dup_body_appended: --body-file {v} is appended to in this same command, so the t
 dup_body_not_heredoc: --body-file {v} is changed in this same command, and not from a heredoc, so the file on disk is not yet the text gh sends. Write the body to that path from a heredoc in this command, or write the file in an earlier command and retry.
 dup_repo_unknown: {guard}: this PR would close #{n}, and the hook can't tell which repo it is opened on (no --repo, and the working directory's origin is not on github.com, or a cd moves it), so it can't check whether an open PR already references #{n}. Pass --repo owner/name, or read the issue first.
 dup_github_silent: {guard}: this PR would close {repo}#{n}, and GitHub couldn't say whether an open PR already references it (gh missing, signed out, offline, an error, or a timeline past {page} events):
-  gh api repos/{repo}/issues/{n}/timeline
-Read the issue before opening a second PR on it.
+      gh api repos/{repo}/issues/{n}/timeline
+    Read the issue before opening a second PR on it.
 dup_open: PR {named} is open and already references {issue}, which this PR would close too, so this command is blocked. If this PR replaces it, close {pr} first or say `Supersedes {pr}` in this body. If both are wanted, drop the closing keyword here and link the issue in prose.
 ```
 
@@ -238,8 +238,8 @@ ruleset_head_unknown: guard-bypass-ruleset: this {prog} push sends the current b
 ruleset_repo_unknown: guard-bypass-ruleset: this pushes to `{branch}` through remote `{remote}`, in a repository the hook can't find (a cd or -C it can't follow, or GIT_DIR), so it can't ask GitHub whether `{branch}` requires a pull request. An agent that pushes with your credentials can use your bypass.
 ruleset_needs_pr: guard-bypass-ruleset: `{branch}` on {slug} requires a pull request, and this push would go around it on the user's bypass. Push a branch and open a PR. A direct push is the user's to make, from their own terminal.
 ruleset_github_silent: guard-bypass-ruleset: this pushes to `{branch}` on {slug}, and GitHub couldn't say whether `{branch}` requires a pull request (gh missing, signed out, offline or an error):
-  gh api repos/{slug}/rules/branches/{branch_q}
-An agent that pushes with your credentials can use your bypass.
+      gh api repos/{slug}/rules/branches/{branch_q}
+    An agent that pushes with your credentials can use your bypass.
 ruleset_refused: guard-bypass-ruleset: {refused}, so the hook can't check whether it goes around a rule that requires a pull request. An agent that pushes with your credentials can use your bypass.
 ```
 
@@ -247,26 +247,26 @@ ruleset_refused: guard-bypass-ruleset: {refused}, so the hook can't check whethe
 
 ```
 sb_unreadable: {guard}: this deletes remote branch `{b}`, but the open-PR list could not be read (no auth, no network, a 20s timeout, or not a GitHub repo), so PRs stacked on it can't be checked. Confirm by hand first:
-{list}
+    {list}
 sb_unresolved: {guard}: this deletes a remote branch named by a variable or a glob, so the branch can't be resolved and checked for open PRs stacked on it. Confirm no open PR names it as base or head:
-{list}
+    {list}
 sb_other_repo: {guard}: this deletes a remote branch in a repository other than the current directory's (`git -C`, `--git-dir`, `GIT_DIR=`), so its open PRs can't be checked from here. Confirm none names the branch as base or head:
-  gh -R <owner>/<repo> pr list --state open --json number,baseRefName,headRefName
+      gh -R <owner>/<repo> pr list --state open --json number,baseRefName,headRefName
 sb_no_gh: {guard}: this deletes a remote branch, but `gh` is not installed, so open PRs based on it can't be checked. Deleting a branch an open PR points at closes that PR silently.
 sb_no_timeout: {guard}: this deletes a remote branch, but neither `timeout` nor `gtimeout` is installed (macOS: `brew install coreutils`), so the open-PR list can't be read without risking a hang. Deleting a branch an open PR points at closes that PR silently. Confirm by hand first:
-{list}
+    {list}
 sb_unparsed: {guard}: deleting remote branch `{b}`, but the open-PR list could not be parsed, so PRs stacked on it can't be checked.
 sb_advice: A stacked PR is retargeted only when its base disappears because the base PR merged. Merge bottom-up with `gh pr merge --delete-branch` (which this hook never fires on), or retarget the dependents to their next base first:
-  gh pr list --base {b} --json number,title
-  gh pr edit <n> --base <new-base>
+      gh pr list --base {b} --json number,title
+      gh pr edit <n> --base <new-base>
 sb_base_open: {guard}: `{b}` is the base branch of open PR(s):
-{prs}
-Deleting it closes every one of them -- GitHub does not retarget a PR whose base is deleted outside a merge, and each has to be reopened and retargeted by hand.
-
-{advice}
+    {prs}
+    Deleting it closes every one of them -- GitHub does not retarget a PR whose base is deleted outside a merge, and each has to be reopened and retargeted by hand.
+    
+    {advice}
 sb_head_open: {guard}: `{b}` is the head branch of open PR(s):
-{prs}
-Deleting it closes them and throws the work away. Merge or close the PR first; `gh pr merge --delete-branch` deletes the branch the safe way.
+    {prs}
+    Deleting it closes them and throws the work away. Merge or close the PR first; `gh pr merge --delete-branch` deletes the branch the safe way.
 ```
 
 ## secrets
@@ -283,8 +283,8 @@ secrets_context: guard-secrets: a value here is named as a credential: {found}. 
 ```
 signature_not_regex: {guard}: the signed_comments_signature setting `{pattern}` is not a regular expression ({err}), so no comment's signature can be checked. Fix the setting, or empty it for the default.
 signature_unread: {guard}: {why}
-
-{signed}
+    
+    {signed}
 signature_opaque_body: {what}, so its signature cannot be checked before it is posted. Write it literally, in a heredoc in the same command, or in a file and pass --body-file <path>.
 signature_body_file: the body file {why}, so its signature cannot be checked before it is posted. Spell out the path, or write the file from a heredoc in this same command (cat > PATH <<'EOF' ... EOF), or put the body in a heredoc and pass --body-file -.
 signature_input_not_json: the --input payload is not JSON this hook can read, so its signature cannot be checked. Write the JSON literally in a heredoc fed to --input -.
@@ -348,8 +348,8 @@ wl_stow_adopt: `stow --adopt` moves each file that conflicts from the target dir
 
 ```
 wt_checkout_home: {guard}: `checkout`/`switch` in $HOME switches the branch every shell and session on this machine sees until someone checks the old branch back out. Use a worktree instead:
-  {prog} worktree add -b <branch> <path> main
-then cd into it and work there.
+      {prog} worktree add -b <branch> <path> main
+    then cd into it and work there.
 wt_chezmoi: {guard}: {hits} overwrites or removes files in $HOME without chezmoi's own prompt: a forced apply replaces every file changed there since the last sync, destroy removes the target, its source entry and its state, and purge deletes the source directory, uncommitted edits included.
 wt_git_missing_checkout: {guard}: git is missing, so a checkout/switch can't be checked against $HOME. This is a gate and fails closed.
 wt_home_unresolved_checkout: {guard}: $HOME does not resolve, so a git checkout/switch can't be checked against it.
@@ -357,14 +357,14 @@ wt_repo_unclear: {guard}: can't tell which repository or work tree this git chec
 wt_dir_unclear: {guard}: can't tell which directory this git checkout/switch runs in (a cd, -C or session cwd that doesn't resolve), so it can't be checked against $HOME. Use an absolute path with git -C. An unresolved path is let through only from the session's own worktree or scratchpad, and only when every directory the command names lands there too; a path that doesn't exist yet lands in the nearest directory above it. $HOME, a main checkout, an unresolved cwd, `cd -` and `~-` keep the deny, as does any cd or -C after a ln, mv or cp in the same command: run that one as a call of its own first.
 wt_dir_unclear_note: {guard}: allowed, but unchecked: can't tell which directory this git checkout/switch runs in (a variable, a $( ) or a path that doesn't exist yet). It went through because the session stands in its own worktree or scratchpad. Make sure it lands there too: never $HOME, a repo's main checkout or another session's worktree. An absolute path with git -C lets the guard check it.
 wt_foreign: {guard}: `{word}` is inside {ft}, a git worktree this session does not own. A hand-off carries a branch, an issue and a PR -- never a directory; another session may still be running in there, and it may be archived out from under you mid-turn.
-To read that branch, stay here: `git log/diff/show <branch>`, `git show <branch>:<path>` -- worktrees of a repo share objects and refs.
-To work on it, take your own worktree, one command, from anywhere: `{recipe}`, then `git merge --ff-only {branch}` inside it. If --ff-only fails, the histories have diverged: report that and stop.
-If you made this worktree yourself in an earlier call, that is why: a worktree is yours only when the command that creates it also `cd`s into it, or it lives under your scratchpad. The recipe above does both.
-Worktree hygiene is the user's call, not a session's.
+    To read that branch, stay here: `git log/diff/show <branch>`, `git show <branch>:<path>` -- worktrees of a repo share objects and refs.
+    To work on it, take your own worktree, one command, from anywhere: `{recipe}`, then `git merge --ff-only {branch}` inside it. If --ff-only fails, the histories have diverged: report that and stop.
+    If you made this worktree yourself in an earlier call, that is why: a worktree is yours only when the command that creates it also `cd`s into it, or it lives under your scratchpad. The recipe above does both.
+    Worktree hygiene is the user's call, not a session's.
 wt_dotdot_missing: {guard}: `{raw}` has a `..` after a directory that does not exist, so where it lands cannot be resolved. Spell the path without `..`.
 wt_git_missing_owner: {guard}: git is missing, so worktree ownership cannot be checked. This is a gate and fails closed.
 wt_home_unresolved_owner: {guard}: $HOME does not resolve, so worktree ownership cannot be checked. This is a gate and fails closed.
 wt_enter_existing: {guard}: EnterWorktree(path=...) enters a worktree that already exists, with no check on whose it is -- the tool only requires that the path appear in `git worktree list`. The session that owns it may be archived mid-turn, and the directory goes away underneath the session that attached to it.
-Take your own instead, one command, from anywhere: `{recipe}`, then `git merge --ff-only <branch>` inside it to bring the branch you are resuming into your own directory. If --ff-only fails, the histories have diverged: report that and stop.
-Nothing needs the other directory -- worktrees of a repo share objects and refs, so `git log/diff/show <branch>` and `git show <branch>:<path>` read it from here.
+    Take your own instead, one command, from anywhere: `{recipe}`, then `git merge --ff-only <branch>` inside it to bring the branch you are resuming into your own directory. If --ff-only fails, the histories have diverged: report that and stop.
+    Nothing needs the other directory -- worktrees of a repo share objects and refs, so `git log/diff/show <branch>` and `git show <branch>:<path>` read it from here.
 ```
