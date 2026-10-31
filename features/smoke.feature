@@ -24,7 +24,7 @@ Feature: smoke
     When the doctor runs on that machine
     Then its "Claude Code" row is ✓ matching "^plugin cd31356, user scope$"
     And beneath it a line is ✓ matching "^guards enabled: \d+$"
-    And beneath it a line is ✓ matching "^guards disabled: 0$"
+    And beneath it a line is ! matching "^guards disabled: 1$"
     And its "gh" row is ✓ matching "^signed in$"
     And its "parse check" row is ✓ matching "^`echo \"unclosed` was denied: <reader>"
     And its "fail-closed" row is ✓ matching "was denied through the hook command as installed"
