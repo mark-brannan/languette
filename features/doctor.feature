@@ -46,12 +46,34 @@ Feature: doctor
     And beneath that, one ! line per off guard, "(off) <guard>: " and its one-line description
 
     Examples:
-      | options                                                                                                       | on | off | mark | guard          |
-      | {"guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true}                                                 | 25 | 1   | !    | guard_worktrees |
-      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true, "guard_disks": false}   | 25 | 1   | !    | guard_disks    |
-      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true, "guard_disks": "false"} | 25 | 1   | !    | guard_disks    |
-      | {"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true, "guard_disks": "no"}    | 26 | 0   | ✓    |                |
-      | {"guard_worktrees": "yes", "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true}                       | 25 | 1   | !    | guard_worktrees |
+      | options                                                  | on | off | mark | guard          |
+      | {}                                                       | 21 | 0   | ✓    |                |
+      | {"guard_disks": false}                                   | 20 | 1   | !    | guard_disks    |
+      | {"guard_disks": "false"}                                 | 20 | 1   | !    | guard_disks    |
+      | {"guard_disks": "no"}                                    | 21 | 0   | ✓    |                |
+      | {"guard_worktrees": "yes"}                               | 21 | 0   | ✓    |                |
+      | {"guard_worktrees": true, "guard_disks": false}          | 21 | 1   | !    | guard_disks    |
+
+  Scenario: an opt-in guard left unset is not counted as disabled
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{}`
+    When the doctor runs
+    Then the "Claude Code" row is ✓ "plugin cd31356, user scope"
+    And beneath it "guards disabled: 0" is ✓
+
+  Scenario: an opt-in guard set false explicitly is not counted as disabled
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{"prose_budget_commit": false}`
+    When the doctor runs
+    Then the "Claude Code" row is ✓ "plugin cd31356, user scope"
+    And beneath it "guards disabled: 0" is ✓
+
+  Scenario: a default-on guard set false is counted as disabled
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{"guard_disks": false}`
+    When the doctor runs
+    Then the "Claude Code" row is ✓ "plugin cd31356, user scope"
+    And beneath it "guards disabled: 1" is !
 
   Scenario: gh signed out is a warning, not a failure
     Given languette "cd31356ad5db" is installed at user scope
