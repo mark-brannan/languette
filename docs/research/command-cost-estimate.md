@@ -141,3 +141,102 @@ Rules live in the command-rules format, so one table serves both the estimate
 and ask-first's list; ask-first's `cost` field is prose today and would gain
 a band beside it. Without history the band for test runners and builds is
 "unknown", and a guard should treat unknown as unknown, not as cheap.
+
+# Can the record carry the history, and do the rules fit the rules format?
+
+A second pass for #136, on 2026-10-30. No code is added. The counts come from
+a throwaway script over the maintainer's own decision record (both files of
+`decisions.jsonl`), reading field presence and counts only.
+
+## Answer
+
+Yes, with three fields the record does not keep yet. The record already
+writes a row for each PostToolUse and PostToolUseFailure on Bash, keyed by
+the same call id as the PreToolUse row, so pre and post pair up today. What
+it lacks is the hook's own `duration_ms`, the exit code, and whether the
+call ran in the background. The rules fit the command-rules format for
+`match` and most of `when`; the format lacks a cost result, a scope class
+for path arguments, and a way for one finding to cap another.
+
+## What the post hooks give
+
+From the [hooks reference](https://code.claude.com/docs/en/hooks), checked
+2026-10-30:
+
+| Field | PostToolUse | PostToolUseFailure | Kept by the record |
+|---|---|---|---|
+| `tool_use_id` | yes | yes | yes, as `call` |
+| `duration_ms` | optional | optional | no |
+| exit code | none: the event means success | first line of `error`, `Exit code N` | no |
+| `is_interrupt` | no | optional | no |
+| Bash `tool_response` | `stdout`, `stderr`, `interrupted`, `isImage` | none | no |
+| `tool_input.run_in_background` | yes | yes | no |
+
+`duration_ms` excludes permission prompts and PreToolUse hooks, so it is the
+command's own time; the gap between the two rows' `t` stamps includes both.
+A backgrounded call reports when it moves to the background, so its time
+says nothing of the command's cost; the record has to know which calls those
+were, or it files a launch time as a run time.
+
+## Measured on the record
+
+| Count | Value |
+|---|---|
+| Rows, span | 6,543 rows, 37 sessions, 16 hours (2026-10-30 08:44 to 2026-10-31 00:41 UTC) |
+| Size | 9.3 MB, about 1.4 KB a row; rotation keeps two files of up to 8 MiB |
+| Bash PreToolUse rows | 3,065, all with `command.programs`, all but one with masked `command.text` |
+| Paired with a post row | 2,954 (96%); 143 of them PostToolUseFailure |
+| Unpaired | 111: 88 denied, 22 silent (cancelled, running or backgrounded; the record cannot tell which), 1 ask |
+| Pre-to-post gap, `t` stamps | median 1 s, 90th percentile 12 s, 113 at a minute or more, 5 at five minutes or more, max 601 s; 610 read 0 s |
+| Exact command text seen twice | 12 of 3,042 distinct texts (34 calls) |
+| Same `programs` list seen twice | 228 of 2,353 lists (940 calls) |
+
+Three readings. The stamps are whole seconds, so a third of the calls read
+zero and the gap cannot rank fast commands; `duration_ms` is the field to
+keep. The exact text almost never repeats, so a history keyed on it finds
+nothing; a short normal form (programs, subcommand, scope class, as
+sandwatch's first two words) is the key, and the record has to keep it or
+derive it at read. At this rate the rotation holds about a day, so the
+history is a day's, unless the record keeps a separate, smaller table of
+durations.
+
+## The rules in the command-rules format
+
+The first pass's 16 rules were in a throwaway script; the table below
+rebuilds them from its signal table. `band` is the field the format lacks:
+a wall band (`s` seconds, `m` minutes, `h` hours, `inf` unbounded, `?`
+unknown) and a core band (`1`, `all`). `scope` is a proposed predicate on a
+path argument's class: `disk` (`/`), `home` (`~`, `$HOME`, `~/*`, `..`),
+`project` (`.`, a relative path, a named file), `none` (no path).
+
+| id | match | when | band |
+|---|---|---|---|
+| walk-wide | `{"any": [{"cmd": "find"}, {"cmd": "du"}, {"cmd": "rg"}, {"cmd": "tar"}, {"cmd": "rsync"}]}` | `{"scope": ["disk", "home"]}` | `h`, `1` |
+| walk-project | the same | `{"scope": "project"}` | `s`, `1` |
+| walk-stdin | the same | `{"scope": "none"}` | none: a pipe's reader |
+| test-py | `{"any": [{"cmd": "pytest"}, {"cmd": "tox"}]}` | | `?` |
+| test-js | `{"any": [{"cmd": "jest"}, {"cmd": "npm", "args": ["test"]}]}` | | `?` |
+| test-rust | `{"cmd": "cargo", "args": ["test"]}` | | `?` |
+| build-make | `{"cmd": "make"}` | | `?` |
+| build-lang | `{"any": [{"cmd": "cargo", "args": ["build"]}, {"cmd": "go", "args": ["build"]}, {"cmd": "bazel"}]}` | | `?` |
+| build-image | `{"cmd": "docker", "args": ["build"]}` | | `?` |
+| container | `{"any": [{"cmd": "docker", "args": ["run"]}, {"cmd": "docker", "args": ["compose", "up"]}]}` | | `inf` |
+| parallel | any of the above | `{"any": [{"option-value-in": ["-n", "auto"]}, {"flags": ["-j", "--parallel"]}]}` | cores `all` |
+| release | any build | `{"flags": ["--release", "-O3", "--no-cache"]}` | one wall band up |
+| capped | any | `{"any": [{"flags": ["-maxdepth"]}, {"wrapper": "timeout"}, {"piped-to": "head"}]}` | caps wall at the limit |
+| long-lived | `{"any": [{"cmd": "sleep"}, {"cmd": "watch"}, {"cmd": "tail", "flags": ["-f"]}]}` | | wall only, cores `0` |
+| media | `{"any": [{"cmd": "ffmpeg"}, {"cmd": "xz", "flags": ["-9"]}, {"cmd": "zstd", "flags": ["-19"]}]}` | | `m`, `1` |
+| loop | any | `{"in-loop-body": true}` | the body's band, times the matches |
+
+What the format lacks, by rule:
+
+| Lack | Rules | What it needs |
+|---|---|---|
+| A result that is not a verdict | all 16 | `band` beside `action`; the estimate is a step guards read, so a cost rule has no `deny` or `ask` of its own |
+| Combining bands | parallel, release, capped, loop | findings combine by tightening today; bands need max for wall, a raise for release, a min for a cap, a product for a loop |
+| A path argument's class | the three walks | `path` names a `gh api` path today; a walker's path arguments need their own selector, and `scope` over it |
+| A wrapper's words | capped | the scanner sees through `timeout`; the rule needs the wrapper and its argument, not only the program inside |
+| Pipe position | walk-stdin, capped | whether the matched program reads stdin, and what reads its output |
+| A flag without a value | parallel | `-j` bare and `-j8` differ; `flags` cannot say "no value" |
+| Loop context | loop | whether the segment sits in a `for` or `while` body |
+| History | all `?` rows | a fact that reads past durations under the normal-form key; that is a Need kind, which the format already has |
