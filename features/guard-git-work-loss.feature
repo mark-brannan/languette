@@ -223,7 +223,6 @@ Feature: guard-git-work-loss
       | cd {TMP}/clean && git restore .  | a cd moves the tree                   |
       | git clean -fdx                   | ignored files are not in the status   |
       | env --chdir={TMP}/clean git checkout . | a wrapper's chdir moves the tree |
-      | sudo -D {TMP}/clean git checkout .     | a wrapper's chdir moves the tree |
       | git -c core.worktree={TMP}/clean checkout . | -c can re-aim the work tree |
       | sh -c 'git -c core.worktree={TMP}/clean checkout .' | git's -c, inside the quoted script |
       | sh -c 'git -C {TMP}/clean checkout .' | git's -C, inside the quoted script |
@@ -243,6 +242,11 @@ Feature: guard-git-work-loss
       | chroot /tmp git reset --hard     | a wrapper's root moves the tree       |
       | watch -n 60 git reset --hard     | a repeat runs after the status read   |
       | systemd-run --user --on-active=1h git reset --hard | a delay runs after the status read |
+
+    @also_guard-sudo
+    Examples:
+      | command                          | note                                  |
+      | sudo -D {TMP}/clean git checkout .     | a wrapper's chdir moves the tree |
 
   Scenario Outline: discarding is denied when the working tree has changes
     Given a git repository at "{TMP}/dirty"
@@ -331,7 +335,6 @@ Feature: guard-git-work-loss
       | stow --dir=dotfiles --adopt zsh       | asks      | a glued value                                |
       | stow -R --adopt zsh                   | asks      | a restow stows again, adopting               |
       | stow -D a -S b --adopt                | asks      | b is stowed                                  |
-      | sudo /usr/bin/stow --adopt zsh        | asks      | behind a wrapper, by path                    |
       | sh -c 'stow --adopt zsh'              | asks      | in a shell body                              |
       | stow --adopt -- zsh                   | asks      | packages after --                            |
       | stow zsh                              | is silent | no adopt                                     |
@@ -350,6 +353,11 @@ Feature: guard-git-work-loss
       | man stow --adopt zsh                  | asks      | man is not prose (its pager runs a command)  |
       | stow -t adopt zsh                     | is silent | adopt as a value, not the option             |
       | git commit -m 'stow --adopt zsh'      | is silent | a commit message                             |
+
+    @also_guard-sudo
+    Examples:
+      | command                               | verdict   | note                                         |
+      | sudo /usr/bin/stow --adopt zsh        | asks      | behind a wrapper, by path                    |
 
   Scenario Outline: force-deleting a branch is denied
     When the agent runs `<command>`
@@ -393,12 +401,16 @@ Feature: guard-git-work-loss
       | git checkout -- './'                | denies    | quoted ./                          |
       | git stash drop                      | denies    | drop with no ref drops the top     |
       | git stash clear                     | denies    |                                    |
-      | sudo git add -A                     | denies    | git reached through a wrapper      |
       | GIT_DIR=x git add -A                | denies    | an assignment prefix               |
       | timeout 30 git push -f origin foo   | denies    | a wrapper with an argument         |
       | /usr/bin/git add -A                 | denies    | a full path                        |
       | git stash drop stash@{3}            | is silent | by ref                             |
       | git stash drop abc123               | is silent | by sha                             |
+
+    @also_guard-sudo
+    Examples:
+      | command                             | verdict   | note                               |
+      | sudo git add -A                     | denies    | git reached through a wrapper      |
 
     @also_guard-git-stacked-base
     Examples:
@@ -527,8 +539,12 @@ Feature: guard-git-work-loss
       | git commit -m "block git add -A everywhere"        | is silent | prose in a commit message       |
       | echo "never run git add -A"                        | is silent | echo prints                     |
       | git commit -m "it's done" && echo "don't"          | is silent | apostrophes in prose            |
-      | sudo apt-get install -y git                        | is silent | git as an argument              |
       | git-lfs install                                    | is silent | git-lfs is not git              |
+
+    @also_guard-sudo
+    Examples:
+      | command                                            | verdict   | note                            |
+      | sudo apt-get install -y git                        | is silent | git as an argument              |
 
     @also_guard-bypass-ruleset
     Examples:

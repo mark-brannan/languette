@@ -113,6 +113,12 @@
       "description": "Deny crontab -r, which deletes the whole crontab with no undo. Leave on unless you want it through unchecked.",
       "default": true
     },
+    "guard_sudo": {
+      "type": "boolean",
+      "title": "Block acting as root",
+      "description": "Opt-in. Deny sudo, su, doas and pkexec wherever a command runs them: an agent works as the user, never as root.",
+      "default": false
+    },
     "guard_git_stacked_base": {
       "type": "boolean",
       "title": "Block deleting a stacked base branch",
@@ -141,6 +147,12 @@
       "type": "boolean",
       "title": "Ask before costly commands",
       "description": "Deny a command the repo lists in .languette/ask-first.json until the user approves that one run through AskUserQuestion. Leave on unless you want those commands through unasked.",
+      "default": true
+    },
+    "deny_always": {
+      "type": "boolean",
+      "title": "Deny the commands the repo forbids",
+      "description": "Deny every time a command the repo lists in .languette/deny-always.json. Leave on unless you want those commands through unchecked.",
       "default": true
     },
     "guard_bypass_hooks": {

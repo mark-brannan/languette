@@ -128,6 +128,18 @@ def test_every_guard_has_its_feature():
     assert_that(missing, empty())
 
 
+def test_every_rule_set_loads_and_has_its_feature():
+    """A guard that is a rule set alone (languette/rules/) loads, so the deny a rule set that
+    does not load gives never greets an install, and has its feature as a guard module does."""
+    from languette import engine
+    rule_sets = [importlib.import_module(f"languette.rules.{f.stem}").RULE_SET
+                 for f in sorted((ROOT / "languette" / "rules").glob("*.py")) if f.stem != "__init__"]
+    for rs in rule_sets:
+        engine.load(rs)
+    missing = [rs["guard"] for rs in rule_sets if not (ROOT / "features" / f"{rs['guard']}.feature").is_file()]
+    assert_that(missing, empty())
+
+
 def test_a_guard_reads_the_call_through_the_document():
     found = Counter()
     for g in GUARDS:

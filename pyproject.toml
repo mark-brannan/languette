@@ -19,7 +19,7 @@ Homepage = "https://github.com/mark-brannan/languette"
 languette = "languette.__main__:main"
 
 [tool.setuptools]
-packages = ["languette", "languette.guards"]
+packages = ["languette", "languette.guards", "languette.rules"]
 
 [tool.setuptools.package-data]
 # Each guard's shipped rule file (docs/design/guard-rules.md).

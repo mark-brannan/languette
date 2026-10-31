@@ -19,10 +19,12 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _pure():
-    """The guards, the verdict, the document they read, and every languette
-    module those import, so a helper cannot carry the escape for them."""
-    todo, seen = sorted((ROOT / "languette" / "guards").glob("*.py")) + [ROOT / "languette" / f
-                                                                         for f in ("verdict.py", "document.py")], set()
+    """The guards, the rules engine and the rule sets it reads, the verdict, the
+    document they read, and every languette module those import, so a helper
+    cannot carry the escape for them."""
+    todo, seen = sorted((ROOT / "languette" / "guards").glob("*.py")) + sorted(
+        (ROOT / "languette" / "rules").glob("*.py")) + [ROOT / "languette" / f
+                                                        for f in ("engine.py", "verdict.py", "document.py")], set()
     while todo:
         f = todo.pop()
         if f in seen:

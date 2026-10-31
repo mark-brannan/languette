@@ -45,7 +45,6 @@ Feature: guard-recursive-delete
       | rm -rf .                     | denies    |                                                 |
       | rm -rf ~                     | denies    | never $HOME itself                              |
       | cd x && rm -rf y             | denies    | a relative target after a cd cannot be resolved |
-      | sudo rm -rf /srv/z           | denies    |                                                 |
       | timeout 5 rm -r a            | denies    |                                                 |
       | rm -rf node_modules examples | denies    | one target the user's is enough                 |
       | rm --recursive build         | denies    | --recursive spelled out                         |
@@ -57,6 +56,11 @@ Feature: guard-recursive-delete
       | rm -rf -- examples           | denies    |                                                 |
       | rm -rf "$(pwd)/examples"     | denies    | command substitution                            |
       | rm -rf `pwd`/examples        | denies    | backtick substitution                           |
+
+    @also_guard-sudo
+    Examples:
+      | command                      | verdict   | note                                            |
+      | sudo rm -rf /srv/z           | denies    |                                                 |
 
     @also_guard-worktrees
     Examples:
@@ -124,7 +128,7 @@ Feature: guard-recursive-delete
       | {HOME}/project                      | rm -rf {examples,docs}                 | a brace list, no visible target                 |
       | {HOME}/project                      | rm -rf my\ dir                         | an escaped space in the target                  |
 
-    @also_ask-first
+    @also_ask-first @also_deny-always
     Examples:
       | cwd                                 | command                                | note                                            |
       | {HOME}/.local/state/claude-tmpdir/x | rm -rf "my dir"                        | a quoted path with a space, from the scratchpad |
@@ -146,14 +150,18 @@ Feature: guard-recursive-delete
       | cwd                                 | command                         | note                                                      |
       | /tmp                                | cd ~/project && rm -rf examples | a cd moves the target out of /tmp                         |
       | /tmp                                | env -C /tmp/elsewhere rm -r build | env -C moves the target as a cd does                    |
-      | /tmp                                | sudo -D ~/project rm -r x       | so does sudo -D                                           |
       | {HOME}                              | rm -rf .                        | the cwd is $HOME                                          |
       | {HOME}/project                      | rm -rf ~/dist                   | a generated name directly under $HOME is just a directory |
       | {HOME}                              | rm -rf coverage                 | the same, reached from $HOME                              |
       | {HOME}/project                      | rm -rf /dist                    | a generated name directly under /                         |
       | /                                   | rm -rf coverage                 | the same, reached from /                                  |
 
-    @also_ask-first
+    @also_guard-sudo
+    Examples:
+      | cwd                                 | command                         | note                                                      |
+      | /tmp                                | sudo -D ~/project rm -r x       | so does sudo -D                                           |
+
+    @also_ask-first @also_deny-always
     Examples:
       | cwd                                 | command                         | note                                                      |
       | {HOME}/.local/state/claude-tmpdir/x | cd ~/project; rm -rf examples   | a cd moves the target out of the scratchpad               |
@@ -174,7 +182,7 @@ Feature: guard-recursive-delete
       | {HOME}/project     | rm -rf {HOME}/.claude/worktrees/foo                  | denies    | not a worktree directory of this project        |
       | {HOME}/project     | rm -rf {HOME}/project/.claude/worktrees              | is silent | the directory itself                            |
 
-    @also_ask-first
+    @also_ask-first @also_deny-always
     Examples:
       | cwd                | command                                              | verdict   | note                                            |
       | {HOME}/project/sub | rm -rf {HOME}/project/.claude/worktrees/x            | is silent | an absolute worktree, from a deeper cwd         |
@@ -254,7 +262,7 @@ Feature: guard-recursive-delete
       | {HOME}/project     | mytool --run "rm -rf examples"                       | denies    | an unknown consumer's quoted text is scanned    |
       | {HOME}/project     | man -P 'rm -rf ~' ls                                 | denies    | man runs its -P pager, so it is not prose       |
 
-    @also_ask-first
+    @also_ask-first @also_deny-always
     Examples:
       | cwd                | command                                              | verdict   | note                                            |
       | /opt/proj          | rm -rf dist                                          | is silent | a generated name nested under /                 |

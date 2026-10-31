@@ -49,11 +49,14 @@ try:
                                   guard_scheduled_jobs, guard_secrets, guard_signed_comments, require_well_formed,
                                   guard_worktrees,
                                   prose_budget_commit)
-    from languette import record
+    from languette import engine, record
+    from languette.rules import deny_always as _deny_always, guard_sudo as _guard_sudo
     from languette.document import Document
     from languette.messages import say
     from languette.verdict import Act, deny, verdict
     from languette.world import ACTS, World
+    # The guards that are a rule set alone (languette/engine.py).
+    deny_always, guard_sudo = engine.Guard(_deny_always), engine.Guard(_guard_sudo)
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
                                          "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"}))
@@ -66,11 +69,11 @@ STATE_EVENTS = frozenset({"PostToolUse", "PostToolUseFailure", "SubagentStart", 
 _SEND_STATE_TOOLS = re.compile(r"(?:WebFetch|WebSearch|Bash|Agent|mcp__.+)\Z")
 GUARDS = (
     ("PreToolUse", re.compile(r"Bash\Z"), (require_well_formed, guard_git_work_loss, guard_recursive_delete, ask_first,
-                                           guard_bypass_hooks, guard_infra, guard_bypass_labels,
+                                           deny_always, guard_bypass_hooks, guard_infra, guard_bypass_labels,
                                            guard_bypass_ruleset, guard_permissions, guard_pipe_to_shell,
                                            guard_disks, guard_host_availability, guard_protected_services,
-                                           guard_scheduled_jobs, guard_git_stacked_base, guard_review_threads, guard_secrets,
-                                           prose_budget_commit)),
+                                           guard_scheduled_jobs, guard_sudo, guard_git_stacked_base,
+                                           guard_review_threads, guard_secrets, prose_budget_commit)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
     ("PreToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
     ("PreToolUse", guard_private_terms.TOOLS, (guard_private_terms,)),
