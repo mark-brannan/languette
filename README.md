@@ -101,7 +101,7 @@ Each guard checks for one kind of hazard:
 - [`ask-first`](#ask-first): a command the repo lists as costly, until you
   approve that one run
 - [`deny-always`](#deny-always): a command the repo forbids, every time
-- [`guard-sudo`](features/guard-sudo.feature): opt-in; `sudo`, `su`, `doas`, `pkexec`
+- [`guard-sudo`](features/guard-sudo.feature): opt-in; `sudo`, `su`, `doas`, `pkexec`, `run0`, `sudoedit`, `dzdo`
 - [`require-well-formed`](features/require-well-formed.feature): a Bash command that
   doesn't parse; the other guards skip it
 - [`guard-disks`](features/guard-disks.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks

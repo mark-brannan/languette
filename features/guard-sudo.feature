@@ -1,7 +1,8 @@
 @python
 Feature: guard-sudo
-  Acting as root is denied: `sudo`, `su`, `doas` and `pkexec`, wherever the
-  command runs them. Naming one as another command's argument passes. The
+  Acting as root is denied: `sudo`, `su`, `doas`, `pkexec`, `run0`, `sudoedit`
+  and `dzdo`, wherever the command runs them. Naming one as another command's
+  argument passes. The
   guard is a rule set alone (languette/rules/guard_sudo.py), read by
   languette/engine.py.
 
@@ -18,6 +19,9 @@ Feature: guard-sudo
       | su -c ls bob                            | `su`        |                                       |
       | doas ls /root                           | `doas`      |                                       |
       | pkexec ls                               | `pkexec`    |                                       |
+      | run0 id                                 | `run0`      | systemd's sudo                        |
+      | sudoedit /etc/hosts                     | `sudoedit`  | an editor as root                     |
+      | dzdo ls                                 | `dzdo`      |                                       |
       | FOO=1 sudo ls                           | `sudo`      | behind an assignment                  |
       | env FOO=1 sudo ls                       | `sudo`      | behind a wrapper                      |
       | nice -n 5 sudo ls                       | `sudo`      | behind a wrapper with a valued option |
@@ -29,6 +33,8 @@ Feature: guard-sudo
       | echo "$(sudo cat /etc/shadow)"          | `sudo`      | inside a command substitution         |
       | ls \| xargs sudo rm                     | `sudo`      | behind a program that runs a command  |
       | setsid sudo ls                          | `sudo`      | behind a program that runs a command  |
+      | systemd-run --pipe sudo id              | `sudo`      | behind a program that runs a command  |
+      | fakeroot sudo id                        | `sudo`      | behind a program that runs a command  |
       | npx sudo ls                             | `sudo`      | behind a launcher                     |
       | find . -name x -exec sudo rm {} \;      | `sudo`      | find -exec                            |
 

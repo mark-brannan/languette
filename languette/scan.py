@@ -1533,7 +1533,8 @@ def load_rules(cfg, key, keys=(), check=None, many=False, taken=(), nonempty=Fal
 # Programs that run a command they are given: past one of these, `at: "command"` reads every
 # later word as it would without `at`, since where their command starts is theirs to say.
 _RUNS_A_COMMAND = EXEC | WRAP | LOOP | LAUNCH | _FIND_WRAPPERS | frozenset(
-    "setsid ionice stdbuf chroot flock strace ltrace unshare nsenter runuser chrt taskset".split())
+    "setsid ionice stdbuf chroot flock strace ltrace unshare nsenter runuser chrt taskset "
+    "setpriv systemd-run fakeroot unbuffer sg capsh bwrap firejail proxychains torsocks caffeinate cgexec".split())
 
 
 def _placed_index(s, a, b, rx):

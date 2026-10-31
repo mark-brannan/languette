@@ -7,7 +7,9 @@ RULE_SET = {
     "opt_in": "CLAUDE_PLUGIN_OPTION_GUARD_SUDO",
     "rules": [{"id": "root",
                "match": [{"cmd": "sudo", "at": "command"}, {"cmd": "su", "at": "command"},
-                         {"cmd": "doas", "at": "command"}, {"cmd": "pkexec", "at": "command"}],
+                         {"cmd": "doas", "at": "command"}, {"cmd": "pkexec", "at": "command"},
+                         {"cmd": "run0", "at": "command"}, {"cmd": "sudoedit", "at": "command"},
+                         {"cmd": "dzdo", "at": "command"}],
                "action": "deny",
                "why": "sudo_root"}],
 }
