@@ -1,9 +1,9 @@
 """What the repository says about itself that two guards ask the same way.
 
 The default branch is read from the remote's HEAD ref (refs/remotes/<remote>/HEAD),
-never presumed. The remote a repository means is its current branch's upstream remote,
-else its only remote, else origin. A guard hands in how it asks git; the answer is a
-Need the world performs, so a guard stays pure."""
+never presumed. The remote a repository means is the one `gh` would act on, never the
+branch's tracking remote (see remote_url). A guard hands in how it asks git; the answer
+is a Need the world performs, so a guard stays pure."""
 
 from languette.verdict import Need
 
