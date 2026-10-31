@@ -231,7 +231,8 @@ Matches, lookup and a broken file work as for ask-first; `{"cmd":
 ## Configuration
 
 Every guard is on by default except `guard-worktrees`,
-`guard-review-threads`, `guard-signed-comments` and `guard-sudo`, which are opt-in; `guard-signed-comments` is experimental. Turn one off (or those on) with
+`guard-review-threads`, `guard-signed-comments`, `guard-sudo` and
+`prose-budget-commit`, which are opt-in; `guard-signed-comments` is experimental. Turn one off (or those on) with
 `/plugin configure languette@languette`,
 or at install, by its name with underscores:
 

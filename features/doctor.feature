@@ -51,7 +51,7 @@ Feature: doctor
       | {"guard_disks": false}                                   | 20 | 1   | !    | guard_disks    |
       | {"guard_disks": "false"}                                 | 20 | 1   | !    | guard_disks    |
       | {"guard_disks": "no"}                                    | 21 | 0   | ✓    |                |
-      | {"guard_worktrees": "yes"}                               | 21 | 0   | ✓    |                |
+      | {"guard_worktrees": "yes"}                               | 21 | 1   | !    | guard_worktrees |
       | {"guard_worktrees": true, "guard_disks": false}          | 21 | 1   | !    | guard_disks    |
 
   Scenario: an opt-in guard left unset is not counted as disabled

@@ -25,7 +25,6 @@ Feature: wiring
     And the stub "prose-budget" is the engine
     And PROSE_BUDGET_FAIL is "1"
     And CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "postgresql"
-    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is "true"
 
   Scenario Outline: each hooks.json command judges a payload
     Given the hook is the hooks.json command for "<guard>"
@@ -48,7 +47,6 @@ Feature: wiring
       | guard-secrets | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 | denies |
       | guard-infra         | terraform destroy             | denies    |
       | guard-github-issues             | gh issue create -t t -b b     | denies    |
-      | prose-budget-commit    | git commit -m x               | warns about "CI fails on this" |
       | guard-duplicate-prs | gh pr create -t t -b "Closes #1" | asks |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok | denies    |
       | guard-bypass-ruleset      | git push origin HEAD:$b       | asks      |
@@ -95,7 +93,6 @@ Feature: wiring
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
       | guard-duplicate-prs | gh pr create -t t -b "Closes #1" |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
-      | prose-budget-commit    | git commit -m x               |
 
   # One command runs every guard, so with python3 absent it denies every call
   # and says why instead of blaming the plugin directory. Without python3 it
@@ -166,7 +163,6 @@ Feature: wiring
       | guard-private-terms     | gh issue comment 3 -R o/r -b Wanderlust |
       | guard-duplicate-prs | gh pr create -t t -b "Closes #1" |
       | guard-bypass-labels       | gh pr edit 4 --add-label churn-ok |
-      | prose-budget-commit    | git commit -m x               |
 
   Scenario Outline: the option set to false skips the guard
     Given the hook is the hooks.json command for "<guard>"
@@ -309,6 +305,33 @@ Feature: wiring
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
+
+  # prose-budget-commit is opt-in too: it runs only when its option is exactly "true".
+  Scenario: the opt-in prose-budget guard warns when its option is true
+    Given the hook is the hooks.json command for "prose-budget-commit"
+    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is "true"
+    When the agent runs `git commit -m x`
+    Then the guard warns about "CI fails on this"
+
+  Scenario: the opt-in prose-budget guard stays silent when its option is unset
+    Given the hook is the hooks.json command for "prose-budget-commit"
+    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is unset
+    When the agent runs `git commit -m x`
+    Then the guard is silent
+
+  Scenario: a missing script is a deny for the opt-in prose-budget guard when it is on
+    Given the hook is the hooks.json command for "prose-budget-commit"
+    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is "true"
+    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
+    When the agent runs `git commit -m x`
+    Then the guard denies
+
+  Scenario: a crashing script is a deny for the opt-in prose-budget guard when it is on
+    Given the hook is the hooks.json command for "prose-budget-commit"
+    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is "true"
+    And the plugin's script for "prose-budget-commit" crashes
+    When the agent runs `git commit -m x`
+    Then the guard denies
 
   # guard-worktrees is opt-in, the reverse of the guards above: it runs only
   # when its option is exactly "true", so a misconfiguration leaves it off.

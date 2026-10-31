@@ -113,6 +113,8 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
   state, review threads, a transcript) is the exception, not the shape.
 - Current thinking, not settled: guards trend toward a rules engine with a
   few deep special cases.
+- 2026-10-30: guard-sudo and deny-always enter by #198's stage 2, no `ready`
+  issue; [#314](https://github.com/mark-brannan/languette/pull/314) ships its config.
 
 ## Base-case guard names: 2026-10-09
 
@@ -203,3 +205,5 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 - A redaction transforms data, so a per-repo rule may loosen one a wider tier
   applies. Current thinking. ([thread](https://github.com/mark-brannan/languette/pull/290#discussion_r4395034528))
 - Spec: [features/guard-private-terms.feature](../features/guard-private-terms.feature).
+- 2026-10-30: for now, a missing default terms file is regenerated; its
+  long-term source is open ([thread](https://github.com/mark-brannan/languette/pull/308#discussion_r4397429263)).

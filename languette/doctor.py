@@ -359,8 +359,9 @@ def check(cwd):
                                                "are on is unknown", [])
             else:
                 on = [k for k, g in found.items() if is_on(g, options.get(k))]
-                # Disabled is a default-on guard turned off; an opt-in guard nobody opted into is not.
-                off = sorted(k for k, g in found.items() if g == "=" and k not in on)
+                # Disabled: a default-on guard turned off, or an opt-in set to a value that leaves it off.
+                off = sorted(k for k, g in found.items() if k not in on and (
+                    g == "=" or options.get(k) is not None and _env_value(options[k]) != "false"))
                 titles = _titles(root)
                 claude = (OK, "Claude Code", where, [
                     line(OK, f"guards enabled: {len(on)}"),
