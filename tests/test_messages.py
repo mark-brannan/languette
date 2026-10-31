@@ -57,3 +57,9 @@ def test_every_message_in_the_catalog_is_said_somewhere():
 def test_a_blank_with_braces_in_it_is_filled_as_text():
     from languette.messages import say
     assert_that(say("payload_unreadable", err="{x}"), equal_to("languette: unreadable hook payload ({x})"))
+
+
+def test_the_listing_page_is_the_catalog():
+    from languette.messages import listing
+    page = ROOT.parent / "docs" / "messages.md"
+    assert_that(page.read_text(), equal_to(listing() + "\n"), "regenerate: python -m languette.messages > docs/messages.md")

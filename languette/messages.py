@@ -600,3 +600,21 @@ MESSAGES = {
 def say(code, **blanks):
     """The message `code` with its blanks filled; a blank left out is a KeyError."""
     return MESSAGES[code].format(**blanks)
+
+
+def listing():
+    """The catalog as a markdown page, grouped by the first word of each code."""
+    groups = {}
+    for code, template in MESSAGES.items():
+        groups.setdefault(code.split("_")[0], []).append((code, template))
+    out = ["# Messages", "",
+           "Generated: regenerate with `python -m languette.messages > docs/messages.md`.", ""]
+    for prefix in sorted(groups):
+        out += [f"## {prefix}", "", "```"]
+        out += [f"{code}: {template}" for code, template in groups[prefix]]
+        out += ["```", ""]
+    return "\n".join(out)
+
+
+if __name__ == "__main__":
+    print(listing(), end="")
