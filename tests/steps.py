@@ -333,6 +333,22 @@ def _tracks(ctx, branch, path, upstream):
     subprocess.run(["git", "-C", d, "config", f"branch.{branch}.merge", f"refs/heads/{name}"], check=True)
 
 
+@given(parsers.parse('"{path}" marks the remote "{name}" as gh\'s default'))
+def _gh_resolved(ctx, path, name):
+    if name != "-":
+        subprocess.run(["git", "-C", ctx.expand(path), "config", f"remote.{name}.gh-resolved", "base"], check=True)
+
+
+@given(parsers.parse('"{path}" has a remote "{name}" at "{url}"'))
+def _add_remote(ctx, path, name, url):
+    subprocess.run(["git", "-C", ctx.expand(path), "remote", "add", name, url], check=True)
+
+
+@given(parsers.parse('"{path}" has remote.{name}.gh-resolved "{value}"'))
+def _gh_resolved_value(ctx, path, name, value):
+    subprocess.run(["git", "-C", ctx.expand(path), "config", f"remote.{name}.gh-resolved", value], check=True)
+
+
 def _engine(ctx, command):
     # The prose_budget_command option names the engine.
     ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = command
@@ -639,9 +655,9 @@ def _spawns(ctx, name, agent):
     assert ctx.verdict.stdout == "", f"PostToolUse printed {ctx.verdict.stdout!r}"
 
 
-@given(parsers.parse('the session\'s team config lists "{name}"'))
-def _team(ctx, name):
-    d = Path(os.environ["HOME"], ".claude", "teams", f"session-{ctx.session[:8]}")
+@given(parsers.re(r'the session\'s team config lists "(?P<name>[^"]+)"(?: under "(?P<base>[^"]+)")?'))
+def _team(ctx, name, base=None):
+    d = Path(ctx.expand(base) if base else os.environ["HOME"] + "/.claude", "teams", f"session-{ctx.session[:8]}")
     d.mkdir(parents=True, exist_ok=True)
     (d / "config.json").write_text(json.dumps({"members": [{"name": "team-lead", "agentType": "team-lead"},
                                                            {"name": name, "agentId": f"{name}@x"}]}))

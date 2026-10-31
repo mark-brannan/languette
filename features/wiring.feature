@@ -405,22 +405,26 @@ Feature: wiring
   Scenario: the opt-in signed-comments guard judges when its option is true
     Given the hook is the hooks.json command for "guard-signed-comments"
     And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "true"
-    And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING is "🤖 "
-    And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is "🤖 \S+ · (?:low|medium|high|xhigh|max|-) · {session}"
     When the agent runs `gh pr comment 3 -R o/r -b Done`
     Then the guard denies
 
   Scenario: with the opt-in signed-comments guard on, the hooks.json command judges an MCP call
     Given the hook is the hooks.json command for "guard-signed-comments"
     And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "true"
-    And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING is "🤖 "
-    And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is "🤖 \S+ · (?:low|medium|high|xhigh|max|-) · {session}"
     When the agent calls MCP tool "mcp__plugin_github_github__add_reply_to_pull_request_comment" with input `{"owner":"o","repo":"r","pullNumber":4,"commentId":9,"body":"Replacement is the intent"}`
     Then the guard denies
 
   Scenario: the opt-in signed-comments guard stays silent when its option is unset
     Given the hook is the hooks.json command for "guard-signed-comments"
     And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is unset
+    When the agent runs `gh pr comment 3 -R o/r -b Done`
+    Then the guard is silent
+
+  Scenario: with the opt-in signed-comments guard on and both options unset, the hooks.json command checks nothing
+    Given the hook is the hooks.json command for "guard-signed-comments"
+    And CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS is "true"
+    And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING is unset
+    And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is unset
     When the agent runs `gh pr comment 3 -R o/r -b Done`
     Then the guard is silent
 

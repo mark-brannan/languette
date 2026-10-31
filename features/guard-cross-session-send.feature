@@ -54,6 +54,24 @@ Feature: guard-cross-session-send
     And the agent sends "implementer" the message `take task 3`
     Then the guard is silent
 
+  Scenario: a teammate in the team config under the host's CLAUDE_CONFIG_DIR passes
+    Given CLAUDE_CONFIG_DIR is "{HOME}/elsewhere"
+    And the session's team config lists "implementer" under "{HOME}/elsewhere"
+    When the agent sends "implementer" the message `take task 3`
+    Then the guard is silent
+
+  Scenario: a relative CLAUDE_CONFIG_DIR is not read; the team config is under $HOME/.claude
+    Given CLAUDE_CONFIG_DIR is "elsewhere"
+    And the session's team config lists "implementer"
+    When the agent sends "implementer" the message `take task 3`
+    Then the guard is silent
+
+  Scenario: a team config under $HOME/.claude is not read when CLAUDE_CONFIG_DIR names another directory
+    Given CLAUDE_CONFIG_DIR is "{HOME}/elsewhere"
+    And the session's team config lists "implementer"
+    When the agent sends "implementer" the message `take task 3`
+    Then the guard asks
+
   Scenario: a name the team config does not list is not a teammate
     Given the session's team config lists "implementer"
     When the agent sends "reviewer" the message `take task 3`
@@ -157,6 +175,7 @@ Feature: guard-cross-session-send
       | mcp__github__list_issues                     | denies    |
       | mcp__slack__fetch_thread                     | denies    |
       | mcp__browser__navigate                       | denies    |
+      | mcp__oracle__pray_for_answer                 | denies    |
       | mcp__github__issue_write                     | is silent |
       | mcp__github__add_issue_comment               | is silent |
       | mcp__slack__post_message                     | is silent |
