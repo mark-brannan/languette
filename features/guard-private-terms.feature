@@ -76,7 +76,7 @@ Feature: guard-private-terms
 
   The target repo is --repo/-R, GH_REPO=, a positional issue or PR URL or
   `owner/repo#n`, the `gh api` path, or MCP owner/repo; failing those, the
-  remote of the payload's cwd (the branch's upstream, else the only one, else origin), unless the command also runs `cd`, in which
+  remote of the payload's cwd (the only one, else the one gh resolves: gh-resolved, upstream, github, origin), unless the command also runs `cd`, in which
   case it is unknown. A graphql mutation names its target by node id, so its
   repo is always unknown, never the cwd's. Unknown is scanned. Only a repo
   listed in the private_repos option (comma-separated owner/name, default
@@ -854,20 +854,30 @@ Feature: guard-private-terms
         | https://github.com/o/r.git   | denies    |
 
     @also_guard-github-issues
-    Scenario Outline: with several remotes, the branch's upstream remote decides, else origin
+    Scenario Outline: with several remotes, the one gh resolves decides, never the branch's tracking remote
       Given a clone of "<origin>" at "{TMP}/w" on branch "main"
       And "{TMP}/w" has a remote "mine" at "<mine>"
-      And the branch "main" of "{TMP}/w" <tracking>
+      And the branch "main" of "{TMP}/w" tracks "mine/main"
+      And "{TMP}/w" marks the remote "<marked>" as gh's default
       And the working directory is "{TMP}/w"
       When the agent runs `gh issue create -t x -b "aboard Wanderlust"`
       Then the guard <verdict>
 
       Examples:
-        | origin                       | mine                         | tracking          | verdict   |
-        | https://github.com/o/r.git   | git@github.com:you/notes.git | tracks "mine/main" | is silent |
-        | git@github.com:you/notes.git | https://github.com/o/r.git   | tracks "mine/main" | denies    |
-        | https://github.com/o/r.git   | git@github.com:you/notes.git | tracks nothing    | denies    |
-        | git@github.com:you/notes.git | https://github.com/o/r.git   | tracks nothing    | is silent |
+        | origin                       | mine                         | marked | verdict   |
+        | https://github.com/o/r.git   | git@github.com:you/notes.git | -      | denies    |
+        | git@github.com:you/notes.git | https://github.com/o/r.git   | -      | is silent |
+        | https://github.com/o/r.git   | git@github.com:you/notes.git | mine   | is silent |
+        | git@github.com:you/notes.git | https://github.com/o/r.git   | mine   | denies    |
+
+    @also_guard-github-issues
+    Scenario: with several remotes and none that gh would pick, the target is unknown and scanned
+      Given a clone of "git@github.com:you/notes.git" at "{TMP}/w" on branch "main"
+      And "{TMP}/w" has a remote "mine" at "git@github.com:you/notes.git"
+      And the remote of "{TMP}/w" is renamed to "fork"
+      And the working directory is "{TMP}/w"
+      When the agent runs `gh issue create -t x -b "aboard Wanderlust"`
+      Then the guard denies, naming "Wanderlust"
 
     # --- reads and clean text pass ------------------------------------------------
 

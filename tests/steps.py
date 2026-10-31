@@ -333,11 +333,10 @@ def _tracks(ctx, branch, path, upstream):
     subprocess.run(["git", "-C", d, "config", f"branch.{branch}.merge", f"refs/heads/{name}"], check=True)
 
 
-@given(parsers.parse('the branch "{branch}" of "{path}" tracks nothing'))
-def _tracks_nothing(ctx, branch, path):
-    d = ctx.expand(path)
-    for key in ("remote", "merge"):
-        subprocess.run(["git", "-C", d, "config", "--unset", f"branch.{branch}.{key}"], check=True)
+@given(parsers.parse('"{path}" marks the remote "{name}" as gh\'s default'))
+def _gh_resolved(ctx, path, name):
+    if name != "-":
+        subprocess.run(["git", "-C", ctx.expand(path), "config", f"remote.{name}.gh-resolved", "base"], check=True)
 
 
 @given(parsers.parse('"{path}" has a remote "{name}" at "{url}"'))

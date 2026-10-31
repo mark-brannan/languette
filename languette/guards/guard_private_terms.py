@@ -44,7 +44,7 @@ never its path; for MCP, every string in tool_input. Each term is matched
 case-insensitively as plain text.
 
 The target repo is --repo/-R, GH_REPO=, a positional URL or owner/repo#n, the
-gh api path, or MCP owner/repo; failing those, the cwd's remote (the branch's upstream, else the only one, else origin), unless
+gh api path, or MCP owner/repo; failing those, the cwd's remote (the only one, else the one gh resolves), unless
 the command runs a `cd`. A graphql mutation's repo is unknown. Unknown is
 judged; only when every target is in private_repos does the text go unjudged.
 

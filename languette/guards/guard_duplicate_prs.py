@@ -18,7 +18,7 @@ fixed, resolve, resolves, resolved; an optional colon; then `#N`,
 already on that issue: deny, naming both, unless this body says
 `Supersedes` or `Replaces` that PR, in the same reference forms. The repo of
 a bare `#N` is --repo/-R, GH_REPO=, or the MCP owner/repo; failing those,
-the cwd's remote (the branch's upstream, else the only one, else origin), unless the command runs a `cd`.
+the cwd's remote (the only one, else the one gh resolves), unless the command runs a `cd`.
 
 GitHub that cannot answer (gh missing, signed out, offline, an error), a
 timeline page filled with no open PR on it (an older one may sit past it),

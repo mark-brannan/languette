@@ -30,16 +30,23 @@ def default_branches(ask, remote=None):
 
 
 def remote_url(cwd):
-    """The URL of the remote the repository means, or None when git cannot say.
+    """The URL of the remote `gh` would act on, or None when git cannot say or it is ambiguous.
 
-    That remote is the current branch's upstream remote; with none, the only remote;
-    else origin, read in `cwd`. The upstream is one read, and `git remote` is read only
-    when the branch has none."""
+    With one remote, that remote. With several, the one marked `gh-resolved` in git config,
+    else the first of upstream, github, origin, as `gh` picks; with none of those the target
+    is unknown. The branch's tracking remote is no part of it: `gh` ignores it, so a guard
+    that trusted it could skip a scan of a post `gh` sends elsewhere. Read in `cwd`."""
     def ask(*argv):
         return (yield Need("git", "git", cwd, *argv))
-    out = yield from ask("for-each-ref", "--format=%(if)%(HEAD)%(then)%(upstream:remotename)%(end)", "refs/heads")
-    remote = next((x for x in (out or "").split() if x != "."), None)
-    if remote is None:
-        names = ((yield from ask("remote")) or "").split()
-        remote = names[0] if len(names) == 1 else "origin"
-    return (yield from ask("remote", "get-url", remote))
+    names = ((yield from ask("remote")) or "").split()
+    if len(names) > 1:
+        marked = (yield from ask("config", "--get-regexp", r"^remote\..*\.gh-resolved$")) or ""
+        for line in marked.splitlines():
+            key, _, value = line.partition(" ")
+            name = key.removeprefix("remote.").removesuffix(".gh-resolved")
+            if name in names and value.strip() == "base":
+                names = [name]
+                break
+        else:
+            names = next(([n] for n in ("upstream", "github", "origin") if n in names), [])
+    return (yield from ask("remote", "get-url", names[0])) if len(names) == 1 else None
