@@ -20,15 +20,19 @@ Feature: guard-host-availability
       | f() { f \| f & }; f             | fork-bomb shape           | with whitespace                                |
       | sh -c ':(){ :\|:& };:'          | fork-bomb shape           | nested text                                    |
       | shutdown -h now                 | shutdown                  |                                                |
-      | sudo shutdown -r +5             | shutdown                  | behind sudo                                    |
       | /sbin/shutdown now              | shutdown                  | by path                                        |
       | reboot                          | reboot                    |                                                |
-      | sudo reboot                     | reboot                    |                                                |
-      | sudo -n reboot                  | reboot                    | behind sudo with an option                     |
       | halt                            | halt                      |                                                |
       | poweroff                        | poweroff                  |                                                |
       | sh -c "reboot"                  | reboot                    | nested text                                    |
       | echo done; reboot               | reboot                    | after a ;                                      |
+
+    @also_guard-sudo
+    Examples:
+      | command                         | naming                    | note                                           |
+      | sudo shutdown -r +5             | shutdown                  | behind sudo                                    |
+      | sudo reboot                     | reboot                    |                                                |
+      | sudo -n reboot                  | reboot                    | behind sudo with an option                     |
 
   Scenario Outline: taking the host down, or a service the session runs on, with systemctl is denied
     When the agent runs `<command>`
@@ -42,8 +46,6 @@ Feature: guard-host-availability
       | systemctl isolate rescue.target          | systemctl isolate              | stops every unit the target lacks     |
       | systemctl rescue                         | systemctl rescue               |                                       |
       | systemctl stop sshd                      | systemctl stop sshd            |                                       |
-      | sudo systemctl restart ssh.service       | systemctl restart ssh.service  | behind sudo                           |
-      | sudo -n systemctl restart sshd           | systemctl restart sshd         | behind sudo with an option            |
       | systemctl stop nginx NetworkManager      | systemctl stop NetworkManager  | among several units                   |
       | systemctl kill systemd-logind            | systemctl kill systemd-logind  |                                       |
       | systemctl try-restart gdm                | systemctl try-restart gdm      | a restart by another name             |
@@ -63,22 +65,28 @@ Feature: guard-host-availability
       | systemctl stop session-3.scope           | systemctl stop session-3.scope | a login session                       |
       | systemctl isolate graphical.target       | systemctl isolate              |                                       |
       | service ssh stop                         | service ssh stop               | the SysV form                         |
-      | sudo service networking restart          | service networking restart     | the SysV form behind sudo             |
       | service sshd force-reload                | service sshd force-reload      | every verb in the set                 |
       | service dbus try-restart                 | service dbus try-restart       | every verb in the set                 |
       | service ssh --full-restart               | service ssh --full-restart     | the verb is an option                 |
       | service -v ssh stop                      | service ssh stop               | an option before the unit             |
       | service --full-restart ssh               | service ssh --full-restart     | the verb before the unit              |
       | invoke-rc.d ssh stop                     | invoke-rc.d ssh stop           | the Debian wrapper                    |
-      | sudo invoke-rc.d networking restart      | invoke-rc.d networking restart | the Debian wrapper behind sudo        |
       | rc-service sshd restart                  | rc-service sshd restart        | the OpenRC form                       |
       | rc-service -v dbus stop                  | rc-service dbus stop           | the OpenRC form with an option        |
       | /etc/init.d/ssh stop                     | /etc/init.d/ssh stop           | the init script itself                |
-      | sudo /etc/init.d/networking restart      | /etc/init.d/networking restart | the init script behind sudo           |
       | /etc/rc.d/init.d/sshd restart            | /etc/rc.d/init.d/sshd restart  | the RHEL init script path             |
       | sh /etc/init.d/ssh stop                  | /etc/init.d/ssh stop           | the init script through a shell       |
-      | sudo -u root systemctl stop sshd         | systemctl stop sshd            | a wrapper option's value is not the command |
       | env -S systemctl stop sshd               | systemctl stop sshd            | env -S's value is the command         |
+
+    @also_guard-sudo
+    Examples:
+      | command                                  | naming                         | note                                  |
+      | sudo systemctl restart ssh.service       | systemctl restart ssh.service  | behind sudo                           |
+      | sudo -n systemctl restart sshd           | systemctl restart sshd         | behind sudo with an option            |
+      | sudo service networking restart          | service networking restart     | the SysV form behind sudo             |
+      | sudo invoke-rc.d networking restart      | invoke-rc.d networking restart | the Debian wrapper behind sudo        |
+      | sudo /etc/init.d/networking restart      | /etc/init.d/networking restart | the init script behind sudo           |
+      | sudo -u root systemctl stop sshd         | systemctl stop sshd            | a wrapper option's value is not the command |
 
   Scenario: a fork bomb on a later line is still seen
     When the agent runs:

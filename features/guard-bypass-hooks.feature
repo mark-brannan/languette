@@ -64,7 +64,6 @@ Feature: guard-bypass-hooks
       | vcsh foreach -g git commit --no-verify       | -g runs the command as it is, here git |
       | vcsh foreach -gp git commit -n -m x          | clustered flags                       |
       | bash -c "git commit -n -m x"                 | bash -c nests                         |
-      | sudo git commit -n -m x                      | sudo                                  |
       | git add f && git commit -n -m x              | later in a chain                      |
       | git merge --no-verify feature                | merge                                 |
       | git merge feature --no-verify                | merge, flag last                      |
@@ -83,6 +82,11 @@ Feature: guard-bypass-hooks
       | git --config-env=core.hooksPath=HP commit -m x | --config-env, attached              |
       | yadm -c core.hooksPath=x commit -m x         | yadm is git                           |
       | vcsh -c core.hooksPath=x dots commit -m x   | vcsh is git                           |
+
+    @also_guard-sudo
+    Examples:
+      | command                                      | note                                  |
+      | sudo git commit -n -m x                      | sudo                                  |
 
     @also_guard-bypass-ruleset
     Examples:

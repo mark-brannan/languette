@@ -262,6 +262,15 @@ MESSAGES = {
         "{file} is invalid: {err}. Every Bash command is denied until it is fixed, because the guard "
         "cannot tell what it was meant to cover. Fix the file, or tell the user."
     ),
+    "rules_cannot_look": (
+        "the payload's cwd {cwd!r} is not a directory, so the repo's list cannot be found. "
+        "A gate that cannot look fails closed: retry from the project directory."
+    ),
+    # A rule set's messages (languette/rules/): filled with the command word matched and way_user.
+    "sudo_root": (
+        "`{cmd}` is blocked: it runs the command as root, and an agent works as the user, never as root. "
+        "{way_user}"
+    ),
     "host_power": "`{what}` is blocked: it takes the machine down, with the user's session on it. {way_user}",
     "host_ctl": (
         "`systemctl {verb}` is blocked: it takes down the host or a service the "
@@ -591,3 +600,21 @@ MESSAGES = {
 def say(code, **blanks):
     """The message `code` with its blanks filled; a blank left out is a KeyError."""
     return MESSAGES[code].format(**blanks)
+
+
+def listing():
+    """The catalog as a markdown page, grouped by the first word of each code."""
+    groups = {}
+    for code, template in MESSAGES.items():
+        groups.setdefault(code.split("_")[0], []).append((code, template))
+    out = ["# Messages", "",
+           "Generated: regenerate with `python -m languette.messages > docs/messages.md`.", ""]
+    for prefix in sorted(groups):
+        out += [f"## {prefix}", "", "```"]
+        out += [f"{code}: " + template.replace("\n", "\n    ") for code, template in groups[prefix]]
+        out += ["```", ""]
+    return "\n".join(out)
+
+
+if __name__ == "__main__":
+    print(listing(), end="")

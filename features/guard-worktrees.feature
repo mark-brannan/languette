@@ -203,7 +203,7 @@ Feature: guard-worktrees
         | {PROJ} | vcsh dots switch some-branch     |
         | /tmp   | sh -c 'yadm checkout some-branch' |
 
-      @also_ask-first
+      @also_ask-first @also_deny-always
       Examples:
         | cwd    | command                          |
         | /nonexistent | yadm checkout some-branch  |
@@ -283,7 +283,7 @@ Feature: guard-worktrees
         | {PROJ}       | git -C "$SOMEWHERE" -C sub checkout x       |
         | {PROJ}       | cd "$X" && cd sub && git checkout some-branch |
 
-      @also_ask-first
+      @also_ask-first @also_deny-always
       Examples:
         | cwd          | command                                     |
         | /nonexistent | git checkout some-branch                    |
@@ -304,7 +304,7 @@ Feature: guard-worktrees
         | {PROJ}       | git --git-dir={PROJ}/.git --work-tree="$X" checkout some-branch |
         | {PROJ}       | git --git-dir=nope/.git checkout some-branch                |
 
-      @also_ask-first
+      @also_ask-first @also_deny-always
       Examples:
         | cwd          | command                                                     |
         | /nonexistent | git --git-dir=rel/.git checkout some-branch                 |
@@ -1115,7 +1115,7 @@ Feature: guard-worktrees
         | {PROJ}     | cd "$SOMEWHERE" && git checkout some-branch   |
         | {TMP}/repo | git -C "$SOMEWHERE" switch some-branch        |
 
-    @also_ask-first
+    @also_ask-first @also_deny-always
     Scenario: from a session cwd that does not resolve the deny stays
       Given the working directory is "{TMP}/gone"
       When the agent runs `cd "$SOMEWHERE" && git checkout some-branch`

@@ -165,7 +165,6 @@ Feature: ask-first
         | timeout 3h npm run e2e                     | wrapper                                  |
         | nohup npm run e2e > /tmp/log 2>&1 &        | nohup, backgrounded                      |
         | env FORCE_COLOR=0 npm run e2e              | env wrapper                              |
-        | sudo npm run e2e                           | sudo                                     |
         | npm ci && npm run e2e                      | chain                                    |
         | cd scripts; npm test; npm run e2e          | later in a ; chain                       |
         | sh -c "npm run e2e"                        | sh -c nests                              |
@@ -182,6 +181,11 @@ Feature: ask-first
         | npm run-script e2e                         | run-script is run                        |
         | yarn --cwd web e2e                         | yarn, option value before the script     |
         | npx -p node node scripts/e2e.mjs           | npx -p value before the launched command |
+
+      @also_guard-sudo
+      Examples:
+        | command                                    | note                                     |
+        | sudo npm run e2e                           | sudo                                     |
 
     Scenario Outline: other commands, and prose or process tools that name it, are not running it
       When the agent runs `<command>`

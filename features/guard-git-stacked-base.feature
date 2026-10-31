@@ -69,6 +69,7 @@ Feature: guard-git-stacked-base
       | gh api --method DELETE repos/o/r/git/refs/heads/claude/base-branch |
       | gh api -XDELETE repos/o/r/git/refs/heads/claude/base-branch        |
       | gh api --method=DELETE repos/o/r/git/refs/heads/claude/base-branch |
+      | gh api -X=DELETE repos/o/r/git/refs/heads/claude/base-branch       |
 
   Scenario Outline: the bypasses the shared scanner exists to close stay closed
     When the agent runs `<command>`

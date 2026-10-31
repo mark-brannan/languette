@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "languette"
-version = "0.0.11"
+version = "0.0.12"
 description = "Fail-closed guards against risky actions by coding agents, an installer that wires them into Claude Code, and a doctor that says whether they are on."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -19,7 +19,7 @@ Homepage = "https://github.com/mark-brannan/languette"
 languette = "languette.__main__:main"
 
 [tool.setuptools]
-packages = ["languette", "languette.guards"]
+packages = ["languette", "languette.guards", "languette.rules"]
 
 [tool.setuptools.package-data]
 # Each guard's shipped rule file (docs/design/guard-rules.md).

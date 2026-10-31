@@ -41,7 +41,6 @@ Feature: guard-protected-services
       | command                         | note                                 |
       | service postgresql stop         |                                      |
       | service postgresql restart      |                                      |
-      | sudo service postgresql stop    | behind sudo                          |
       | pkill postgresql                |                                      |
       | pkill -9 postgresql             | a signal flag                        |
       | pkill -f postgresql             | a pattern over command lines         |
@@ -84,14 +83,19 @@ Feature: guard-protected-services
       | pkill -f 'postgres:'            | a literal run the unit's name holds  |
       | pkill -f 'postgres.*checkpointer' | a literal run the unit's name holds  |
       | pkill -f -- -Dpostgres          | a run that holds the unit's stem     |
-      | sudo -u postgres pkill postgres | a wrapper option's value is not the command |
-      | sudo -u postgres killall postgres | a wrapper option's value is not the command |
       | pkill `cat x`                   | a backtick substitution fails closed |
       | pkill -f `cat x`                | a backtick substitution fails closed |
       | pkill -v nginx                  | an inverted pattern selects the unit |
       | pkill --inverse nginx           | an inverted pattern selects the unit |
       | pkill -F /run/postgresql/postmaster.pid | a pidfile under the unit's name      |
       | sh /etc/init.d/postgresql stop  | the init script through a shell      |
+
+    @also_guard-sudo
+    Examples:
+      | command                         | note                                 |
+      | sudo service postgresql stop    | behind sudo                          |
+      | sudo -u postgres pkill postgres | a wrapper option's value is not the command |
+      | sudo -u postgres killall postgres | a wrapper option's value is not the command |
 
   Scenario Outline: a process pattern that could name a protected service is denied
     Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "<setting>"

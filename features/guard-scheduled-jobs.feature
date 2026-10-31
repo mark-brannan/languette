@@ -11,6 +11,10 @@ Feature: guard-scheduled-jobs
       | command                         | naming                    | note                                           |
       | crontab -r                      | crontab -r                |                                                |
       | crontab -ir                     | crontab -r                | a short cluster holding r                      |
+
+    @also_guard-sudo
+    Examples:
+      | command                         | naming                    | note                                           |
       | sudo crontab -u bob -r          | crontab -r                |                                                |
 
   Scenario: the denial names the safe path

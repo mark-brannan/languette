@@ -117,6 +117,13 @@ def host_tmp_roots(env):
     return [d for d in dict.fromkeys(named) if d] + ["/tmp"]
 
 
+def config_dir(env):
+    """The host's own configuration directory: CLAUDE_CONFIG_DIR when it is set
+    and absolute, else $HOME/.claude."""
+    named = (env.get("CLAUDE_CONFIG_DIR") or "").rstrip("/")
+    return named if named.startswith("/") else os.path.join(env.get("HOME") or "", ".claude")
+
+
 def own_bases(env, cwd):
     """Where the agent works and nothing of the user's lives, as written: /tmp,
     the host's scratch roots, and the host's worktree directory,

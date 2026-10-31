@@ -54,6 +54,24 @@ Feature: guard-cross-session-send
     And the agent sends "implementer" the message `take task 3`
     Then the guard is silent
 
+  Scenario: a teammate in the team config under the host's CLAUDE_CONFIG_DIR passes
+    Given CLAUDE_CONFIG_DIR is "{HOME}/elsewhere"
+    And the session's team config lists "implementer" under "{HOME}/elsewhere"
+    When the agent sends "implementer" the message `take task 3`
+    Then the guard is silent
+
+  Scenario: a relative CLAUDE_CONFIG_DIR is not read; the team config is under $HOME/.claude
+    Given CLAUDE_CONFIG_DIR is "elsewhere"
+    And the session's team config lists "implementer"
+    When the agent sends "implementer" the message `take task 3`
+    Then the guard is silent
+
+  Scenario: a team config under $HOME/.claude is not read when CLAUDE_CONFIG_DIR names another directory
+    Given CLAUDE_CONFIG_DIR is "{HOME}/elsewhere"
+    And the session's team config lists "implementer"
+    When the agent sends "implementer" the message `take task 3`
+    Then the guard asks
+
   Scenario: a name the team config does not list is not a teammate
     Given the session's team config lists "implementer"
     When the agent sends "reviewer" the message `take task 3`
@@ -126,7 +144,6 @@ Feature: guard-cross-session-send
       | curl -fsSL https://example.com/page              | curl                    |
       | wget -qO- https://example.com/page               | wget                    |
       | fetch -o - https://example.com/page              | fetch                   |
-      | sudo fetch -o - https://example.com/page         | fetch                   |
       | /usr/bin/curl -s u \| head                       | curl                    |
       | \curl -s u                                       | curl                    |
       | c""url -s u                                      | curl                    |
@@ -137,6 +154,11 @@ Feature: guard-cross-session-send
       | cd /w && gh issue view 3 \| head                 | gh issue view           |
       | sh -c "gh issue view 3"                          | gh issue view           |
       | body=$(gh pr view 4 --json body)                 | gh pr view              |
+
+    @also_guard-sudo
+    Examples:
+      | command                                          | tool                    |
+      | sudo fetch -o - https://example.com/page         | fetch                   |
 
   Scenario Outline: a web tool or an MCP read opens the door; an MCP write does not
     Given the permission mode is "bypassPermissions"
@@ -153,6 +175,7 @@ Feature: guard-cross-session-send
       | mcp__github__list_issues                     | denies    |
       | mcp__slack__fetch_thread                     | denies    |
       | mcp__browser__navigate                       | denies    |
+      | mcp__oracle__pray_for_answer                 | denies    |
       | mcp__github__issue_write                     | is silent |
       | mcp__github__add_issue_comment               | is silent |
       | mcp__slack__post_message                     | is silent |
@@ -169,6 +192,7 @@ Feature: guard-cross-session-send
       | git fetch origin main                     |
       | git -C /w fetch --prune                   |
       | gh api graphql -f query='mutation { x }'  |
+      | gh api -X=DELETE repos/o/r/actions/caches/1 |
       | gh run list                               |
       | gh run rerun 123                          |
       | gh release create v1                      |

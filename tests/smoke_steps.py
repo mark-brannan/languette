@@ -124,7 +124,7 @@ def given_installed(machine):
     (machine.home / ".claude").mkdir()
     (machine.home / ".claude/settings.json").write_text(
         json.dumps({"pluginConfigs": {"languette@languette": {"options": {
-            "guard_worktrees": True, "guard_review_threads": True, "guard_signed_comments": True}}}}))
+            "guard_worktrees": True, "guard_review_threads": True, "guard_signed_comments": True, "guard_sudo": True}}}}))
 
 
 @given(parsers.re(r"gh is (?P<state>signed in|signed out|not installed)"))
