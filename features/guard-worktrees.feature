@@ -181,6 +181,13 @@ Feature: guard-worktrees
       When the agent runs `git checkout some-branch`
       Then the guard denies, naming "worktree add -b <branch> <path> trunk"
 
+    Scenario: the worktree recipe leaves the base to the reader where the remote HEAD's name is not a plain word
+      Given the working directory is "{TMP}"
+      And the tracked file "{TMP}/f.txt" is committed
+      And the remote HEAD of "{TMP}" points at "trunk;x"
+      When the agent runs `git checkout some-branch`
+      Then the guard denies, naming "worktree add -b <branch> <path> <base>"
+
     Scenario: the worktree recipe leaves the base to the reader where no remote HEAD names one
       Given the working directory is "{TMP}"
       When the agent runs `git checkout some-branch`

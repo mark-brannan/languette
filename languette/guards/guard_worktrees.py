@@ -331,7 +331,7 @@ class _Ask(Exception):
 
 def _generic(prog, cwd):
     """The deny for a branch switch in $HOME. Its recipe names the remote HEAD's branch, read
-    here and only on this path; `<base>` where the repository names none."""
+    here and only on this path; `<base>` where the repository names none or a name the shell would read as more than a word."""
     seen = []
 
     def ask(*argv):
@@ -344,7 +344,7 @@ def _generic(prog, cwd):
             found = yield from default_branches(ask)
         except Exception:  # noqa: BLE001
             found = ()
-        if any(seen) and found:
+        if any(seen) and found and re.fullmatch(r"[A-Za-z0-9._][A-Za-z0-9._/-]*", found[0]):
             base = found[0]
     return Refuse(say("wt_checkout_home", guard=NAME, prog=prog, base=base))
 
