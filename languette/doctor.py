@@ -28,6 +28,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from languette import scan, terms
+from languette.paths import config_dir
 
 OK, WARN, FAIL = "✓", "!", "✗"
 # A probe is (row label, guard, command): the command goes to the guard's hook as a payload.
@@ -59,6 +60,10 @@ class Unreadable(Exception):
 
 def _home():
     return Path(os.environ.get("HOME") or Path.home())
+
+
+def _config_dir():
+    return Path(config_dir({**os.environ, "HOME": str(_home())}))
 
 
 def _tilde(path):
@@ -119,7 +124,7 @@ def installs(settings_files):
             listed = None
         if isinstance(listed, list) and all(isinstance(x, dict) for x in listed):
             return [x for x in listed if _ours(x.get("id"))]
-    path = _home() / ".claude/plugins/installed_plugins.json"
+    path = _config_dir() / "plugins/installed_plugins.json"
     plugins = _dig(_json(path, missing={}), ["plugins"], _tilde(path))
     out = []
     for pid, entries in plugins.items():
@@ -139,7 +144,7 @@ def settings_files(cwd):
     """path -> parsed JSON (or the Unreadable) for the user's settings.json and every
     .claude/settings{,.local}.json from cwd up to, not including, $HOME."""
     home = _home()
-    paths = [home / ".claude/settings.json"]
+    paths = [_config_dir() / "settings.json"]
     d = Path(cwd)
     for d in (d, *d.parents):
         if d == home:
@@ -312,7 +317,7 @@ def check(cwd):
     version, shell parser, the probes, Claude Code with its guards beneath, the forge clients,
     the terms files. A ✗ never stops a later check."""
     files = settings_files(cwd)
-    user_path = _home() / ".claude/settings.json"
+    user_path = _config_dir() / "settings.json"
     hand = {p: hs for p, hs in by_hand(files).items() if hs}
     try:
         inst = in_effect(installs(files), cwd)
@@ -668,7 +673,7 @@ def installed_options(cwd):
     files = settings_files(cwd)
     try:
         inst = in_effect(installs(files), cwd)
-        return _options(files, _home() / ".claude/settings.json", inst) if inst else {}
+        return _options(files, _config_dir() / "settings.json", inst) if inst else {}
     except Unreadable:
         return {}
 

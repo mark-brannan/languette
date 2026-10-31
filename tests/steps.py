@@ -650,9 +650,9 @@ def _spawns(ctx, name, agent):
     assert ctx.verdict.stdout == "", f"PostToolUse printed {ctx.verdict.stdout!r}"
 
 
-@given(parsers.parse('the session\'s team config lists "{name}"'))
-def _team(ctx, name):
-    d = Path(os.environ["HOME"], ".claude", "teams", f"session-{ctx.session[:8]}")
+@given(parsers.re(r'the session\'s team config lists "(?P<name>[^"]+)"(?: under "(?P<base>[^"]+)")?'))
+def _team(ctx, name, base=None):
+    d = Path(ctx.expand(base) if base else os.environ["HOME"] + "/.claude", "teams", f"session-{ctx.session[:8]}")
     d.mkdir(parents=True, exist_ok=True)
     (d / "config.json").write_text(json.dumps({"members": [{"name": "team-lead", "agentType": "team-lead"},
                                                            {"name": name, "agentId": f"{name}@x"}]}))
