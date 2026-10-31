@@ -83,6 +83,14 @@ Feature: doctor
     And the "fail-closed" row is ✗ "no guard-recursive-delete hook installed to send the probe to"
     And the doctor exits 1
 
+  Scenario: the host's own configuration directory holds the settings and the install list
+    Given the host's configuration directory is "{HOME}/cfg"
+    And languette "cd31356ad5db" is installed at user scope
+    And the user's settings.json has a by-hand guard-recursive-delete hook
+    When the doctor runs
+    Then the "Claude Code" row is ✗ "plugin cd31356, user scope, and by-hand run.py hooks in ~/cfg/settings.json: every guard runs twice; remove the by-hand entries"
+    And the doctor exits 1
+
   Scenario: a plugin install and by-hand run.py hooks for the same host fail
     Given languette "cd31356ad5db" is installed at user scope
     And the user's settings.json has a by-hand guard-recursive-delete hook

@@ -2,7 +2,7 @@
   "lines": {"README.md": 470, "docs/design/guard-pipeline.md": 70, "docs/design/exceptions.md": 150, "docs/design/guard-rules.md": 150, "docs/design/install.md": 60, "must_budget": ["docs/design/*.md"]},
   "sections": {"targets": ["README.md", "docs/decisions.md", "docs/approved-guard-names.md", "docs/design/*.md"], "max_words": 360, "exempt": ["Configuration"],
                "files": {"docs/design/portability.md": 625}},
-  "delta": {"targets": ["README.md", "docs/**/*.md", "!docs/agent_decisions.md", "!docs/decisions.md", "!docs/approved-guard-names.md", "!docs/design/*.md", "!docs/research/*.md"], "max_words": 40},
+  "delta": {"targets": ["README.md", "docs/**/*.md", "!docs/agent_decisions.md", "!docs/decisions.md", "!docs/approved-guard-names.md", "!docs/design/*.md", "!docs/research/*.md", "!docs/messages.md"], "max_words": 40},
   "narration": {
     "targets": ["README.md"],
     "grandfathered": [
