@@ -172,7 +172,7 @@ class Ctx:
             # gh is the stub unless the scenario says otherwise, so no guard that asks GitHub reaches it.
             self.stub_log = self.stub_log or self.mkdtemp()
             env = {"HOME": os.environ["HOME"], "USER": Path(os.environ["HOME"]).name, "TMPDIR": self.doordir(), **on,
-                   "PATH": str(ROOT / "tests/stubs/gh-only") + os.pathsep + os.defpath,
+                   "PATH": str(ROOT / "tests/gh-only") + os.pathsep + os.defpath,
                    **self.scenario_env()}
             if self.bare or self.stubs:
                 env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
