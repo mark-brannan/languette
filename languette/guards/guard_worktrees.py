@@ -3,7 +3,7 @@ spec is features/guard-worktrees.feature.
 
   checkout-home  a `git`/`yadm`/`vcsh` checkout or switch that would move the branch
                  checked out in $HOME, when $HOME is itself a worktree; and
-                 chezmoi's forced apply, destroy and purge
+                 chezmoi's forced apply, destroy and purge, and the rows of ROWS
   foreign        a reach into a linked worktree that is not this session's own,
                  by a Bash word, a file tool's path, or EnterWorktree(path=...)
 
@@ -48,6 +48,11 @@ unforced apply or update passes, since chezmoi prompts before it overwrites a
 target changed since it last wrote one, and with no TTY the prompt errors
 rather than answering itself.
 
+The other managers are the rows of ROWS, asked the same way: `rcup -f`, `rcdn`,
+`homeshick link --force`, `dotbot -c` (whose config holds `force`, `relink` and
+`clean`, unseen on the command line), `home-manager switch` and `uninstall`. Each
+row's quiet flags (a dry run, help) pass.
+
 foreign. Another session's worktree is never a place to work:
 the session that owns a worktree may archive it mid-turn under anyone who
 reached in. Any path-shaped word (or the word after -C, or a cd target) that
@@ -69,6 +74,7 @@ one-command recipe for the session's own worktree.
 
 import os
 import re
+from collections import namedtuple
 
 from languette import scan as sw
 from languette.messages import say
@@ -141,6 +147,84 @@ def _chezmoi_hit(s, c, b):
     return None
 
 
+# The other dotfile managers' apply, force and teardown verbs, one row each (program,
+# verb, flags), read by the shape of the command: none need be installed. A row hits
+# when the program's first operand is its verb (None: any call), one of its flags is set
+# (empty: none needed) and none of its quiet flags is (a dry run, help). The hazard of
+# each is in its comment, and wt_dotfiles says them all.
+Row = namedtuple("Row", "program verb flags quiet")
+ROWS = (
+    Row("rcup", None, ("-f",), ("-g", "-h", "-V")),                # replaces existing files, unasked
+    Row("rcdn", None, (), ("-g", "-h", "-V")),                     # removes everything rcup installed
+    Row("homeshick", "link", ("-f", "--force"), ()),               # replaces what a castle conflicts with
+    # dotbot's `force`, `relink` and `clean` are keys of the config that -c names; the
+    # command line never shows them, so any call that applies a config asks.
+    Row("dotbot", None, ("-c", "--config-file"), ()),
+    Row("home-manager", "switch", (), ("-n", "--dry-run", "-h", "--help")),     # links into the Nix store
+    Row("home-manager", "uninstall", (), ("-n", "--dry-run", "-h", "--help")),  # removes the generation's files
+)
+# Each program's options that take a value: short letter -> how many words, long name -> how
+# many (a value glued on with = or to a short letter is no extra word). A long option may be
+# any unique prefix, as the programs' own parsers read it; one not listed is a flag.
+OPTIONS = {
+    "rcup": ({c: 1 for c in "BdItUxS"}, {}),
+    "rcdn": ({c: 1 for c in "BdItUxS"}, {}),
+    "homeshick": ({}, {"--force": 0, "--quiet": 0, "--skip": 0, "--batch": 0, "--verbose": 0}),
+    "dotbot": ({"c": 1, "d": 1, "p": 1}, {"--config-file": 1, "--base-directory": 1, "--plugin": 1,
+                                          "--plugin-dir": 1, "--only": 0, "--except": 0}),
+    "home-manager": ({"b": 1, "f": 1, "I": 1, "A": 1, "j": 1},
+                     {"--file": 1, "--flake": 1, "--max-jobs": 1, "--cores": 1, "--option": 2,
+                      "--override-input": 2, "--extra-experimental-features": 1, "--dry-run": 0,
+                      "--help": 0}),
+}
+
+
+def _manager_hit(s, c, b, program):
+    """The spelling of the row of ROWS the call of `program` at c in segment c..b hits,
+    as the program's own words (`rcup -f`, `homeshick link --force`), or None. Options
+    are read up to a bare --; the first word that is no option, past an option's value,
+    is the verb."""
+    shorts, longs = OPTIONS[program]
+    seen, verb, i = set(), None, c + 1
+    while i <= b and s.w[i] != "--":
+        w = s.w[i]
+        if s.k[i] != "w":  # a quoted word with whitespace: never the verb or an option
+            pass
+        elif w.startswith("--"):
+            name, eq, _ = w.partition("=")
+            same = [n for n in longs if n == name] or [n for n in longs if n.startswith(name)]
+            name = same[0] if len(same) == 1 else name
+            seen.add(name)
+            i += 0 if eq else longs.get(name, 0)
+        elif w.startswith("-") and w != "-":
+            for j, ch in enumerate(w[1:], 1):
+                seen.add("-" + ch)
+                if ch in shorts:  # the rest of the word is its value, else the next words are
+                    i += shorts[ch] if j == len(w) - 1 else 0
+                    break
+        elif verb is None:
+            verb = w
+        i += 1
+    for row in ROWS:
+        if (row.program == program and row.verb in (None, verb) and (not row.flags or seen & set(row.flags))
+                and not seen & set(row.quiet)):
+            return " ".join(x for x in (program, row.verb, next((f for f in row.flags if f in seen), None)) if x)
+    return None
+
+
+def _home_ask(s, a, b, nested):
+    """The spelling of a dotfile-manager call in segment a..b that overwrites or removes
+    in $HOME, or None: chezmoi's, then a row of ROWS."""
+    z = sw.cmd_index(s, a, b, _CHEZMOI, nested)
+    if z is not None and (hit := _chezmoi_hit(s, z, b)):
+        return "chezmoi " + hit
+    for program in OPTIONS:
+        z = sw.cmd_index(s, a, b, re.compile(r"(?:^|/)" + re.escape(program) + r"\Z"), nested)
+        if z is not None and (hit := _manager_hit(s, z, b, program)):
+            return hit
+    return None
+
+
 def _git(cwd, *argv):
     return (yield Need("git", "git", cwd, *argv))
 
@@ -193,7 +277,7 @@ def _expand(raw, base, home):
 def _home_events(doc):
     """The command's moves, in order: ("DENY", the wrapper as it is typed) for a
     checkout/switch by a wrapper whose work tree is always $HOME,
-    ("ASK", spelling) for a chezmoi call that overwrites or removes in $HOME,
+    ("ASK", spelling) for a dotfile-manager call that overwrites or removes in $HOME,
     ("CD", v), ("ENV", kind, v) for a GIT_DIR=/GIT_WORK_TREE= outside a git
     segment, ("FS",) for a segment that may make a link or move, copy or
     unpack one into place (a `git mv` too), and ("G", [(kind, v)]) for one git
@@ -212,8 +296,7 @@ def _home_events(doc):
                 continue
             g = sw.cmd_index(s, a, b, sw.GIT, nested)
             if g is None:
-                z = sw.cmd_index(s, a, b, _CHEZMOI, nested)
-                if z is not None and (hit := _chezmoi_hit(s, z, b)):
+                if hit := _home_ask(s, a, b, nested):
                     out.append(("ASK", hit))
                     continue
                 for i in range(a, b + 1):
@@ -325,8 +408,8 @@ def _landings(raw, bases, home):
 
 
 class _Ask(Exception):
-    """A control's question to the user, not a refusal: the chezmoi spellings it
-    asks about. A later control's deny still outranks it."""
+    """A control's question to the user, not a refusal: the spellings of
+    the dotfile-manager calls it asks about. A later control's deny still outranks it."""
 
 
 def _generic(prog, cwd):
@@ -798,5 +881,8 @@ def check(doc):
         if note:
             notes.append(note)
     if asked:
-        return ask(say("wt_chezmoi", guard=NAME, hits=", ".join(f"`chezmoi {h}`" for h in dict.fromkeys(asked))))
+        hits = ", ".join(f"`{h}`" for h in dict.fromkeys(asked))
+        if all(h.startswith("chezmoi ") for h in asked):
+            return ask(say("wt_chezmoi", guard=NAME, hits=hits))
+        return ask(say("wt_dotfiles", guard=NAME, hits=hits))
     return context("\n\n".join(notes)) if notes else None

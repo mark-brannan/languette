@@ -131,6 +131,13 @@ MESSAGES = {
         "apply replaces every file changed there since the last sync, destroy removes the target, its "
         "source entry and its state, and purge deletes the source directory, uncommitted edits included."
     ),
+    "wt_dotfiles": (
+        "{guard}: {hits} overwrites or removes files in $HOME without a prompt: a forced rcup or "
+        "homeshick link replaces the files already there, rcdn and home-manager uninstall remove what "
+        "they installed, home-manager switch replaces the managed files with links into the read-only "
+        "Nix store, and dotbot applies a config whose link `force` or `relink` and `clean` do either. "
+        "An edit made to one of them is lost."
+    ),
     "wt_git_missing_checkout": (
         "{guard}: git is missing, so a checkout/switch can't be checked against $HOME. This is a "
         "gate and fails closed."
