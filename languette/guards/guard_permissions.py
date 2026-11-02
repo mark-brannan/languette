@@ -67,7 +67,7 @@ class _Judge:
         self.moved, self.targets, self.what = False, [], ""
 
     def blocked(self, raw, why):
-        raise Refuse(f"`{self.what}{' ' + raw if raw else ''}` is blocked: {why}. {_WAY_OUT}")
+        raise Refuse(say("perm_blocked", target=f"{self.what}{' ' + raw if raw else ''}", why=why, way_out=_WAY_OUT))
 
     def target(self, s, idx):
         raw = s.w[idx]

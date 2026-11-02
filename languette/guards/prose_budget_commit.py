@@ -24,6 +24,7 @@ import re
 
 from languette import paths
 from languette import scan as sw
+from languette.messages import say
 from languette.verdict import Need, context
 
 NAME = "prose-budget-commit"
@@ -44,7 +45,7 @@ def _warn(why):
 
 def _done(notes):
     """The warnings, joined, as a call that still runs; None when there are none."""
-    return context("\n\n".join(notes)) if notes else None
+    return context(say("passed", text="\n\n".join(notes))) if notes else None
 
 
 def _join(base, step):

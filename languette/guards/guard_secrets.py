@@ -80,31 +80,31 @@ def _load(path):
     """The project's rules, or Refuse naming what is wrong with the file."""
     cfg = yield from paths.read_json(path)
     if not isinstance(cfg, dict) or not isinstance(cfg.get("patterns"), list):
-        raise Refuse('the top level must be {"patterns": [...]}')
+        raise Refuse(say("sec_top"))
     rules, seen = [], set()
     for n, p in enumerate(cfg["patterns"]):
         where = f"patterns[{n}]"
         if not isinstance(p, dict):
-            raise Refuse(f"{where} is not an object")
+            raise Refuse(say("sec_not_object", where=where))
         for key in ("id", "regex"):
             if not isinstance(p.get(key), str) or not p[key].strip():
-                raise Refuse(f"{where}.{key} must be a non-empty string")
+                raise Refuse(say("sec_key_empty", where=where, key=key))
         if p["id"] in seen:
-            raise Refuse(f"{where}.id '{p['id']}' is a duplicate")
+            raise Refuse(say("sec_id_dup", where=where, id=p["id"]))
         if p["id"] in _SHIPPED:
-            raise Refuse(f"{where}.id '{p['id']}' is a shipped rule's id")
+            raise Refuse(say("sec_id_shipped", where=where, id=p["id"]))
         seen.add(p["id"])
         if len(p["regex"]) > MAX_REGEX:
-            raise Refuse(f"{where}.regex is longer than {MAX_REGEX} characters")
+            raise Refuse(say("sec_regex_long", where=where, max=MAX_REGEX))
         try:
             rx = re.compile(p["regex"])
         except re.error as e:
-            raise Refuse(f"{where}.regex does not compile ({e})")
+            raise Refuse(say("sec_regex_bad", where=where, err=e))
         if _nested_repeat(p["regex"]):
-            raise Refuse(f"{where}.regex nests one unbounded repeat inside another, which can backtrack for minutes")
+            raise Refuse(say("sec_regex_nested", where=where))
         ent = p.get("entropy", 0.0)
         if not isinstance(ent, (int, float)) or isinstance(ent, bool) or ent < 0:
-            raise Refuse(f"{where}.entropy must be a number >= 0")
+            raise Refuse(say("sec_entropy", where=where))
         rules.append(secrets.Rule(p["id"], p.get("description") or p["id"], rx, float(ent)))
     return rules
 
