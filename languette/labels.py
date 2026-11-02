@@ -1,4 +1,6 @@
-"""guard-bypass-labels: a label named in the bypass_labels option is a human's
+"""The labels a call applies, and whether one is a human's to apply: what guard-bypass-labels
+(languette/rules/guard_bypass_labels.py, run by its `bypass-labels` test in
+languette/primitives.py) judges. A label named in the bypass_labels option is a human's
 to apply.
 
 A label that waives a CI gate is the user's to apply unless the option names
@@ -43,7 +45,7 @@ import re
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Need, Refuse, deny, planned
+from languette.verdict import Need, Refuse, deny
 
 NAME = "guard-bypass-labels"
 OPTION = "CLAUDE_PLUGIN_OPTION_BYPASS_LABELS"
@@ -392,7 +394,3 @@ def judge(parsed, answers):
     if f.unseen:
         return deny(say("bypass_label_unseen", guard=NAME, unseen=f.unseen[0], labels=", ".join(bad)))
     return None
-
-
-def check(doc):
-    return (yield from planned(doc, parse, plan, judge))
