@@ -92,12 +92,13 @@ address shapes) the doctor writes there; secret redaction is another.
 
 ## Plan from the rules
 
-The engine reads a rule set and knows its facts before gather: every `when` names them, and every fact is a Need kind.
-So plan is a function of the configuration and the parse, as the pipeline requires, and the two shapes of guard are two
-shapes of rule set: plan/judge when `when` names facts alone, ask-as-it-goes when a fact's argument is another fact's
-answer. State across calls is a fact read in gather and a write made in act by a handler; the handler is code, as the
-issue door's protocol is today. When `match` selects a call, a rule's `handler` is given the call, the guard's name and
-what the match found, asks for its facts as Needs, writes as Acts, and gives the verdict: ask-as-it-goes, behind a rule.
+The engine reads a rule set and knows its facts before gather: every `when`
+names them, and every fact is a Need kind. So plan is a function of the
+configuration and the parse, and a guard's two shapes are two shapes of rule
+set: plan/judge when `when` names facts alone, ask-as-it-goes when a fact's
+argument is another fact's answer. State across calls is read in gather and
+written in act. A rule's `handler`, in code, takes the call, the guard and
+what `match` found, asks for Needs, writes Acts and gives the verdict.
 
 ## Trust tiers
 
