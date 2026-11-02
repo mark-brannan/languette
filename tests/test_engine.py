@@ -26,6 +26,10 @@ def _with_rule(**changes):
     ({**GOOD, "repo": "deny-always.json"}, "repo must be a path under .languette/"),
     (_with_rule(action="ask"), 'rules[0].action must be "deny"'),
     (_with_rule(why="no_such_message"), "rules[0].why must name a message"),
+    ({**GOOD, "read": {"prose": True}}, "read must be an object"),
+    ({**GOOD, "file": "../x.json"}, "file must be the name of a file"),
+    (_with_rule(match=[{"cmd": "foo", "unit": "listed", "program": "pkill"}]), 'unit must be "listed"'),
+    (_with_rule(match=[{"cmd": "foo", "program": "pkill"}]), "belong to an entry with a unit"),
 ])
 def test_a_rule_set_that_does_not_load_names_the_fault(rule_set, fault):
     with pytest.raises(scan.BadRules, match=re.escape(fault)):
