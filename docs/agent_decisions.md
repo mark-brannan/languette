@@ -560,3 +560,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t173512z
 - tests/test_vcsh_needs.py drives guard-bypass-ruleset as run.py builds it Undo: build engine.Guard in the test ([#348](https://github.com/mark-brannan/languette/pull/348))
+
+### 20261102t175830z
+- on keys are limited to the events that carry no decision; PreToolUse stays the rules' event Undo: allow PreToolUse as an on key ([#349](https://github.com/mark-brannan/languette/pull/349))
