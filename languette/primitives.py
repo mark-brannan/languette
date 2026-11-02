@@ -56,6 +56,7 @@ _NODE_SCRIPT = ("-e", "--eval", "-p", "--print", "-pe", "-ep", "-c", "--check")
 _VALUE_OPTS = {"sh": ("-o", "-O", "+o", "+O", "--rcfile", "--init-file"), "python": ("-W", "-X"),
                "perl": ("-I",), "ruby": ("-I", "-r"), "node": ("-r", "--require", "--import", "--loader")}
 
+
 def _family(path):
     name = os.path.basename(path)
     return ("sh" if _SHELLS.fullmatch(name) else "python" if name.startswith("python") else
