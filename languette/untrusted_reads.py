@@ -200,7 +200,7 @@ def keep(doc, guard, found):
     """The `session-keep` handler, on every state event the rule set's `on` names: writes what
     the event records for a known session, and never objects."""
     sid = _sid(doc)
-    rec = _record(doc, doc.event) if sid else None
+    rec = _record(doc, doc.event) if sid and doc.event != "PreToolUse" else None   # a call yet to run: nothing
     if rec:
         yield Act("send-keep", sid, *rec)      # a write that fails leaves an open door (World._send_keep)
     return None

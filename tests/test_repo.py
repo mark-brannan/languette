@@ -261,6 +261,13 @@ def test_the_prompt_hook_has_the_shape_that_opens_the_door():
     assert_that(run.wired("UserPromptSubmit", None), equal_to([run.guard_github_issues]))
 
 
+def test_a_rule_set_names_under_on_every_state_event_run_wires_its_guard_to():
+    # An event run.py wires a guard to and its on leaves out goes to the rules, which record nothing.
+    for g in {g for _, _, gs in run.GUARDS for g in gs if isinstance(g, engine.Guard)}:
+        events = {ev for ev, _, gs in run.GUARDS for x in gs if x is g and ev in engine.STATE_EVENTS}
+        assert_that((g.NAME, events), equal_to((g.NAME, set(g.RULE_SET.get("on", {})))))
+
+
 def _prompt_hooks(*hooks):
     return json.dumps({"hooks": {"UserPromptSubmit": [{"hooks": list(hooks)}]}})
 
