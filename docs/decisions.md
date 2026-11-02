@@ -204,10 +204,6 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
   one edited by hand, comments out a retired one, and leaves commented-out
   defaults and the user's lines alone. Only `guard_private_terms` switches; `redact_home_paths` goes.
   ([thread](https://github.com/mark-brannan/languette/pull/301#discussion_r4397429263))
-- 2026-11-01: a hook writes the default redacted terms file when none is there: the
-  `/plugin install languette` path has no `languette` command, and nothing else
-  reaches that user. Install and `doctor --init-redacted-terms` write it too.
-  ([thread](https://github.com/mark-brannan/languette/pull/308#discussion_r4397429263))
 - A redaction is not a guard: it transforms data and has no verdict.
   "Redact" over anonymize, scrub, mask and rewrite; rewrite then allow is
   its action.

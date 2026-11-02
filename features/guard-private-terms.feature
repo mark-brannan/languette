@@ -278,6 +278,13 @@ Feature: guard-private-terms
     When the session starts from "startup"
     Then the file "{TMP}/xdg/languette/redacted-terms.tsv" still holds "mine"
 
+  Scenario: a session starting with the guard off writes nothing
+    Given CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE is unset
+    And CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS is "false"
+    And XDG_CONFIG_HOME is "{TMP}/xdg"
+    When the session starts from "startup"
+    Then there is no file "{TMP}/xdg/languette/redacted-terms.tsv"
+
   Scenario Outline: another spelling of the home directory is redacted too, another user's is not
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     When the agent runs `gh issue comment 3 -R o/r -b '<path>/x'`

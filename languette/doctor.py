@@ -603,11 +603,20 @@ def write_initial(kind, options, env=None):
     else:
         body = terms.header("blocked") + "\n# A term that denies a whole public post: find, a message for the agent, comment.\n"
         what = "no terms yet"
+    tmp = f"{path}.{os.getpid()}.tmp"
     try:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        Path(path).write_text(body, encoding="utf-8")
+        Path(tmp).write_text(body, encoding="utf-8")
+        os.link(tmp, path)  # atomic, and refuses a file another session wrote first
+    except FileExistsError:
+        return None
     except OSError as e:
         return FAIL, f"{where} cannot be written ({e.strerror or e})"
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
     return OK, f"wrote {where} ({what})"
 
 
