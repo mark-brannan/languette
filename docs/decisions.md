@@ -15,8 +15,9 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 - Why: the harm is unrecoverable by definition, a hurried click in a
   disk-full triage is the wrong place for that yes, and an unattended
   session has no button either way. The family's 28 rules match no
-  command in the 108k real-command corpus, so the default is cheap to
-  hold; dcg denies the same rules outright.
+  command in the maintainer's private corpus of 108k real commands
+  (measured 2026-10-09), so the default is cheap to hold; dcg denies
+  the same rules outright, by severity (its `packs/mod.rs`, v0.15.2).
 - A listed-resource exception (a snapshot set the user names, pruned
   under a policy they wrote) is the Backups family issue's to design,
   not the default's.
