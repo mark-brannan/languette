@@ -127,7 +127,7 @@ Each guard checks for one kind of hazard:
 - [`guard-worktrees`](features/guard-worktrees.feature): opt-in; a branch switch in a `$HOME`
   that is a worktree, chezmoi's forced apply, `destroy` and `purge` (an ask), or a reach into
   another session's worktree
-- [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
+- [`guard-bypass-hooks`](features/guard-bypass-hooks.feature): `--no-verify` on commit, push,
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
 - [`guard-bypass-labels`](features/guard-bypass-labels.feature): a session
   applying a label the `bypass_labels` setting names (none by default)

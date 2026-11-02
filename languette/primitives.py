@@ -4,7 +4,8 @@ rule's message when the call is one it describes, else None. A test that needs f
 of the world (the physical path of a target) is a generator that yields them as Needs
 and gives the verdict itself, deny or context, else None. A test one guard needs
 lives here, named, until a second guard asks for it; the registry is closed, and
-only a shipped rule set may name one.
+only a shipped rule set may name one. A stateful guard's handler, which a rule names
+beside its match, is in HANDLERS.
 """
 
 import functools
@@ -12,7 +13,7 @@ import inspect
 import os
 import re
 
-from languette import labels, paths, posts, secrets
+from languette import branch_deletions, hook_skips, labels, paths, posts, secrets
 from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Refuse, ask, deny, planned
@@ -461,7 +462,14 @@ def private_terms(doc):
 
 TESTS = {"power-word": power_word, "fork-bomb": fork_bomb, "pipe-to-shell": pipe_to_shell,
          "recursive-delete": recursive_delete, "permissions": permissions, "secrets": pasted_secret,
-         "bypass-labels": bypass_label, "private-terms": private_terms}
+         "bypass-labels": bypass_label, "private-terms": private_terms,
+         "skips-hooks": hook_skips.skips, "branch-deletions": branch_deletions.deleted}
+
+# The handlers a rule's `handler` may name: a stateful guard's code, which gathers the facts
+# its rule needs and judges them. handler(doc, guard, found) is a generator, given the call,
+# the guard's name for its sentences and the fields the rule's match found; it yields Needs
+# and Acts and gives a verdict, or None.
+HANDLERS = {"hooks-approval": hook_skips.approval, "open-prs": branch_deletions.open_prs}
 
 
 def judges(name):

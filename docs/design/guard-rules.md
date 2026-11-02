@@ -40,7 +40,7 @@ it onto the engine changes how it is written, never what it decides.
 - `when` is predicates over the matched words and over facts, under `all`,
   `any` and `not`. Absent, the match alone decides.
 - `action` and `why`: the verdict, and the message key that explains it.
-- `on` names the event handlers a stateful guard keeps, by name.
+- `handler` and `on` name a stateful guard's code: the handler of its calls and those of other events.
 
 Each rule that matches is one finding; verdict combines findings as today.
 
@@ -92,13 +92,12 @@ address shapes) the doctor writes there; secret redaction is another.
 
 ## Plan from the rules
 
-The engine reads a rule set and knows its facts before gather: every `when`
-names them, and every fact is a Need kind. So plan is a function of the
-configuration and the parse, as the pipeline requires, and the two shapes of
-guard are two shapes of rule set: plan/judge when `when` names facts alone,
-ask-as-it-goes when a fact's argument is another fact's answer. State across
-calls is a fact read in gather and a write made in act by a handler `on`
-names; the handler is code, as the issue door's protocol is today.
+The engine reads a rule set and knows its facts before gather: every `when` names them, and every fact is a Need kind.
+So plan is a function of the configuration and the parse, as the pipeline requires, and the two shapes of guard are two
+shapes of rule set: plan/judge when `when` names facts alone, ask-as-it-goes when a fact's argument is another fact's
+answer. State across calls is a fact read in gather and a write made in act by a handler; the handler is code, as the
+issue door's protocol is today. When `match` selects a call, a rule's `handler` is given the call, the guard's name and
+what the match found, asks for its facts as Needs, writes as Acts, and gives the verdict: ask-as-it-goes, behind a rule.
 
 ## Trust tiers
 
@@ -131,7 +130,7 @@ list; what it built is then described above.
    tracking, word-live, the valued-option tables), each landing with the
    guards that repeat it moved onto it.
 2. The command guards move, smallest first, two to a change, the rest waiting on the primitives their rules name.
-3. The stateful guards: their rules move, their handlers stay code.
+3. The stateful guards: their rules move, their handlers stay code. A rule's `handler` is built; `on` comes with the door.
 4. The repo tier, once its bounds are decided.
 
 Lines, from the survey: ~3000 of guard code become data plus engine, ~1500
