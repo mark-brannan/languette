@@ -78,10 +78,10 @@ def pytest_configure(config):
     # The default cwd and the hook process's own directory are elsewhere (see
     # scattered). Not under /tmp: guard-recursive-delete allows all of /tmp,
     # so every target would pass.
-    home = tempfile.mkdtemp(prefix="languette-home-", dir="/var/tmp")
+    home = os.path.realpath(tempfile.mkdtemp(prefix="languette-home-", dir="/var/tmp"))
     os.mkdir(os.path.join(home, "project"))
     os.environ["HOME"] = home
-    harness.ELSEWHERE = tempfile.mkdtemp(prefix="languette-elsewhere-", dir="/var/tmp")
+    harness.ELSEWHERE = os.path.realpath(tempfile.mkdtemp(prefix="languette-elsewhere-", dir="/var/tmp"))
 
 
 def pytest_unconfigure(config):

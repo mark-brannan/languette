@@ -29,10 +29,7 @@ pure function.
 
 import re
 
-try:
-    from re import _parser as _sre          # 3.11+
-except ImportError:                          # pragma: no cover -- 3.10 and before
-    import sre_parse as _sre
+from re import _parser as _sre
 
 from languette import paths, secrets
 from languette.messages import say

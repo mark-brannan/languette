@@ -58,7 +58,11 @@ FIXTURES = ROOT / "features/fixtures/private-terms"
 
 def fill_names(text, home):
     """{HOME}, {USER} (the home directory's last part) and {HOSTNAME} (this machine's), as the fixtures spell them."""
-    return text.replace("{HOME}", home).replace("{USER}", Path(home).name).replace("{HOSTNAME}", socket.gethostname())
+    host = socket.gethostname()
+    # A name continued by a hyphen is the short name's: macOS spells the host "x.local",
+    # and the guard rightly redacts "x.local-01" as a .local name.
+    short = host.split(".")[0]
+    return text.replace("{HOME}", home).replace("{USER}", Path(home).name).replace("{HOSTNAME}-", short + "-").replace("{HOSTNAME}", host)
 
 
 def fixture_text(name, home):
@@ -98,7 +102,7 @@ class Ctx:
         self.cleanups = []
 
     def mkdtemp(self):
-        d = tempfile.mkdtemp(prefix="languette-", dir="/tmp")
+        d = os.path.realpath(tempfile.mkdtemp(prefix="languette-", dir="/tmp"))   # macOS: /tmp is a symlink
         self._dirs.append(d)
         return d
 
@@ -267,7 +271,7 @@ class FakeHome:
 
     def __init__(self, kind, subdirs=()):
         # Not under /tmp: guard-recursive-delete allows all of /tmp.
-        self.home = Path(tempfile.mkdtemp(prefix=f"languette-{kind}-home-", dir="/var/tmp"))
+        self.home = Path(os.path.realpath(tempfile.mkdtemp(prefix=f"languette-{kind}-home-", dir="/var/tmp")))
         for d in subdirs:
             (self.home / d).mkdir(parents=True)
         self.aside = Path(tempfile.mkdtemp(prefix=f"languette-{kind}-"))   # stubs and copies, outside HOME

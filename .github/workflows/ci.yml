@@ -43,7 +43,8 @@ jobs:
   tests:
     name: tests (${{ matrix.os }}, ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 5
+    # Measured per push: ubuntu 1m20s to 3m20s, macOS 4m20s.
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 8 || 5 }}
     strategy:
       fail-fast: false
       matrix:
@@ -62,11 +63,15 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-dev.txt
       # shfmt for the Python engine's shfmt rung: noble's is 3.8, past the 3.6 floor.
+      # macOS gets the same 3.8.0 binary, checked by hash: shfmt's parse-error
+      # columns differ between releases and features/ spells 3.8's.
       - name: Install shfmt
         run: |
           set -euo pipefail
           if [ "$RUNNER_OS" = macOS ]; then
-            brew install shfmt
+            curl -fsSL -o shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_darwin_arm64
+            echo "1481240d2a90d4f0b530688d76d4f9117d17a756b6027cfa42b96f0707317f83  shfmt" | shasum -a 256 -c -
+            sudo install -m 755 shfmt /usr/local/bin/shfmt
           else
             sudo apt-get update -q
             sudo apt-get install -y -q shfmt
