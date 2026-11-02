@@ -575,3 +575,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t175931z
 - guard-cross-session-send's on names the four events run.py wires it to, not UserPromptSubmit Undo: add UserPromptSubmit to its on ([#349](https://github.com/mark-brannan/languette/pull/349))
+
+### 20261102t175946z
+- names: modules issue_writes.py, opened_prs.py; tests issue-writes, pr-opens; handlers issue-door, door-open, door-spend, issue-timelines; rule ids issue-write, second-pr Undo: rename ([#349](https://github.com/mark-brannan/languette/pull/349))
