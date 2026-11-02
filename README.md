@@ -341,8 +341,9 @@ measured, which is why the guards treat unset as on.
 
 ## Privacy and support
 
-languette records nothing unless you turn on `record_decisions`. The record
-stays on your machine, in the file above, and is never sent anywhere.
+Nothing leaves your machine. Decisions are recorded only if you turn on
+`record_decisions`, in the file above. Guards keep small session state, such
+as spent approvals, beside the transcript.
 
 Questions and bugs: [GitHub issues](https://github.com/mark-brannan/languette/issues).
 

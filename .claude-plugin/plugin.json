@@ -293,6 +293,5 @@
       "default": false,
       "required": false
     }
-  },
-  "bugs": "https://github.com/mark-brannan/languette/issues"
+  }
 }
