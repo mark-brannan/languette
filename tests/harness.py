@@ -56,17 +56,16 @@ def scattered(seed, role):
 FIXTURES = ROOT / "features/fixtures/private-terms"
 
 
-def fill_names(text, home):
-    """{HOME}, {USER} (the home directory's last part) and {HOSTNAME} (this machine's), as the fixtures spell them."""
-    host = socket.gethostname()
-    # A name continued by a hyphen is the short name's: macOS spells the host "x.local",
-    # and the guard rightly redacts "x.local-01" as a .local name.
-    short = host.split(".")[0]
-    return text.replace("{HOME}", home).replace("{USER}", Path(home).name).replace("{HOSTNAME}-", short + "-").replace("{HOSTNAME}", host)
+PINNED_HOST = "zephyr"   # the $HOSTNAME every scenario runs with, so a row means the same on every OS
 
 
-def fixture_text(name, home):
-    return fill_names((FIXTURES / name.removeprefix(FIXTURES.name + "/")).read_text(), home)
+def fill_names(text, home, host=PINNED_HOST):
+    """{HOME}, {USER} (the home directory's last part) and {HOSTNAME} (the scenario's), as the fixtures spell them."""
+    return text.replace("{HOME}", home).replace("{USER}", Path(home).name).replace("{HOSTNAME}", host)
+
+
+def fixture_text(name, home, host=PINNED_HOST):
+    return fill_names((FIXTURES / name.removeprefix(FIXTURES.name + "/")).read_text(), home, host)
 
 
 class Ctx:
@@ -120,7 +119,8 @@ class Ctx:
         if "{PROJ}" in s:
             assert self.proj, f"test setup: {s!r} names {{PROJ}} but the scenario has no project directory"
             s = s.replace("{PROJ}", str(self.proj))
-        s = fill_names(s, os.environ["HOME"]).replace("{CWD}", self.default_cwd)
+        host = self.env.get("HOSTNAME", PINNED_HOST) or socket.gethostname()   # unset: the OS's name
+        s = fill_names(s, os.environ["HOME"], host).replace("{CWD}", self.default_cwd)
         s = s.replace("{UP}", "../" * self.default_cwd.count("/"))
         if "{TMP}" in s:
             self.tmp = self.tmp or self.mkdtemp()
@@ -158,6 +158,8 @@ class Ctx:
         env = {k: self.expand(v) for k, v in self.env.items() if v is not None}
         if self.proj and self.project_env and "CLAUDE_PROJECT_DIR" not in self.env:
             env["CLAUDE_PROJECT_DIR"] = str(self.proj)
+        if "HOSTNAME" not in self.env:
+            env["HOSTNAME"] = PINNED_HOST
         if "TMPDIR" not in self.env:
             env["TMPDIR"] = self.doordir()     # the per-session state files, one place per scenario
         if "XDG_CACHE_HOME" not in self.env:
