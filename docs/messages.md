@@ -348,6 +348,25 @@ unparsed: require-well-formed: this command does not parse ({rung}: {err}). Noth
 wl_add_all_paths: `git add -A <paths>` is blocked here: it passes only in a linked worktree or the session's scratchpad, run from there with no cd or -C. Drop the -A: `git add <paths>` stages the same changes, deletions included.
 wl_reset_upstream: {why} `git reset --hard <remote>/<this branch>` passes only when it runs on its own, from a linked worktree or the session's scratchpad with no cd or -C, on a clean tree, and the branch tracks that same name or nothing.
 wl_stow_adopt: `stow --adopt` moves each file that conflicts from the target directory into the package, overwriting the repo's copy; it survives only if committed. Commit or stash the package first; if adopting is meant, the user confirms it.
+wl_add_unknown: `git add {t}` is blocked: the guard does not know that option, so it cannot tell its value from a path. Spell it as `git add -h` lists it.
+wl_add_no_value: `git add {t}` is blocked: that option takes no value.
+wl_add_u: `git add -u` with no path is blocked: stage by path.
+wl_commit_a: `git commit -a` is blocked: it is `git add -u` in disguise. Stage by path, then commit.
+wl_stash_pop: `git stash pop` is blocked: the stash stack is shared across worktrees and pop can take another session's entry. Use `git stash apply <sha>` and drop the entry afterwards.
+wl_stash_clear: `git stash clear` is blocked: the stash stack is shared across worktrees; it is not all yours to clear.
+wl_stash_drop: bare `git stash drop` drops stash@{{0}}, which may be another session's. Name the entry: `git stash drop stash@{{n}}` after finding it by tag.
+wl_force_push: bare `git push --force` is blocked. Rebasing a session branch is the one legitimate force: use `--force-with-lease <remote> <branch>`, never to the default branch ({branches}).
+wl_delete_protected: `{branch}` is protected: deleting it is blocked. Rebased work reaches it through a pull request.
+wl_lease_protected: `{branch}` is protected: `--force-with-lease` to it rewrites shared history. Rebased work reaches it through a pull request; if a force to it is meant, the user confirms it.
+wl_discard: `git {sub} {wh}` is blocked: it discards every uncommitted change, same as reset --hard. Restore one path at a time, or ask the user.
+wl_clean_f: `git clean -f` is blocked: it deletes untracked files, unrecoverably. `git clean -n` to list them, then remove by path.
+wl_branch_delete_force: `git branch --delete --force` is blocked: same as -D.
+wl_reset_hard: `git reset --hard` is blocked. It discards uncommitted work, and on a shared checkout that work may not be yours. Ask the user to run it themselves, or reach for a reversible move: `git revert`, a new branch off the good commit, `git stash`, `git reset --soft`/`--mixed`.
+wl_add_whole: `git add {t}` is blocked: stage by path, not the whole tree.
+wl_branch_D: `git branch -D` is blocked: it deletes unmerged work. `git branch -d` refuses when there is something to lose; if it refuses, that is the answer.
+wl_add_needs_value: `git add {t}` is blocked: it wants a value and has none.
+wl_add_unknown_short: `git add {t}` is blocked: the guard does not know `-{ch}`, so it cannot tell its value from a path.
+wl_add_all: `git add -A` is blocked: stage by path. Where the worktree is $HOME it stages the home directory; elsewhere it sweeps in files a parallel session is working on.
 ```
 
 ## wt

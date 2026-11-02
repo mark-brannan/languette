@@ -140,11 +140,10 @@ def _add_long(t):
     else:
         hit = list({forms[f] for f in forms if f.startswith(name)}) if name else []
     if len(hit) != 1:
-        raise Refuse(f"`git add {t}` is blocked: the guard does not know that option, so it cannot "
-                     "tell its value from a path. Spell it as `git add -h` lists it.")
+        raise Refuse(say("wl_add_unknown", t=t))
     full, negated = hit[0]
     if eq and not _ADD_LONG[full][0]:
-        raise Refuse(f"`git add {t}` is blocked: that option takes no value.")
+        raise Refuse(say("wl_add_no_value", t=t))
     return full, negated, (val if eq else None)
 
 
@@ -166,20 +165,19 @@ def _add_options(a):
             full, negated, val = _add_long(t)
             if _ADD_LONG[full][0] and not negated and val is None:
                 if i >= n:
-                    raise Refuse(f"`git add {t}` is blocked: it wants a value and has none.")
+                    raise Refuse(say("wl_add_needs_value", t=t))
                 i += 1
             opts.append(("no-" if negated else "") + full)
         elif t.startswith("-") and t != "-":
             for j, ch in enumerate(t[1:], 1):
                 full = _ADD_SHORT.get(ch)
                 if full is None:
-                    raise Refuse(f"`git add {t}` is blocked: the guard does not know `-{ch}`, so it cannot "
-                                 "tell its value from a path.")
+                    raise Refuse(say("wl_add_unknown_short", t=t, ch=ch))
                 opts.append(full)
                 if _ADD_LONG[full][0]:
                     if j == len(t) - 1:
                         if i >= n:
-                            raise Refuse(f"`git add {t}` is blocked: it wants a value and has none.")
+                            raise Refuse(say("wl_add_needs_value", t=t))
                         i += 1
                     break
         else:
@@ -193,38 +191,33 @@ def _add(a):
         return
     for t in names:
         if _WHOLE.match(t):
-            raise Refuse(f"`git add {t}` is blocked: stage by path, not the whole tree.")
+            raise Refuse(say("wl_add_whole", t=t))
     every = "all" in opts or "no-ignore-removal" in opts
     upd = "update" in opts or "renormalize" in opts
     listed = "pathspec-from-file" in opts     # the paths are in a file the guard does not read
     paths = len(names)
     if every:
-        msg = ("`git add -A` is blocked: stage by path. Where the worktree is $HOME it stages the home "
-               "directory; elsewhere it sweeps in files a parallel session is working on.")
         if paths and not listed and not any(_UNRESOLVED.search(t) for t in names):
-            raise _Placed(msg, names)
-        raise Refuse(msg)
+            raise _Placed(say("wl_add_all"), names)
+        raise Refuse(say("wl_add_all"))
     if upd and not paths:
-        raise Refuse("`git add -u` with no path is blocked: stage by path.")
+        raise Refuse(say("wl_add_u"))
 
 
 def _commit(a):
     if any(_pfx(t, "--all") or _has(t, "a") for t in a):
-        raise Refuse("`git commit -a` is blocked: it is `git add -u` in disguise. Stage by path, then commit.")
+        raise Refuse(say("wl_commit_a"))
 
 
 def _stash(a):
     words = [t for t in a if not t.startswith("-")]
     op, refs = (words[0], len(words) - 1) if words else ("", 0)
     if op == "pop":
-        raise Refuse("`git stash pop` is blocked: the stash stack is shared across worktrees and pop can take "
-                     "another session's entry. Use `git stash apply <sha>` and drop the entry afterwards.")
+        raise Refuse(say("wl_stash_pop"))
     if op == "clear":
-        raise Refuse("`git stash clear` is blocked: the stash stack is shared across worktrees; it is not all "
-                     "yours to clear.")
+        raise Refuse(say("wl_stash_clear"))
     if op == "drop" and not refs:
-        raise Refuse("bare `git stash drop` drops stash@{0}, which may be another session's. "
-                     "Name the entry: `git stash drop stash@{n}` after finding it by tag.")
+        raise Refuse(say("wl_stash_drop"))
 
 
 def _default(branches):
@@ -261,14 +254,11 @@ def _push(doc, a):
         elif not t.startswith("-") and main.match(_dst(t)):
             protected_branch = _dst(t).removeprefix("refs/heads/")
     if force:
-        raise Refuse("bare `git push --force` is blocked. Rebasing a session branch is the one legitimate force: "
-                     "use `--force-with-lease <remote> <branch>`, never to the default branch "
-                     f"({', '.join(branches)}).")
+        raise Refuse(say("wl_force_push", branches=', '.join(branches)))
     if protected_branch and delete:
-        raise Refuse(f"`{protected_branch}` is protected: deleting it is blocked. Rebased work reaches it through a pull request.")
+        raise Refuse(say("wl_delete_protected", branch=protected_branch))
     if protected_branch and lease:
-        raise Ask(f"`{protected_branch}` is protected: `--force-with-lease` to it rewrites shared history. Rebased work "
-                  "reaches it through a pull request; if a force to it is meant, the user confirms it.")
+        raise Ask(say("wl_lease_protected", branch=protected_branch))
 
 
 def _discard(sub, a):
@@ -280,36 +270,30 @@ def _discard(sub, a):
         if _WHOLE.match(t):
             wh = t
     if wh and not (sub == "restore" and staged and not wt):
-        raise Refuse(f"`git {sub} {wh}` is blocked: it discards every uncommitted change, same as reset --hard. "
-                     "Restore one path at a time, or ask the user.")
+        raise Refuse(say("wl_discard", sub=sub, wh=wh))
 
 
 def _clean(a):
     force = any(_pfx(t, "--force") or _has(t, "f") for t in a)
     dry = any(_pfx(t, "--dry-run") or _has(t, "n") for t in a)
     if force and not dry:
-        raise Refuse("`git clean -f` is blocked: it deletes untracked files, unrecoverably. "
-                     "`git clean -n` to list them, then remove by path.")
+        raise Refuse(say("wl_clean_f"))
 
 
 def _branch(a):
     delete = force = False
     for t in a:
         if t == "-D" or _has(t, "D"):
-            raise Refuse("`git branch -D` is blocked: it deletes unmerged work. `git branch -d` refuses when there "
-                         "is something to lose; if it refuses, that is the answer.")
+            raise Refuse(say("wl_branch_D"))
         delete = delete or t == "-d" or _pfx(t, "--delete") or _has(t, "d")
         force = force or t == "-f" or _pfx(t, "--force") or _has(t, "f")
     if delete and force:
-        raise Refuse("`git branch --delete --force` is blocked: same as -D.")
+        raise Refuse(say("wl_branch_delete_force"))
 
 
 def _reset(a):
     if any(_pfx(t, "--hard") for t in a):
-        raise Refuse("`git reset --hard` is blocked. It discards uncommitted work, and on a shared "
-                     "checkout that work may not be yours. Ask the user to run it themselves, or reach for a "
-                     "reversible move: `git revert`, a new branch off the good commit, `git stash`, "
-                     "`git reset --soft`/`--mixed`.")
+        raise Refuse(say("wl_reset_hard"))
 
 
 def _short(t, ch):
@@ -442,7 +426,7 @@ def _default_branches(doc):
         return FALLBACK
 
 
-def _staging_where_agents_work(doc, names, msg):
+def _staging_where_agents_work(doc, names):
     """`git add -A <paths>` stages only those paths; it passes when no word of the command
     moves or re-aims the tree, the payload's cwd is where agents work, and each path,
     resolved from the cwd, lies strictly inside the toplevel both as git reads it (lexically,
@@ -469,7 +453,7 @@ def _staging_where_agents_work(doc, names, msg):
             return True
     except Exception:  # noqa: BLE001
         return False
-    raise Refuse(msg)
+    raise Refuse(say("wl_add_all"))
 
 
 def _stow_long(t):
@@ -563,7 +547,7 @@ def _segment(doc, s, a, b, nested, env):
         elif sub == "reset":
             _reset(args)
     except _Placed as p:
-        if not sw.git_wrapper(s.w[g])[1].home and _own_command(s, a, b, g) and (yield from _staging_where_agents_work(doc, p.names, str(p))):
+        if not sw.git_wrapper(s.w[g])[1].home and _own_command(s, a, b, g) and (yield from _staging_where_agents_work(doc, p.names)):
             return
         raise Refuse(say("wl_add_all_paths"))
     except Refuse as r:
