@@ -76,9 +76,12 @@ def _file(r, where):
         raise sw.BadRules(f"{where}.why must be a non-empty string")
 
 
-def _unit(e, where, units):
+def _unit(e, where, units, calls="command"):
     """A unit entry names its program and its verb table, and the set lists the units. A test
-    entry names a test primitives holds."""
+    entry names a test primitives holds; a set that judges any call has only test entries,
+    since a call with no command gives a command entry nothing to match."""
+    if calls == "any" and "test" not in e:
+        raise sw.BadRules(f'{where}: a rule set that says calls "any" needs every match entry to be a test')
     if "test" in e:
         if e["test"] not in primitives.TESTS:
             raise sw.BadRules(f"{where}.test must name a test languette holds")
@@ -98,7 +101,7 @@ def _unit(e, where, units):
 def load(rule_set):
     """The rule set's rules, checked, or BadRules naming the fault."""
     if not isinstance(rule_set, dict) or set(rule_set) - _SET_KEYS or not {"guard", "rules"} <= set(rule_set):
-        raise sw.BadRules("the rule set must be an object holding guard and rules, and optionally repo and opt_in")
+        raise sw.BadRules("the rule set must be an object holding guard and rules, and optionally the keys _SET_KEYS lists")
     if not isinstance(rule_set["guard"], str) or not rule_set["guard"]:
         raise sw.BadRules("guard must be a guard's name")
     if "repo" in rule_set and (not isinstance(rule_set["repo"], str) or not rule_set["repo"].startswith(".languette/")):
@@ -121,7 +124,7 @@ def load(rule_set):
                           match_keys=sw.SHIPPED_MATCH_KEYS)
     for n, r in enumerate(rules):
         for i, e in enumerate(r["match"]):
-            _unit(e, f"rules[{n}].match[{i}]", units)
+            _unit(e, f"rules[{n}].match[{i}]", units, rule_set.get("calls", "command"))
     return rules
 
 
