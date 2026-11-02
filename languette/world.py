@@ -20,9 +20,10 @@ import time
 from urllib.parse import quote
 
 from languette import paths
+from languette import scan as sw
 
 GIT_TIMEOUT = 5
-GH_TIMEOUT = 10
+FORGE_TIMEOUT = 10
 PR_LIST_TIMEOUT = 25                # past the `timeout 20` guard-git-stacked-base wraps gh pr list in
 SPENT = ".languette-ask"            # appended to the transcript path
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
@@ -30,7 +31,7 @@ RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the ol
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
 # A control character: never written into a record line, never read from one.
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
-KINDS = frozenset("git gh-api pr-list which read path physical clock ruleset-cache claim worktree run door "
+KINDS = frozenset("git forge-api pr-list which read path physical clock ruleset-cache claim worktree run door "
                   "send-state hostname".split())
 ACTS = {"ruleset-keep": "_ruleset_keep", "send-keep": "_send_keep", "worktree-keep": "_wt_keep",
         "worktree-leave": "_wt_leave", "door-open": "_door_open", "door-spend": "_door_spend"}
@@ -63,17 +64,23 @@ class World:
         out = r.stdout.strip()
         return out if r.returncode == 0 and out else None
 
-    def _gh_api(self, path):
+    def _forge_api(self, forge, host, path):
+        """(HTTP status, parsed body) for the API `path` on `forge` (a scan.FORGES
+        key) at `host`, asked through the forge's client; (None, None) when it
+        cannot say. The client's own host needs no --hostname."""
+        row = sw.FORGES[forge]
+        argv = [row["cli"], "api", *(() if host == row["host"] else ("--hostname", host)), path]
         try:
-            r = subprocess.run(["gh", "api", path], env=self.env, capture_output=True, text=True,
-                               timeout=GH_TIMEOUT, stdin=subprocess.DEVNULL)
+            r = subprocess.run(argv, env=self.env, capture_output=True, text=True,
+                               timeout=FORGE_TIMEOUT, stdin=subprocess.DEVNULL)
             body = json.loads(r.stdout)
         except (OSError, subprocess.SubprocessError, ValueError):
             return None, None
         if r.returncode == 0:
             return 200, body
-        status = body.get("status") if isinstance(body, dict) else None
-        return (int(status), body) if isinstance(status, str) and status.isdigit() else (None, None)
+        # gh puts the status in the body; GitLab leads its message with it ("404 Not Found").
+        said = body.get("status") or str(body.get("message") or "")[:3] if isinstance(body, dict) else ""
+        return (int(said), body) if isinstance(said, str) and said.isdigit() else (None, None)
 
     def _pr_list(self, cwd, *argv):
         try:
