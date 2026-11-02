@@ -14,9 +14,10 @@ program's description in scan, `verbs` a table of its stop verbs (VERBS), and
 comma-separated list, with the `drop` suffix each unit loses, or fixed `names`;
 unset, the entry matches nothing. `host_verbs` names a table of systemctl verbs
 that take the host down, which need no unit. An entry may instead be `{"test": name}`, one of the named tests in
-languette/primitives.py, whose answer fills the message. `action` is "deny", the one action this
-engine reads yet. `why` names the message that explains it, filled with the
-command word it matched (`cmd`), the stop it found (`verb`) and `way_user`.
+languette/primitives.py, whose answer fills the message. A test that needs facts of the world
+asks for them and gives the verdict itself, a deny or a context; its rule has no `why`. `action`
+is "deny", the one action this engine reads yet. `why` names the message that explains it, filled
+with the command word it matched (`cmd`), the stop it found (`verb`) and `way_user`.
 `read`, optional, says how scan reads the call's words, for every entry:
 `process_prose` false makes pkill, ps and kin commands, and `launchers` false
 stops the look through npx and kin. `file`, optional, names a rule file
@@ -52,6 +53,10 @@ HOST_VERBS = {"systemctl-host": sw.CTL_HOST}     # the tables an entry's `host_v
 def _shipped(r, where):
     if r.get("action") != "deny":
         raise sw.BadRules(f'{where}.action must be "deny"')
+    m = r.get("match")
+    if isinstance(m, list) and m and all(isinstance(e, dict) and isinstance(e.get("test"), str)
+                                         and primitives.judges(e["test"]) for e in m):
+        return                                 # the test says its own reason
     if r.get("why") not in MESSAGES:
         raise sw.BadRules(f"{where}.why must name a message in languette/messages.py")
 
@@ -131,12 +136,17 @@ def _resolved(e, env, units):
 def _hit(doc, rule, read, units):
     """(the command word of the first of the rule's match entries the call runs, the stop it
     found or None, the fields a test gave for the message), or None. A test entry has no
-    command word. A file's rule has one entry, not a list."""
+    command word; one that judges gives the verdict, not a tuple. A file's rule has one
+    entry, not a list."""
     for e in rule["match"] if isinstance(rule["match"], list) else [rule["match"]]:
         if "test" in e:
-            fields = primitives.TESTS[e["test"]](doc)
-            if fields is not None:
-                return e["test"], None, fields
+            got = primitives.TESTS[e["test"]](doc)
+            if primitives.judges(e["test"]):
+                got = yield from got
+                if got is not None:
+                    return got
+            elif got is not None:
+                return e["test"], None, got
             continue
         n, _, said = sw.match_rule(doc, _resolved(e, doc.env, units), **read)
         if n:
@@ -183,12 +193,14 @@ class Guard:
             except Refuse as e:
                 return say("rules_bad", file=self.RULE_FILE, err=e)
         for rule in rules:
-            hit = _hit(doc, rule, self._read, self.RULE_SET.get("units"))
+            hit = yield from _hit(doc, rule, self._read, self.RULE_SET.get("units"))
+            if isinstance(hit, dict):
+                return hit
             if hit:
                 have = {"cmd": hit[0], "verb": hit[1], "way_user": WAY_USER, **hit[2]}
                 return say(rule["why"], **{k: v for k, v in have.items() if "{" + k + "}" in MESSAGES[rule["why"]]})
         for rule in shipped:
-            hit = _hit(doc, rule, self._read, self.RULE_SET.get("units"))
+            hit = yield from _hit(doc, rule, self._read, self.RULE_SET.get("units"))
             if hit:
                 return _denial(rule, hit[0], self.RULE_FILE)
         if "repo" not in self.RULE_SET:
@@ -202,7 +214,7 @@ class Guard:
         except Refuse as e:
             return say("rules_bad", file=path, err=e)
         for rule in found:
-            hit = _hit(doc, rule, self._read, self.RULE_SET.get("units"))
+            hit = yield from _hit(doc, rule, self._read, self.RULE_SET.get("units"))
             if hit:
                 return _denial(rule, hit[0], path)
         return None
