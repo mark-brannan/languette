@@ -135,7 +135,7 @@ Each guard checks for one kind of hazard:
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
 - [`guard-bypass-labels`](features/guard-bypass-labels.feature): a session
   applying a label the `bypass_labels` setting names (none by default)
-- [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push direct to
+- [`guard-bypass-ruleset`](features/guard-bypass-ruleset.feature): a push direct to
   main where pull requests are normally required (agents could potentially bypass using your credentials)
 - [`guard-cross-session-send`](features/guard-cross-session-send.feature): prevents
   sending messages to another session with the option to ask first or deny outright
