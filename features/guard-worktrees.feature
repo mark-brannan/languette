@@ -569,6 +569,13 @@ Feature: guard-worktrees
         | {TMP}    | home-manager -b bak switch                       | `home-manager switch`        |
         | {TMP}    | home-manager --option cores 4 switch             | `home-manager switch`        |
         | {TMP}    | home-manager uninstall                           | `home-manager uninstall`     |
+        | {TMP}    | home-manager --builders x switch                 | `home-manager switch`        |
+        | {TMP}    | home-manager --extra-substituters u switch       | `home-manager switch`        |
+        | {TMP}    | home-manager --max-silent-time 5 switch         | `home-manager switch`        |
+        | {TMP}    | home-manager -b switch                           | `home-manager switch`        |
+        | {TMP}    | home-manager switch --dry                        | `home-manager switch`        |
+        | {TMP}    | homeshick --unlisted x link castle --force       | `homeshick link --force`     |
+        | {TMP}    | dotbot --version rcup -f                         | `rcup -f`                    |
         | {TMP}    | echo hi && rcdn                                  | `rcdn`                       |
         | {TMP}    | sh -c 'rcup -f'                                  | `rcup -f`                    |
         | {TMP}    | rcup -f && home-manager uninstall                | `home-manager uninstall`     |
@@ -605,7 +612,6 @@ Feature: guard-worktrees
         | home-manager switch -n                           |
         | home-manager uninstall -n                        |
         | home-manager --help                              |
-        | home-manager -b switch                           |
         | echo 'rcup -f'                                   |
         | echo rcdn                                        |
         | git commit -m 'home-manager switch'              |
@@ -623,6 +629,17 @@ Feature: guard-worktrees
       When the agent runs `rcup -f && chezmoi purge`
       Then the guard asks, naming "`rcup -f`"
       And the guard asks, naming "`chezmoi purge`"
+
+    # A valued option the table lacks would hide the verb if it were read by position, so the
+    # verb is any word before a bare --; a value spelled like it asks, the cost of failing closed.
+    # home-manager's script matches options exactly, so --dry is no --dry-run.
+    Scenario: a chezmoi ask and a dotfile-manager ask in one command say both hazards
+      Given the working directory is "{TMP}"
+      When the agent runs `chezmoi apply --force && rcdn`
+      Then the guard asks, naming "`chezmoi apply --force`"
+      And the guard asks, naming "`rcdn`"
+      And the guard asks, naming "chezmoi's own prompt"
+      And the guard asks, naming "rcdn and home-manager uninstall remove"
 
     Scenario: a dotfile-manager ask and a branch switch in one command is the switch's deny
       Given the working directory is "{TMP}"

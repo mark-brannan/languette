@@ -126,13 +126,14 @@ MESSAGES = {
         "this machine sees until someone checks the old branch back out. Use a worktree "
         "instead:\n  {prog} worktree add -b <branch> <path> {base}\nthen cd into it and work there."
     ),
+    "wt_home_ask": "{guard}: {said}",
     "wt_chezmoi": (
-        "{guard}: {hits} overwrites or removes files in $HOME without chezmoi's own prompt: a forced "
+        "{hits} overwrites or removes files in $HOME without chezmoi's own prompt: a forced "
         "apply replaces every file changed there since the last sync, destroy removes the target, its "
         "source entry and its state, and purge deletes the source directory, uncommitted edits included."
     ),
     "wt_dotfiles": (
-        "{guard}: {hits} overwrites or removes files in $HOME without a prompt: a forced rcup or "
+        "{hits} overwrites or removes files in $HOME without a prompt: a forced rcup or "
         "homeshick link replaces the files already there, rcdn and home-manager uninstall remove what "
         "they installed, home-manager switch replaces the managed files with links into the read-only "
         "Nix store, and dotbot applies a config whose link `force` or `relink` and `clean` do either. "

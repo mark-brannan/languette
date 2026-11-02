@@ -93,7 +93,6 @@ _TILDE_LOST = re.compile(r"~(?:-|[+-]?[0-9]+)(?:/|\Z)")
 _FS_CHANGE = re.compile(r"(?:^|/)(?:ln|link|mv|cp|rsync|tar|unzip|cpio)\Z")
 # chezmoi: its global options that take a value as the next word (-R/--refresh-externals
 # takes one only glued on); past them the first word that is no option is the verb.
-_CHEZMOI = re.compile(r"(?:^|/)chezmoi\Z")
 _CHEZMOI_VALUED = frozenset("-c --config --config-format -D --destination -S --source -W --working-tree "
                             "-o --output --cache --persistent-state --age-recipient --age-recipient-file "
                             "--mode --override-data --override-data-file --color --progress "
@@ -164,8 +163,8 @@ ROWS = (
     Row("home-manager", "uninstall", (), ("-n", "--dry-run", "-h", "--help")),  # removes the generation's files
 )
 # Each program's options that take a value: short letter -> how many words, long name -> how
-# many (a value glued on with = or to a short letter is no extra word). A long option may be
-# any unique prefix, as the programs' own parsers read it; one not listed is a flag.
+# many (a value glued on with = or to a short letter is no extra word); one not listed is a
+# flag. A long option may be any unique prefix only for ABBREVIATING, whose parsers read it so.
 OPTIONS = {
     "rcup": ({c: 1 for c in "BdItUxS"}, {}),
     "rcdn": ({c: 1 for c in "BdItUxS"}, {}),
@@ -179,20 +178,28 @@ OPTIONS = {
 }
 
 
+ABBREVIATING = frozenset(("dotbot", "homeshick"))
+_MANAGER = re.compile(r"(?:^|/)(chezmoi|" + "|".join(map(re.escape, OPTIONS)) + r")\Z")
+
+
 def _manager_hit(s, c, b, program):
     """The spelling of the row of ROWS the call of `program` at c in segment c..b hits,
     as the program's own words (`rcup -f`, `homeshick link --force`), or None. Options
-    are read up to a bare --; the first word that is no option, past an option's value,
-    is the verb."""
+    are read up to a bare --. The verb is any word before it that is no option: an
+    option the table lacks may take a value, and reading the verb by position would let
+    its value hide `switch`, so a value spelled like the verb asks too."""
     shorts, longs = OPTIONS[program]
-    seen, verb, i = set(), None, c + 1
+    seen, i = set(), c + 1
+    stop = next((j for j in range(c + 1, b + 1) if s.w[j] == "--"), b + 1)
+    words = {s.w[j] for j in range(c + 1, stop) if s.k[j] == "w" and not s.w[j].startswith("-")}
     while i <= b and s.w[i] != "--":
         w = s.w[i]
         if s.k[i] != "w":  # a quoted word with whitespace: never the verb or an option
             pass
         elif w.startswith("--"):
             name, eq, _ = w.partition("=")
-            same = [n for n in longs if n == name] or [n for n in longs if n.startswith(name)]
+            same = [n for n in longs if n == name]
+            same = same or [n for n in longs if program in ABBREVIATING and n.startswith(name)]
             name = same[0] if len(same) == 1 else name
             seen.add(name)
             i += 0 if eq else longs.get(name, 0)
@@ -202,26 +209,28 @@ def _manager_hit(s, c, b, program):
                 if ch in shorts:  # the rest of the word is its value, else the next words are
                     i += shorts[ch] if j == len(w) - 1 else 0
                     break
-        elif verb is None:
-            verb = w
         i += 1
     for row in ROWS:
-        if (row.program == program and row.verb in (None, verb) and (not row.flags or seen & set(row.flags))
+        if (row.program == program and (row.verb is None or row.verb in words) and (not row.flags or seen & set(row.flags))
                 and not seen & set(row.quiet)):
             return " ".join(x for x in (program, row.verb, next((f for f in row.flags if f in seen), None)) if x)
     return None
 
 
 def _home_ask(s, a, b, nested):
-    """The spelling of a dotfile-manager call in segment a..b that overwrites or removes
-    in $HOME, or None: chezmoi's, then a row of ROWS."""
-    z = sw.cmd_index(s, a, b, _CHEZMOI, nested)
-    if z is not None and (hit := _chezmoi_hit(s, z, b)):
-        return "chezmoi " + hit
-    for program in OPTIONS:
-        z = sw.cmd_index(s, a, b, re.compile(r"(?:^|/)" + re.escape(program) + r"\Z"), nested)
-        if z is not None and (hit := _manager_hit(s, z, b, program)):
-            return hit
+    """(kind, spelling) of a dotfile-manager call in segment a..b that overwrites or
+    removes in $HOME, or None: kind is "chezmoi" or "dotfiles" (a row of ROWS). Every
+    manager's word in the segment is read, in one scan, not only the first."""
+    while (z := sw.cmd_index(s, a, b, _MANAGER, nested)) is not None:
+        program = _MANAGER.search(s.w[z]).group(1)
+        if program == "chezmoi":
+            hit = _chezmoi_hit(s, z, b)
+            hit = hit and "chezmoi " + hit
+        else:
+            hit = _manager_hit(s, z, b, program)
+        if hit:
+            return ("chezmoi" if program == "chezmoi" else "dotfiles", hit)
+        a = z + 1
     return None
 
 
@@ -277,7 +286,7 @@ def _expand(raw, base, home):
 def _home_events(doc):
     """The command's moves, in order: ("DENY", the wrapper as it is typed) for a
     checkout/switch by a wrapper whose work tree is always $HOME,
-    ("ASK", spelling) for a dotfile-manager call that overwrites or removes in $HOME,
+    ("ASK", (kind, spelling)) for a dotfile-manager call that overwrites or removes in $HOME,
     ("CD", v), ("ENV", kind, v) for a GIT_DIR=/GIT_WORK_TREE= outside a git
     segment, ("FS",) for a segment that may make a link or move, copy or
     unpack one into place (a `git mv` too), and ("G", [(kind, v)]) for one git
@@ -881,8 +890,13 @@ def check(doc):
         if note:
             notes.append(note)
     if asked:
-        hits = ", ".join(f"`{h}`" for h in dict.fromkeys(asked))
-        if all(h.startswith("chezmoi ") for h in asked):
-            return ask(say("wt_chezmoi", guard=NAME, hits=hits))
-        return ask(say("wt_dotfiles", guard=NAME, hits=hits))
+        def hits(kind):
+            return ", ".join(f"`{h}`" for k, h in dict.fromkeys(asked) if k == kind)
+
+        said = []
+        if hits("chezmoi"):
+            said.append(say("wt_chezmoi", hits=hits("chezmoi")))
+        if hits("dotfiles"):
+            said.append(say("wt_dotfiles", hits=hits("dotfiles")))
+        return ask(say("wt_home_ask", guard=NAME, said=" ".join(said)))
     return context("\n\n".join(notes)) if notes else None

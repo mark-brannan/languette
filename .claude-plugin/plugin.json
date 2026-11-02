@@ -269,7 +269,7 @@
     },
     "guard_worktrees_checkout_home": {
       "type": "boolean",
-      "title": "Guard worktrees: control for a branch switch or chezmoi overwrite in $HOME",
+      "title": "Guard worktrees: control for a branch switch or a dotfile manager overwriting in $HOME",
       "description": "On by default; applies only when guard_worktrees is on. Set false to keep only the other control.",
       "default": true
     },
