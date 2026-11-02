@@ -41,25 +41,44 @@ def _out(event, fields):
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
-    from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_bypass_ruleset,
-                                  guard_cross_session_send, guard_disks, guard_duplicate_prs, guard_git_stacked_base,
-                                  guard_git_work_loss, guard_github_issues, guard_host_availability,
-                                  guard_infra, guard_permissions, guard_pipe_to_shell, guard_private_terms,
-                                  guard_recursive_delete, guard_review_threads,
-                                  guard_secrets, guard_signed_comments, require_well_formed,
+    from languette.guards import (ask_first, guard_bypass_ruleset,
+                                  guard_cross_session_send, guard_disks, guard_duplicate_prs,
+                                  guard_git_work_loss, guard_github_issues,
+                                  guard_infra,
+                                  guard_review_threads,
+                                  guard_signed_comments, require_well_formed,
                                   guard_worktrees,
                                   prose_budget_commit)
-    from languette import engine, record
-    from languette.rules import (deny_always as _deny_always, guard_protected_services as _guard_protected_services,
-                                 guard_scheduled_jobs as _guard_scheduled_jobs, guard_sudo as _guard_sudo)
+    from languette import engine, posts, record, secrets
+    from languette.rules import (deny_always as _deny_always, guard_bypass_hooks as _guard_bypass_hooks,
+                                 guard_bypass_labels as _guard_bypass_labels,
+                                 guard_git_stacked_base as _guard_git_stacked_base,
+                                 guard_host_availability as _guard_host_availability,
+                                 guard_private_terms as _guard_private_terms,
+                                 guard_permissions as _guard_permissions,
+                                 guard_pipe_to_shell as _guard_pipe_to_shell,
+                                 guard_protected_services as _guard_protected_services,
+                                 guard_recursive_delete as _guard_recursive_delete,
+                                 guard_scheduled_jobs as _guard_scheduled_jobs, guard_secrets as _guard_secrets,
+                                 guard_sudo as _guard_sudo)
     from languette.document import Document
     from languette.messages import say
     from languette.verdict import Act, deny, verdict
     from languette.world import ACTS, World
     # The guards that are a rule set alone (languette/engine.py).
     deny_always, guard_sudo = engine.Guard(_deny_always), engine.Guard(_guard_sudo)
+    guard_bypass_labels = engine.Guard(_guard_bypass_labels)
+    guard_private_terms = engine.Guard(_guard_private_terms)
+    guard_host_availability = engine.Guard(_guard_host_availability)
+    guard_permissions = engine.Guard(_guard_permissions)
+    guard_pipe_to_shell = engine.Guard(_guard_pipe_to_shell)
     guard_protected_services = engine.Guard(_guard_protected_services)
+    guard_recursive_delete = engine.Guard(_guard_recursive_delete)
     guard_scheduled_jobs = engine.Guard(_guard_scheduled_jobs)
+    guard_secrets = engine.Guard(_guard_secrets)
+    # Stateful: the rule set names a handler that gathers and judges its facts.
+    guard_bypass_hooks = engine.Guard(_guard_bypass_hooks)
+    guard_git_stacked_base = engine.Guard(_guard_git_stacked_base)
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
                                          "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"}))
@@ -79,7 +98,7 @@ GUARDS = (
                                            guard_review_threads, guard_secrets, prose_budget_commit)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
     ("PreToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
-    ("PreToolUse", guard_private_terms.TOOLS, (guard_private_terms,)),
+    ("PreToolUse", posts.TOOLS, (guard_private_terms,)),
     ("PreToolUse", guard_duplicate_prs.TOOLS, (guard_duplicate_prs,)),
     ("PreToolUse", guard_signed_comments.TOOLS, (guard_signed_comments,)),
     ("PreToolUse", re.compile(r"(?:Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree)\Z"), (guard_worktrees,)),
@@ -177,7 +196,7 @@ def _project_rules(world, payload, env):
     if env.get(record.RAW) == "true":
         return ()
     try:
-        return drive(guard_secrets.project_rules(payload, env), world, [])
+        return drive(secrets.project_rules(payload, env), world, [])
     except Exception:  # noqa: BLE001 -- a malformed list costs the record its text, never the verdict
         return None
 

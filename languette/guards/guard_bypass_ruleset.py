@@ -71,8 +71,6 @@ _SPECIAL = re.compile(r"\A(?:BASH\w*|COMP\w*|HIST\w*|PWD|OLDPWD|RANDOM|SRANDOM|S
                       r"GROUPS|SHELLOPTS|PIPESTATUS|FUNCNAME|DIRSTACK|EPOCH\w*|REPLY|OPT\w*|SHLVL|_)\Z")
 HEAD, ALL, IMPLICIT = object(), object(), object()
 
-ADMIN = say("ruleset_admin")
-
 
 class _Push:
     def __init__(self, prog, here, remote, dsts, repo=None):
@@ -196,8 +194,7 @@ def _push(s, a, b, nested, here, lits=None):
             here = None
         cfg = _config_value(s, i, b)
         if cfg and (cfg.startswith("alias.") or "insteadof" in cfg):
-            raise Refuse("a `-c` override of an alias or a URL rewrite can turn any subcommand into a push, "
-                         "or any remote into another")
+            raise Refuse(say("br_alias"))
     i = sub
     if i > b:
         return None
@@ -206,7 +203,7 @@ def _push(s, a, b, nested, here, lits=None):
         return _Push(prog, here, None, [IMPLICIT])    # in every repository, a bare push: vcsh push ignores what follows
     if x != "push":
         if s.live[i] or _UNREADABLE.search(x):
-            raise Refuse(f"the subcommand `{x}` is built at run time")
+            raise Refuse(say("br_sub_live", x=x))
         return None                            # another subcommand
     remote, pos, all_, tags, dry, dashdash = None, [], False, False, False, False
     i += 1
@@ -221,11 +218,11 @@ def _push(s, a, b, nested, here, lits=None):
         elif _opt(x, "--repo") and "=" not in x and i + 1 <= b:
             remote = s.w[i + 1]
             if s.live[i + 1]:
-                raise Refuse(f"the remote `{remote}` is built at run time")
+                raise Refuse(say("br_remote_live", remote=remote))
         elif _opt(x, "--repo") and "=" in x:
             remote = x.split("=", 1)[1]
             if s.live[i]:
-                raise Refuse(f"the remote `{remote}` is built at run time")
+                raise Refuse(say("br_remote_live", remote=remote))
         elif any(_opt(x, f) for f in _ALL):
             all_ = True
         elif _opt(x, "--tags"):
@@ -243,9 +240,9 @@ def _push(s, a, b, nested, here, lits=None):
         k = pos.pop(0)
         remote = s.w[k]
         if s.live[k]:
-            raise Refuse(f"the remote `{remote}` is built at run time")
+            raise Refuse(say("br_remote_live", remote=remote))
     if remote is not None and _UNREADABLE.search(remote):
-        raise Refuse(f"the remote `{remote}` is built at run time")
+        raise Refuse(say("br_remote_live", remote=remote))
     if all_:
         return _Push(prog, here, remote, [ALL], repo)
     if not pos:
@@ -254,7 +251,7 @@ def _push(s, a, b, nested, here, lits=None):
     for j in pos:
         r = (lits and s.live[j] and lits.word(j, a)) or s.w[j]
         if (s.live[j] and r is s.w[j]) or _UNREADABLE.search(r):
-            raise Refuse(f"the refspec `{s.w[j]}` is built at run time, so where it lands can't be read")
+            raise Refuse(say("br_refspec_live", refspec=s.w[j]))
         src, _, dst = r.lstrip("+").partition(":")
         if ":" in r and not src:
             continue                           # :branch deletes
@@ -296,14 +293,14 @@ def _admin_merge(s, a, b, nested):
         if admin:
             return True
         if any(dyn):
-            raise Refuse("a `gh pr merge` word is built at run time and could be `--admin`")
+            raise Refuse(say("br_merge_live"))
         return False
     if any(dyn):
         if admin:
             return True                        # a live subcommand beside a literal --admin
         # Only a run-time group, or a run-time verb under a literal `pr`, could spell `pr merge`.
         if first and (dyn[first[0]] or (w[first[0]] == "pr" and len(first) > 1 and dyn[first[1]])):
-            raise Refuse("the `gh` subcommand is built at run time and could be `pr merge --admin`")
+            raise Refuse(say("br_gh_live"))
     return False
 
 
@@ -520,7 +517,7 @@ def check(doc):
     cwd = payload["cwd"]
     pushes, admin, refused = _walk(doc, cmd, cwd, env.get("HOME"))
     if admin:
-        return deny(ADMIN)
+        return deny(say("ruleset_admin"))
     asked = None
     for p in pushes:
         v = yield from _judge(p, env)

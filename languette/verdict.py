@@ -118,17 +118,21 @@ class Act(Need):
     __slots__ = ()
 
 
-def judged(doc, name, judge):
+def judged(doc, name, judge, any_call=False):
     """A check for a guard whose judge(doc) gives a deny reason or None: no
-    command is no finding, and a reason is a deny under the guard's name. A judge
-    that is a generator is run to its end, so the check is one too."""
-    if doc.text is None:
+    command is no finding (unless `any_call`: the guard judges a call with none, an MCP
+    tool's), and a reason is a deny under the guard's name; a judge may instead give a
+    verdict, which stands as it is. A judge that is a generator is run to its end, so
+    the check is one too."""
+    if doc.text is None and not any_call:
         return None
     why = judge(doc)
     return _judged_after(name, why) if inspect.isgenerator(why) else _judged(name, why)
 
 
 def _judged(name, why):
+    if isinstance(why, dict):                  # a verdict of its own: a judge that asked the world
+        return why
     return deny(say("judged", guard=name, why=why)) if why else None
 
 

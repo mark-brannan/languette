@@ -211,8 +211,9 @@ def _installed_crashing(doctor, version):
     copy = doctor.aside / "plugin"
     shutil.copytree(ROOT / "hooks", copy / "hooks")
     shutil.copytree(ROOT / "languette", copy / "languette", ignore=shutil.ignore_patterns("__pycache__"))
-    with open(copy / "languette/guards/guard_recursive_delete.py", "a", encoding="utf-8") as f:
-        f.write("\n\ndef check(doc):\n    raise RuntimeError(\"canary\")\n")
+    # guard-recursive-delete is a rule set; the test it names is what raises.
+    with open(copy / "languette/primitives.py", "a", encoding="utf-8") as f:
+        f.write("\n\ndef _canary(doc):\n    raise RuntimeError(\"canary\")\n    yield\n\n\nTESTS[\"recursive-delete\"] = _canary\n")
     _install(doctor, version, "user", root=copy)
 
 

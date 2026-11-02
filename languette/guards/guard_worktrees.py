@@ -890,7 +890,7 @@ def check(doc):
             asked += q.args[0]
             continue
         except Refuse as r:
-            return deny(str(r))
+            return deny(say("passed", text=r))
         if note:
             notes.append(note)
     if asked:
@@ -903,4 +903,4 @@ def check(doc):
         if hits("dotfiles"):
             said.append(say("wt_dotfiles", hits=hits("dotfiles")))
         return ask(say("wt_home_ask", guard=NAME, said=" ".join(said)))
-    return context("\n\n".join(notes)) if notes else None
+    return context(say("passed", text="\n\n".join(notes))) if notes else None

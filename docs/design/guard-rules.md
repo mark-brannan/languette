@@ -40,7 +40,7 @@ it onto the engine changes how it is written, never what it decides.
 - `when` is predicates over the matched words and over facts, under `all`,
   `any` and `not`. Absent, the match alone decides.
 - `action` and `why`: the verdict, and the message key that explains it.
-- `on` names the event handlers a stateful guard keeps, by name.
+- `handler` and `on` name a stateful guard's code: the handler of its calls and those of other events.
 
 Each rule that matches is one finding; verdict combines findings as today.
 
@@ -60,10 +60,11 @@ value is never read as a subcommand, and where the subcommand sits. git's
 comes from #197's finder; infra's `VALUED` table is the same thing for six
 programs.
 
-The registry grows when a rule needs a primitive, not before. Seventeen
-predicates serve one guard each today; those are that guard's own logic and
-stay beside it, named, until a second guard asks. A primitive two guards
-share lands in scan or verdict first (decisions: "New guards").
+The registry grows when a rule needs a primitive, not before. Seventeen predicates serve one guard each today; those are
+that guard's own logic and stay in `primitives.py` or a module it names (the text guards' walks of a post are `labels.py`
+and `posts.py`), a rule naming one as `{"test": name}`, until a second guard asks. A test that needs a fact (where a target
+really is) yields a Need and gives its own verdict, as the text guards do; a rule set whose guard also judges a call with no
+command, an MCP tool's, says `"calls": "any"`. A primitive two guards share lands in scan or verdict first (decisions: "New guards").
 
 Sequence is a fact, never a condition: the five guards that would lose
 precision as pure data (git-work-loss relaxations, bypass-ruleset binding,
@@ -93,11 +94,11 @@ address shapes) the doctor writes there; secret redaction is another.
 
 The engine reads a rule set and knows its facts before gather: every `when`
 names them, and every fact is a Need kind. So plan is a function of the
-configuration and the parse, as the pipeline requires, and the two shapes of
-guard are two shapes of rule set: plan/judge when `when` names facts alone,
-ask-as-it-goes when a fact's argument is another fact's answer. State across
-calls is a fact read in gather and a write made in act by a handler `on`
-names; the handler is code, as the issue door's protocol is today.
+configuration and the parse, and a guard's two shapes are two shapes of rule
+set: plan/judge when `when` names facts alone, ask-as-it-goes when a fact's
+argument is another fact's answer. State across calls is read in gather and
+written in act. A rule's `handler`, in code, takes the call, the guard and
+what `match` found, asks for Needs, writes Acts and gives the verdict.
 
 ## Trust tiers
 
@@ -129,9 +130,8 @@ list; what it built is then described above.
 1. The registry: the shared selectors first (the `gh api` walk, cd
    tracking, word-live, the valued-option tables), each landing with the
    guards that repeat it moved onto it.
-2. The command guards move, smallest first, two to a change, the rest waiting on the primitives their rules name; then the text guards, whose
-   `secret_rules`, term list and label list are already data.
-3. The stateful guards: their rules move, their handlers stay code.
+2. The command guards move, smallest first, two to a change, the rest waiting on the primitives their rules name.
+3. The stateful guards: their rules move, their handlers stay code. A rule's `handler` is built; `on` comes with the door.
 4. The repo tier, once its bounds are decided.
 
 Lines, from the survey: ~3000 of guard code become data plus engine, ~1500
