@@ -1,4 +1,5 @@
-"""guard-cross-session-send: features/guard-cross-session-send.feature is the spec.
+"""guard-cross-session-send's walks and its handlers (languette/rules/guard_cross_session_send.py
+is the rule set). The spec is features/guard-cross-session-send.feature.
 
 A session that has read untrusted content (anything fetched from the network:
 a web page, an issue or PR body, an MCP read) must not relay instruction-shaped
@@ -37,8 +38,6 @@ from languette import scan as sw
 from languette.paths import config_dir
 from languette.messages import say
 from languette.verdict import NO_PROMPT, NO_QUESTION, Act, Need, ask, deny
-
-NAME = "guard-cross-session-send"
 
 FIRST_LINE = 80
 _FETCH = re.compile(r"(?:^|/)fetch\Z")      # BSD fetch, at command position only: never `git fetch`
@@ -190,26 +189,44 @@ def _record(doc, event):
     return ("read", what) if what else None
 
 
-def check(doc):
-    payload, env = doc.payload, doc.env
-    event = payload.get("hook_event_name") or "PreToolUse"
-    sid = payload.get("session_id")
-    sid = sid if isinstance(sid, str) and sid else None
+def _sid(doc):
+    sid = doc.payload.get("session_id")
+    return sid if isinstance(sid, str) and sid else None
 
-    # --- the state hooks: record, never object ------------------------------
-    if event != "PreToolUse":
-        rec = _record(doc, event) if sid else None
-        if rec:
-            yield Act("send-keep", sid, *rec)   # a write that fails leaves an open door (World._send_keep)
-        return None
 
-    # --- the send -------------------------------------------------------------
-    if doc.tool != "SendMessage":
+# --- the state hooks: record, never object ------------------------------------
+
+def recorded(doc):
+    """The `session-record` test: on a state event (any event but PreToolUse) of a known
+    session, {"sid", "op", "arg"} for World's send-keep, or None when it changes nothing."""
+    sid = _sid(doc)
+    rec = _record(doc, doc.event) if sid and doc.event != "PreToolUse" else None
+    return {"sid": sid, "op": rec[0], "arg": rec[1]} if rec else None
+
+
+def keep(doc, guard, found):
+    """The `session-keep` handler: writes the record, and never objects."""
+    yield Act("send-keep", found["sid"], found["op"], found["arg"])  # a write that fails leaves an open door (World._send_keep)
+    return None
+
+
+# --- the send -------------------------------------------------------------------
+
+def sent(doc):
+    """The `send-elsewhere` test: a SendMessage to any target but "main", {"to": the target,
+    "" when it names none}, or None."""
+    if doc.event != "PreToolUse" or doc.tool != "SendMessage":
         return None
     ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
     to = ti.get("to") if isinstance(ti.get("to"), str) else ""
-    if to == "main":
-        return None
+    return None if to == "main" else {"to": to}
+
+
+def door(doc, guard, found):
+    """The `send-door` handler: a send to this session's own subagent or teammate passes; any
+    other target is judged by what the session's record says it read, and the permission mode."""
+    env, sid, to = doc.env, _sid(doc), found["to"]
+    ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
     state, lost = None, sid is None
     if sid is not None:
         try:
@@ -232,13 +249,13 @@ def check(doc):
     target = f"`{_shown(to)}`" if to else "an unnamed target"
     if mode in _UNSEEN_ASK or not isinstance(mode, str):
         if closed:
-            return None if mode in _UNSEEN_ASK else _ask_user(target, ti)
+            return None if mode in _UNSEEN_ASK else _ask_user(guard, target, ti)
         why = (f"this session read untrusted content ({state['read']})" if not lost
                else "this guard cannot tell whether this session read untrusted content")
-        return deny(say("cross_session_deny", guard=NAME, target=target, why=why,
+        return deny(say("cross_session_deny", guard=guard, target=target, why=why,
                         mode=mode or "an unknown permission mode", way_out=_WAY_OUT))
-    return _ask_user(target, ti)
+    return _ask_user(guard, target, ti)
 
 
-def _ask_user(target, ti):
-    return ask(say("cross_session_ask", guard=NAME, target=target, first_line=_first_line(ti.get("message"))))
+def _ask_user(guard, target, ti):
+    return ask(say("cross_session_ask", guard=guard, target=target, first_line=_first_line(ti.get("message"))))

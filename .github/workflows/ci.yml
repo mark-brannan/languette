@@ -37,24 +37,48 @@ jobs:
   # runs them. The same run checks the hooks.json shape (`claude plugin validate
   # --strict` passes a garbage one), the stdlib-only rule for languette/ and
   # the README table.
+  # Python 3.11 is the floor (`requires-python`): 3.10 lacks re's possessive
+  # repeats, which guard-private-terms reads. 3.12 sits between, 3.13 is the
+  # newest the suite pins. One macOS leg, on 3.13, covers the other OS.
   tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    name: tests (${{ matrix.os }}, ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    # Measured per push: ubuntu 1m20s to 3m20s, macOS 4m20s.
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 8 || 5 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.11", "3.12", "3.13"]
+        include:
+          - os: macos-latest
+            python: "3.13"
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: requirements-dev.txt
       # shfmt for the Python engine's shfmt rung: noble's is 3.8, past the 3.6 floor.
+      # macOS gets the same 3.8.0 binary, checked by hash: shfmt's parse-error
+      # columns differ between releases and features/ spells 3.8's.
       - name: Install shfmt
         run: |
           set -euo pipefail
-          sudo apt-get update -q
-          sudo apt-get install -y -q shfmt
+          if [ "$RUNNER_OS" = macOS ]; then
+            curl -fsSL -o shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_darwin_arm64
+            echo "1481240d2a90d4f0b530688d76d4f9117d17a756b6027cfa42b96f0707317f83  shfmt" | shasum -a 256 -c -
+            sudo install -m 755 shfmt /usr/local/bin/shfmt
+            # guard-git-stacked-base wants a timeout; macOS ships none, Homebrew's coreutils has gtimeout
+            # (the scenarios link gh and timeout from the real PATH onto their own, tests/harness.py system_path).
+            brew install coreutils
+          else
+            sudo apt-get update -q
+            sudo apt-get install -y -q shfmt
+          fi
       - run: pip install -r requirements-dev.txt
       # smoke_steps.py builds its own PATHs and venvs: the smoke job runs it.
       # pytest-xdist on min(4, cores) workers: pyproject's -n auto, capped in tests/conftest.py.
@@ -64,7 +88,8 @@ jobs:
         env:
           COVERAGE_FILE: ${{ github.workspace }}/.coverage
       # On main too: main's report at a PR's merge base is what the total's delta is measured against.
-      - if: github.event_name == 'pull_request' || github.event_name == 'push'
+      # One leg uploads, so the artifact name never collides.
+      - if: (github.event_name == 'pull_request' || github.event_name == 'push') && matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
         uses: actions/upload-artifact@v7.0.2
         with:
           name: coverage

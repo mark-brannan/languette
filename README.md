@@ -47,7 +47,7 @@ aliases ([#153](https://github.com/mark-brannan/languette/issues/153)).
 /plugin install languette@languette
 ```
 
-It needs `python3`, standard library only. `shfmt` (the parser it trusts
+It needs `python3` 3.11 or newer, standard library only. `shfmt` (the parser it trusts
 most) and `gh` (for the guards that ask GitHub) are optional. Without
 `python3`, every Bash call is denied: the guards fail closed.
 With no GitHub lookup, a Bash call waits a median 166-219 ms (p90 up to 318 ms) for the
@@ -114,7 +114,7 @@ Each guard checks for one kind of hazard:
 - [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub or GitLab issue create,
   transfer or delete in one human turn, or any inside a loop
 - [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb, `systemctl stop sshd`
-- [`guard-infra`](languette/guards/guard_infra.py): `terraform destroy`, `kubectl delete` and
+- [`guard-infra`](features/guard-infra.feature): `terraform destroy`, `kubectl delete` and
   other infrastructure destroys, until you approve that one run
 - [`guard-permissions`](features/guard-permissions.feature): recursive `chmod`,
   `chown`, `chgrp` or `chmod 777` outside agent-owned or
@@ -135,7 +135,7 @@ Each guard checks for one kind of hazard:
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
 - [`guard-bypass-labels`](features/guard-bypass-labels.feature): a session
   applying a label the `bypass_labels` setting names (none by default)
-- [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push direct to
+- [`guard-bypass-ruleset`](features/guard-bypass-ruleset.feature): a push direct to
   main where pull requests are normally required (agents could potentially bypass using your credentials)
 - [`guard-cross-session-send`](features/guard-cross-session-send.feature): prevents
   sending messages to another session with the option to ask first or deny outright
