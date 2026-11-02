@@ -281,7 +281,7 @@ secrets_context: guard-secrets: a value here is named as a credential: {found}. 
 ## signature
 
 ```
-signature_not_regex: {guard}: the signed_comments_signature setting `{pattern}` is not a regular expression ({err}), so no comment's signature can be checked. Fix the setting, or empty it for the default.
+signature_not_regex: {guard}: the signed_comments_signature setting `{pattern}` is not a regular expression ({err}), so no comment's signature can be checked. Fix the setting, or empty it to skip the signature check.
 signature_unread: {guard}: {why}
     
     {signed}

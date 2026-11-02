@@ -212,15 +212,15 @@
     "signed_comments_opening": {
       "type": "string",
       "title": "Signed comments: opening",
-      "description": "The text a signed comment's first line starts with. Empty means the default, the robot emoji and a space.",
-      "default": "🤖 ",
+      "description": "The text a signed comment's first line starts with, for example the robot emoji and a space. Empty, the default, means the first line is not checked. Set both this and the signature, or posts go unchecked for a signature.",
+      "default": "",
       "required": false
     },
     "signed_comments_signature": {
       "type": "string",
       "title": "Signed comments: signature",
-      "description": "A regular expression a signed comment's last non-empty line must match whole; {session} in it is the first eight hex of the session id. Empty means the default, the robot emoji, model, effort and session. A pattern that does not compile denies every comment.",
-      "default": "🤖 \\S+ · (?:low|medium|high|xhigh|max|-) · {session}",
+      "description": "A regular expression a signed comment's last non-empty line must match whole; {session} in it is the first eight hex of the session id. Empty, the default, means the last line is not checked. For example `🤖 \\S+ · (?:low|medium|high|xhigh|max|-) · {session}`: the robot emoji, model, effort and session. A pattern that does not compile denies every comment.",
+      "default": "",
       "required": false
     },
     "guard_cross_session_send": {

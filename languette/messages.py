@@ -208,7 +208,7 @@ MESSAGES = {
     # A GitHub comment that is not signed as an agent's.
     "signature_not_regex": (
         "{guard}: the signed_comments_signature setting `{pattern}` is not a regular expression "
-        "({err}), so no comment's signature can be checked. Fix the setting, or empty it for the default."
+        "({err}), so no comment's signature can be checked. Fix the setting, or empty it to skip the signature check."
     ),
     "signature_unread": "{guard}: {why}\n\n{signed}",
     "signature_opaque_body": (
