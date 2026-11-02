@@ -7,7 +7,7 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 ## Backups family default: 2026-11-01
 
 - The `backups` family (the copies you would recover from, and the keys
-  that unlock them) defaults to `block`: no approve button. The denial
+  that decrypt them) defaults to `block`: no approve button. The denial
   names the copy at risk and says the user runs the command themselves
   or sets `backups=ask`. The family promise gains a clause: your
   backups it never touches.
