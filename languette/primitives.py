@@ -12,10 +12,10 @@ import inspect
 import os
 import re
 
-from languette import paths
+from languette import labels, paths, posts, secrets
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Refuse, deny
+from languette.verdict import Refuse, ask, deny, planned
 
 _POWER = re.compile(r"(?:^|/)(?:shutdown|reboot|halt|poweroff)\Z")
 _FORK = re.compile(r"([A-Za-z_:][A-Za-z0-9_:]*)\s*\(\s*\)\s*\{\s*\1\s*\|\s*\1\s*&")
@@ -421,8 +421,47 @@ def permissions(doc):
                                            _perm_allow, _perm_malformed, _perm_verdict))
 
 
+_SECRETS_WAY_OUT = say("secrets_way_out")
+
+
+def pasted_secret(doc):
+    """A credential written into the command: a known token shape is denied, a value only its
+    context names as one (`DB_PASSWORD=...`, `--password ...`, a URL with a password) is asked,
+    heredoc bodies and nested shell text read too. The project may add shapes
+    (secrets.CONFIG); a list that does not load denies every command."""
+    try:
+        extra = yield from secrets.project_rules(doc.payload, doc.env)
+    except Refuse as e:
+        return deny(say("secrets_config", config=secrets.CONFIG, err=e))
+    desc = {r.id: r.description for r in tuple(secrets.secret_rules.RULES) + tuple(extra)}
+    shapes, contexts = [], []
+    for s in secrets.doc_scans(doc):
+        for f in secrets.findings(s, extra):
+            item = f"`{secrets.shown(s, f)}` ({desc.get(f.rule, f.rule.replace('context:', 'named by '))})"
+            (shapes if f.how == "shape" else contexts).append(item)
+    if shapes:
+        return deny(say("secrets_shape", found=", ".join(shapes), way_out=_SECRETS_WAY_OUT))
+    if contexts:
+        return ask(say("secrets_context", found=", ".join(contexts), way_out=_SECRETS_WAY_OUT))
+    return None
+
+
+def bypass_label(doc):
+    """A label the bypass_labels option names, applied by gh's flags, gh api or an MCP tool's
+    fields; or a label the walk cannot read. Nothing is guarded while the option is empty."""
+    return (yield from planned(doc, labels.parse, labels.plan, labels.judge))
+
+
+def private_terms(doc):
+    """The text of a post bound for a public GitHub repo, read against the redacted and the
+    blocked terms: a hit on a blocked term denies the post, a redacted one is replaced in the
+    posted text alone and the call allowed (languette/posts.py)."""
+    return (yield from posts.check(doc))
+
+
 TESTS = {"power-word": power_word, "fork-bomb": fork_bomb, "pipe-to-shell": pipe_to_shell,
-         "recursive-delete": recursive_delete, "permissions": permissions}
+         "recursive-delete": recursive_delete, "permissions": permissions, "secrets": pasted_secret,
+         "bypass-labels": bypass_label, "private-terms": private_terms}
 
 
 def judges(name):

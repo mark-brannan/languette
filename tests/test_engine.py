@@ -38,6 +38,7 @@ def _with_rule(**changes):
     ({**GOOD, "units": {"setting": "X", "names": ["a"]}}, "units must be an object"),
     ({**GOOD, "units": {"names": []}}, "units must be an object"),
     ({**GOOD, "units": {"names": [1]}}, "units must be an object"),
+    ({**GOOD, "calls": "some"}, 'calls must be "command" or "any"'),
 ])
 def test_a_rule_set_that_does_not_load_names_the_fault(rule_set, fault):
     with pytest.raises(scan.BadRules, match=re.escape(fault)):

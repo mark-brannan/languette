@@ -25,7 +25,8 @@ shipped beside the rule sets, read when present; its rules add denies, as
 `repo`'s do. `repo`, optional, names the file a project keeps, found as
 ask-first finds its list, whose rules add denies: the repo tier, which says
 nothing else, and whose `why` is the repo's own words. Its rules take an
-optional `action`, which must be "deny". `opt_in`, optional, names the plugin
+optional `action`, which must be "deny". `calls`, optional, is "command" (the default: a call
+with no command is no finding) or "any": the guard judges a call that carries none, an MCP tool's. `opt_in`, optional, names the plugin
 option that must be "true" for the guard to run, as an opt-in guard module's
 OPT_IN does.
 
@@ -41,7 +42,7 @@ from languette import scan as sw
 from languette.messages import MESSAGES, say
 from languette.verdict import WAY_USER, Need, Refuse, judged
 
-_SET_KEYS = frozenset({"guard", "rules", "repo", "opt_in", "file", "read", "units"})
+_SET_KEYS = frozenset({"guard", "rules", "repo", "opt_in", "file", "read", "units", "calls"})
 _READ_KEYS = frozenset({"process_prose", "launchers"})
 # The tables an entry's `verbs` names; the last is the SysV stops of a service the session runs on,
 # a smaller table than sysv-stops, as the host's guard has always read it.
@@ -102,6 +103,8 @@ def load(rule_set):
         raise sw.BadRules("guard must be a guard's name")
     if "repo" in rule_set and (not isinstance(rule_set["repo"], str) or not rule_set["repo"].startswith(".languette/")):
         raise sw.BadRules("repo must be a path under .languette/")
+    if rule_set.get("calls", "command") not in ("command", "any"):
+        raise sw.BadRules('calls must be "command" or "any"')
     if "file" in rule_set and (not isinstance(rule_set["file"], str) or "/" in rule_set["file"]):
         raise sw.BadRules("file must be the name of a file beside the rule sets")
     read = rule_set.get("read", {})
@@ -178,7 +181,7 @@ class Guard:
                       **({} if read.get("launchers", True) else {"launchers": False})}
 
         def check(doc):
-            return judged(doc, self.NAME, self._judge)
+            return judged(doc, self.NAME, self._judge, self.RULE_SET.get("calls") == "any")
         self.check = check
 
     def _judge(self, doc):

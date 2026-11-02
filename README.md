@@ -123,13 +123,13 @@ Each guard checks for one kind of hazard:
 - [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
-- [`guard-secrets`](languette/guards/guard_secrets.py): a pasted credential
+- [`guard-secrets`](features/guard-secrets.feature): a pasted credential
 - [`guard-worktrees`](features/guard-worktrees.feature): opt-in; a branch switch in a `$HOME`
   that is a worktree, chezmoi's forced apply, `destroy` and `purge` (an ask), or a reach into
   another session's worktree
 - [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
-- [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
+- [`guard-bypass-labels`](features/guard-bypass-labels.feature): a session
   applying a label the `bypass_labels` setting names (none by default)
 - [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push direct to
   main where pull requests are normally required (agents could potentially bypass using your credentials)
