@@ -13,8 +13,8 @@ import inspect
 import os
 import re
 
-from languette import (branch_deletions, hook_skips, infra_runs, labels, listed_runs, paths, posts, pushes,
-                       secrets, untrusted_reads)
+from languette import (branch_deletions, hook_skips, infra_runs, issue_writes, labels, listed_runs, opened_prs,
+                       paths, posts, pushes, secrets, untrusted_reads)
 from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Refuse, ask, deny, planned
@@ -669,16 +669,19 @@ TESTS = {"power-word": power_word, "fork-bomb": fork_bomb, "pipe-to-shell": pipe
          "skips-hooks": hook_skips.skips, "branch-deletions": branch_deletions.deleted,
          "infra-runs": infra_runs.runs, "command": command, "disks": disks,
          "ruleset-pushes": pushes.pushed,
-         "send-elsewhere": untrusted_reads.sent, "session-record": untrusted_reads.recorded}
+         "send-elsewhere": untrusted_reads.sent,
+         "issue-writes": issue_writes.written, "pr-opens": opened_prs.opened}
 
 # The handlers a rule's `handler` may name: a stateful guard's code, which gathers the facts
 # its rule needs and judges them. handler(doc, guard, found) is a generator, given the call,
-# the guard's name for its sentences and the fields the rule's match found; it yields Needs
-# and Acts and gives a verdict, or None.
+# the guard's name for its sentences and the fields the rule's match found (none, for an event
+# a rule set's `on` names); it yields Needs and Acts and gives a verdict, or None.
 HANDLERS = {"hooks-approval": hook_skips.approval, "open-prs": branch_deletions.open_prs,
             "infra-approval": infra_runs.approval, "listed-approval": listed_runs.approval,
             "branch-rules": pushes.branch_rules,
-            "send-door": untrusted_reads.door, "session-keep": untrusted_reads.keep}
+            "send-door": untrusted_reads.door, "session-keep": untrusted_reads.keep,
+            "issue-door": issue_writes.door, "door-open": issue_writes.door_open,
+            "door-spend": issue_writes.door_spend, "issue-timelines": opened_prs.timelines}
 
 
 def judges(name):

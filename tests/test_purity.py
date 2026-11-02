@@ -90,7 +90,7 @@ KNOWN = {
     # Needs that write as they read, under one lock or rename; they move with
     # the approval spend (#84).
     "verdict.py": ["Need claim"],
-    "guards/guard_github_issues.py": ["Need door claim", "Need door take"],
+    "issue_writes.py": ["Need door claim", "Need door take"],
     "guards/guard_worktrees.py": ["Need worktree arrive"],
     # The parser ladder's shfmt rung (docs/decisions.md, "Runtime dependencies").
     "scan.py": ["import shutil", "import subprocess", "subprocess.run", "subprocess.TimeoutExpired", "shutil.which"],

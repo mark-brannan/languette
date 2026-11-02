@@ -31,7 +31,9 @@ nothing else, and whose `why` is the repo's own words. Its rules take an
 optional `action`, which must be "deny". `calls`, optional, is "command" (the default: a call
 with no command is no finding) or "any": the guard judges a call that carries none, an MCP tool's. `opt_in`, optional, names the plugin
 option that must be "true" for the guard to run, as an opt-in guard module's
-OPT_IN does.
+OPT_IN does. `on`, optional, maps a hook event that carries no decision (STATE_EVENTS) to the
+handler in primitives.HANDLERS that event goes to, given nothing found; the rules judge no
+event `on` names, and every event it does not. run.py still says which events reach a guard.
 
 A rule set that does not load, shipped or the repo's, denies every Bash
 command, naming the file and the fault. Guard(module) is a guard as run.py
@@ -46,7 +48,9 @@ from languette import scan as sw
 from languette.messages import MESSAGES, say
 from languette.verdict import WAY_USER, Need, Refuse, judged
 
-_SET_KEYS = frozenset({"guard", "rules", "repo", "opt_in", "file", "read", "units", "calls"})
+_SET_KEYS = frozenset({"guard", "rules", "repo", "opt_in", "file", "read", "units", "calls", "on"})
+# The hook events that carry no decision, whose output run.py keeps off stdout: the ones `on` may name.
+STATE_EVENTS = frozenset({"PostToolUse", "PostToolUseFailure", "SubagentStart", "SessionStart", "UserPromptSubmit"})
 _READ_KEYS = frozenset({"process_prose", "launchers"})
 # The tables an entry's `verbs` names; the last is the SysV stops of a service the session runs on,
 # a smaller table than sysv-stops, as the host's guard has always read it.
@@ -121,6 +125,10 @@ def load(rule_set):
         raise sw.BadRules('calls must be "command" or "any"')
     if "file" in rule_set and (not isinstance(rule_set["file"], str) or "/" in rule_set["file"]):
         raise sw.BadRules("file must be the name of a file beside the rule sets")
+    on = rule_set.get("on", {})
+    if not isinstance(on, dict) or set(on) - STATE_EVENTS or not all(
+            inspect.isgeneratorfunction(primitives.HANDLERS.get(h)) for h in on.values()):
+        raise sw.BadRules("on must be an object mapping events STATE_EVENTS lists to handlers languette holds")
     read = rule_set.get("read", {})
     if not isinstance(read, dict) or set(read) - _READ_KEYS or not all(isinstance(v, bool) for v in read.values()):
         raise sw.BadRules("read must be an object holding only process_prose and launchers, each true or false")
@@ -195,8 +203,20 @@ class Guard:
                       **({} if read.get("launchers", True) else {"launchers": False})}
 
         def check(doc):
+            on = self.RULE_SET.get("on")
+            handler = on.get(doc.event) if isinstance(on, dict) else None
+            if handler is not None:            # an event carries no command, or one the rules never judge
+                return judged(doc, self.NAME, lambda d: self._event(d, handler), True)
             return judged(doc, self.NAME, self._judge, self.RULE_SET.get("calls") == "any")
         self.check = check
+
+    def _event(self, doc, handler):
+        """An event `on` names: its handler's verdict, or why the rule set does not load."""
+        try:
+            load(self.RULE_SET)
+        except sw.BadRules as e:
+            return say("rules_bad", file=self.FILE, err=e)
+        return (yield from primitives.HANDLERS[handler](doc, self.NAME, {}))
 
     def _judge(self, doc):
         try:
