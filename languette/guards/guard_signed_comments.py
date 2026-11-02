@@ -6,8 +6,10 @@ Experimental: the convention is one workflow's; the general shape is issue #194.
 An agent may post under the user's own login, and then without a mark a review bot and
 the next agent read its reply as the user's own words. So a post comes from a
 bot's account, always: gh's GraphQL viewer is an App's (refs.bot), read with one
-gh call; gh that cannot say is an ask, and a GitHub MCP tool, whose server posts
-with a token this hook cannot read, is a deny. And the body's first line
+gh call; gh that cannot say is an ask, as is a command that picks gh's account
+itself (a token or host variable it sets or unsets, `gh auth switch`,
+`--hostname`), where the hook's gh would answer for another; and a GitHub MCP
+tool, whose server posts with a token this hook cannot read, is a deny. And the body's first line
 begins with signed_comments_opening and its last non-empty line matches
 signed_comments_signature, a regular expression the whole line matches, its
 `{session}` the payload's first eight hex (any eight without one). Both
@@ -55,6 +57,10 @@ _COMMENTS = re.compile(r"(?:^|/)(?:comments|reviews)(?:/|\Z)")
 _FROM_DOC = re.compile(r"\$\(\s*cat\s+(?:-\s+)?HEREDOC(\d+)\s*\)")
 _HOME = re.compile(r"(?:~|\$HOME|\$\{HOME\})(?=/|\Z)")
 _MARK = " HEREDOC "
+# A word that chooses which account gh posts as, read from the command's own words:
+# `NAME=...` (a prefix, export or env), `env -u NAME`, `unset NAME`.
+_ACCOUNT = re.compile(r"(?:--unset=|-u)?(?:GH_TOKEN|GITHUB_TOKEN|GH_ENTERPRISE_TOKEN|GITHUB_ENTERPRISE_TOKEN|"
+                      r"GH_HOST|GH_CONFIG_DIR)(?:=.*)?\Z", re.S)
 # gh's verbs that post a comment, and the flags that carry its body.
 _VERBS = {("pr", "comment"): "b", ("issue", "comment"): "b", ("pr", "review"): "b",
           ("pr", "close"): "c", ("pr", "reopen"): "c", ("issue", "close"): "c", ("issue", "reopen"): "c"}
@@ -94,9 +100,11 @@ class _Read:
                     self.fed[p] = int(ks[0])
         self.cd = False
         self.posts = []
+        self.account = None            # the word by which this command picks gh's account itself
         for text, nested in doc.texts(text=stripped):
             s = self.s = doc.scan(text)
             self.cd = self.cd or sw.cd_present(s)
+            self.account = self.account or next((w for k, w in zip(s.k, s.w) if k == "w" and _ACCOUNT.match(w)), None)
             for a, b in s.segments():
                 if a <= b:
                     self.segment(a, b, nested)
@@ -142,6 +150,9 @@ class _Read:
         g = sw.cmd_index(s, lo, hi, sw.GH, nested)
         if g is None or g + 1 > hi:
             return
+        if g + 2 <= hi and s.w[g + 1] == "auth" and sw.word(s, g + 2) in ("switch", "login", "logout"):
+            self.account = self.account or f"gh auth {s.w[g + 2]}"
+        self.account = self.account or next((w for w in s.w[g + 1:hi + 1] if w.split("=")[0] == "--hostname"), None)
         if s.w[g + 1] == "api":
             self.api(g, hi)
             return
@@ -389,7 +400,11 @@ def check(doc):
     also = say("signature_also", problems="; ".join(problems), shape=shape) if problems else ""
     if r is None:
         return deny(say("signature_mcp_account", guard=NAME, tool=tool, also=also))
-    who = yield from refs.viewer(cwd if isinstance(cwd, str) and cwd.startswith("/") else "/")
+    if r.account:
+        # gh's own account is not the one this command posts as: reading it would answer for another.
+        who = f"this command picks gh's account itself, with `{_short(r.account)}`"
+    else:
+        who = yield from refs.viewer(cwd if isinstance(cwd, str) and cwd.startswith("/") else "/")
     if isinstance(who, str) and not problems:
         return ask(say("signature_account_unread", guard=NAME, got=who))
     if not isinstance(who, str) and not refs.bot(*who):

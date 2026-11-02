@@ -461,6 +461,25 @@ Feature: guard-signed-comments
         """
       Then the guard asks, naming "gh could not say which account it posts as"
 
+    Scenario Outline: a command that picks gh's account itself is an ask, without reading the hook's
+      The hook's gh answers with the hook's own account; this command posts as another.
+
+      Given CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING is ""
+      And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is ""
+      When the agent runs `<command>`
+      Then the guard asks, naming "this command picks gh's account itself, with `<word>`"
+      And the stub "gh" was called 0 times
+
+      Examples:
+        | command                                                     | word                 |
+        | env -u GH_TOKEN gh pr comment 1 -b "Done."                  | GH_TOKEN             |
+        | env --unset=GITHUB_TOKEN gh pr comment 1 -b "Done."         | --unset=GITHUB_TOKEN |
+        | GH_TOKEN=x gh pr comment 1 -b "Done."                       | GH_TOKEN=x           |
+        | unset GH_TOKEN; gh pr comment 1 -b "Done."                  | GH_TOKEN             |
+        | export GH_HOST=ghe.example.com && gh pr comment 1 -b "Done." | GH_HOST=ghe.example.com |
+        | gh auth switch && gh pr comment 1 -b "Done."                | gh auth switch       |
+        | gh pr comment 1 -b "Done." --hostname ghe.example.com       | --hostname           |
+
   Scenario: a payload without an absolute working directory is denied before the guard judges
     Given the working directory is "relative/dir"
     When the agent runs `gh pr comment 1 -b "no signature"`
