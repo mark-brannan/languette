@@ -33,7 +33,10 @@ reach is a ✗ row naming the by-hand path. One row per step, in the doctor's
 marks; exit non-zero on any ✗. Install, wired already or not, also writes
 the default redacted terms file, the one file it writes itself, where the installed plugin's options say the
 guard reads it, as `languette doctor --init-redacted-terms` does, when there
-is none; a file already there is left alone.
+is none; a file already there is left alone. The plugin's session-start hook writes it the same way when
+it is missing, since the plugin path has no `languette` command and install never runs. A hook has no row
+and blocks nothing: a write it cannot make leaves the file missing, and the doctor's redacted terms row
+says so, with the fix beneath.
 
 ## doctor
 

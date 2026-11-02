@@ -107,8 +107,8 @@ Each guard checks for one kind of hazard:
 - [`require-well-formed`](features/require-well-formed.feature): a Bash command that
   doesn't parse; the other guards skip it
 - [`guard-disks`](features/guard-disks.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
-- [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub issue create, transfer
-  or delete in one human turn, or any inside a loop
+- [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub or GitLab issue create,
+  transfer or delete in one human turn, or any inside a loop
 - [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb, `systemctl stop sshd`
 - [`guard-infra`](languette/guards/guard_infra.py): `terraform destroy`, `kubectl delete` and
   other infrastructure destroys, until you approve that one run
@@ -340,6 +340,14 @@ reach the environment under `--plugin-dir`; the installed-plugin path was not
 measured, which is why the guards treat unset as on.
 
 </details>
+
+## Privacy and support
+
+Guards that need GitHub's answer ask through your own `gh`. Session state
+stays in local files. Decisions are recorded only if you turn on
+`record_decisions`.
+
+Questions and bugs: [GitHub issues](https://github.com/mark-brannan/languette/issues).
 
 ## Strong guards
 
