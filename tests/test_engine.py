@@ -35,6 +35,8 @@ def _with_rule(**changes):
     (_with_rule(match=[{"test": "fork-bomb", "cmd": "foo"}]), "test must be a test's name, alone"),
     (_with_rule(match=[{"cmd": "foo", "unit": "listed", "host_verbs": "x"}]), "host_verbs must name a verb table"),
     ({**GOOD, "units": {"setting": "X", "names": ["a"]}}, "units must be an object"),
+    ({**GOOD, "units": {"names": []}}, "units must be an object"),
+    ({**GOOD, "units": {"names": [1]}}, "units must be an object"),
 ])
 def test_a_rule_set_that_does_not_load_names_the_fault(rule_set, fault):
     with pytest.raises(scan.BadRules, match=re.escape(fault)):

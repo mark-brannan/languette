@@ -106,8 +106,9 @@ def load(rule_set):
     if "units" in rule_set and (not isinstance(units, dict) or set(units) - {"setting", "drop", "names"}
                                 or ("names" in units) == ("setting" in units)
                                 or not isinstance(units.get("setting", ""), str)
-                                or not isinstance(units.get("names", []), list)):
-        raise sw.BadRules("units must be an object holding setting (and optionally drop) or names, a list")
+                                or not isinstance(units.get("names", []), list)
+                                or ("names" in units and not (units["names"] and all(isinstance(x, str) for x in units["names"])))):
+        raise sw.BadRules("units must be an object holding setting (and optionally drop) or names, a non-empty list of strings")
     rules = sw.load_rules({"rules": rule_set["rules"]}, "rules", ("action", "why"), _shipped, many=True,
                           match_keys=sw.SHIPPED_MATCH_KEYS)
     for n, r in enumerate(rules):
