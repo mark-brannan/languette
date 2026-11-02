@@ -527,7 +527,7 @@ def redirect_targets(text):
 
 class _DiskJudge:
     def __init__(self, cwd, home):
-        self.cwd, self.home, self.homeN = cwd, home, paths.normalize(home)
+        self.cwd, self.home = cwd, home
         self.moved, self.dev_moved, self.targets = False, False, []
 
     def refuse(self, what, why):

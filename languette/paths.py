@@ -257,7 +257,7 @@ def parse_targets(doc, name, judge, allow_var):
         walker.run(doc)
     except Refuse as e:
         out["refused"] = str(e)
-    out.update(home=home, allow=(env.get(allow_var) if allow_var else None) or None, targets=walker.targets, bases=own_bases(env, cwd))
+    out.update(home=home, allow=(allow_var and env.get(allow_var)) or None, targets=walker.targets, bases=own_bases(env, cwd))
     return out
 
 
