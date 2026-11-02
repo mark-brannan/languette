@@ -581,3 +581,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t180000z
 - test_purity KNOWN entry for the door Needs re-keyed to issue_writes.py, the same two entries Undo: drop the entry ([#349](https://github.com/mark-brannan/languette/pull/349))
+
+### 20261102t180011z
+- design doc left unedited; its stage-3 line still reads true Undo: edit the stage-3 line ([#349](https://github.com/mark-brannan/languette/pull/349))
