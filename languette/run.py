@@ -41,20 +41,21 @@ def _out(event, fields):
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
-    from languette.guards import (ask_first, guard_bypass_ruleset,
+    from languette.guards import (guard_bypass_ruleset,
                                   guard_cross_session_send, guard_duplicate_prs,
                                   guard_git_work_loss, guard_github_issues,
-                                  guard_infra,
                                   guard_review_threads,
                                   guard_signed_comments, require_well_formed,
                                   guard_worktrees,
                                   prose_budget_commit)
     from languette import engine, posts, record, secrets
-    from languette.rules import (deny_always as _deny_always, guard_bypass_hooks as _guard_bypass_hooks,
+    from languette.rules import (ask_first as _ask_first, deny_always as _deny_always,
+                                 guard_bypass_hooks as _guard_bypass_hooks,
                                  guard_bypass_labels as _guard_bypass_labels,
                                  guard_disks as _guard_disks,
                                  guard_git_stacked_base as _guard_git_stacked_base,
                                  guard_host_availability as _guard_host_availability,
+                                 guard_infra as _guard_infra,
                                  guard_private_terms as _guard_private_terms,
                                  guard_permissions as _guard_permissions,
                                  guard_pipe_to_shell as _guard_pipe_to_shell,
@@ -81,6 +82,7 @@ try:
     # Stateful: the rule set names a handler that gathers and judges its facts.
     guard_bypass_hooks = engine.Guard(_guard_bypass_hooks)
     guard_git_stacked_base = engine.Guard(_guard_git_stacked_base)
+    ask_first, guard_infra = engine.Guard(_ask_first), engine.Guard(_guard_infra)
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
                                          "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"}))

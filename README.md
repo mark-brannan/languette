@@ -114,7 +114,7 @@ Each guard checks for one kind of hazard:
 - [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub or GitLab issue create,
   transfer or delete in one human turn, or any inside a loop
 - [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb, `systemctl stop sshd`
-- [`guard-infra`](languette/guards/guard_infra.py): `terraform destroy`, `kubectl delete` and
+- [`guard-infra`](features/guard-infra.feature): `terraform destroy`, `kubectl delete` and
   other infrastructure destroys, until you approve that one run
 - [`guard-permissions`](features/guard-permissions.feature): recursive `chmod`,
   `chown`, `chgrp` or `chmod 777` outside agent-owned or

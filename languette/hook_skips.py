@@ -13,7 +13,7 @@ read the way the other guards read one: through wrappers, `sh -c "..."`, env
 prefixes and git's global options, and a message or heredoc that merely names
 the flag is not the flag.
 
-Approval is the mechanism ask-first uses (languette.guards.ask_first): the
+Approval is the mechanism ask-first uses (languette/listed_runs.py): the
 user's answer to an AskUserQuestion is exactly APPROVE_LABEL, the question's
 text proves nothing, and each approval allows one run: it is recorded as
 spent beside the transcript and never counts again. A command that skips the
