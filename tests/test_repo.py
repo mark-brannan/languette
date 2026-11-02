@@ -14,9 +14,9 @@ from hamcrest import assert_that, contains_string, empty, equal_to, has_length, 
 
 import readme_table
 from harness import hooks_json_commands, hooks_json_prompt_command
-from languette import run
+from languette import engine, run, scan
 from languette.guards import (guard_bypass_labels, guard_duplicate_prs, guard_github_issues, guard_private_terms,
-                              guard_protected_services, guard_signed_comments)
+                              guard_signed_comments)
 
 ROOT = Path(__file__).resolve().parent.parent
 # Spelled out, not read from run.GUARDS, so a guard dropped from run.GUARDS fails the comparisons below.
@@ -191,8 +191,7 @@ def test_every_guard_has_one_boolean_option_defaulting_to_true_unless_opt_in():
 
 def test_protected_services_starts_empty():
     uc = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())["userConfig"]
-    assert_that(guard_protected_services.protected({guard_protected_services.OPTION: uc["protected_services"]["default"]}),
-                equal_to(()))
+    assert_that(scan.listed(uc["protected_services"]["default"]), equal_to([]))
 
 
 def test_a_command_rules_cmd_picks_the_program_it_matches():
@@ -380,8 +379,7 @@ def _gathered(gen):
 def test_every_shipped_rule_file_loads_and_is_packaged(rule_file):
     # docs/design/guard-rules.md, "Rule sets that do not load": the deny a bad file
     # gives never greets an install.
-    guard = importlib.import_module(f"languette.guards.{rule_file.stem.replace('-', '_')}")
+    guard = next(g for _, _, gs in run.GUARDS for g in gs if g.NAME == rule_file.stem)
     assert_that(Path(guard.RULE_FILE), equal_to(rule_file))
-    got = _gathered(guard.rules(str(rule_file)))
-    assert_that(got[:len(guard.RULES)], equal_to(guard.RULES))
+    _gathered(guard.file_rules({r["id"] for r in engine.load(guard.RULE_SET)}))
     assert_that((ROOT / "pyproject.toml").read_text(), contains_string('languette = ["rules/*.json", "rules/*.tsv"]'))
