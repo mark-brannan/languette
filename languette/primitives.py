@@ -320,7 +320,7 @@ class _PermJudge:
         self.moved, self.targets, self.what = False, [], ""
 
     def blocked(self, raw, why):
-        raise Refuse(say("perm_blocked", what=f"{self.what}{' ' + raw if raw else ''}", why=why,
+        raise Refuse(say("perm_blocked", target=f"{self.what}{' ' + raw if raw else ''}", why=why,
                          way_out=_PERM_WAY_OUT))
 
     def target(self, s, idx):

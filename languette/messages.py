@@ -242,6 +242,20 @@ MESSAGES = {
         "{guard}: this may post a GitHub comment under the user's login, so it must be signed as an agent's, "
         "or a reader takes it for the user's own words. Here {problems}. {shape}"
     ),
+    # A GitHub comment that does not come from a bot's account.
+    "signature_person": (
+        "{guard}: this posts to GitHub as {login}, a person's account, so a reader takes it for that "
+        "person's own words. Post it through the agent's GitHub App, whose login ends in [bot].{also}"
+    ),
+    "signature_mcp_account": (
+        "{guard}: {tool} posts with its MCP server's own token, and this hook cannot read whose account "
+        "that is, so it cannot tell that a bot posts it. Post it with gh, through the agent's GitHub App.{also}"
+    ),
+    "signature_account_unread": (
+        "{guard}: this posts to GitHub, and gh could not say which account it posts as ({got}). "
+        "Approve only if it posts through the agent's GitHub App, whose login ends in [bot]."
+    ),
+    "signature_also": " It is not signed as an agent's either: {problems}. {shape}",
     # A command the user runs, not an agent: the host, the crontab, a protected service.
     "judged": "{guard}: {why}",
     # guard-git-work-loss's two relaxations, which hold only where an agent works: a linked worktree
@@ -517,7 +531,6 @@ MESSAGES = {
         "else is the user's; a sweep over a project tree is theirs to run, or to allow with "
         "LANGUETTE_PERM_ALLOW."
     ),
-    "perm_blocked": "`{what}` is blocked: {why}. {way_out}",
     "perm_not_allowed": (
         "`{what} {raw}` is blocked: only the scratchpad, /tmp, agent worktrees and paths named "
         "in LANGUETTE_PERM_ALLOW may be swept, and {abs_} is none of those. {way_out}"
@@ -606,6 +619,44 @@ MESSAGES = {
         "bot's finding on it was answered ({got}). Approve only if the thread was answered with "
         "the fix commit or a link to the record the dismissal rests on."
     ),
+    "af_cwd_not_dir": "the payload's cwd {cwd} is not a directory, so the repo's list cannot be found",
+    "af_label_shared": (
+        "commands[{n}].approve_label '{label}' is shared with another command; a click must approve "
+        "exactly one"
+    ),
+    "passed": "{text}",
+    "bl_alone": (
+        "is read at hook time, and another command in the same call could rewrite it before gh reads it; "
+        "run the gh on its own"
+    ),
+    "bl_home": "names a home directory the guard cannot see",
+    "bl_relative": "is a relative path, and the guard cannot tell where the command stands",
+    "bl_not_read": "is not read yet",
+    "unreadable_file": "cannot be read ({err})",
+    "bl_input_live": "the --input path `{src}` is built at run time",
+    "bl_input_stdin": "the --input payload comes from stdin and no heredoc in the command feeds it",
+    "bl_heredoc_live": "the heredoc feeding --input is built at run time (an unquoted delimiter and a $ or backtick)",
+    "bl_input_file": "the --input file `{src}` {err}",
+    "br_alias": (
+        "a `-c` override of an alias or a URL rewrite can turn any subcommand into a push, or any remote "
+        "into another"
+    ),
+    "br_sub_live": "the subcommand `{x}` is built at run time",
+    "br_remote_live": "the remote `{remote}` is built at run time",
+    "br_refspec_live": "the refspec `{refspec}` is built at run time, so where it lands can't be read",
+    "br_merge_live": "a `gh pr merge` word is built at run time and could be `--admin`",
+    "br_gh_live": "the `gh` subcommand is built at run time and could be `pr merge --admin`",
+    "dp_relative_cd": "is a relative path after a cd, and the guard cannot tell where the command stands",
+    "sec_top": "the top level must be {{\"patterns\": [...]}}",
+    "sec_not_object": "{where} is not an object",
+    "sec_key_empty": "{where}.{key} must be a non-empty string",
+    "sec_id_dup": "{where}.id '{id}' is a duplicate",
+    "sec_id_shipped": "{where}.id '{id}' is a shipped rule's id",
+    "sec_regex_long": "{where}.regex is longer than {max} characters",
+    "sec_regex_bad": "{where}.regex does not compile ({err})",
+    "sec_regex_nested": "{where}.regex nests one unbounded repeat inside another, which can backtrack for minutes",
+    "sec_entropy": "{where}.entropy must be a number >= 0",
+    "perm_blocked": "`{target}` is blocked: {why}. {way_out}",
     "wl_add_unknown": (
         "`git add {t}` is blocked: the guard does not know that option, so it cannot tell its value from "
         "a path. Spell it as `git add -h` lists it."

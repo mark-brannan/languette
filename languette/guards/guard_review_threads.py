@@ -21,7 +21,7 @@ a POST to the GraphQL endpoint by another client (curl, a script) is not.
 import json
 import re
 
-from languette import paths
+from languette import paths, refs
 from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Need, ask, deny
@@ -41,7 +41,7 @@ VAR = re.compile(r"\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])|\$\([^)]*
 READ = re.compile(r"\s*(?:\{|query(?![A-Za-z0-9_]))")
 TIMEOUT = 10
 # The last 100 comments: the bot's last word and every reply after it.
-QUERY = ("query($id: ID!) { viewer { login } node(id: $id) { ... on PullRequestReviewThread { "
+QUERY = ("query($id: ID!) { " + refs.VIEWER + " node(id: $id) { ... on PullRequestReviewThread { "
          "comments(last: 100) { nodes { author { login __typename } body createdAt } } } } }")
 DO = ("Reply on the thread with the fix commit, or with a link to the decision record or issue the "
       "dismissal rests on, then resolve it. A dismissal with nothing behind it leaves the thread open for a person.")
@@ -203,7 +203,7 @@ def _login(c):
 
 def _bot(c):
     a = c.get("author") or {}
-    return a.get("__typename") == "Bot" or str(a.get("login") or "").endswith("[bot]") or _login(c) in BOTS
+    return refs.bot(a.get("login"), a.get("__typename")) or _login(c) in BOTS
 
 
 def _judge(tid, viewer, comments, also=()):
