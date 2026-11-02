@@ -106,15 +106,15 @@ class Ctx:
         return d
 
     def system_path(self):
-        """The default PATH plus a directory linking gh and timeout (or gtimeout) from the real PATH, so a
-        guard's `which` finds them where the OS keeps them (Homebrew's /opt/homebrew/bin on macOS) and
-        nothing else on the real PATH reaches the scenario."""
+        """The gh stub, then a directory linking timeout (or gtimeout) from the real PATH, then the default
+        PATH, so a guard's `which` finds the timeout where the OS keeps it (Homebrew's /opt/homebrew/bin on
+        macOS) and nothing else on the real PATH reaches the scenario."""
         d = self.mkdtemp()
-        for tool in ("gh", "timeout", "gtimeout"):
+        for tool in ("timeout", "gtimeout"):
             found = shutil.which(tool)
             if found:
                 os.symlink(found, os.path.join(d, tool))
-        return d + os.pathsep + os.defpath
+        return os.pathsep.join([str(ROOT / "tests/gh-only"), d, os.defpath])
 
     def doordir(self):
         # Lazy and once per scenario: the guard-github-issues state lives at
@@ -189,12 +189,9 @@ class Ctx:
             # gh is the stub unless the scenario says otherwise, so no guard that asks GitHub reaches it.
             self.stub_log = self.stub_log or self.mkdtemp()
             env = {"HOME": os.environ["HOME"], "USER": Path(os.environ["HOME"]).name, "TMPDIR": self.doordir(), **on,
-                   "PATH": str(ROOT / "tests/gh-only") + os.pathsep + os.defpath,
-                   **self.scenario_env()}
+                   "PATH": self.system_path(), **self.scenario_env()}
             if self.bare or self.stubs:
                 env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
-            elif "PATH" not in env:
-                env["PATH"] = self.system_path()
             if self.stub_log:
                 env["LANGUETTE_STUB_LOG"] = self.stub_log
             if self.arg:
