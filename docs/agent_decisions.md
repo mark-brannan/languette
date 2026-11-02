@@ -557,3 +557,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t173443z
 - guard-cross-session-send's state events go through a second rule whose test reads the event, since the engine does not read on yet Undo: move the session-record test and session-keep handler under on once the engine reads it ([#348](https://github.com/mark-brannan/languette/pull/348))
+
+### 20261102t173512z
+- tests/test_vcsh_needs.py drives guard-bypass-ruleset as run.py builds it Undo: build engine.Guard in the test ([#348](https://github.com/mark-brannan/languette/pull/348))
