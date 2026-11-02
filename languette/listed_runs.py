@@ -81,7 +81,7 @@ def _load(path):
 def approval(doc, guard, found):
     """The `listed-approval` handler: finds the repo's list, and for each listed command the
     call runs, spends one of the user's approvals per run; short of one per run, or in a
-    loop, the call is denied. A list it cannot find or read denies every command."""
+    loop, the call is denied. No list is no finding; a list it cannot read denies every command."""
     payload, env = doc.payload, doc.env
     try:
         path = yield from _config(payload, env)
