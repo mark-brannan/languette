@@ -41,7 +41,7 @@ KNOWN_PAYLOAD_READS = {"guard_bypass_labels": 2, "guard_cross_session_send": 8, 
                        "guard_github_issues": 3, "guard_private_terms": 3, "guard_signed_comments": 2,
                        "guard_worktrees": 4, "prose_budget_commit": 2}
 # Answers whose text is anything but a messages.say call, at most, per guard.
-KNOWN_INLINE_TEXT = {"guard_git_work_loss": 20}
+KNOWN_INLINE_TEXT = {}
 
 
 def _imported(tree):

@@ -188,7 +188,7 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 
 - No environment variable configures languette; one is a last resort.
 - Two behaviours. Redact replaces terms in text bound for a public repo and
-  allows the call, with the entries in the user's file and nothing else. Hard block denies
+  allows the call. Hard block denies
   the whole post for a term on a short list, where even a redacted post
   could leak strategy; it reads the text as written, before any redaction.
 - Only the file's entries count; no other set loads at run time. A default
@@ -224,4 +224,7 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
   applies. Current thinking. ([thread](https://github.com/mark-brannan/languette/pull/290#discussion_r4395034528))
 - Spec: [features/guard-private-terms.feature](../features/guard-private-terms.feature).
 - 2026-10-30: for now, a missing default terms file is regenerated; its
-  long-term source is open ([thread](https://github.com/mark-brannan/languette/pull/308#discussion_r4397429263)).
+  long-term source is open ([thread](https://github.com/mark-brannan/languette/pull/308#discussion_r4421665440)).
+- 2026-11-01: the session-start hook regenerates it too:
+  `/plugin install languette` runs no `languette` command. Pencil
+  ([#338](https://github.com/mark-brannan/languette/pull/338)).
