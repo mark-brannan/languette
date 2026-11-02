@@ -169,7 +169,10 @@ class Ctx:
             # TMPDIR fresh per scenario, so a guard's per-session file starts
             # empty; PATH and the stub log as the stubs need.
             on = {k: "true" for k in OPT_INS if k not in self.env}
+            # gh is the stub unless the scenario says otherwise, so no guard that asks GitHub reaches it.
+            self.stub_log = self.stub_log or self.mkdtemp()
             env = {"HOME": os.environ["HOME"], "USER": Path(os.environ["HOME"]).name, "TMPDIR": self.doordir(), **on,
+                   "PATH": str(ROOT / "tests/gh-only") + os.pathsep + os.defpath,
                    **self.scenario_env()}
             if self.bare or self.stubs:
                 env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]

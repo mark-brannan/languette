@@ -2,12 +2,40 @@
 
 The default branch is read from the remote's HEAD ref (refs/remotes/<remote>/HEAD),
 never presumed. The remote a repository means is the one `gh` would act on, never the
-branch's tracking remote (see remote_url). A guard hands in how it asks git; the answer
-is a Need the world performs, so a guard stays pure."""
+branch's tracking remote (see remote_url). The account `gh` acts as is GraphQL's viewer
+(see viewer). A guard hands in how it asks git; the answer is a Need the world performs,
+so a guard stays pure."""
+
+import json
 
 from languette.verdict import Need
 
 FALLBACK = ("main", "master")      # always protected, beside what a remote HEAD names
+# The account a gh call goes out as, in a GraphQL query's selection.
+VIEWER = "viewer { login __typename }"
+GH_TIMEOUT = 10                    # seconds
+
+
+def bot(login, typename=None):
+    """Whether a GitHub account is an App's: GitHub types it Bot, or its login ends in `[bot]`.
+    GraphQL types its viewer User even for an App's token, so the login is what tells."""
+    return typename == "Bot" or str(login or "").endswith("[bot]")
+
+
+def viewer(cwd):
+    """(login, typename) of the account gh acts as, or why gh could not say: one gh call."""
+    try:
+        rc, out, err = yield Need("run", cwd, GH_TIMEOUT, "gh", "api", "graphql", "-f", f"query={{ {VIEWER} }}")
+    except Exception as e:  # noqa: BLE001 -- gh missing or hung: the caller says what that means
+        return f"gh did not run ({type(e).__name__})"
+    if rc != 0:
+        return f"gh exited {rc}: {(err or out).strip()[:200]}"
+    try:
+        v = json.loads(out)["data"]["viewer"]
+        login, typename = v["login"], v.get("__typename")
+    except (ValueError, KeyError, TypeError, AttributeError):
+        login = typename = None
+    return (login, typename) if isinstance(login, str) and login else "GitHub named no viewer"
 
 
 def remote_heads(ask, remote=None):
