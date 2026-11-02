@@ -60,13 +60,15 @@ class Document:
 
     @property
     def chained(self):
-        """Whether the Bash command runs more than one segment (`;`, `&&`, `||`, `|`).
-        A command that will not read is not."""
+        """Whether the Bash command runs more than one segment (`;`, `&&`, `||`, `|`),
+        read with heredoc bodies stripped through the scan texts() made, so a
+        multi-line heredoc is one command and nothing is scanned twice. A call
+        that is not Bash, or a command that will not read, is not chained."""
         def read():
-            if self.text is None:
+            if self.command is None:
                 return False
             try:
-                return sum(1 for a, b in self.scan(self.text).segments() if a <= b) > 1
+                return sum(1 for a, b in self.scan(self.stripped()).segments() if a <= b) > 1
             except Exception:  # noqa: BLE001 -- a command that will not read is the guards' to report
                 return False
         return self._kept(("chained",), read)

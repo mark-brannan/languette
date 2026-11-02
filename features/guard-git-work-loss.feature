@@ -81,12 +81,26 @@ Feature: guard-git-work-loss
 
   Scenario Outline: a deny of a chain says one refused segment refuses the whole command
     When the agent runs `<command>`
-    Then the guard denies, naming "<naming>"
+    Then the guard denies, naming "run each command in its own Bash call"
 
     Examples:
-      | command                          | naming                                  |
-      | git status && git add -A         | run git commands one per Bash call      |
-      | git add -A                       | git add -A                              |
+      | command                  | note                            |
+      | git status && git add -A | the refused segment comes second |
+      | git add -A \| cat        | a pipe is a chain too           |
+
+  Scenario: a deny of one command has no chain footer
+    When the agent runs `git add -A`
+    Then the guard denies, not naming "in its own Bash call"
+
+  Scenario: a heredoc body's lines are not a chain
+    When the agent runs:
+      """
+      git commit -a -F - <<EOF
+      first line
+      second line
+      EOF
+      """
+    Then the guard denies, not naming "in its own Bash call"
 
   Scenario Outline: popping, dropping or clearing the shared stash is denied
     When the agent runs `<command>`

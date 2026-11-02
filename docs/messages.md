@@ -23,7 +23,7 @@ bypass_label_unseen: {guard}: {unseen}, so the guard cannot tell whether it appl
 ## chain
 
 ```
-chain_footer: One refused segment refuses the whole command, and the segments before it did not run: run git commands one per Bash call.
+chain_footer: One refused segment refuses the whole command, and the segments before it did not run: run each command in its own Bash call.
 ```
 
 ## command
