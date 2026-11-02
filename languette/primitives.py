@@ -13,7 +13,7 @@ import inspect
 import os
 import re
 
-from languette import branch_deletions, hook_skips, labels, paths, posts, secrets
+from languette import branch_deletions, hook_skips, labels, paths, posts, pushes, secrets, untrusted_reads
 from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Refuse, ask, deny, planned
@@ -463,13 +463,17 @@ def private_terms(doc):
 TESTS = {"power-word": power_word, "fork-bomb": fork_bomb, "pipe-to-shell": pipe_to_shell,
          "recursive-delete": recursive_delete, "permissions": permissions, "secrets": pasted_secret,
          "bypass-labels": bypass_label, "private-terms": private_terms,
-         "skips-hooks": hook_skips.skips, "branch-deletions": branch_deletions.deleted}
+         "skips-hooks": hook_skips.skips, "branch-deletions": branch_deletions.deleted,
+         "ruleset-pushes": pushes.pushed,
+         "send-elsewhere": untrusted_reads.sent, "session-record": untrusted_reads.recorded}
 
 # The handlers a rule's `handler` may name: a stateful guard's code, which gathers the facts
 # its rule needs and judges them. handler(doc, guard, found) is a generator, given the call,
 # the guard's name for its sentences and the fields the rule's match found; it yields Needs
 # and Acts and gives a verdict, or None.
-HANDLERS = {"hooks-approval": hook_skips.approval, "open-prs": branch_deletions.open_prs}
+HANDLERS = {"hooks-approval": hook_skips.approval, "open-prs": branch_deletions.open_prs,
+            "branch-rules": pushes.branch_rules,
+            "send-door": untrusted_reads.door, "session-keep": untrusted_reads.keep}
 
 
 def judges(name):
