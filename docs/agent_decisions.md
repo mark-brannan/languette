@@ -539,3 +539,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261031t002255z
 - at: "command" keeps its meaning past an unknown first word; the bypass the review found is closed by growing _RUNS_A_COMMAND with the twelve command-running programs it named, not by failing closed on every unknown program Undo: in _placed_index, scan later words when the first is not a known data-taking program, with a passes list ([#314](https://github.com/mark-brannan/languette/pull/314#discussion_r4421978587)) ([#314](https://github.com/mark-brannan/languette/pull/314))
+
+### 20261102t074404z
+- The plugin's SessionStart hook writes the default redacted terms file, not the guard on first public post. Undo: drop the SessionStart entry and the terms-init Act ([#338](https://github.com/mark-brannan/languette/pull/338))
