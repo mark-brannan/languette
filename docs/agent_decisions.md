@@ -563,3 +563,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t175830z
 - on keys are limited to the events that carry no decision; PreToolUse stays the rules' event Undo: allow PreToolUse as an on key ([#349](https://github.com/mark-brannan/languette/pull/349))
+
+### 20261102t175848z
+- an event on names runs its handler only, never the rules; the handler is given an empty found Undo: run the rules after the on handler ([#349](https://github.com/mark-brannan/languette/pull/349))
