@@ -129,7 +129,7 @@ list; what it built is then described above.
 1. The registry: the shared selectors first (the `gh api` walk, cd
    tracking, word-live, the valued-option tables), each landing with the
    guards that repeat it moved onto it.
-2. The command guards move, smallest first; then the text guards, whose
+2. The command guards move, smallest first, two to a change, the rest waiting on the primitives their rules name; then the text guards, whose
    `secret_rules`, term list and label list are already data.
 3. The stateful guards: their rules move, their handlers stay code.
 4. The repo tier, once its bounds are decided.

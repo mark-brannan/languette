@@ -79,6 +79,29 @@ Feature: guard-git-work-loss
       | git commit -m 'block git commit -a'     | is silent | a commit message that mentions -a |
       | git commit -S -m x                      | is silent | -S is not -a                      |
 
+  Scenario Outline: a deny of a chain says one refused segment refuses the whole command
+    When the agent runs `<command>`
+    Then the guard denies, naming "run each command in its own Bash call"
+
+    Examples:
+      | command                  | note                            |
+      | git status && git add -A | the refused segment comes second |
+      | git add -A \| cat        | a pipe is a chain too           |
+
+  Scenario: a deny of one command has no chain footer
+    When the agent runs `git add -A`
+    Then the guard denies, not naming "in its own Bash call"
+
+  Scenario: a heredoc body's lines are not a chain
+    When the agent runs:
+      """
+      git commit -a -F - <<EOF
+      first line
+      second line
+      EOF
+      """
+    Then the guard denies, not naming "in its own Bash call"
+
   Scenario Outline: popping, dropping or clearing the shared stash is denied
     When the agent runs `<command>`
     Then the guard <verdict>
