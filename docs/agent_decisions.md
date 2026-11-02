@@ -569,3 +569,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t175901z
 - STATE_EVENTS moves from run.py to engine.py; run.py reads it from there Undo: move STATE_EVENTS back to run.py ([#349](https://github.com/mark-brannan/languette/pull/349))
+
+### 20261102t175917z
+- run.py wiring stays hand-written, not derived from on: tool patterns differ per guard and event Undo: derive run.py wiring from on ([#349](https://github.com/mark-brannan/languette/pull/349))
