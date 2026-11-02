@@ -162,19 +162,18 @@ ROWS = (
     Row("home-manager", ("switch",), (), ("-n", "--dry-run", "-h", "--help")),     # links into the Nix store
     Row("home-manager", ("uninstall",), (), ("-n", "--dry-run", "-h", "--help")),  # removes the generation's files
 )
-# Each program's options that take a value: short letter -> how many words, long name -> how
-# many (a value glued on with = or to a short letter is no extra word); one not listed is a
-# flag. A long option may be any unique prefix only for ABBREVIATING, whose parsers read it so.
+# Each program's options as scan.getopt reads them: option -> how many words its value takes, 0
+# for a flag; one not listed is a flag. A long option may be any unique prefix only for
+# ABBREVIATING, whose parsers read it so.
 OPTIONS = {
-    "rcup": ({c: 1 for c in "BdItUxS"}, {}),
-    "rcdn": ({c: 1 for c in "BdItUxS"}, {}),
-    "homeshick": ({}, {"--force": 0, "--quiet": 0, "--skip": 0, "--batch": 0, "--verbose": 0}),
-    "dotbot": ({"c": 1, "d": 1, "p": 1}, {"--config-file": 1, "--base-directory": 1, "--plugin": 1,
-                                          "--plugin-dir": 1, "--only": 0, "--except": 0}),
-    "home-manager": ({"b": 1, "f": 1, "I": 1, "A": 1, "j": 1},
-                     {"--file": 1, "--flake": 1, "--max-jobs": 1, "--cores": 1, "--option": 2,
-                      "--override-input": 2, "--extra-experimental-features": 1, "--dry-run": 0,
-                      "--help": 0}),
+    "rcup": {"-" + c: 1 for c in "BdItUxS"},
+    "rcdn": {"-" + c: 1 for c in "BdItUxS"},
+    "homeshick": {"--force": 0, "--quiet": 0, "--skip": 0, "--batch": 0, "--verbose": 0},
+    "dotbot": {"-c": 1, "-d": 1, "-p": 1, "--config-file": 1, "--base-directory": 1, "--plugin": 1,
+               "--plugin-dir": 1, "--only": 0, "--except": 0},
+    "home-manager": {"-b": 1, "-f": 1, "-I": 1, "-A": 1, "-j": 1, "--file": 1, "--flake": 1, "--max-jobs": 1,
+                     "--cores": 1, "--option": 2, "--override-input": 2, "--extra-experimental-features": 1,
+                     "--dry-run": 0, "--help": 0},
 }
 
 
@@ -188,28 +187,9 @@ def _manager_hit(s, c, b, program):
     are read up to a bare --. The verb is any word before it that is no option: an
     option the table lacks may take a value, and reading the verb by position would let
     its value hide `switch`, so a value spelled like the verb asks too."""
-    shorts, longs = OPTIONS[program]
-    seen, i = set(), c + 1
     stop = next((j for j in range(c + 1, b + 1) if s.w[j] == "--"), b + 1)
     words = {s.w[j] for j in range(c + 1, stop) if s.k[j] == "w" and not s.w[j].startswith("-")}
-    while i <= b and s.w[i] != "--":
-        w = s.w[i]
-        if s.k[i] != "w":  # a quoted word with whitespace: never the verb or an option
-            pass
-        elif w.startswith("--"):
-            name, eq, _ = w.partition("=")
-            same = [n for n in longs if n == name]
-            same = same or [n for n in longs if program in ABBREVIATING and n.startswith(name)]
-            name = same[0] if len(same) == 1 else name
-            seen.add(name)
-            i += 0 if eq else longs.get(name, 0)
-        elif w.startswith("-") and w != "-":
-            for j, ch in enumerate(w[1:], 1):
-                seen.add("-" + ch)
-                if ch in shorts:  # the rest of the word is its value, else the next words are
-                    i += shorts[ch] if j == len(w) - 1 else 0
-                    break
-        i += 1
+    seen = {o for o, _ in sw.getopt(s.w[c + 1:b + 1], OPTIONS[program], program in ABBREVIATING) if o}
     for row in ROWS:
         verb = next((v for v in row.verbs if v in words), None) if row.verbs else None
         if (row.program == program and (row.verbs is None or verb) and (not row.flags or seen & set(row.flags))
