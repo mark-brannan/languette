@@ -62,7 +62,7 @@ programs.
 
 The registry grows when a rule needs a primitive, not before. Seventeen
 predicates serve one guard each today; those are that guard's own logic and
-stay beside it, named, until a second guard asks. A primitive two guards
+stay in `primitives.py`, a rule naming one as `{"test": name}`, until a second guard asks. A primitive two guards
 share lands in scan or verdict first (decisions: "New guards").
 
 Sequence is a fact, never a condition: the five guards that would lose

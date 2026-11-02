@@ -46,6 +46,8 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
 It needs `python3`, standard library only. `shfmt` (the parser it trusts
 most) and `gh` (for the guards that ask GitHub) are optional.
+With no GitHub lookup, a Bash call waits a median 166-219 ms (p90 up to 318 ms) for the
+guards: one hook process, on 16 cores of WSL2 under load. A lookup adds a network round trip.
 
 ### macOS
 
@@ -338,6 +340,14 @@ reach the environment under `--plugin-dir`; the installed-plugin path was not
 measured, which is why the guards treat unset as on.
 
 </details>
+
+## Privacy and support
+
+Guards that need GitHub's answer ask through your own `gh`. Session state
+stays in local files. Decisions are recorded only if you turn on
+`record_decisions`.
+
+Questions and bugs: [GitHub issues](https://github.com/mark-brannan/languette/issues).
 
 ## Strong guards
 
