@@ -104,7 +104,7 @@ hooks_skipped: {guard}: --no-verify, -n or core.hooksPath skips this repo's hook
 
 ```
 host_power: `{what}` is blocked: it takes the machine down, with the user's session on it. {way_user}
-host_ctl: `systemctl {verb}` is blocked: it takes down the host or a service the user's session runs on. {way_user}
+host_ctl: `{verb}` is blocked: it takes down the host or a service the user's session runs on. {way_user}
 host_sysv: `{verb}` is blocked: it takes down a service the user's session runs on. {way_user}
 host_fork_bomb: `:(){{ :|:& }};:` is blocked: that is the fork-bomb shape, a function that pipes itself into itself in the background, and it freezes the machine. {way_user}
 ```
@@ -152,7 +152,7 @@ perm_not_allowed: `{what} {raw}` is blocked: only the scratchpad, /tmp, agent wo
 
 ```
 pipe_to_shell_way_out: Download it to a file, read it, then run the file: `curl -fsSLo install.sh <url>`, read install.sh, `sh install.sh`. The same install, one more command, and the script has been seen before it ran.
-pipe_to_shell: guard-pipe-to-shell: {why} runs whatever the server sends, unread. {way_out}
+pipe_to_shell: {why} runs whatever the server sends, unread. {way_out}
 pipe_into: a download piped into `{name}`
 pipe_substituted: `{name}` run on a download substituted into its command line
 pipe_substituted_c: `{name} -c` run on a download substituted into its command line
