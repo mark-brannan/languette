@@ -339,6 +339,13 @@ measured, which is why the guards treat unset as on.
 
 </details>
 
+## Privacy and support
+
+languette records nothing unless you turn on `record_decisions`. The record
+stays on your machine, in the file above, and is never sent anywhere.
+
+Questions and bugs: [GitHub issues](https://github.com/mark-brannan/languette/issues).
+
 ## Strong guards
 
 A guard is a pure function of the command and the facts it asked for; it
