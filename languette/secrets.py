@@ -33,10 +33,7 @@ import math
 import re
 from collections import namedtuple
 
-try:
-    from re import _parser as _sre          # 3.11+
-except ImportError:                          # pragma: no cover -- 3.10 and before
-    import sre_parse as _sre
+from re import _parser as _sre          # 3.11+ (requires-python floor)
 
 from languette import paths
 from languette import scan as sw

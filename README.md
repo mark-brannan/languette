@@ -47,7 +47,7 @@ aliases ([#153](https://github.com/mark-brannan/languette/issues/153)).
 /plugin install languette@languette
 ```
 
-It needs `python3`, standard library only. `shfmt` (the parser it trusts
+It needs `python3` 3.11 or newer, standard library only. `shfmt` (the parser it trusts
 most) and `gh` (for the guards that ask GitHub) are optional. Without
 `python3`, every Bash call is denied: the guards fail closed.
 With no GitHub lookup, a Bash call waits a median 166-219 ms (p90 up to 318 ms) for the

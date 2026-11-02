@@ -56,13 +56,16 @@ def scattered(seed, role):
 FIXTURES = ROOT / "features/fixtures/private-terms"
 
 
-def fill_names(text, home):
-    """{HOME}, {USER} (the home directory's last part) and {HOSTNAME} (this machine's), as the fixtures spell them."""
-    return text.replace("{HOME}", home).replace("{USER}", Path(home).name).replace("{HOSTNAME}", socket.gethostname())
+PINNED_HOST = "zephyr"   # the $HOSTNAME every scenario runs with, so a row means the same on every OS
 
 
-def fixture_text(name, home):
-    return fill_names((FIXTURES / name.removeprefix(FIXTURES.name + "/")).read_text(), home)
+def fill_names(text, home, host=PINNED_HOST):
+    """{HOME}, {USER} (the home directory's last part) and {HOSTNAME} (the scenario's), as the fixtures spell them."""
+    return text.replace("{HOME}", home).replace("{USER}", Path(home).name).replace("{HOSTNAME}", host)
+
+
+def fixture_text(name, home, host=PINNED_HOST):
+    return fill_names((FIXTURES / name.removeprefix(FIXTURES.name + "/")).read_text(), home, host)
 
 
 class Ctx:
@@ -98,9 +101,20 @@ class Ctx:
         self.cleanups = []
 
     def mkdtemp(self):
-        d = tempfile.mkdtemp(prefix="languette-", dir="/tmp")
+        d = os.path.realpath(tempfile.mkdtemp(prefix="languette-", dir="/tmp"))   # macOS: /tmp is a symlink
         self._dirs.append(d)
         return d
+
+    def system_path(self):
+        """The gh stub, then a directory linking timeout (or gtimeout) from the real PATH, then the default
+        PATH, so a guard's `which` finds the timeout where the OS keeps it (Homebrew's /opt/homebrew/bin on
+        macOS) and nothing else on the real PATH reaches the scenario."""
+        d = self.mkdtemp()
+        for tool in ("timeout", "gtimeout"):
+            found = shutil.which(tool)
+            if found:
+                os.symlink(found, os.path.join(d, tool))
+        return os.pathsep.join([str(ROOT / "tests/gh-only"), d, os.defpath])
 
     def doordir(self):
         # Lazy and once per scenario: the guard-github-issues state lives at
@@ -116,7 +130,8 @@ class Ctx:
         if "{PROJ}" in s:
             assert self.proj, f"test setup: {s!r} names {{PROJ}} but the scenario has no project directory"
             s = s.replace("{PROJ}", str(self.proj))
-        s = fill_names(s, os.environ["HOME"]).replace("{CWD}", self.default_cwd)
+        host = self.env.get("HOSTNAME", PINNED_HOST) or socket.gethostname()   # unset: the OS's name
+        s = fill_names(s, os.environ["HOME"], host).replace("{CWD}", self.default_cwd)
         s = s.replace("{UP}", "../" * self.default_cwd.count("/"))
         if "{TMP}" in s:
             self.tmp = self.tmp or self.mkdtemp()
@@ -154,6 +169,8 @@ class Ctx:
         env = {k: self.expand(v) for k, v in self.env.items() if v is not None}
         if self.proj and self.project_env and "CLAUDE_PROJECT_DIR" not in self.env:
             env["CLAUDE_PROJECT_DIR"] = str(self.proj)
+        if "HOSTNAME" not in self.env:
+            env["HOSTNAME"] = PINNED_HOST
         if "TMPDIR" not in self.env:
             env["TMPDIR"] = self.doordir()     # the per-session state files, one place per scenario
         if "XDG_CACHE_HOME" not in self.env:
@@ -172,8 +189,7 @@ class Ctx:
             # gh is the stub unless the scenario says otherwise, so no guard that asks GitHub reaches it.
             self.stub_log = self.stub_log or self.mkdtemp()
             env = {"HOME": os.environ["HOME"], "USER": Path(os.environ["HOME"]).name, "TMPDIR": self.doordir(), **on,
-                   "PATH": str(ROOT / "tests/gh-only") + os.pathsep + os.defpath,
-                   **self.scenario_env()}
+                   "PATH": self.system_path(), **self.scenario_env()}
             if self.bare or self.stubs:
                 env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
             if self.stub_log:
@@ -272,7 +288,7 @@ class FakeHome:
 
     def __init__(self, kind, subdirs=()):
         # Not under /tmp: guard-recursive-delete allows all of /tmp.
-        self.home = Path(tempfile.mkdtemp(prefix=f"languette-{kind}-home-", dir="/var/tmp"))
+        self.home = Path(os.path.realpath(tempfile.mkdtemp(prefix=f"languette-{kind}-home-", dir="/var/tmp")))
         for d in subdirs:
             (self.home / d).mkdir(parents=True)
         self.aside = Path(tempfile.mkdtemp(prefix=f"languette-{kind}-"))   # stubs and copies, outside HOME
@@ -289,7 +305,7 @@ class FakeHome:
         `stdin` as its input, nothing when None."""
         env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "LANGUETTE_")) and k not in SCRUB}
         env.update(HOME=str(self.home), USER=self.home.name, PATH=f"{self.bin}{os.pathsep}{path}", TMPDIR=str(self.aside),
-                   PYTHONPATH=str(ROOT), **self.env)
+                   PYTHONPATH=str(ROOT), HOSTNAME=PINNED_HOST, **self.env)
         self.before = self.snapshot()
         r = subprocess.run([sys.executable, "-m", "languette", *args], cwd=cwd, env=env, capture_output=True,
                            text=True, timeout=60, input=stdin or "")
