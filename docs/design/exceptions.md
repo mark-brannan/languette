@@ -107,7 +107,7 @@ After the verdict, act and the record sit behind one silent catch each.
 ## What changes to get there
 
 - `world`: `read`, `claim`, `send-state`, `run`, `cwd` and `path realpath`
-  answer `Unavailable` rather than raise; `git`, `gh-api` and `pr-list`
+  answer `Unavailable` rather than raise; `git`, `forge-api` and `pr-list`
   answer it where they now answer `None` for a failure to ask.
 - `run._drive`: no throw; an unknown Need or Act ends the guard at the
   catch-all; a crashed state-keeping guard's named Act is done.

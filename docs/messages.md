@@ -20,6 +20,12 @@ bypass_label: {guard}: the label `{label}` is a human's to apply, not a session'
 bypass_label_unseen: {guard}: {unseen}, so the guard cannot tell whether it applies a bypass label ({labels}). Write the label literally in the command, or leave it for the user to add.
 ```
 
+## chain
+
+```
+chain_footer: One refused segment refuses the whole command, and the segments before it did not run: run each command in its own Bash call.
+```
+
 ## command
 
 ```
