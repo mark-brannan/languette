@@ -62,7 +62,7 @@ from languette import scan as sw
 from languette import terms
 from languette.refs import remote_url
 from languette.messages import say
-from languette.verdict import Need, allow, deny
+from languette.verdict import Act, Need, allow, deny
 
 NAME = "guard-private-terms"
 _MCP = ("create_issue|update_issue|issue_write|add_issue_comment|create_pull_request|update_pull_request|"
@@ -361,6 +361,10 @@ def _changes(texts, applied):
 
 def check(doc):
     payload, env = doc.payload, doc.env
+    if payload.get("hook_event_name") == "SessionStart":
+        # Not a verdict: the plugin path has no `languette install`, so the default file is written here.
+        yield Act("terms-init")
+        return None
     tool = doc.tool
     if not isinstance(tool, str) or not tool:
         return None

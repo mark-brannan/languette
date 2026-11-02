@@ -90,6 +90,21 @@ def _terms(ctx, kind, docstring):
     ctx.env[f"CLAUDE_PLUGIN_OPTION_{kind.upper()}_TERMS_FILE"] = str(f)
 
 
+@then(parsers.parse('the file "{rel}" holds the default redacted terms'))
+def _file_has_defaults(ctx, rel):
+    assert Path(ctx.expand(rel)).read_text(encoding="utf-8") == terms.initial(terms.defaults(Path(terms.DEFAULTS).read_text(encoding="utf-8")))
+
+
+@then(parsers.parse('the file "{rel}" still holds "{text}"'))
+def _file_still_holds(ctx, rel, text):
+    assert Path(ctx.expand(rel)).read_text(encoding="utf-8") == text
+
+
+@then(parsers.parse('there is no file "{rel}"'))
+def _no_file(ctx, rel):
+    assert not Path(ctx.expand(rel)).exists()
+
+
 @given("the redacted terms file holds the default entries")
 def _terms_defaults(ctx):
     f = Path(ctx.mkdtemp()) / "redacted-terms.tsv"
