@@ -46,6 +46,8 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
 It needs `python3`, standard library only. `shfmt` (the parser it trusts
 most) and `gh` (for the guards that ask GitHub) are optional.
+Each Bash call waits about 200 ms for the guards: one hook process, median of 30 runs
+per command, on 16 cores of WSL2 under load.
 
 ### macOS
 
