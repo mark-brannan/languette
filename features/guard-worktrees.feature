@@ -554,6 +554,7 @@ Feature: guard-worktrees
         | {TMP}    | rcdn -v                                          | `rcdn`                       |
         | {TMP}    | rcdn -d ~/dots -t vim                            | `rcdn`                       |
         | {TMP}    | homeshick link castle --force                    | `homeshick link --force`     |
+        | {TMP}    | homeshick symlink castle --force                 | `homeshick symlink --force`  |
         | {TMP}    | homeshick --force link castle                    | `homeshick link --force`     |
         | {TMP}    | homeshick link -f castle                         | `homeshick link -f`          |
         | {TMP}    | homeshick link castle --forc                     | `homeshick link --force`     |
@@ -614,6 +615,8 @@ Feature: guard-worktrees
         | home-manager --help                              |
         | echo 'rcup -f'                                   |
         | echo rcdn                                        |
+        | which rcdn                                       |
+        | man rcdn                                         |
         | git commit -m 'home-manager switch'              |
         | notrcdn                                          |
         | dotbot-helper -c x                               |

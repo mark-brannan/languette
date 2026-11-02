@@ -147,20 +147,20 @@ def _chezmoi_hit(s, c, b):
 
 
 # The other dotfile managers' apply, force and teardown verbs, one row each (program,
-# verb, flags), read by the shape of the command: none need be installed. A row hits
-# when the program's first operand is its verb (None: any call), one of its flags is set
+# verbs, flags), read by the shape of the command: none need be installed. A row hits
+# when one of its verbs (aliases, as a tuple; None: any call) is a word, one of its flags is set
 # (empty: none needed) and none of its quiet flags is (a dry run, help). The hazard of
 # each is in its comment, and wt_dotfiles says them all.
-Row = namedtuple("Row", "program verb flags quiet")
+Row = namedtuple("Row", "program verbs flags quiet")
 ROWS = (
     Row("rcup", None, ("-f",), ("-g", "-h", "-V")),                # replaces existing files, unasked
     Row("rcdn", None, (), ("-g", "-h", "-V")),                     # removes everything rcup installed
-    Row("homeshick", "link", ("-f", "--force"), ()),               # replaces what a castle conflicts with
+    Row("homeshick", ("link", "symlink"), ("-f", "--force"), ()),               # replaces what a castle conflicts with
     # dotbot's `force`, `relink` and `clean` are keys of the config that -c names; the
     # command line never shows them, so any call that applies a config asks.
     Row("dotbot", None, ("-c", "--config-file"), ()),
-    Row("home-manager", "switch", (), ("-n", "--dry-run", "-h", "--help")),     # links into the Nix store
-    Row("home-manager", "uninstall", (), ("-n", "--dry-run", "-h", "--help")),  # removes the generation's files
+    Row("home-manager", ("switch",), (), ("-n", "--dry-run", "-h", "--help")),     # links into the Nix store
+    Row("home-manager", ("uninstall",), (), ("-n", "--dry-run", "-h", "--help")),  # removes the generation's files
 )
 # Each program's options that take a value: short letter -> how many words, long name -> how
 # many (a value glued on with = or to a short letter is no extra word); one not listed is a
@@ -211,17 +211,21 @@ def _manager_hit(s, c, b, program):
                     break
         i += 1
     for row in ROWS:
-        if (row.program == program and (row.verb is None or row.verb in words) and (not row.flags or seen & set(row.flags))
+        verb = next((v for v in row.verbs if v in words), None) if row.verbs else None
+        if (row.program == program and (row.verbs is None or verb) and (not row.flags or seen & set(row.flags))
                 and not seen & set(row.quiet)):
-            return " ".join(x for x in (program, row.verb, next((f for f in row.flags if f in seen), None)) if x)
+            return " ".join(x for x in (program, verb, next((f for f in row.flags if f in seen), None)) if x)
     return None
+
+
+_READERS = sw.PROSE_PROCESS | {"man"}  # commands that name a manager, not run it
 
 
 def _home_ask(s, a, b, nested):
     """(kind, spelling) of a dotfile-manager call in segment a..b that overwrites or
     removes in $HOME, or None: kind is "chezmoi" or "dotfiles" (a row of ROWS). Every
     manager's word in the segment is read, in one scan, not only the first."""
-    while (z := sw.cmd_index(s, a, b, _MANAGER, nested)) is not None:
+    while (z := sw.cmd_index(s, a, b, _MANAGER, nested, prose=_READERS)) is not None:
         program = _MANAGER.search(s.w[z]).group(1)
         if program == "chezmoi":
             hit = _chezmoi_hit(s, z, b)
