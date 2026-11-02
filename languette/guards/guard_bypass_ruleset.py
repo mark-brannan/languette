@@ -72,7 +72,6 @@ _SPECIAL = re.compile(r"\A(?:BASH\w*|COMP\w*|HIST\w*|PWD|OLDPWD|RANDOM|SRANDOM|S
 HEAD, ALL, IMPLICIT = object(), object(), object()
 
 
-
 class _Push:
     def __init__(self, prog, here, remote, dsts, repo=None):
         self.prog, self.here, self.remote, self.dsts, self.repo = prog, here, remote, dsts, repo
