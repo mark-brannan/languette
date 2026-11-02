@@ -551,3 +551,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t173402z
 - guard-bypass-ruleset's and guard-cross-session-send's walks and handlers live in languette/pushes.py and languette/untrusted_reads.py, named for what each walk finds Undo: rename the two modules ([#348](https://github.com/mark-brannan/languette/pull/348))
+
+### 20261102t173423z
+- Registry names for the two guards: tests ruleset-pushes, send-elsewhere, session-record; handlers branch-rules, send-door, session-keep; rule ids default-branch, send, record Undo: rename the registry keys and rule ids ([#348](https://github.com/mark-brannan/languette/pull/348))
