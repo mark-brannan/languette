@@ -13,7 +13,8 @@ import inspect
 import os
 import re
 
-from languette import branch_deletions, hook_skips, labels, paths, posts, pushes, secrets, untrusted_reads
+from languette import (branch_deletions, hook_skips, infra_runs, labels, listed_runs, paths, posts, pushes,
+                       secrets, untrusted_reads)
 from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Refuse, ask, deny, planned
@@ -460,6 +461,12 @@ def private_terms(doc):
     return (yield from posts.check(doc))
 
 
+def command(doc):
+    """Any command with a word in it, for a rule whose handler reads what to look for
+    (ask-first's list is the repo's, read in gather)."""
+    return {} if doc.text and doc.text.strip() else None
+
+
 _DD = re.compile(r"(?:^|/)dd\Z")
 _MKFS = re.compile(r"(?:^|/)(?:mkfs(?:\.[A-Za-z0-9]+)?|mke2fs|mkswap|mkdosfs)\Z")
 _WIPE = re.compile(r"(?:^|/)(?:wipefs|shred)\Z")
@@ -659,7 +666,8 @@ def disks(doc):
 TESTS = {"power-word": power_word, "fork-bomb": fork_bomb, "pipe-to-shell": pipe_to_shell,
          "recursive-delete": recursive_delete, "permissions": permissions, "secrets": pasted_secret,
          "bypass-labels": bypass_label, "private-terms": private_terms,
-         "skips-hooks": hook_skips.skips, "branch-deletions": branch_deletions.deleted, "disks": disks,
+         "skips-hooks": hook_skips.skips, "branch-deletions": branch_deletions.deleted,
+         "infra-runs": infra_runs.runs, "command": command, "disks": disks,
          "ruleset-pushes": pushes.pushed,
          "send-elsewhere": untrusted_reads.sent, "session-record": untrusted_reads.recorded}
 
@@ -668,6 +676,7 @@ TESTS = {"power-word": power_word, "fork-bomb": fork_bomb, "pipe-to-shell": pipe
 # the guard's name for its sentences and the fields the rule's match found; it yields Needs
 # and Acts and gives a verdict, or None.
 HANDLERS = {"hooks-approval": hook_skips.approval, "open-prs": branch_deletions.open_prs,
+            "infra-approval": infra_runs.approval, "listed-approval": listed_runs.approval,
             "branch-rules": pushes.branch_rules,
             "send-door": untrusted_reads.door, "session-keep": untrusted_reads.keep}
 
