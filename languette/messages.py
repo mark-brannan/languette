@@ -594,6 +594,44 @@ MESSAGES = {
         "bot's finding on it was answered ({got}). Approve only if the thread was answered with "
         "the fix commit or a link to the record the dismissal rests on."
     ),
+    "af_cwd_not_dir": "the payload's cwd {cwd} is not a directory, so the repo's list cannot be found",
+    "af_label_shared": (
+        "commands[{n}].approve_label '{label}' is shared with another command; a click must approve "
+        "exactly one"
+    ),
+    "passed": "{text}",
+    "bl_alone": (
+        "is read at hook time, and another command in the same call could rewrite it before gh reads it; "
+        "run the gh on its own"
+    ),
+    "bl_home": "names a home directory the guard cannot see",
+    "bl_relative": "is a relative path, and the guard cannot tell where the command stands",
+    "bl_not_read": "is not read yet",
+    "unreadable_file": "cannot be read ({err})",
+    "bl_input_live": "the --input path `{src}` is built at run time",
+    "bl_input_stdin": "the --input payload comes from stdin and no heredoc in the command feeds it",
+    "bl_heredoc_live": "the heredoc feeding --input is built at run time (an unquoted delimiter and a $ or backtick)",
+    "bl_input_file": "the --input file `{src}` {err}",
+    "br_alias": (
+        "a `-c` override of an alias or a URL rewrite can turn any subcommand into a push, or any remote "
+        "into another"
+    ),
+    "br_sub_live": "the subcommand `{x}` is built at run time",
+    "br_remote_live": "the remote `{remote}` is built at run time",
+    "br_refspec_live": "the refspec `{refspec}` is built at run time, so where it lands can't be read",
+    "br_merge_live": "a `gh pr merge` word is built at run time and could be `--admin`",
+    "br_gh_live": "the `gh` subcommand is built at run time and could be `pr merge --admin`",
+    "dp_relative_cd": "is a relative path after a cd, and the guard cannot tell where the command stands",
+    "sec_top": "the top level must be {{\"patterns\": [...]}}",
+    "sec_not_object": "{where} is not an object",
+    "sec_key_empty": "{where}.{key} must be a non-empty string",
+    "sec_id_dup": "{where}.id '{id}' is a duplicate",
+    "sec_id_shipped": "{where}.id '{id}' is a shipped rule's id",
+    "sec_regex_long": "{where}.regex is longer than {max} characters",
+    "sec_regex_bad": "{where}.regex does not compile ({err})",
+    "sec_regex_nested": "{where}.regex nests one unbounded repeat inside another, which can backtrack for minutes",
+    "sec_entropy": "{where}.entropy must be a number >= 0",
+    "perm_blocked": "`{target}` is blocked: {why}. {way_out}",
 }
 
 
