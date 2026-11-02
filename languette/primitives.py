@@ -1,15 +1,21 @@
 """The named tests a rule set's `{"test": name}` entry may use (docs/design/guard-rules.md,
 "Primitives"): each a pure function of the Document that gives the fields of its
-rule's message when the call is one it describes, else None. A test one guard needs
+rule's message when the call is one it describes, else None. A test that needs facts
+of the world (the physical path of a target) is a generator that yields them as Needs
+and gives the verdict itself, deny or context, else None. A test one guard needs
 lives here, named, until a second guard asks for it; the registry is closed, and
 only a shipped rule set may name one.
 """
 
+import functools
+import inspect
 import os
 import re
 
+from languette import paths
 from languette import scan as sw
 from languette.messages import say
+from languette.verdict import Refuse, deny
 
 _POWER = re.compile(r"(?:^|/)(?:shutdown|reboot|halt|poweroff)\Z")
 _FORK = re.compile(r"([A-Za-z_:][A-Za-z0-9_:]*)\s*\(\s*\)\s*\{\s*\1\s*\|\s*\1\s*&")
@@ -151,4 +157,274 @@ def pipe_to_shell(doc):
     return None
 
 
-TESTS = {"power-word": power_word, "fork-bomb": fork_bomb, "pipe-to-shell": pipe_to_shell}
+
+
+# The tests that judge target paths (recursive-delete, permissions): the walk of the command
+# gathers the targets, paths.check_targets asks the world where each really is.
+_FIND = re.compile(r"(?:^|/)find\Z")
+_RM = re.compile(r"(?:^|/)rm\Z")
+_RM_PARENTS = re.compile(r"^(?:" + "|".join(sw.GIT_WRAPPERS) + r"|svn|hg|jj|gsutil)\Z")
+# Adding a name is a PR, not a judgment call in a session.
+#   node_modules   npm/yarn/pnpm install output, most JS repos
+#   dist           tsc/vite/webpack build output
+#   coverage       test coverage reports (nyc/jest/vitest)
+#   .pio           PlatformIO build cache
+GENERATED_NAMES = ("node_modules", "dist", "coverage", ".pio")
+
+
+class _RmJudge:
+    """Find every recursive target in the command and either refuse it on
+    sight or return it resolved."""
+
+    def __init__(self, cwd, home):
+        self.cwd, self.home = cwd, home
+        self.trig, self.moved, self.targets = "rm", False, []
+
+    def lab(self, raw):
+        if self.trig == "find":
+            return "find" + ("" if raw == "" else " " + raw) + " -delete"
+        return "rm -r" + ("" if raw == "" else " " + raw)
+
+    def blocked(self, raw, why):
+        raise Refuse(say("recursive_delete", label=self.lab(raw), why=why))
+
+    def target(self, s, idx):
+        raw = s.w[idx]
+        try:
+            t = paths.resolve_target(raw, s.k[idx] == "q", self.cwd, self.home, self.moved)
+        except paths.Unresolved as e:
+            self.blocked(raw, str(e))
+        self.targets.append((t, self.trig, raw))
+
+    def segment(self, s, a, b, nested):
+        g = sw.cmd_index(s, a, b, _FIND, nested)
+        if g is not None and "-delete" in s.w[g + 1:b + 1]:
+            self.trig, starts = "find", paths.find_starts(s, g, b)
+            if not starts:
+                self.blocked("", say("rd_find_no_start"))
+            for i in starts:
+                self.target(s, i)
+            self.trig = "rm"
+        g = sw.cmd_index(s, a, b, _RM, nested, _RM_PARENTS)
+        if g is None:
+            return
+        recursive, dashdash, tgt = False, False, []
+        for i in range(g + 1, b + 1):
+            x = s.w[i]
+            if not dashdash and x == "--":
+                dashdash = True
+                continue
+            # GNU getopt_long takes any unambiguous prefix: --rec, --r are --recursive.
+            if not dashdash and s.k[i] == "w" and x.startswith("--"):
+                if len(x) >= 3 and "--recursive".startswith(x):
+                    recursive = True
+                continue
+            if not dashdash and s.k[i] == "w" and len(x) >= 2 and x.startswith("-"):
+                if re.fullmatch(r"-[A-Za-z0-9]*[rR][A-Za-z0-9]*", x):
+                    recursive = True
+                continue
+            tgt.append(i)
+        if not recursive:
+            return
+        if not tgt:
+            self.blocked("", say("rd_no_target"))
+        for i in tgt:
+            self.target(s, i)
+
+    def run(self, doc):
+        scans = [(doc.scan(t), nested) for t, nested in doc.texts()]
+        # Any cd anywhere makes every relative target in the command unresolvable.
+        self.moved = paths.moves_directory(scans)
+        paths.judge_segments(self, scans)
+
+
+def _rm_malformed(guard, err):
+    return say("rm_malformed", guard=guard, err=err)
+
+
+def _rm_verdict(targets, home, bases, physical, extra_roots=(), extra_names=()):
+    names = GENERATED_NAMES + tuple(extra_names)
+    roots = paths.own_roots(home, bases, physical, extra_roots)
+
+    def is_generated(p):
+        if p.startswith(home + "/"):
+            p = p[len(home) + 1:]
+        for depth, seg in enumerate((s for s in p.split("/") if s), 1):
+            if seg in names:
+                return depth != 1
+        return False
+
+    def allowed(p):
+        return paths.under(p, roots) or is_generated(p)
+
+    for abs_, kind, raw in targets:
+        what = f"find {raw} -delete" if kind == "find" else f"rm -r {raw}"
+        if not allowed(abs_):
+            return deny(say("rd_not_allowed", what=what, raw=raw, abs_=abs_))
+        phys = physical(abs_)
+        if phys != abs_ and not allowed(phys):
+            return deny(say("rd_symlink_out", what=what, abs_=abs_, phys=phys))
+    return None
+
+
+def recursive_delete(doc):
+    """A recursive `rm` or `find ... -delete` whose every target, resolved against the cwd and
+    then the filesystem, is not the agent's to remove: the scratchpad, an agent worktree, /tmp
+    or a generated directory (GENERATED_NAMES) that is not a direct child of $HOME or of /. A
+    target that does not resolve to one allowed path is denied on sight."""
+    return (yield from paths.check_targets(doc, "guard-recursive-delete", _RmJudge, "LANGUETTE_RM_ALLOW",
+                                           functools.partial(paths.parse_allow, bare_names=True), _rm_malformed,
+                                           _rm_verdict))
+
+
+_PERM = re.compile(r"(?:^|/)(chown|chgrp|chmod)\Z")
+_EXEC = ("-exec", "-execdir", "-ok", "-okdir")
+_WRAPPERS = re.compile(r"(?:sudo|doas|env|nice|nohup|timeout|command|exec|time|ionice|stdbuf|sh|bash|dash|zsh|ksh)\Z")
+_PERM_IN_TEXT = re.compile(r"(?:^|[^A-Za-z0-9_./-])(chmod|chown|chgrp)(?![A-Za-z0-9_-])")
+_CHMOD_FLAGS = re.compile(r"-[Rcfv]+\Z")
+_WORLD = re.compile(r"(?:0*777|(?:a|ugo)[+=]rwx)\Z")
+_PERM_WAY_OUT = say("perm_way_out")
+
+
+def _perm_allow(value, home, home_p, physical):
+    """LANGUETTE_PERM_ALLOW -> (extra_roots, error or None): absolute paths only."""
+    roots, _, err = paths.parse_allow(value, home, home_p, physical)
+    return roots, err
+
+
+def _exec_perm(s, g, b):
+    """The chmod, chown or chgrp that a find at g runs with -exec, even behind a
+    wrapper (`-exec sudo chmod`, `-exec sh -c 'chmod ..'`), else None. Once the
+    command after -exec is a wrapper, the rest of the clause is searched."""
+    for i in range(g + 1, b):
+        if s.k[i] != "w" or s.w[i] not in _EXEC:
+            continue
+        m = _PERM.search(s.w[i + 1]) if s.k[i + 1] == "w" else None
+        if m:
+            return m.group(1)
+        if s.k[i + 1] != "w" or not _WRAPPERS.fullmatch(os.path.basename(s.w[i + 1])):
+            continue
+        for j in range(i + 1, b + 1):
+            m = _PERM.search(s.w[j]) if s.k[j] == "w" else _PERM_IN_TEXT.search(s.q[j])
+            if m:
+                return m.group(1)
+    return None
+
+
+class _PermJudge:
+    """Find every judged target in the command and either refuse it on sight
+    or return it resolved."""
+
+    def __init__(self, cwd, home):
+        self.cwd, self.home = cwd, home
+        self.moved, self.targets, self.what = False, [], ""
+
+    def blocked(self, raw, why):
+        raise Refuse(say("perm_blocked", what=f"{self.what}{' ' + raw if raw else ''}", why=why,
+                         way_out=_PERM_WAY_OUT))
+
+    def target(self, s, idx):
+        raw = s.w[idx]
+        try:
+            t = paths.resolve_target(raw, s.k[idx] == "q", self.cwd, self.home, self.moved)
+        except paths.Unresolved as e:
+            self.blocked(raw, str(e))
+        if ".git" in t.split("/"):
+            self.blocked(raw, "it is inside a .git directory, the repository's own store")
+        self.targets.append((t, self.what, raw))
+
+    def perm(self, s, g, b, sweep):
+        """chown, chgrp or chmod at g. `sweep`: a find -exec runs it over a tree."""
+        name = _PERM.search(s.w[g]).group(1)
+        recursive = ref = dashdash = False
+        ops = []
+        i = g + 1
+        while i <= b:
+            x, at, i = s.w[i], i, i + 1
+            if s.k[at] != "w":
+                ops.append(at)
+            elif not dashdash and x == "--":
+                dashdash = True
+            elif not dashdash and x.startswith("--"):
+                # GNU getopt_long takes any unambiguous prefix: --rec is --recursive.
+                if len(x) >= 3 and "--recursive".startswith(x):
+                    recursive = True
+                elif x == "--reference":
+                    ref, i = True, i + 1
+                elif x.startswith("--reference="):
+                    ref = True
+            elif not dashdash and len(x) > 1 and x[0] == "-":
+                if re.fullmatch(r"-[A-Za-z0-9]*R[A-Za-z0-9]*", x):
+                    recursive = True
+                # chmod's mode may begin with a dash (-x, -w): it is the first operand, not an option.
+                if name == "chmod" and not ref and not ops and not _CHMOD_FLAGS.fullmatch(x):
+                    ops.append(at)
+            else:
+                ops.append(at)
+        mode = None
+        if not ref and ops:
+            mode = s.w[ops.pop(0)]
+        world = name == "chmod" and mode is not None and bool(_WORLD.fullmatch(mode))
+        if not (recursive or world or sweep):
+            return
+        self.what = f"{name} -R" if recursive else f"{name} {mode}" if world else f"find -exec {name}"
+        if not ops:
+            if sweep:
+                return
+            self.blocked("", "no target is visible to this hook -- xargs, brace expansion and quoted lists all "
+                             "look like this. Run it on the resolved paths directly")
+        for i in ops:
+            self.target(s, i)
+
+    def segment(self, s, a, b, nested):
+        g, sweep = sw.cmd_index(s, a, b, _FIND, nested), False
+        if g is not None:
+            name = _exec_perm(s, g, b)
+            if name is not None:
+                sweep, self.what = True, "find -exec " + name
+                starts = paths.find_starts(s, g, b)
+                if not starts:
+                    self.blocked("", "with no start path find sweeps the working directory")
+                for i in starts:
+                    self.target(s, i)
+        g = sw.cmd_index(s, a, b, _PERM, nested)
+        if g is not None:
+            self.perm(s, g, b, sweep)
+
+    def run(self, doc):
+        scans = [(doc.scan(t), nested) for t, nested in doc.texts()]
+        self.moved = paths.moves_directory(scans)
+        paths.judge_segments(self, scans)
+
+
+def _perm_malformed(guard, err):
+    return say("perm_malformed", guard=guard, err=err)
+
+
+def _perm_verdict(targets, home, bases, physical, extra_roots=()):
+    roots = paths.own_roots(home, bases, physical, extra_roots)
+    for abs_, what, raw in targets:
+        if not paths.under(abs_, roots):
+            return deny(say("perm_not_allowed", what=what, raw=raw, abs_=abs_, way_out=_PERM_WAY_OUT))
+        phys = physical(abs_)
+        if phys != abs_ and not paths.under(phys, roots):
+            return deny(say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys, way_out=_PERM_WAY_OUT))
+    return None
+
+
+def permissions(doc):
+    """A recursive chown, chgrp or chmod (-R, --recursive, a short cluster holding R), `chmod 777`,
+    and `find ... -exec chown|chgrp|chmod`, whose every target, resolved against the cwd and then
+    the filesystem, is not the agent's own: under the scratchpad, an agent worktree or /tmp, or an
+    absolute path named in LANGUETTE_PERM_ALLOW. Never `/`, $HOME itself, or anything inside a .git."""
+    return (yield from paths.check_targets(doc, "guard-permissions", _PermJudge, "LANGUETTE_PERM_ALLOW",
+                                           _perm_allow, _perm_malformed, _perm_verdict))
+
+
+TESTS = {"power-word": power_word, "fork-bomb": fork_bomb, "pipe-to-shell": pipe_to_shell,
+         "recursive-delete": recursive_delete, "permissions": permissions}
+
+
+def judges(name):
+    """Whether the test gives a verdict of its own, having asked the world: a generator."""
+    return inspect.isgeneratorfunction(TESTS.get(name))

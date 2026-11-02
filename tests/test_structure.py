@@ -33,16 +33,14 @@ ANSWERS = {"Refuse", "deny", "ask", "context"}
 
 # A constant two or more guards keep: the names, as one set each; a found set
 # must fall inside one of these.
-KNOWN_TWICE = {
-    frozenset({"guard_permissions._FIND", "guard_recursive_delete._FIND"}),
-}
+KNOWN_TWICE = set()
 # Reads of a DOCUMENT_FIELDS key from the payload, at most, per guard.
 KNOWN_PAYLOAD_READS = {"guard_bypass_labels": 2, "guard_cross_session_send": 8, "guard_duplicate_prs": 2,
                        "guard_github_issues": 3, "guard_private_terms": 3, "guard_signed_comments": 2,
                        "guard_worktrees": 4, "prose_budget_commit": 2}
 # Answers whose text is anything but a messages.say call, at most, per guard.
 KNOWN_INLINE_TEXT = {"ask_first": 2, "guard_bypass_labels": 12, "guard_bypass_ruleset": 10, "guard_cross_session_send": 2,
-                     "guard_duplicate_prs": 4, "guard_permissions": 1,
+                     "guard_duplicate_prs": 4,
                      "guard_secrets": 9, "guard_worktrees": 2,
                      "prose_budget_commit": 1}
 

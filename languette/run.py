@@ -44,15 +44,17 @@ try:
     from languette.guards import (ask_first, guard_bypass_hooks, guard_bypass_labels, guard_bypass_ruleset,
                                   guard_cross_session_send, guard_disks, guard_duplicate_prs, guard_git_stacked_base,
                                   guard_git_work_loss, guard_github_issues,
-                                  guard_infra, guard_permissions, guard_private_terms,
-                                  guard_recursive_delete, guard_review_threads,
+                                  guard_infra, guard_private_terms,
+                                  guard_review_threads,
                                   guard_secrets, guard_signed_comments, require_well_formed,
                                   guard_worktrees,
                                   prose_budget_commit)
     from languette import engine, record
     from languette.rules import (deny_always as _deny_always, guard_host_availability as _guard_host_availability,
+                                 guard_permissions as _guard_permissions,
                                  guard_pipe_to_shell as _guard_pipe_to_shell,
                                  guard_protected_services as _guard_protected_services,
+                                 guard_recursive_delete as _guard_recursive_delete,
                                  guard_scheduled_jobs as _guard_scheduled_jobs, guard_sudo as _guard_sudo)
     from languette.document import Document
     from languette.messages import say
@@ -61,8 +63,10 @@ try:
     # The guards that are a rule set alone (languette/engine.py).
     deny_always, guard_sudo = engine.Guard(_deny_always), engine.Guard(_guard_sudo)
     guard_host_availability = engine.Guard(_guard_host_availability)
+    guard_permissions = engine.Guard(_guard_permissions)
     guard_pipe_to_shell = engine.Guard(_guard_pipe_to_shell)
     guard_protected_services = engine.Guard(_guard_protected_services)
+    guard_recursive_delete = engine.Guard(_guard_recursive_delete)
     guard_scheduled_jobs = engine.Guard(_guard_scheduled_jobs)
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",

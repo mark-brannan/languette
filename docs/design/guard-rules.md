@@ -60,10 +60,10 @@ value is never read as a subcommand, and where the subcommand sits. git's
 comes from #197's finder; infra's `VALUED` table is the same thing for six
 programs.
 
-The registry grows when a rule needs a primitive, not before. Seventeen
-predicates serve one guard each today; those are that guard's own logic and
-stay in `primitives.py`, a rule naming one as `{"test": name}`, until a second guard asks. A primitive two guards
-share lands in scan or verdict first (decisions: "New guards").
+The registry grows when a rule needs a primitive, not before. Seventeen predicates serve one guard each today; those are
+that guard's own logic and stay in `primitives.py`, a rule naming one as `{"test": name}`, until a second guard asks. A test
+that needs a fact (where a target really is) yields a Need and gives its own verdict. A primitive two guards share lands in
+scan or verdict first (decisions: "New guards").
 
 Sequence is a fact, never a condition: the five guards that would lose
 precision as pure data (git-work-loss relaxations, bypass-ruleset binding,

@@ -145,6 +145,8 @@ payload_unreadable: languette: unreadable hook payload ({err})
 
 ```
 perm_malformed: {guard}: LANGUETTE_PERM_ALLOW is malformed ({err}). Recursive chown, chgrp and chmod, and chmod 777, are blocked until it is fixed or unset; other commands run. It must be a colon-separated list of absolute paths (/srv/scratch), using only letters, digits and . _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.
+perm_way_out: Spell the files out: chmod or chown the paths themselves, without -R (`git ls-files <dir>` lists what a sweep would touch), or sweep inside the scratchpad, /tmp or an agent worktree. Anything else is the user's; a sweep over a project tree is theirs to run, or to allow with LANGUETTE_PERM_ALLOW.
+perm_blocked: `{what}` is blocked: {why}. {way_out}
 perm_not_allowed: `{what} {raw}` is blocked: only the scratchpad, /tmp, agent worktrees and paths named in LANGUETTE_PERM_ALLOW may be swept, and {abs_} is none of those. {way_out}
 ```
 
@@ -198,7 +200,7 @@ rd_root: that is the root of the filesystem
 rd_home: that is $HOME itself
 rd_find_no_start: with no start path find deletes under the working directory
 rd_no_target: no target is visible to this hook -- find -exec, xargs, brace expansion and quoted lists all look like this. Run rm on the resolved paths directly
-rd_not_allowed: `{what}` is blocked: only the scratchpad, /tmp, agent worktrees and the generated directories in GENERATED_NAMES in languette/guards/guard_recursive_delete.py (node_modules, dist, coverage, .pio ...) may be removed recursively, and {abs_} is none of those. `git status --short {raw}` and `git clean -n {raw}` show what is there; `git rm` tracked files by path, and hand anything untracked to the user -- a directory they own can hold downloads and logs no session knows about.
+rd_not_allowed: `{what}` is blocked: only the scratchpad, /tmp, agent worktrees and the generated directories in GENERATED_NAMES in languette/primitives.py (node_modules, dist, coverage, .pio ...) may be removed recursively, and {abs_} is none of those. `git status --short {raw}` and `git clean -n {raw}` show what is there; `git rm` tracked files by path, and hand anything untracked to the user -- a directory they own can hold downloads and logs no session knows about.
 rd_symlink_out: `{what}` is blocked: {abs_} resolves through a symlink to {phys}, which is not a generated directory, the scratchpad, /tmp or an agent worktree. rm follows a trailing slash into the link's target.
 ```
 

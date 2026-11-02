@@ -489,7 +489,7 @@ MESSAGES = {
     ),
     "rd_not_allowed": (
         "`{what}` is blocked: only the scratchpad, /tmp, agent worktrees and the generated "
-        "directories in GENERATED_NAMES in languette/guards/guard_recursive_delete.py (node_modules, dist, coverage, .pio ...) may be removed "
+        "directories in GENERATED_NAMES in languette/primitives.py (node_modules, dist, coverage, .pio ...) may be removed "
         "recursively, and {abs_} is none of those. `git status --short {raw}` and `git clean -n {raw}` "
         "show what is there; `git rm` tracked files by path, and hand anything untracked to the user "
         "-- a directory they own can hold downloads and logs no session knows about."
@@ -511,6 +511,13 @@ MESSAGES = {
         "colon-separated list of absolute paths (/srv/scratch), using only letters, digits and "
         ". _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME."
     ),
+    "perm_way_out": (
+        "Spell the files out: chmod or chown the paths themselves, without -R (`git ls-files <dir>` lists "
+        "what a sweep would touch), or sweep inside the scratchpad, /tmp or an agent worktree. Anything "
+        "else is the user's; a sweep over a project tree is theirs to run, or to allow with "
+        "LANGUETTE_PERM_ALLOW."
+    ),
+    "perm_blocked": "`{what}` is blocked: {why}. {way_out}",
     "perm_not_allowed": (
         "`{what} {raw}` is blocked: only the scratchpad, /tmp, agent worktrees and paths named "
         "in LANGUETTE_PERM_ALLOW may be swept, and {abs_} is none of those. {way_out}"

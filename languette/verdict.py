@@ -120,8 +120,9 @@ class Act(Need):
 
 def judged(doc, name, judge):
     """A check for a guard whose judge(doc) gives a deny reason or None: no
-    command is no finding, and a reason is a deny under the guard's name. A judge
-    that is a generator is run to its end, so the check is one too."""
+    command is no finding, and a reason is a deny under the guard's name; a judge
+    may instead give a verdict, which stands as it is. A judge that is a generator
+    is run to its end, so the check is one too."""
     if doc.text is None:
         return None
     why = judge(doc)
@@ -129,6 +130,8 @@ def judged(doc, name, judge):
 
 
 def _judged(name, why):
+    if isinstance(why, dict):                  # a verdict of its own: a judge that asked the world
+        return why
     return deny(say("judged", guard=name, why=why)) if why else None
 
 
