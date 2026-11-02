@@ -90,7 +90,7 @@ MESSAGES = {
         "install.sh, `sh install.sh`. The same install, one more command, and the script has been "
         "seen before it ran."
     ),
-    "pipe_to_shell": "guard-pipe-to-shell: {why} runs whatever the server sends, unread. {way_out}",
+    "pipe_to_shell": "{why} runs whatever the server sends, unread. {way_out}",
     # A recursive delete that is not a generated directory.
     "recursive_delete": (
         "`{label}` is blocked: {why}. Resolve the target yourself and spell it out: `rm -rf` on "
@@ -278,7 +278,7 @@ MESSAGES = {
     ),
     "host_power": "`{what}` is blocked: it takes the machine down, with the user's session on it. {way_user}",
     "host_ctl": (
-        "`systemctl {verb}` is blocked: it takes down the host or a service the "
+        "`{verb}` is blocked: it takes down the host or a service the "
         "user's session runs on. {way_user}"
     ),
     "host_sysv": "`{verb}` is blocked: it takes down a service the user's session runs on. {way_user}",

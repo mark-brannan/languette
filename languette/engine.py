@@ -11,8 +11,10 @@ languette/rules/, one module per guard, shaped as the file it will become:
 which selects the call. An entry may be a stop of a unit: `program` names the
 program's description in scan, `verbs` a table of its stop verbs (VERBS), and
 `unit` is "listed": the units are the set's `units`, a plugin option holding a
-comma-separated list, with the `drop` suffix each unit loses; unset, the entry
-matches nothing. `action` is "deny", the one action this
+comma-separated list, with the `drop` suffix each unit loses, or fixed `names`;
+unset, the entry matches nothing. `host_verbs` names a table of systemctl verbs
+that take the host down, which need no unit. An entry may instead be `{"test": name}`, one of the named tests in
+languette/primitives.py, whose answer fills the message. `action` is "deny", the one action this
 engine reads yet. `why` names the message that explains it, filled with the
 command word it matched (`cmd`), the stop it found (`verb`) and `way_user`.
 `read`, optional, says how scan reads the call's words, for every entry:
@@ -33,14 +35,18 @@ drives one: a NAME and check(doc).
 
 import os
 
-from languette import paths
+from languette import paths, primitives
 from languette import scan as sw
 from languette.messages import MESSAGES, say
 from languette.verdict import WAY_USER, Need, Refuse, judged
 
 _SET_KEYS = frozenset({"guard", "rules", "repo", "opt_in", "file", "read", "units"})
 _READ_KEYS = frozenset({"process_prose", "launchers"})
-VERBS = {"systemctl-stops": sw.CTL_STOPS, "sysv-stops": sw.SERVICE_STOPS}   # the tables an entry's `verbs` names
+# The tables an entry's `verbs` names; the last is the SysV stops of a service the session runs on,
+# a smaller table than sysv-stops, as the host's guard has always read it.
+VERBS = {"systemctl-stops": sw.CTL_STOPS, "sysv-stops": sw.SERVICE_STOPS,
+         "sysv-core-stops": {v: [] for v in ("stop", "restart", "force-reload", "try-restart", "--full-restart")}}
+HOST_VERBS = {"systemctl-host": sw.CTL_HOST}     # the tables an entry's `host_verbs` names: they take the host down
 
 
 def _shipped(r, where):
@@ -65,11 +71,18 @@ def _file(r, where):
 
 
 def _unit(e, where, units):
-    """A unit entry names its program and its verb table, and the set lists the units."""
-    if "unit" not in e:
-        if {"program", "verbs"} & set(e):
-            raise sw.BadRules(f"{where}: program and verbs belong to an entry with a unit")
+    """A unit entry names its program and its verb table, and the set lists the units. A test
+    entry names a test primitives holds."""
+    if "test" in e:
+        if e["test"] not in primitives.TESTS:
+            raise sw.BadRules(f"{where}.test must name a test languette holds")
         return
+    if "unit" not in e:
+        if {"program", "verbs", "host_verbs"} & set(e):
+            raise sw.BadRules(f"{where}: program, verbs and host_verbs belong to an entry with a unit")
+        return
+    if e.get("host_verbs", next(iter(HOST_VERBS))) not in HOST_VERBS:
+        raise sw.BadRules(f"{where}.host_verbs must name a verb table languette holds")
     if e.get("program") not in sw.PROGRAMS or e.get("verbs", next(iter(VERBS))) not in VERBS:
         raise sw.BadRules(f"{where}.program and .verbs must name a program and a verb table languette holds")
     if e["unit"] != "listed" or not units:
@@ -90,9 +103,11 @@ def load(rule_set):
     if not isinstance(read, dict) or set(read) - _READ_KEYS or not all(isinstance(v, bool) for v in read.values()):
         raise sw.BadRules("read must be an object holding only process_prose and launchers, each true or false")
     units = rule_set.get("units")
-    if "units" in rule_set and (not isinstance(units, dict) or set(units) - {"setting", "drop"}
-                                or not isinstance(units.get("setting"), str)):
-        raise sw.BadRules("units must be an object holding setting, and optionally drop")
+    if "units" in rule_set and (not isinstance(units, dict) or set(units) - {"setting", "drop", "names"}
+                                or ("names" in units) == ("setting" in units)
+                                or not isinstance(units.get("setting", ""), str)
+                                or not isinstance(units.get("names", []), list)):
+        raise sw.BadRules("units must be an object holding setting (and optionally drop) or names, a list")
     rules = sw.load_rules({"rules": rule_set["rules"]}, "rules", ("action", "why"), _shipped, many=True,
                           match_keys=sw.SHIPPED_MATCH_KEYS)
     for n, r in enumerate(rules):
@@ -106,17 +121,25 @@ def _resolved(e, env, units):
     if "unit" not in e:
         return e
     drop = units.get("drop", "")
-    listed = [x[:-len(drop)] if drop and x.endswith(drop) else x for x in sw.listed(env.get(units["setting"]))]
-    return {**e, "unit": {"units": listed}, "verbs": VERBS.get(e.get("verbs"), {})}
+    listed = units.get("names") or [x[:-len(drop)] if drop and x.endswith(drop) else x
+                                    for x in sw.listed(env.get(units["setting"]))]
+    return {**e, "unit": {"units": listed}, "verbs": VERBS.get(e.get("verbs"), {}),
+            "host_verbs": HOST_VERBS.get(e.get("host_verbs"), ())}
 
 
 def _hit(doc, rule, read, units):
     """(the command word of the first of the rule's match entries the call runs, the stop it
-    found or None), or None. A file's rule has one entry, not a list."""
+    found or None, the fields a test gave for the message), or None. A test entry has no
+    command word. A file's rule has one entry, not a list."""
     for e in rule["match"] if isinstance(rule["match"], list) else [rule["match"]]:
+        if "test" in e:
+            fields = primitives.TESTS[e["test"]](doc)
+            if fields is not None:
+                return e["test"], None, fields
+            continue
         n, _, said = sw.match_rule(doc, _resolved(e, doc.env, units), **read)
         if n:
-            return (e["cmd"] if isinstance(e["cmd"], str) else e["cmd"][0]), said
+            return (e["cmd"] if isinstance(e["cmd"], str) else e["cmd"][0]), said, {}
     return None
 
 
@@ -161,7 +184,7 @@ class Guard:
         for rule in rules:
             hit = _hit(doc, rule, self._read, self.RULE_SET.get("units"))
             if hit:
-                have = {"cmd": hit[0], "verb": hit[1], "way_user": WAY_USER}
+                have = {"cmd": hit[0], "verb": hit[1], "way_user": WAY_USER, **hit[2]}
                 return say(rule["why"], **{k: v for k, v in have.items() if "{" + k + "}" in MESSAGES[rule["why"]]})
         for rule in shipped:
             hit = _hit(doc, rule, self._read, self.RULE_SET.get("units"))

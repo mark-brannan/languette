@@ -1,11 +1,8 @@
-"""guard-pipe-to-shell: features/guard-pipe-to-shell.feature is the spec.
-
-Blocks a download that is run as it arrives: curl, wget or fetch piped into
-an interpreter that reads its program from stdin (`curl u | sh`, `| sudo bash
--s`, `| python3 -`), a download handed over as a file (`sh <(curl u)`,
-`source <(curl u)`) and a download handed over as text (`eval "$(curl u)"`,
-`bash -c "$(curl u)"`). An interpreter given a script of its own (`| python3 -c
-...`, `| node -e ...`, `| sh install.sh`) is not reading the download as code.
+"""The named tests a rule set's `{"test": name}` entry may use (docs/design/guard-rules.md,
+"Primitives"): each a pure function of the Document that gives the fields of its
+rule's message when the call is one it describes, else None. A test one guard needs
+lives here, named, until a second guard asks for it; the registry is closed, and
+only a shipped rule set may name one.
 """
 
 import os
@@ -13,9 +10,41 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import deny
 
-NAME = "guard-pipe-to-shell"
+_POWER = re.compile(r"(?:^|/)(?:shutdown|reboot|halt|poweroff)\Z")
+_FORK = re.compile(r"([A-Za-z_:][A-Za-z0-9_:]*)\s*\(\s*\)\s*\{\s*\1\s*\|\s*\1\s*&")
+
+
+def _power(s, a, b):
+    g = sw.cmd_index(s, a, b, _POWER, True)
+    if g is None:                              # `sh -c reboot`: a one-word script is not a nested text
+        g = next((i for i in range(a + 1, b + 1) if s.k[i] == "w" and _POWER.search(s.w[i])
+                  and re.fullmatch(r"-[A-Za-z]*c", s.w[i - 1])), None)
+    return None if g is None else os.path.basename(s.w[g])
+
+
+def power_word(doc):
+    """shutdown, reboot, halt or poweroff at command position, or as the one-word script of `sh -c`."""
+    for t, _ in doc.texts():
+        s = doc.scan(t)
+        for a, b in s.segments():
+            what = a <= b and _power(s, a, b)
+            if what:
+                return {"what": what}
+    return None
+
+
+def fork_bomb(doc):
+    """The fork-bomb shape. It is raw text, so a commit message that quotes it must not trip it:
+    only a text with a segment that is not led by a prose consumer is read."""
+    for t, _ in doc.texts():
+        s = doc.scan(t)
+        segs = [(a, b) for a, b in s.segments() if a <= b]
+        if any(sw.seg_cmd(s, a, b) is None or s.w[sw.seg_cmd(s, a, b)] not in sw.PROSE or s.shellseg
+               for a, b in segs) and _FORK.search(t):
+            return {}
+    return None
+
 
 _DL = re.compile(r"(?:^|/)(?:curl|wget|fetch)\Z")
 _INTERP = re.compile(r"(?:^|/)(?:sh|bash|dash|zsh|ksh|ash|fish|python[0-9.]*|perl[0-9.]*|node|ruby)\Z")
@@ -26,9 +55,6 @@ _FED = ("(", "`")
 _NODE_SCRIPT = ("-e", "--eval", "-p", "--print", "-pe", "-ep", "-c", "--check")
 _VALUE_OPTS = {"sh": ("-o", "-O", "+o", "+O", "--rcfile", "--init-file"), "python": ("-W", "-X"),
                "perl": ("-I",), "ruby": ("-I", "-r"), "node": ("-r", "--require", "--import", "--loader")}
-
-_WAY_OUT = say("pipe_to_shell_way_out")
-
 
 def _family(path):
     name = os.path.basename(path)
@@ -83,7 +109,7 @@ def _text_downloads(doc, raw):
     return any(a <= b and _has_dl(s, a, b, False) for a, b in s.segments())
 
 
-def _judge(doc, s, nested):
+def _pipe_why(doc, s, nested):
     """The reason this scanned text is a pipe-to-shell, or None."""
     segs = {a: b for a, b in s.segments() if a <= b}
     carried = False
@@ -114,11 +140,14 @@ def _judge(doc, s, nested):
     return None
 
 
-def check(doc):
-    if doc.text is None:
-        return None
+def pipe_to_shell(doc):
+    """A download that is run as it arrives: piped into an interpreter that reads stdin, handed
+    over as a file (`sh <(curl u)`) or as text (`eval "$(curl u)"`)."""
     for text, nested in doc.texts():
-        why = _judge(doc, doc.scan(text), nested)
+        why = _pipe_why(doc, doc.scan(text), nested)
         if why:
-            return deny(say("pipe_to_shell", why=why, way_out=_WAY_OUT))
+            return {"why": why, "way_out": say("pipe_to_shell_way_out")}
     return None
+
+
+TESTS = {"power-word": power_word, "fork-bomb": fork_bomb, "pipe-to-shell": pipe_to_shell}
