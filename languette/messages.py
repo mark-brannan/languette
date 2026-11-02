@@ -22,6 +22,11 @@ MESSAGES = {
         "{guard}: this needs the user's approval, and in {mode} no one is there to approve it, "
         "so it is denied instead of asked. What it would have asked: {why}"
     ),
+    # Appended once to a deny of a command with more than one segment (languette.verdict.verdict).
+    "chain_footer": (
+        "One refused segment refuses the whole command, and the segments before it did not run: "
+        "run each command in its own Bash call."
+    ),
     "guard_crashed": "{guard}: guard crashed ({kind}: {err}), cannot inspect the command",
     "home_not_absolute": "{guard}: $HOME is not an absolute path, cannot resolve targets",
     "too_many": (

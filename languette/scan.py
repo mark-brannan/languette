@@ -1516,6 +1516,8 @@ class BadRules(ValueError):
 _MATCH_KEYS = ("args", "cmd", "flags", "script")
 # A match the rules engine reads (languette/engine.py): `at` too, and `cmd` alone is the whole program.
 ENGINE_MATCH_KEYS = (*_MATCH_KEYS, "at")
+# A shipped rule set's: a stop of a unit too (stop_of), which no tier but the shipped one may say.
+SHIPPED_MATCH_KEYS = (*ENGINE_MATCH_KEYS, "program", "unit", "verbs")
 
 
 def _listed(v, what, each=r".+", of="non-empty strings"):
@@ -1526,7 +1528,8 @@ def _listed(v, what, each=r".+", of="non-empty strings"):
 def _check_match(m, w, keys=_MATCH_KEYS):
     if not isinstance(m, dict) or set(m) - set(keys):
         raise BadRules(f"{w} must be an object holding only {', '.join(keys)}")
-    if not isinstance(m.get("cmd"), str) or not re.fullmatch(r"[A-Za-z0-9._+-]+", m["cmd"]):
+    cmds = m["cmd"] if isinstance(m.get("cmd"), list) and m["cmd"] and "unit" in m else [m.get("cmd")]
+    if not all(isinstance(c, str) and re.fullmatch(r"[A-Za-z0-9._+-]+", c) for c in cmds):
         raise BadRules(f"{w}.cmd must be a bare command name")
     if keys is _MATCH_KEYS and not {"args", "script", "flags"} & set(m):
         raise BadRules(f"{w} needs args or script (or flags), or it would match every {m['cmd']}")
