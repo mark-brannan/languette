@@ -14,6 +14,8 @@
 # a full page of 100 labeled events; unset is an empty timeline.
 # For `api graphql ... id=<id>` it answers as GH_LOGIN with the review thread
 # in $GH_THREADS/<id>.json, or GitHub's not-found error when there is none.
+# For `api graphql` asking only for the viewer it answers GH_LOGIN, an App's
+# login, agent[bot], when unset; GraphQL types its viewer User either way.
 printf '%s\n' "$*" >> "${LANGUETTE_STUB_LOG:?}/gh"
 [ -n "${GH_FAIL:-}" ] && exit 1
 upgrade='{"message":"Upgrade to GitHub Pro or make this repository public to enable this feature.","status":"403"}'
@@ -35,6 +37,9 @@ case "$*" in
     exit 0 ;;
   api\ graphql*)
     id=$(printf '%s\n' "$@" | sed -n 's/^id=//p' | head -n 1)
+    case "$*" in *"query={ viewer { login __typename } }")
+      printf '{"data":{"viewer":{"login":"%s","__typename":"User"}}}\n' "${GH_LOGIN:-agent[bot]}"; exit 0 ;;
+    esac
     f="${GH_THREADS:-/nonexistent}/$id.json"
     if [ -n "$id" ] && [ -f "$f" ]; then
       printf '{"data":{"viewer":{"login":"%s"},"node":' "${GH_LOGIN:-me}"; cat "$f"; echo '}}'

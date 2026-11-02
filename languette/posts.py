@@ -1,5 +1,6 @@
-"""guard-private-terms: text bound for a public GitHub repo is judged twice. The
-spec is features/guard-private-terms.feature.
+"""Text bound for a public GitHub repo, judged twice: what guard-private-terms
+(languette/rules/guard_private_terms.py, run by its `private-terms` test in
+languette/primitives.py) decides. The spec is features/guard-private-terms.feature.
 
 Once a private term is in a public issue or PR it is in GitHub's history and
 every mirror of it; the undo is a support ticket, not an edit. So the check
@@ -68,7 +69,7 @@ _MCP = ("create_issue|update_issue|issue_write|add_issue_comment|create_pull_req
         "add_pull_request_review_comment|create_pull_request_review|pull_request_review_write|"
         "add_comment_to_pending_review|create_and_submit_pull_request_review|submit_pending_pull_request_review|"
         "add_reply_to_pull_request_comment|update_issue_comment")
-# The tools hooks.json wires this guard to; the MCP ones by their name's tail.
+# The tools run.py wires the guard to; the MCP ones by their name's tail.
 TOOLS = re.compile(rf"(?:Bash|mcp__.*__(?:{_MCP}))\Z")
 _MCP_TOOL = re.compile(rf"mcp__.*__(?:{_MCP})\Z")
 TO_PRIVATE = "target a repo listed in the private_repos option"

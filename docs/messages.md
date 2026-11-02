@@ -2,6 +2,13 @@
 
 Generated: regenerate with `python -m languette.messages > docs/messages.md`.
 
+## af
+
+```
+af_cwd_not_dir: the payload's cwd {cwd} is not a directory, so the repo's list cannot be found
+af_label_shared: commands[{n}].approve_label '{label}' is shared with another command; a click must approve exactly one
+```
+
 ## ask
 
 ```
@@ -13,11 +20,41 @@ ask_first_need: `{id}` ({path}) needs the user's approval for each run{times}. C
 ask_first_unattended: `{id}` ({path}) needs the user's approval for each run, and in {mode} no one is there to approve it: AskUserQuestion is denied unseen. Cost: {cost}.{cheaper} If a cheaper form answers the question, use it instead; otherwise leave `{cmd}` for the user to run.
 ```
 
+## bl
+
+```
+bl_alone: is read at hook time, and another command in the same call could rewrite it before gh reads it; run the gh on its own
+bl_home: names a home directory the guard cannot see
+bl_relative: is a relative path, and the guard cannot tell where the command stands
+bl_not_read: is not read yet
+bl_input_live: the --input path `{src}` is built at run time
+bl_input_stdin: the --input payload comes from stdin and no heredoc in the command feeds it
+bl_heredoc_live: the heredoc feeding --input is built at run time (an unquoted delimiter and a $ or backtick)
+bl_input_file: the --input file `{src}` {err}
+```
+
+## br
+
+```
+br_alias: a `-c` override of an alias or a URL rewrite can turn any subcommand into a push, or any remote into another
+br_sub_live: the subcommand `{x}` is built at run time
+br_remote_live: the remote `{remote}` is built at run time
+br_refspec_live: the refspec `{refspec}` is built at run time, so where it lands can't be read
+br_merge_live: a `gh pr merge` word is built at run time and could be `--admin`
+br_gh_live: the `gh` subcommand is built at run time and could be `pr merge --admin`
+```
+
 ## bypass
 
 ```
 bypass_label: {guard}: the label `{label}` is a human's to apply, not a session's: it waives a CI gate, and a gate whose bypass the gated party can apply is not a gate. Split the change instead, or say in the PR body why it needs the waiver and leave the label for the user to add by hand.
 bypass_label_unseen: {guard}: {unseen}, so the guard cannot tell whether it applies a bypass label ({labels}). Write the label literally in the command, or leave it for the user to add.
+```
+
+## chain
+
+```
+chain_footer: One refused segment refuses the whole command, and the segments before it did not run: run each command in its own Bash call.
 ```
 
 ## command
@@ -47,6 +84,12 @@ disks_way_out: Work on an image file in /tmp or the scratchpad instead; a real d
 disks_cd_moved: a `cd` earlier in this command may move the working directory into /dev and the hook cannot follow it. Name the target by a literal absolute path (/tmp/out.txt: the hook does not expand $VAR, $(...) or ~ here), or write the file with the Write tool instead of a redirect
 disks_refused: `{what}` is blocked: {why}. {way_out}
 disks_blocked: `{what} {raw}` is blocked: {abs_} is {kind}. {way_out}
+```
+
+## dp
+
+```
+dp_relative_cd: is a relative path after a cd, and the guard cannot tell where the command stands
 ```
 
 ## dup
@@ -98,7 +141,7 @@ hooks_skipped: {guard}: --no-verify, -n or core.hooksPath skips this repo's hook
 
 ```
 host_power: `{what}` is blocked: it takes the machine down, with the user's session on it. {way_user}
-host_ctl: `systemctl {verb}` is blocked: it takes down the host or a service the user's session runs on. {way_user}
+host_ctl: `{verb}` is blocked: it takes down the host or a service the user's session runs on. {way_user}
 host_sysv: `{verb}` is blocked: it takes down a service the user's session runs on. {way_user}
 host_fork_bomb: `:(){{ :|:& }};:` is blocked: that is the fork-bomb shape, a function that pipes itself into itself in the background, and it freezes the machine. {way_user}
 ```
@@ -129,6 +172,12 @@ loop_hooks: {guard}: skipping the hooks inside a loop, xargs, parallel or watch 
 no_cwd: languette: the hook payload has no working directory, or only a relative one, so no path in the call can be resolved. This is a gate and fails closed.
 ```
 
+## passed
+
+```
+passed: {text}
+```
+
 ## payload
 
 ```
@@ -139,14 +188,16 @@ payload_unreadable: languette: unreadable hook payload ({err})
 
 ```
 perm_malformed: {guard}: LANGUETTE_PERM_ALLOW is malformed ({err}). Recursive chown, chgrp and chmod, and chmod 777, are blocked until it is fixed or unset; other commands run. It must be a colon-separated list of absolute paths (/srv/scratch), using only letters, digits and . _ @ + - ; a path may not hold a . or .. segment and may not be / or $HOME.
+perm_way_out: Spell the files out: chmod or chown the paths themselves, without -R (`git ls-files <dir>` lists what a sweep would touch), or sweep inside the scratchpad, /tmp or an agent worktree. Anything else is the user's; a sweep over a project tree is theirs to run, or to allow with LANGUETTE_PERM_ALLOW.
 perm_not_allowed: `{what} {raw}` is blocked: only the scratchpad, /tmp, agent worktrees and paths named in LANGUETTE_PERM_ALLOW may be swept, and {abs_} is none of those. {way_out}
+perm_blocked: `{target}` is blocked: {why}. {way_out}
 ```
 
 ## pipe
 
 ```
 pipe_to_shell_way_out: Download it to a file, read it, then run the file: `curl -fsSLo install.sh <url>`, read install.sh, `sh install.sh`. The same install, one more command, and the script has been seen before it ran.
-pipe_to_shell: guard-pipe-to-shell: {why} runs whatever the server sends, unread. {way_out}
+pipe_to_shell: {why} runs whatever the server sends, unread. {way_out}
 pipe_into: a download piped into `{name}`
 pipe_substituted: `{name}` run on a download substituted into its command line
 pipe_substituted_c: `{name} -c` run on a download substituted into its command line
@@ -192,7 +243,7 @@ rd_root: that is the root of the filesystem
 rd_home: that is $HOME itself
 rd_find_no_start: with no start path find deletes under the working directory
 rd_no_target: no target is visible to this hook -- find -exec, xargs, brace expansion and quoted lists all look like this. Run rm on the resolved paths directly
-rd_not_allowed: `{what}` is blocked: only the scratchpad, /tmp, agent worktrees and the generated directories in GENERATED_NAMES in languette/guards/guard_recursive_delete.py (node_modules, dist, coverage, .pio ...) may be removed recursively, and {abs_} is none of those. `git status --short {raw}` and `git clean -n {raw}` show what is there; `git rm` tracked files by path, and hand anything untracked to the user -- a directory they own can hold downloads and logs no session knows about.
+rd_not_allowed: `{what}` is blocked: only the scratchpad, /tmp, agent worktrees and the generated directories in GENERATED_NAMES in languette/primitives.py (node_modules, dist, coverage, .pio ...) may be removed recursively, and {abs_} is none of those. `git status --short {raw}` and `git clean -n {raw}` show what is there; `git rm` tracked files by path, and hand anything untracked to the user -- a directory they own can hold downloads and logs no session knows about.
 rd_symlink_out: `{what}` is blocked: {abs_} resolves through a symlink to {phys}, which is not a generated directory, the scratchpad, /tmp or an agent worktree. rm follows a trailing slash into the link's target.
 ```
 
@@ -269,6 +320,20 @@ sb_head_open: {guard}: `{b}` is the head branch of open PR(s):
     Deleting it closes them and throws the work away. Merge or close the PR first; `gh pr merge --delete-branch` deletes the branch the safe way.
 ```
 
+## sec
+
+```
+sec_top: the top level must be {{"patterns": [...]}}
+sec_not_object: {where} is not an object
+sec_key_empty: {where}.{key} must be a non-empty string
+sec_id_dup: {where}.id '{id}' is a duplicate
+sec_id_shipped: {where}.id '{id}' is a shipped rule's id
+sec_regex_long: {where}.regex is longer than {max} characters
+sec_regex_bad: {where}.regex does not compile ({err})
+sec_regex_nested: {where}.regex nests one unbounded repeat inside another, which can backtrack for minutes
+sec_entropy: {where}.entropy must be a number >= 0
+```
+
 ## secrets
 
 ```
@@ -291,6 +356,10 @@ signature_input_not_json: the --input payload is not JSON this hook can read, so
 signature_graphql_not_literal: the graphql body is not a string literal this hook can read, so its signature cannot be checked. Pass it as a variable (-f body=..., or from a heredoc).
 signature_graphql_variable: the graphql {field} comes from ${name}, which this hook cannot read, so its signature cannot be checked. Pass the body as its own variable, -f body=... or from a heredoc in the same command.
 signature_wrong: {guard}: this may post a GitHub comment under the user's login, so it must be signed as an agent's, or a reader takes it for the user's own words. Here {problems}. {shape}
+signature_person: {guard}: this posts to GitHub as {login}, a person's account, so a reader takes it for that person's own words. Post it through the agent's GitHub App, whose login ends in [bot].{also}
+signature_mcp_account: {guard}: {tool} posts with its MCP server's own token, and this hook cannot read whose account that is, so it cannot tell that a bot posts it. Post it with gh, through the agent's GitHub App.{also}
+signature_account_unread: {guard}: this posts to GitHub, and gh could not say which account it posts as ({got}). Approve only if it posts through the agent's GitHub App, whose login ends in [bot].
+signature_also:  It is not signed as an agent's either: {problems}. {shape}
 ```
 
 ## sudo
@@ -336,12 +405,37 @@ unknown_guard: languette: no guard is named {name}, so this hook checks nothing.
 unparsed: require-well-formed: this command does not parse ({rung}: {err}). Nothing ran: bad input is a deny; fix the syntax and run it again
 ```
 
+## unreadable
+
+```
+unreadable_file: cannot be read ({err})
+```
+
 ## wl
 
 ```
 wl_add_all_paths: `git add -A <paths>` is blocked here: it passes only in a linked worktree or the session's scratchpad, run from there with no cd or -C. Drop the -A: `git add <paths>` stages the same changes, deletions included.
 wl_reset_upstream: {why} `git reset --hard <remote>/<this branch>` passes only when it runs on its own, from a linked worktree or the session's scratchpad with no cd or -C, on a clean tree, and the branch tracks that same name or nothing.
 wl_stow_adopt: `stow --adopt` moves each file that conflicts from the target directory into the package, overwriting the repo's copy; it survives only if committed. Commit or stash the package first; if adopting is meant, the user confirms it.
+wl_add_unknown: `git add {t}` is blocked: the guard does not know that option, so it cannot tell its value from a path. Spell it as `git add -h` lists it.
+wl_add_no_value: `git add {t}` is blocked: that option takes no value.
+wl_add_u: `git add -u` with no path is blocked: stage by path.
+wl_commit_a: `git commit -a` is blocked: it is `git add -u` in disguise. Stage by path, then commit.
+wl_stash_pop: `git stash pop` is blocked: the stash stack is shared across worktrees and pop can take another session's entry. Use `git stash apply <sha>` and drop the entry afterwards.
+wl_stash_clear: `git stash clear` is blocked: the stash stack is shared across worktrees; it is not all yours to clear.
+wl_stash_drop: bare `git stash drop` drops stash@{{0}}, which may be another session's. Name the entry: `git stash drop stash@{{n}}` after finding it by tag.
+wl_force_push: bare `git push --force` is blocked. Rebasing a session branch is the one legitimate force: use `--force-with-lease <remote> <branch>`, never to the default branch ({branches}).
+wl_delete_protected: `{branch}` is protected: deleting it is blocked. Rebased work reaches it through a pull request.
+wl_lease_protected: `{branch}` is protected: `--force-with-lease` to it rewrites shared history. Rebased work reaches it through a pull request; if a force to it is meant, the user confirms it.
+wl_discard: `git {sub} {wh}` is blocked: it discards every uncommitted change, same as reset --hard. Restore one path at a time, or ask the user.
+wl_clean_f: `git clean -f` is blocked: it deletes untracked files, unrecoverably. `git clean -n` to list them, then remove by path.
+wl_branch_delete_force: `git branch --delete --force` is blocked: same as -D.
+wl_reset_hard: `git reset --hard` is blocked. It discards uncommitted work, and on a shared checkout that work may not be yours. Ask the user to run it themselves, or reach for a reversible move: `git revert`, a new branch off the good commit, `git stash`, `git reset --soft`/`--mixed`.
+wl_add_whole: `git add {t}` is blocked: stage by path, not the whole tree.
+wl_branch_D: `git branch -D` is blocked: it deletes unmerged work. `git branch -d` refuses when there is something to lose; if it refuses, that is the answer.
+wl_add_needs_value: `git add {t}` is blocked: it wants a value and has none.
+wl_add_unknown_short: `git add {t}` is blocked: the guard does not know `-{ch}`, so it cannot tell its value from a path.
+wl_add_all: `git add -A` is blocked: stage by path. Where the worktree is $HOME it stages the home directory; elsewhere it sweeps in files a parallel session is working on.
 ```
 
 ## wt

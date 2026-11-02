@@ -35,7 +35,8 @@ class Need:
     the guard; a fact that cannot be had is thrown in as the exception world raised.
 
         git           prog, cwd, *argv    -> stdout, stripped, or None
-        gh-api        path                -> (status, body), or (None, None)
+        forge-api     forge, host, path   -> (status, body) from the forge's client (scan.FORGES),
+                                             or (None, None)
         pr-list       cwd, *argv          -> stdout of argv run in cwd, stripped, or None
         which         name                -> the program's path on the env's PATH, or None
         read          path, limit=None    -> the regular file's text, opened non-blocking; ValueError
@@ -118,17 +119,21 @@ class Act(Need):
     __slots__ = ()
 
 
-def judged(doc, name, judge):
+def judged(doc, name, judge, any_call=False):
     """A check for a guard whose judge(doc) gives a deny reason or None: no
-    command is no finding, and a reason is a deny under the guard's name. A judge
-    that is a generator is run to its end, so the check is one too."""
-    if doc.text is None:
+    command is no finding (unless `any_call`: the guard judges a call with none, an MCP
+    tool's), and a reason is a deny under the guard's name; a judge may instead give a
+    verdict, which stands as it is. A judge that is a generator is run to its end, so
+    the check is one too."""
+    if doc.text is None and not any_call:
         return None
     why = judge(doc)
     return _judged_after(name, why) if inspect.isgenerator(why) else _judged(name, why)
 
 
 def _judged(name, why):
+    if isinstance(why, dict):                  # a verdict of its own: a judge that asked the world
+        return why
     return deny(say("judged", guard=name, why=why)) if why else None
 
 
@@ -167,11 +172,19 @@ def allow(reason, updated_input):
     return {"permissionDecision": "allow", "permissionDecisionReason": reason, "updatedInput": updated_input}
 
 
-def verdict(event, findings, mode=None):
+def _footer(chained):
+    """The chain footer, once, when `chained` (a callable, read here only) says
+    the command had more than one segment; nothing when there is no reading."""
+    return [say("chain_footer")] if chained is not None and chained() else []
+
+
+def verdict(event, findings, mode=None, chained=None):
     """The one decision for a call, from every guard's finding: the fields of
     hookSpecificOutput, or None for silence. `findings` is [(guard name, result,
     crashed)] in the order the guards judged. A deny outranks an ask, an ask an
     allow (a redaction), and an ask carries a rewrite along; the first rewrite wins, since two cannot both apply.
+    A deny ends with the chain footer when `chained`, a callable read only then, says the
+    command had more than one segment (languette.document.Document.chained).
     In a permission `mode` where no one can answer (NO_PROMPT), an ask is a deny that says so."""
     if event != "PreToolUse":                  # state-keeping events: nothing to decide
         return None
@@ -190,9 +203,10 @@ def verdict(event, findings, mode=None):
         if r.get("additionalContext"):
             notes.append(r["additionalContext"])
     if reasons:
-        return deny("\n\n".join(reasons))
+        return deny("\n\n".join(reasons + _footer(chained)))
     if asks and mode in NO_PROMPT:
-        return deny("\n\n".join(say("unattended_ask", guard=n, mode=mode, why=r) for n, r in asks))
+        return deny("\n\n".join([say("unattended_ask", guard=n, mode=mode, why=r) for n, r in asks]
+                                 + _footer(chained)))
     if asks:
         return {**ask("\n\n".join(r for _, r in asks)), **({"updatedInput": rewrites[0]} if rewrites else {})}
     if allows:

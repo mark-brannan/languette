@@ -51,7 +51,6 @@ _REF = (rf"(?:(?P<repo>{_NAME}/{_NAME})?#(?P<num>[0-9]+)"
 CLOSES = re.compile(rf"(?<![A-Za-z0-9_-])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)(?:[ \t]*:[ \t]*|[ \t]+){_REF}",
                     re.IGNORECASE)
 SUPERSEDES = re.compile(rf"(?<![A-Za-z0-9_-])(?:supersedes|replaces)(?:[ \t]*:[ \t]*|[ \t]+){_REF}", re.IGNORECASE)
-_GITHUB = re.compile(rf"github\.com(?::\d+)?[:/]+({_NAME})/({_NAME}?)(?:\.git)?/?\Z", re.IGNORECASE)
 _HTML = re.compile(rf"github\.com/({_NAME}/{_NAME})/(?:pull|issues)/[0-9]+")
 # A path the command appends to: the file is its old text plus what is appended, never
 # a heredoc's text alone. Over-matches a `>>` inside a heredoc body, which only costs a deny.
@@ -177,11 +176,11 @@ def _fetch(p):
     try:
         return (yield Need("read", p, paths.MAX_READ))
     except UnicodeDecodeError as e:
-        return Refuse(f"cannot be read ({e})")
+        return Refuse(say("unreadable_file", err=e))
     except OSError as e:
-        return Refuse(f"cannot be read ({e.strerror or e})")
+        return Refuse(say("unreadable_file", err=e.strerror or e))
     except ValueError as e:                    # not a regular file, or past MAX_READ
-        return Refuse(str(e))
+        return Refuse(say("passed", text=e))
 
 
 def _abs(p, cwd, cd, env):
@@ -219,7 +218,7 @@ def _body(post, cwd, cd, docs, writes, env):
             text += "".join(body + "\n" for body, _ in docs)    # its one write is a heredoc: that text, not the file's
         else:
             p = _abs(v, cwd, cd, env)
-            got = Refuse("is a relative path after a cd, and the guard cannot tell where the command stands") \
+            got = Refuse(say("dp_relative_cd")) \
                 if p is None else (yield from _fetch(p))
             if isinstance(got, Refuse):
                 return _deny(say("dup_body_file", v=v, got=got))
@@ -235,15 +234,16 @@ def _slug(repo, cd, cwd):
     if cd or not cwd:
         return None
     url = yield from remote_url(cwd)
-    m = _GITHUB.search(url or "")
-    return sw.norm_repo(f"{m.group(1)}/{m.group(2)}") if m else None
+    r = sw.remote(url)
+    return sw.norm_repo(r.repo) if r and r.forge == "github" else None
 
 
 def _open_prs(slug, n):
     """[(owner/name, M, title)] of the open PRs cross-referenced on issue n,
     or None when GitHub can't answer, or fills the page with none: an older
     one may sit past it."""
-    code, body = yield Need("gh-api", f"repos/{slug}/issues/{n}/timeline?per_page={PAGE}")
+    code, body = yield Need("forge-api", "github", "github.com",
+                            f"repos/{slug}/issues/{n}/timeline?per_page={PAGE}")
     if code != 200 or not isinstance(body, list):
         return None
     out = []

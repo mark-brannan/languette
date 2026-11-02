@@ -154,7 +154,7 @@ def _unsetenv(ctx, var):
 
 
 def _guard_module(guard):
-    return __import__(f"languette.guards.{guard.replace('-', '_')}", fromlist=["RULE_FILE"])
+    return next(g for _, _, gs in run.GUARDS for g in gs if g.NAME == guard)
 
 
 @given(parsers.parse('the rule file of "{guard}" is absent'))

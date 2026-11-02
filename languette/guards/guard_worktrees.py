@@ -794,9 +794,9 @@ def check(doc):
             asked += q.args[0]
             continue
         except Refuse as r:
-            return deny(str(r))
+            return deny(say("passed", text=r))
         if note:
             notes.append(note)
     if asked:
         return ask(say("wt_chezmoi", guard=NAME, hits=", ".join(f"`chezmoi {h}`" for h in dict.fromkeys(asked))))
-    return context("\n\n".join(notes)) if notes else None
+    return context(say("passed", text="\n\n".join(notes))) if notes else None
