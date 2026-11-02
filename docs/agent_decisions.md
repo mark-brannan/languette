@@ -572,3 +572,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t175917z
 - run.py wiring stays hand-written, not derived from on: tool patterns differ per guard and event Undo: derive run.py wiring from on ([#349](https://github.com/mark-brannan/languette/pull/349))
+
+### 20261102t175931z
+- guard-cross-session-send's on names the four events run.py wires it to, not UserPromptSubmit Undo: add UserPromptSubmit to its on ([#349](https://github.com/mark-brannan/languette/pull/349))
