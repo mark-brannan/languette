@@ -1,4 +1,6 @@
-"""guard-bypass-ruleset: a ruleset's bypass is the user's, never the agent's.
+"""guard-bypass-ruleset's walk and its handler (languette/rules/guard_bypass_ruleset.py is
+the rule set): a ruleset's bypass is the user's, never the agent's. The spec is
+features/guard-bypass-ruleset.feature.
 
 An agent that runs on the user's credentials may bypass a branch's rules
 wherever the user may, and GitHub cannot tell them apart. Two
@@ -46,7 +48,6 @@ from languette.refs import default_branches
 from languette.messages import say
 from languette.verdict import Act, Need, Refuse, ask, deny
 
-NAME = "guard-bypass-ruleset"
 TTL = 3600
 
 _EXPORT = frozenset("export declare typeset".split())
@@ -509,21 +510,29 @@ def _judge(p, env):
     return asked
 
 
-def check(doc):
-    payload, env = doc.payload, doc.env
+def pushed(doc):
+    """The `ruleset-pushes` test: {"pushes": the pushes the command runs, "admin": whether it
+    runs `gh pr merge --admin`, "refused": the first command it could not read, or None}, or
+    None when it holds none of the three."""
     cmd = doc.text
     if not cmd or not cmd.strip():
         return None
-    cwd = payload["cwd"]
-    pushes, admin, refused = _walk(doc, cmd, cwd, env.get("HOME"))
-    if admin:
+    pushes, admin, refused = _walk(doc, cmd, doc.payload["cwd"], doc.env.get("HOME"))
+    return {"pushes": pushes, "admin": admin, "refused": refused} if pushes or admin or refused else None
+
+
+def branch_rules(doc, guard, found):
+    """The `branch-rules` handler: an admin merge is denied; a push that lands on the remote's
+    default branch asks GitHub, through the cache, whether that branch requires a pull
+    request, and is denied when it does; it asks when GitHub or the walk cannot tell."""
+    if found["admin"]:
         return deny(say("ruleset_admin"))
     asked = None
-    for p in pushes:
-        v = yield from _judge(p, env)
+    for p in found["pushes"]:
+        v = yield from _judge(p, doc.env)
         if v and v["permissionDecision"] == "deny":
             return v
         asked = asked or v
-    if refused:
-        return ask(say("ruleset_refused", refused=refused))
+    if found["refused"]:
+        return ask(say("ruleset_refused", refused=found["refused"]))
     return asked
