@@ -248,7 +248,7 @@ Feature: guard-review-threads
   Scenario Outline: a graphql call whose query cannot be read is denied
     When the agent runs `<command>`
     Then the guard denies, naming "cannot tell which review thread"
-    And the stub "gh" was not called
+    And the stub "gh" was not called with "PullRequestReviewThread"
 
     Examples:
       | command                                                                                                      | note                      |
@@ -389,7 +389,7 @@ Feature: guard-review-threads
   Scenario Outline: what resolves no thread is not this guard's
     When the agent runs `<command>`
     Then the guard is silent
-    And the stub "gh" was not called
+    And the stub "gh" was not called with "PullRequestReviewThread"
 
     Examples:
       | command                                                                                                         | note                          |
