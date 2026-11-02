@@ -180,9 +180,9 @@ class Ctx:
                 stdin = json.dumps({**json.loads(stdin), "hook_event_name": EVENTS[self.arg]})
             here = os.getcwd()
             os.chdir(self.process_dir)
-            seen = []
+            seen, docs = [], []
             try:
-                self.verdict = Verdict(_respond_all(stdin, env, seen))
+                self.verdict = Verdict(_respond_all(stdin, env, seen, docs))
             finally:
                 os.chdir(here)
             if self.guard and seen:
@@ -195,7 +195,7 @@ class Ctx:
                 # answered before any guard judged (no cwd, say), and that answer stands.
                 event = json.loads(stdin).get("hook_event_name") or "PreToolUse"
                 fields = verdict.verdict(event, [f for f in seen if f[0] == self.guard],
-                                         json.loads(stdin).get("permission_mode"))
+                                         json.loads(stdin).get("permission_mode"), lambda: docs[-1].chained)
                 self.verdict = Verdict(run._out(event, fields) if fields else "")
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
@@ -224,13 +224,15 @@ class Ctx:
             return []
 
 
-def _respond_all(stdin, env, seen):
-    """run.respond with every guard on; each guard's own finding goes on `seen`."""
+def _respond_all(stdin, env, seen, docs):
+    """run.respond with every guard on; each guard's own finding goes on `seen`,
+    the call's Document on `docs`."""
     real = run._respond
 
     def spy(*a):
         out, judged = real(*a)
         seen.extend(judged[2])
+        docs.append(judged[4])
         return out, judged
     run._respond = spy
     try:

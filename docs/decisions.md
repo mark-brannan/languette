@@ -4,6 +4,24 @@ Decisions that settle languette's public interface. The README says what the
 interface is; this file says what was decided and why, one line each. Every
 line is the maintainer's (@mark-brannan) unless it says otherwise.
 
+## Backups family default: 2026-11-01
+
+- The `backups` family (the copies you would recover from, and the keys
+  that decrypt them) defaults to `block`: no approve button. The denial
+  names the copy at risk and says the user runs the command themselves
+  or sets `backups=ask`. The family promise gains a clause: your
+  backups it never touches.
+  ([#153](https://github.com/mark-brannan/languette/issues/153))
+- Why: the harm is unrecoverable by definition, a hurried click in a
+  disk-full triage is the wrong place for that yes, and an unattended
+  session has no button either way. The family's 28 rules match no
+  command in the maintainer's private corpus of 108k real commands
+  (measured 2026-10-09), so the default is cheap to hold; dcg denies
+  the same rules outright, by severity (its `packs/mod.rs`, v0.15.2).
+- A listed-resource exception (a snapshot set the user names, pruned
+  under a policy they wrote) is the Backups family issue's to design,
+  not the default's.
+
 ## ask-first config: 2026-10-02 and 2026-10-03
 
 - The config lives at `.languette/ask-first.json`, replacing
@@ -170,7 +188,7 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 
 - No environment variable configures languette; one is a last resort.
 - Two behaviours. Redact replaces terms in text bound for a public repo and
-  allows the call, with the entries in the user's file and nothing else. Hard block denies
+  allows the call. Hard block denies
   the whole post for a term on a short list, where even a redacted post
   could leak strategy; it reads the text as written, before any redaction.
 - Only the file's entries count; no other set loads at run time. A default
@@ -206,4 +224,7 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
   applies. Current thinking. ([thread](https://github.com/mark-brannan/languette/pull/290#discussion_r4395034528))
 - Spec: [features/guard-private-terms.feature](../features/guard-private-terms.feature).
 - 2026-10-30: for now, a missing default terms file is regenerated; its
-  long-term source is open ([thread](https://github.com/mark-brannan/languette/pull/308#discussion_r4397429263)).
+  long-term source is open ([thread](https://github.com/mark-brannan/languette/pull/308#discussion_r4421665440)).
+- 2026-11-01: the session-start hook regenerates it too:
+  `/plugin install languette` runs no `languette` command. Pencil
+  ([#338](https://github.com/mark-brannan/languette/pull/338)).
