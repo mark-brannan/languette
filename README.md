@@ -37,9 +37,8 @@ The guards run as `PreToolUse` hooks in Claude Code today, on shell commands,
 `gh` and GitHub MCP calls, and messages to other sessions; other agent hosts
 are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
-Languette is in beta: versions are patch-only for now, and configuration keys
-stay, though they may gain family aliases
-([#153](https://github.com/mark-brannan/languette/issues/153)).
+It is in beta: versions are patch-only; configuration keys stay but may gain
+aliases ([#153](https://github.com/mark-brannan/languette/issues/153)).
 
 ### Claude Code
 
@@ -49,9 +48,8 @@ stay, though they may gain family aliases
 ```
 
 It needs `python3`, standard library only. `shfmt` (the parser it trusts
-most) and `gh` (for the guards that ask GitHub) are optional. With no
-`python3` on PATH, every Bash call is denied, by design: the guards fail
-closed.
+most) and `gh` (for the guards that ask GitHub) are optional. Without
+`python3`, every Bash call is denied: the guards fail closed.
 
 ### macOS
 
@@ -221,7 +219,7 @@ parse, that has a key a command does not (only `id`, `match`, `cost`,
 meant. Spent approvals are kept beside the session transcript, in
 `<transcript>.languette-ask`.
 
-When nobody is there to answer, as in an unattended session, an ask is a deny
+In an unattended session, an ask is a deny
 (planned: [#164](https://github.com/mark-brannan/languette/issues/164)).
 
 ## Deny always
