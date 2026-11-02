@@ -6,7 +6,7 @@ with no step of its own. Each run.respond call the scenario makes is watched:
                 parser ladder reads the command (scan.parse, every rung)
                 at most once;
   pinned I/O    the Needs that start a program (git, pr-list, run) or reach
-                GitHub (gh-api), counted per scenario, match
+                a forge (forge-api), counted per scenario, match
                 tests/io_counts.json, so one more git or network call per
                 guard shows up there as a diff. The parser ladder's own runs
                 are not counted: whether shfmt is there turns on the
@@ -34,7 +34,7 @@ import pytest
 from languette import run, scan
 
 PINS = Path(__file__).resolve().parent / "io_counts.json"
-PIN_KINDS = ("git", "gh-api", "pr-list", "run")
+PIN_KINDS = ("git", "forge-api", "pr-list", "run")
 _UPDATE = os.environ.get("LANGUETTE_PIN_IO") == "update"
 _pinned = json.loads(PINS.read_text()) if PINS.exists() else {}
 _seen = {}                                     # key -> {engine: counts}, under update
@@ -114,7 +114,7 @@ def pipeline(engine, request, monkeypatch):
         return
     want = _pinned.get(key, {})
     want = want.get(engine, {}) if set(want) & {"python", "shfmt"} else want
-    assert got == want, (f"{key}: programs and GitHub calls {got}, pinned {want} in {PINS.name}. One more git or "
+    assert got == want, (f"{key}: programs and forge calls {got}, pinned {want} in {PINS.name}. One more git or "
                          "network call per guard shows here; if it is meant, LANGUETTE_PIN_IO=update pytest "
                          "--full -n 0 tests/test_features.py")
 

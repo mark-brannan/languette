@@ -373,3 +373,68 @@ Feature: guard-github-issues
         """
       When the agent runs `gh api graphql -f query='mutation { transferIssue(input: {}) { issue { id } } }'`
       Then the guard is silent
+
+  Rule: GitLab's issues, through glab, are judged as GitHub's are
+
+    Scenario Outline: never a GitLab identifier write, door shut or not
+      When the agent runs `<command>`
+      Then the guard is silent
+
+      Examples:
+        | command                                                      |
+        | glab issue view 12 -R g/p                                    |
+        | glab issue list --opened                                     |
+        | glab issue note 12 -m progress                               |
+        | glab mr create -t t -d "fixes the issue create path"         |
+        | glab api projects/:id/issues                                 |
+        | glab api -X GET projects/:id/issues -f state=opened          |
+        | glab api -X DELETE projects/:id/issues/4/notes/9             |
+        | glab api graphql -f query='mutation { issueMoveList(input:{}) { clientMutationId } }' |
+
+    Scenario Outline: a GitLab identifier write with the door shut is denied, however it is reached
+      When the agent runs `<command>`
+      Then the guard denies
+
+      Examples:
+        | command                                                            |
+        | glab issue create -t t -d b                                        |
+        | glab issue new -t t -d b                                           |
+        | glab issue delete 4                                                |
+        | glab issue del https://gitlab.com/g/s/p/-/issues/4                 |
+        | glab issue -R g/p create -t t -d b                                 |
+        | sh -c "glab issue create -t t -d b"                                |
+        | glab api projects/:id/issues -f title=t                            |
+        | glab api -X POST projects/g%2Fp/issues --form title=t              |
+        | glab api https://gitlab.example.com/api/v4/projects/7/issues -f title=t |
+        | glab api projects/:id/issues/4/move -f to_project_id=9             |
+        | glab api projects/:id/issues/4/clone -f to_project_id=9            |
+        | glab api -X DELETE projects/:id/issues/4                           |
+        | glab api graphql -f query='mutation { createIssue(input:{}) { issue { id } } }'       |
+        | glab api graphql -f query='mutation { workItemCreate(input:{}) { workItem { id } } }' |
+        | glab api graphql -f query='mutation { issueMove(input:{}) { issue { id } } }'         |
+        | glab api graphql -f query='mutation { workItemDelete(input:{}) { errors } }'          |
+
+    Scenario: the turn's one write may be GitLab's
+      When the human speaks, opening the door
+      And the agent runs `glab issue create -t t -d b`
+      Then the guard is silent
+
+    Scenario Outline: one forge's write and another's in one turn are still two
+      When the human speaks, opening the door
+      And the agent runs `<command>`
+      Then the guard denies
+
+      Examples:
+        | command                                                  |
+        | glab issue create -t a -d b; gh issue create -t c -b d   |
+        | for t in a b; do glab issue create -t "$t" -d x; done    |
+
+    Scenario: a yes to delete a GitLab issue by its URL names its project
+      Given a project directory
+      And the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Delete issue 7 in g/s/p?", "header": "Issue", "multiSelect": false, "options": [{"label": "Delete issue g/s/p#7", "description": ""}, {"label": "Don't", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Delete issue 7 in g/s/p?\"=\"Delete issue g/s/p#7\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `glab issue delete https://gitlab.com/g/s/p/-/issues/7`
+      Then the guard is silent

@@ -35,7 +35,8 @@ class Need:
     the guard; a fact that cannot be had is thrown in as the exception world raised.
 
         git           prog, cwd, *argv    -> stdout, stripped, or None
-        gh-api        path                -> (status, body), or (None, None)
+        forge-api     forge, host, path   -> (status, body) from the forge's client (scan.FORGES),
+                                             or (None, None)
         pr-list       cwd, *argv          -> stdout of argv run in cwd, stripped, or None
         which         name                -> the program's path on the env's PATH, or None
         read          path, limit=None    -> the regular file's text, opened non-blocking; ValueError

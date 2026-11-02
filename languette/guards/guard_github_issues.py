@@ -1,4 +1,4 @@
-"""guard-github-issues: one GitHub issue create, transfer or delete per human
+"""guard-github-issues: one GitHub or GitLab issue create, transfer or delete per human
 turn; never two in one call, never one in a loop. An issue number is an
 identifier things link to where no agent can see, so minting or moving one is
 a one-way door. The spec is features/guard-github-issues.feature.
@@ -22,7 +22,10 @@ each.
 Counts as an identifier write: `gh issue create|new|transfer|delete`; `gh api`
 POST to repos/o/r/issues; a graphql createIssue, transferIssue or deleteIssue;
 the MCP create_issue, transfer_issue, delete_issue, and issue_write with
-method create. `sh -c`, `eval` and `xargs` bodies are read; a script file is
+method create. On GitLab, through `glab`: `glab issue create|new|delete|del`;
+`glab api` POST to projects/:id/issues or its issue's clone or move, DELETE
+of an issue; a graphql createIssue, workItemCreate, issueMove or
+workItemDelete. `sh -c`, `eval` and `xargs` bodies are read; a script file is
 not. The door file carries a languette- prefix (languette.world.DOOR), so
 another plugin's copy of this guard never spends it.
 """
@@ -41,10 +44,27 @@ _MCP_ISSUE_WRITE = re.compile(r"mcp__.*__issue_write\Z")
 _REPEATS = re.compile(r"(?:^|/)(?:xargs|parallel|find)\Z")
 _LOOP = frozenset("for while until select".split())
 _LEAD = frozenset("do then else elif ! time { (".split())
-_MUTATION = re.compile(r"(create|transfer|delete)Issue\s*\(")
+# Each forge's client, a row (docs/design/forges.md): what it calls an issue
+# identifier write, by the verb this guard names. issue: `<cli> issue` verbs;
+# rest: (`<cli> api` path, method, verb), a call with no -X sending POST when
+# it carries a field, GET otherwise; mutation: graphql mutations.
+_CLIENTS = (
+    (sw.GH, "gh", {"issue": {"create": "create", "new": "create", "transfer": "transfer", "delete": "delete"},
+                   "rest": ((r"repos/[^/]+/[^/]+/issues", "POST", "create"),),
+                   "mutation": {"createIssue": "create", "transferIssue": "transfer", "deleteIssue": "delete"}}),
+    (sw.GLAB, "glab", {"issue": {"create": "create", "new": "create", "delete": "delete", "del": "delete"},
+                       "rest": ((r"(?:api/v4/)?projects/[^/]+/issues", "POST", "create"),
+                                (r"(?:api/v4/)?projects/[^/]+/issues/[^/]+/clone", "POST", "create"),
+                                (r"(?:api/v4/)?projects/[^/]+/issues/[^/]+/move", "POST", "transfer"),
+                                (r"(?:api/v4/)?projects/[^/]+/issues/[^/]+", "DELETE", "delete")),
+                       "mutation": {"createIssue": "create", "workItemCreate": "create", "issueMove": "transfer",
+                                    "workItemDelete": "delete"}}),
+)
 SHUT = ("the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or "
         "the human has not spoken since.")
-_NUMBER = re.compile(r"#?(\d+)|https?://[^/\s]+/([^/\s]+/[^/\s]+)/issues/(\d+)/?")
+# An issue a delete or transfer names: its number, a GitHub issue URL, or a GitLab one (group/project/-/issues/n).
+_NUMBER = re.compile(r"#?(\d+)|https?://[^/\s]+/([^/\s]+/[^/\s]+)/issues/(\d+)/?"
+                     r"|https?://[^/\s]+/([^/\s]+(?:/[^/\s]+)+)/-/issues/(\d+)/?")
 
 
 def _label(verb, number, repo=None):
@@ -101,36 +121,43 @@ class _Writes:
             i += 1
         if s.k[lo] == "w" and s.w[lo] == "done" and self.depth > 0:
             self.depth -= 1
-        g = sw.cmd_index(s, lo, hi, sw.GH, nested)
-        if g is None or g + 1 > hi:
-            return
+        for cmd, cli, row in _CLIENTS:
+            g = sw.cmd_index(s, lo, hi, cmd, nested)
+            if g is not None and g + 1 <= hi:
+                self._client(s, lo, g, hi, cli, row)
+                return
+
+    def _client(self, s, lo, g, hi, cli, row):
         rep = any(s.k[i] == "w" and _REPEATS.search(s.w[i]) for i in range(lo, g))
         sub1 = sw.gh_verb(s, g + 1, hi)
         if sub1 is None:
             return
         if s.w[sub1] == "issue":
             sub2 = sw.gh_verb(s, sub1 + 1, hi)
-            if sub2 is not None and s.w[sub2] in ("create", "new"):
+            verb = row["issue"].get(s.w[sub2]) if sub2 is not None else None
+            if verb == "create":
                 self._emit(rep, "create")
-            elif sub2 is not None and s.w[sub2] in ("transfer", "delete"):
+            elif verb:
                 arg = sw.gh_verb(s, sub2 + 1, hi)
                 hit = _NUMBER.fullmatch(sw.word(s, arg)) if arg is not None else None
-                number = hit and (hit[1] or hit[3])
-                repo = number and ((hit[2] if hit else None) or _repo_flag(s, g + 1, hi))
-                self._emit(rep, s.w[sub2], number, repo)
+                number = hit and (hit[1] or hit[3] or hit[5])
+                repo = number and ((hit[2] or hit[4] if hit else None) or _repo_flag(s, g + 1, hi))
+                self._emit(rep, verb, number, repo)
             return
         if s.w[sub1] != "api":
             return
-        api = sw.gh_api(s, sub1 + 1, hi)
-        m = [x for i in range(sub1 + 1, hi + 1) if i not in api.skipped for x in _MUTATION.findall(sw.word(s, i))]
-        if re.fullmatch(r"repos/[^/]+/[^/]+/issues", api.path) and (
-                api.method == "POST" or (api.method == "" and api.sends)):
-            self._emit(rep, "create")
+        api = sw.gh_api(s, sub1 + 1, hi, cli)
+        mutation = re.compile("(" + "|".join(row["mutation"]) + r")\s*\(")
+        m = [x for i in range(sub1 + 1, hi + 1) if i not in api.skipped for x in mutation.findall(sw.word(s, i))]
+        method = api.method or ("POST" if api.sends else "GET")
+        verb = next((v for path, meth, v in row["rest"] if meth == method and re.fullmatch(path, api.path)), None)
+        if verb:
+            self._emit(rep, verb)
         if api.path == "graphql":
-            m += _MUTATION.findall(self.hd)
+            m += mutation.findall(self.hd)
             self.hd = ""
-            for verb in m:
-                self._emit(rep, verb)
+            for name in m:
+                self._emit(rep, row["mutation"][name])
 
 
 def _writes(doc):
