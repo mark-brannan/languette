@@ -121,7 +121,7 @@ GUARDS = (
     ("PostToolUse", _SEND_STATE_TOOLS, (guard_cross_session_send,)),
     ("PostToolUseFailure", _SEND_STATE_TOOLS, (guard_cross_session_send,)),
     ("SubagentStart", None, (guard_cross_session_send,)),
-    ("SessionStart", None, (guard_cross_session_send,)),
+    ("SessionStart", None, (guard_cross_session_send, guard_private_terms)),
     # guard-github-issues' door: a human turn opens it, a write that ran spends it.
     ("UserPromptSubmit", None, (guard_github_issues,)),
     ("PostToolUse", issue_writes.TOOLS, (guard_github_issues,)),
