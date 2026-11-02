@@ -43,7 +43,7 @@ they become rule data, one `match` entry per client (planned).
 
 | Guard | GitLab |
 |---|---|
-| guard-github-issues | `glab issue create\|new\|delete\|del`; `glab api` issue create, clone, move, delete; graphql `createIssue`, `workItemCreate`, `issueMove`, `workItemDelete` |
+| guard-github-issues | issue create, delete and move through glab (see the guard's header) |
 | private-terms, signed-comments, bypass-labels | notes, labels, project visibility (planned) |
 | duplicate-prs, review-threads, bypass-ruleset | merge requests, discussions, protected branches (planned) |
 | GitLab's MCP tools | (planned), once their names are verified |
