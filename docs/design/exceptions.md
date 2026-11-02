@@ -87,7 +87,7 @@ After the verdict, act and the record sit behind one silent catch each.
 ## Allowed
 
 - A step's own signal as a non-local exit out of a walk, a recursion or a
-  judge with many call sites frames below its edge (the guard-disks judge), caught
+  judge with many call sites frames below its edge (the disks test's judge), caught
   at the step's edge and turned into a finding.
 - A library's exception, by its own class, on the line that called it.
 - A fence around foreign code: a pip parser that fails is a missing rung.

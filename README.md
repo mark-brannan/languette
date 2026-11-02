@@ -114,7 +114,7 @@ Each guard checks for one kind of hazard:
 - [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub or GitLab issue create,
   transfer or delete in one human turn, or any inside a loop
 - [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb, `systemctl stop sshd`
-- [`guard-infra`](languette/guards/guard_infra.py): `terraform destroy`, `kubectl delete` and
+- [`guard-infra`](features/guard-infra.feature): `terraform destroy`, `kubectl delete` and
   other infrastructure destroys, until you approve that one run
 - [`guard-permissions`](features/guard-permissions.feature): recursive `chmod`,
   `chown`, `chgrp` or `chmod 777` outside agent-owned or
@@ -131,11 +131,11 @@ Each guard checks for one kind of hazard:
 - [`guard-worktrees`](features/guard-worktrees.feature): opt-in; a branch switch in a `$HOME`
   that is a worktree, chezmoi's forced apply, `destroy` and `purge` (an ask), or a reach into
   another session's worktree
-- [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
+- [`guard-bypass-hooks`](features/guard-bypass-hooks.feature): `--no-verify` on commit, push,
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
 - [`guard-bypass-labels`](features/guard-bypass-labels.feature): a session
   applying a label the `bypass_labels` setting names (none by default)
-- [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push direct to
+- [`guard-bypass-ruleset`](features/guard-bypass-ruleset.feature): a push direct to
   main where pull requests are normally required (agents could potentially bypass using your credentials)
 - [`guard-cross-session-send`](features/guard-cross-session-send.feature): prevents
   sending messages to another session with the option to ask first or deny outright

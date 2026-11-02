@@ -1,5 +1,7 @@
-"""ask-first: a command the repo names as costly runs only after the user said
-yes to it, once, through AskUserQuestion.
+"""ask-first's handler (languette/rules/ask_first.py is the rule set): a command the
+repo names as costly runs only after the user said yes to it, once, through
+AskUserQuestion. The spec is features/ask-first.feature. The list is the repo's, read
+from a file, so the walk of the command is the handler's too, after the read.
 
 The repo owns the list, in <project>/.languette/ask-first.json, where
 <project> is the nearest directory at or above the payload's cwd that has one,
@@ -44,7 +46,6 @@ from languette.messages import say
 from languette.secrets import quote
 from languette.verdict import NO_QUESTION, Refuse, approve, deny
 
-NAME = "ask-first"
 CONFIG = ".languette/ask-first.json"
 
 
@@ -77,11 +78,11 @@ def _load(path):
     return commands
 
 
-def check(doc):
+def approval(doc, guard, found):
+    """The `listed-approval` handler: finds the repo's list, and for each listed command the
+    call runs, spends one of the user's approvals per run; short of one per run, or in a
+    loop, the call is denied. No list is no finding; a list it cannot read denies every command."""
     payload, env = doc.payload, doc.env
-    cmd = doc.text
-    if not cmd or not cmd.strip():
-        return None
     try:
         path = yield from _config(payload, env)
     except Refuse as e:
@@ -105,13 +106,13 @@ def check(doc):
     if not hits:
         return None
     if looped:
-        return deny(say("loop", guard=NAME, what=", ".join(f"`{c['id']}`" for c in looped),
+        return deny(say("loop", guard=guard, what=", ".join(f"`{c['id']}`" for c in looped),
                         then="Run it once, on its own."))
 
     shown = quote(doc) or say("command_withheld")
     approved, done = yield from approve(
         {c["approve_label"]: runs[c["id"]] for c in hits},
-        lambda e: say("transcript_unreadable", guard=NAME, err=e, cmd=shown,
+        lambda e: say("transcript_unreadable", guard=guard, err=e, cmd=shown,
                       then="Ask the user to run it themselves."))
     if done:
         return done[0]
@@ -128,4 +129,4 @@ def check(doc):
         parts.append(say("ask_first_need", id=c["id"], path=path,
                          times=(say("ask_first_times", n=runs[c["id"]], have=have) if runs[c["id"]] > 1 else ""),
                          cost=c["cost"], cheaper=cheaper, cmd=shown, label=c["approve_label"]))
-    return deny(say("judged", guard=NAME, why="\n\n".join(parts)))
+    return deny(say("judged", guard=guard, why="\n\n".join(parts)))

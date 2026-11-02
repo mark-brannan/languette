@@ -1,5 +1,6 @@
-"""guard-infra: a command that destroys real infrastructure runs only after
-the user said yes to it, once, through AskUserQuestion.
+"""guard-infra's walk and its handler (languette/rules/guard_infra.py is the rule
+set): a command that destroys real infrastructure runs only after the user said
+yes to it, once, through AskUserQuestion. The spec is features/guard-infra.feature.
 
 The approval is ask-first's: an AskUserQuestion whose answer (not the
 question, which is the agent's text) is exactly the rule's label, spent
@@ -48,8 +49,6 @@ from languette import scan as sw
 from languette.messages import say
 from languette.secrets import quote
 from languette.verdict import approve, deny
-
-NAME = "guard-infra"
 
 # id -> (approve_label, what it does, cost, what to run instead). {tool} is the
 # command word as written (terraform or tofu).
@@ -259,20 +258,27 @@ def _runs(doc):
     return found, loop
 
 
-def check(doc):
+def runs(doc):
+    """The `infra-runs` test: {"runs": {rule: [tool name per run]}, "looped": whether the
+    command has a loop word}, or None when it breaks no rule."""
     cmd = doc.text
     if not cmd or not cmd.strip():
         return None
     found, loop = _runs(doc)
-    if not found:
-        return None
+    return {"runs": found, "looped": loop} if found else None
+
+
+def approval(doc, guard, found):
+    """The `infra-approval` handler: each run of a rule spends one of the user's approvals
+    of that rule; short of one per run, or in a loop, the call is denied."""
+    found, loop = found["runs"], found["looped"]
     if loop:
-        return deny(say("loop", guard=NAME, what=", ".join(f"`{r}`" for r in found),
+        return deny(say("loop", guard=guard, what=", ".join(f"`{r}`" for r in found),
                         then="Run it once, on its own, after looking at what it would remove."))
     shown = quote(doc) or say("command_withheld")
     approved, done = yield from approve(
         {RULES[r][0]: len(found[r]) for r in found},
-        lambda e: say("transcript_unreadable", guard=NAME, err=e, cmd=shown,
+        lambda e: say("transcript_unreadable", guard=guard, err=e, cmd=shown,
                       then="Ask the user to run it themselves."))
     if done:
         return done[0]
@@ -285,4 +291,4 @@ def check(doc):
         parts.append(say("infra_need", cmd=shown, what=what, rule=r,
                          times=(say("infra_times", n=n, have=have) if n > 1 else ""),
                          cost=cost, instead=instead.format(tool=found[r][0]), label=label))
-    return deny(say("judged", guard=NAME, why="\n\n".join(parts)))
+    return deny(say("judged", guard=guard, why="\n\n".join(parts)))
