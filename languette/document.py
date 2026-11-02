@@ -59,6 +59,19 @@ class Document:
         return self._text.rstrip("\n") or None
 
     @property
+    def chained(self):
+        """Whether the Bash command runs more than one segment (`;`, `&&`, `||`, `|`).
+        A command that will not read is not."""
+        def read():
+            if self.text is None:
+                return False
+            try:
+                return sum(1 for a, b in self.scan(self.text).segments() if a <= b) > 1
+            except Exception:  # noqa: BLE001 -- a command that will not read is the guards' to report
+                return False
+        return self._kept(("chained",), read)
+
+    @property
     def refusal(self):
         """The scan.Unparseable the ladder or the nested-text cap refuses the
         Bash command with, or None when it reads (or there is no command). Any

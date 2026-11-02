@@ -79,6 +79,15 @@ Feature: guard-git-work-loss
       | git commit -m 'block git commit -a'     | is silent | a commit message that mentions -a |
       | git commit -S -m x                      | is silent | -S is not -a                      |
 
+  Scenario Outline: a deny of a chain says one refused segment refuses the whole command
+    When the agent runs `<command>`
+    Then the guard denies, naming "<naming>"
+
+    Examples:
+      | command                          | naming                                  |
+      | git status && git add -A         | run git commands one per Bash call      |
+      | git add -A                       | git add -A                              |
+
   Scenario Outline: popping, dropping or clearing the shared stash is denied
     When the agent runs `<command>`
     Then the guard <verdict>
