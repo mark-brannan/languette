@@ -341,9 +341,9 @@ measured, which is why the guards treat unset as on.
 
 ## Privacy and support
 
-Nothing leaves your machine. Decisions are recorded only if you turn on
-`record_decisions`, in the file above. Guards keep small session state, such
-as spent approvals, beside the transcript.
+Guards that need GitHub's answer ask through your own `gh`. Session state
+stays in local files. Decisions are recorded only if you turn on
+`record_decisions`.
 
 Questions and bugs: [GitHub issues](https://github.com/mark-brannan/languette/issues).
 

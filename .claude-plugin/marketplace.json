@@ -10,7 +10,7 @@
     {
       "name": "languette",
       "source": "./",
-      "description": "Fail-closed PreToolUse guards: recursive rm, git work loss, deleting a branch an open PR is stacked on, costly commands the repo says to ask about first. Records nothing unless you turn on record_decisions, and then only on your machine.",
+      "description": "Fail-closed PreToolUse guards: recursive rm, git work loss, deleting a branch an open PR is stacked on, costly commands the repo says to ask about first. Records decisions only if you turn on record_decisions, to a local file.",
       "homepage": "https://github.com/mark-brannan/languette",
       "repository": "https://github.com/mark-brannan/languette"
     }
