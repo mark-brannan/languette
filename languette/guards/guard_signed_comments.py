@@ -4,12 +4,15 @@ agent's. The spec is features/guard-signed-comments.feature.
 Experimental: the convention is one workflow's; the general shape is issue #194.
 
 An agent may post under the user's own login, and then without a mark a review bot and
-the next agent read its reply as the user's own words. The body's first line
+the next agent read its reply as the user's own words. So a post comes from a
+bot's account, always: gh's GraphQL viewer is an App's (refs.bot), read with one
+gh call; gh that cannot say is an ask, and a GitHub MCP tool, whose server posts
+with a token this hook cannot read, is a deny. And the body's first line
 begins with signed_comments_opening and its last non-empty line matches
 signed_comments_signature, a regular expression the whole line matches, its
 `{session}` the payload's first eight hex (any eight without one). Both
 default to empty: an empty one checks nothing for its part, and with both
-empty the guard is silent. A signature that does not compile is a deny.
+empty only the account is checked. A signature that does not compile is a deny.
 
 Fires on Bash `gh pr comment`, `gh issue comment`, `gh pr review` with a body,
 `gh pr|issue close|reopen --comment`, `gh api` writing a body to a path with a
@@ -28,10 +31,10 @@ import json
 import os
 import re
 
-from languette import paths
+from languette import paths, refs
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Need, deny
+from languette.verdict import Need, ask, deny
 
 NAME = "guard-signed-comments"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS"
@@ -246,8 +249,6 @@ def check(doc):
     sid = payload.get("session_id")
     hexid = sid[:8] if isinstance(sid, str) and re.fullmatch(r"[0-9a-f]{8}", sid[:8]) else None
     first, pattern = env.get(OPENING) or "", env.get(SIGNATURE) or ""
-    if not first and not pattern:
-        return None
     sig = loose = None
     if pattern:
         try:
@@ -261,7 +262,7 @@ def check(doc):
          + (", where {session} is the first 8 hex of the session id" if "{session}" in pattern else "")]
         if pattern else [])
     need = " and ".join(want)
-    shape = need[0].upper() + need[1:] + "."
+    shape = need[:1].upper() + need[1:] + "."
     signed = f"A signed body, as the settings have it: {need}."
     cwd = payload.get("cwd")
     home = env.get("HOME") or ""
@@ -362,8 +363,8 @@ def check(doc):
                 raise _Unread(say("signature_graphql_variable", field=m.group(1), name=name))
         return out
 
-    problems = []
-    for post in posts:
+    problems, posted = [], not want    # with nothing to check in a body, every post is one
+    for post in posts if want else ():
         for src in post:
             try:
                 got = yield from bodies(src)
@@ -372,6 +373,7 @@ def check(doc):
             for body in got:
                 if not body.strip():
                     continue           # nothing posted as text: gh refuses it, or a review posts no comment
+                posted = True
                 lines = body.split("\n")
                 last = ([ln.rstrip() for ln in lines if ln.strip()] or [""])[-1]
                 if first and not lines[0].startswith(first):
@@ -382,6 +384,16 @@ def check(doc):
                     problems.append(f"the last line's hex is not this session's ({hexid}): `{_short(last)}`")
                 else:
                     problems.append(f"the last line is not the signature: `{_short(last)}`")
+    if not posted:
+        return None
+    also = say("signature_also", problems="; ".join(problems), shape=shape) if problems else ""
+    if r is None:
+        return deny(say("signature_mcp_account", guard=NAME, tool=tool, also=also))
+    who = yield from refs.viewer(cwd if isinstance(cwd, str) and cwd.startswith("/") else "/")
+    if isinstance(who, str) and not problems:
+        return ask(say("signature_account_unread", guard=NAME, got=who))
+    if not isinstance(who, str) and not refs.bot(*who):
+        return deny(say("signature_person", guard=NAME, login=who[0], also=also))
     if not problems:
         return None
     return deny(say("signature_wrong", guard=NAME, problems="; ".join(problems), shape=shape))

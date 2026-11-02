@@ -291,6 +291,10 @@ signature_input_not_json: the --input payload is not JSON this hook can read, so
 signature_graphql_not_literal: the graphql body is not a string literal this hook can read, so its signature cannot be checked. Pass it as a variable (-f body=..., or from a heredoc).
 signature_graphql_variable: the graphql {field} comes from ${name}, which this hook cannot read, so its signature cannot be checked. Pass the body as its own variable, -f body=... or from a heredoc in the same command.
 signature_wrong: {guard}: this may post a GitHub comment under the user's login, so it must be signed as an agent's, or a reader takes it for the user's own words. Here {problems}. {shape}
+signature_person: {guard}: this posts to GitHub as {login}, a person's account, so a reader takes it for that person's own words. Post it through the agent's GitHub App, whose login ends in [bot].{also}
+signature_mcp_account: {guard}: {tool} posts with its MCP server's own token, and this hook cannot read whose account that is, so it cannot tell that a bot posts it. Post it with gh, through the agent's GitHub App.{also}
+signature_account_unread: {guard}: this posts to GitHub, and gh could not say which account it posts as ({got}). Approve only if it posts through the agent's GitHub App, whose login ends in [bot].
+signature_also:  It is not signed as an agent's either: {problems}. {shape}
 ```
 
 ## sudo

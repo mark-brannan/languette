@@ -13,6 +13,14 @@ Feature: guard-signed-comments
 
       🤖 claude-opus-5-5 · high · 5a74df74
 
+  A post comes from a bot's account too, always, whatever the settings: gh's
+  GraphQL viewer, read with one gh call, is an App's, its login ending in
+  `[bot]` (GitHub types the viewer User even then, so the login tells). A
+  person's login is denied, and so is a GitHub MCP tool, whose account this
+  hook cannot read; gh that cannot say is an ask. The deny names what is
+  missing: the account, the signature, or both. gh is the stub throughout,
+  answering as GH_LOGIN, `agent[bot]` unless a scenario sets it.
+
   Why. Where an agent posts under the user's login, a review bot and
   the next agent read an agent's reply as the user's own words. Scar: #116,
   where an agent's reply on a review thread was taken as the user's, and a
@@ -215,7 +223,11 @@ Feature: guard-signed-comments
       When the agent runs `gh api repos/o/r/pulls/4/reviews --input {PROJ}/review.json`
       Then the guard denies, naming "first line"
 
-  Rule: the GitHub MCP tools that post a comment are judged the same
+  Rule: the GitHub MCP tools that post a comment are read the same, and denied for their account
+
+    A GitHub MCP server posts with its own token, whose account this hook
+    cannot read, so a post through one is denied as not known to be a bot's;
+    the reason names any signature problem too.
 
     Scenario Outline: every body in the tool's input is read
       When the agent calls MCP tool "<tool>" with input `<input>`
@@ -223,15 +235,15 @@ Feature: guard-signed-comments
 
       Examples:
         | tool | input | verdict |
-        | mcp__plugin_github_github__add_issue_comment | {"owner":"o","repo":"r","issue_number":3,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | is silent |
+        | mcp__plugin_github_github__add_issue_comment | {"owner":"o","repo":"r","issue_number":3,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | denies, naming "MCP server's own token" |
         | mcp__plugin_github_github__add_issue_comment | {"owner":"o","repo":"r","issue_number":3,"body":"Replacement is the intent"} | denies, naming "first line" |
-        | mcp__plugin_github_github__add_reply_to_pull_request_comment | {"owner":"o","repo":"r","pullNumber":4,"commentId":9,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | is silent |
+        | mcp__plugin_github_github__add_reply_to_pull_request_comment | {"owner":"o","repo":"r","pullNumber":4,"commentId":9,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | denies, naming "MCP server's own token" |
         | mcp__plugin_github_github__add_reply_to_pull_request_comment | {"owner":"o","repo":"r","pullNumber":4,"commentId":9,"body":"Replacement is the intent"} | denies, naming "first line" |
-        | mcp__plugin_github_github__add_comment_to_pending_review | {"owner":"o","repo":"r","pullNumber":4,"path":"a.py","subjectType":"FILE","body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | is silent |
+        | mcp__plugin_github_github__add_comment_to_pending_review | {"owner":"o","repo":"r","pullNumber":4,"path":"a.py","subjectType":"FILE","body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | denies, naming "MCP server's own token" |
         | mcp__plugin_github_github__add_comment_to_pending_review | {"owner":"o","repo":"r","pullNumber":4,"path":"a.py","subjectType":"FILE","body":"Replacement is the intent"} | denies, naming "first line" |
-        | mcp__plugin_github_github__pull_request_review_write | {"method":"create","owner":"o","repo":"r","pullNumber":4,"event":"COMMENT","body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | is silent |
+        | mcp__plugin_github_github__pull_request_review_write | {"method":"create","owner":"o","repo":"r","pullNumber":4,"event":"COMMENT","body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | denies, naming "MCP server's own token" |
         | mcp__plugin_github_github__pull_request_review_write | {"method":"create","owner":"o","repo":"r","pullNumber":4,"event":"COMMENT","body":"Replacement is the intent"} | denies, naming "first line" |
-        | mcp__plugin_github_github__update_issue_comment | {"owner":"o","repo":"r","comment_id":5,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | is silent |
+        | mcp__plugin_github_github__update_issue_comment | {"owner":"o","repo":"r","comment_id":5,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | denies, naming "MCP server's own token" |
         | mcp__plugin_github_github__update_issue_comment | {"owner":"o","repo":"r","comment_id":5,"body":"Replacement is the intent"} | denies, naming "first line" |
         | mcp__github__create_and_submit_pull_request_review | {"owner":"o","repo":"r","pullNumber":4,"event":"COMMENT","body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74","comments":[{"path":"a.py","line":1,"body":"Nit"}]} | denies, naming "first line" |
         | mcp__plugin_github_github__add_issue_comment | {"owner":"o","repo":"r","issue_number":3,"reaction":"+1"} | is silent |
@@ -399,11 +411,55 @@ Feature: guard-signed-comments
       When the agent runs `gh pr comment 1 -b "🤖 Done."`
       Then the guard is silent
 
-    Scenario: with both settings empty no comment is checked
+    Scenario: with both settings empty only the account is checked
       Given CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING is ""
       And CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE is ""
       When the agent runs `gh pr comment 1 -b "Replacement is the intent"`
       Then the guard is silent
+      Given GH_LOGIN is "someone"
+      When the agent runs `gh pr comment 1 -b "Replacement is the intent"`
+      Then the guard denies, naming "as someone, a person's account"
+
+  Rule: a post comes from a bot's account
+
+    Scenario: a signed post from an App's account posts, after one gh call
+      When the agent runs:
+        """
+        gh pr comment 1 -b "🤖 Done.
+
+        🤖 claude-opus-5-5 · high · 5a74df74"
+        """
+      Then the guard is silent
+      And the stub "gh" was called 1 times
+      And the stub "gh" was called with "query={ viewer { login __typename } }"
+
+    Scenario: a signed post from a person's account is denied, naming the account
+      Given GH_LOGIN is "someone"
+      When the agent runs:
+        """
+        gh pr comment 1 -b "🤖 Done.
+
+        🤖 claude-opus-5-5 · high · 5a74df74"
+        """
+      Then the guard denies, naming "as someone, a person's account"
+      And the guard denies, naming "whose login ends in [bot]"
+
+    Scenario: an unsigned post from a person's account is denied, naming both
+      Given GH_LOGIN is "someone"
+      When the agent runs `gh pr comment 1 -b "Done."`
+      Then the guard denies, naming "as someone, a person's account"
+      And the guard denies, naming "not signed as an agent's either"
+      And the guard denies, naming "the first line does not start with"
+
+    Scenario: gh that cannot say which account posts is an ask
+      Given GH_FAIL is "1"
+      When the agent runs:
+        """
+        gh pr comment 1 -b "🤖 Done.
+
+        🤖 claude-opus-5-5 · high · 5a74df74"
+        """
+      Then the guard asks, naming "gh could not say which account it posts as"
 
   Scenario: a payload without an absolute working directory is denied before the guard judges
     Given the working directory is "relative/dir"
