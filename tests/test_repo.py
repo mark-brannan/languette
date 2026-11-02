@@ -233,7 +233,7 @@ def test_every_call_to_a_guard_generator_is_a_yield_from():
     # A call without it hands the caller a generator object, truthy, in place of the
     # answer, and nothing else fails: the ports' likeliest bug (#79).
     files = sorted((ROOT / "languette" / "guards").glob("*.py")) + [
-        ROOT / "languette" / f"{m}.py" for m in ("hook_skips", "branch_deletions")]
+        ROOT / "languette" / f"{m}.py" for m in ("hook_skips", "branch_deletions", "infra_runs", "listed_runs")]
     trees = {f.stem: ast.parse(f.read_text()) for f in files}
     gens = {m: _generators(t) for m, t in trees.items()}
     bad = []
