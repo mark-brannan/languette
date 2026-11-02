@@ -53,7 +53,6 @@ _EXPORT = frozenset("export declare typeset".split())
 _GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
 _ALL = frozenset("--all --branches --mirror".split())
 _UNREADABLE = re.compile(r"[$`*?\[{]")
-_GITHUB = re.compile(r"github\.com(?::\d+)?[:/]+([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?\Z", re.IGNORECASE)
 # The operators a separator's text is made of, as Scan piles them up (`;}&&` for `; } &&`).
 _OPS = re.compile(r"\|\||&&|\|&|\||&|;|\n|\(|\)|\{|\}|`")
 _PIPE = ("|", "|&")
@@ -71,8 +70,6 @@ _RESERVED = frozenset("if then else elif fi case esac for select while until do 
 _SPECIAL = re.compile(r"\A(?:BASH\w*|COMP\w*|HIST\w*|PWD|OLDPWD|RANDOM|SRANDOM|SECONDS|LINENO|UID|EUID|PPID|"
                       r"GROUPS|SHELLOPTS|PIPESTATUS|FUNCNAME|DIRSTACK|EPOCH\w*|REPLY|OPT\w*|SHLVL|_)\Z")
 HEAD, ALL, IMPLICIT = object(), object(), object()
-
-ADMIN = say("ruleset_admin")
 
 
 class _Push:
@@ -197,8 +194,7 @@ def _push(s, a, b, nested, here, lits=None):
             here = None
         cfg = _config_value(s, i, b)
         if cfg and (cfg.startswith("alias.") or "insteadof" in cfg):
-            raise Refuse("a `-c` override of an alias or a URL rewrite can turn any subcommand into a push, "
-                         "or any remote into another")
+            raise Refuse(say("br_alias"))
     i = sub
     if i > b:
         return None
@@ -207,7 +203,7 @@ def _push(s, a, b, nested, here, lits=None):
         return _Push(prog, here, None, [IMPLICIT])    # in every repository, a bare push: vcsh push ignores what follows
     if x != "push":
         if s.live[i] or _UNREADABLE.search(x):
-            raise Refuse(f"the subcommand `{x}` is built at run time")
+            raise Refuse(say("br_sub_live", x=x))
         return None                            # another subcommand
     remote, pos, all_, tags, dry, dashdash = None, [], False, False, False, False
     i += 1
@@ -222,11 +218,11 @@ def _push(s, a, b, nested, here, lits=None):
         elif _opt(x, "--repo") and "=" not in x and i + 1 <= b:
             remote = s.w[i + 1]
             if s.live[i + 1]:
-                raise Refuse(f"the remote `{remote}` is built at run time")
+                raise Refuse(say("br_remote_live", remote=remote))
         elif _opt(x, "--repo") and "=" in x:
             remote = x.split("=", 1)[1]
             if s.live[i]:
-                raise Refuse(f"the remote `{remote}` is built at run time")
+                raise Refuse(say("br_remote_live", remote=remote))
         elif any(_opt(x, f) for f in _ALL):
             all_ = True
         elif _opt(x, "--tags"):
@@ -244,9 +240,9 @@ def _push(s, a, b, nested, here, lits=None):
         k = pos.pop(0)
         remote = s.w[k]
         if s.live[k]:
-            raise Refuse(f"the remote `{remote}` is built at run time")
+            raise Refuse(say("br_remote_live", remote=remote))
     if remote is not None and _UNREADABLE.search(remote):
-        raise Refuse(f"the remote `{remote}` is built at run time")
+        raise Refuse(say("br_remote_live", remote=remote))
     if all_:
         return _Push(prog, here, remote, [ALL], repo)
     if not pos:
@@ -255,7 +251,7 @@ def _push(s, a, b, nested, here, lits=None):
     for j in pos:
         r = (lits and s.live[j] and lits.word(j, a)) or s.w[j]
         if (s.live[j] and r is s.w[j]) or _UNREADABLE.search(r):
-            raise Refuse(f"the refspec `{s.w[j]}` is built at run time, so where it lands can't be read")
+            raise Refuse(say("br_refspec_live", refspec=s.w[j]))
         src, _, dst = r.lstrip("+").partition(":")
         if ":" in r and not src:
             continue                           # :branch deletes
@@ -297,14 +293,14 @@ def _admin_merge(s, a, b, nested):
         if admin:
             return True
         if any(dyn):
-            raise Refuse("a `gh pr merge` word is built at run time and could be `--admin`")
+            raise Refuse(say("br_merge_live"))
         return False
     if any(dyn):
         if admin:
             return True                        # a live subcommand beside a literal --admin
         # Only a run-time group, or a run-time verb under a literal `pr`, could spell `pr merge`.
         if first and (dyn[first[0]] or (w[first[0]] == "pr" and len(first) > 1 and dyn[first[1]])):
-            raise Refuse("the `gh` subcommand is built at run time and could be `pr merge --admin`")
+            raise Refuse(say("br_gh_live"))
     return False
 
 
@@ -440,7 +436,7 @@ def _requires_pr(slug, branch):
     if cached and cached[1] == "pr" and (yield Need("clock")) - cached[0] < TTL:
         return "pr"
     b = quote(branch, safe="")
-    code, body = yield Need("gh-api", f"repos/{slug}/rules/branches/{b}")
+    code, body = yield Need("forge-api", "github", "github.com", f"repos/{slug}/rules/branches/{b}")
     if code == 200 and isinstance(body, list) and any(isinstance(r, dict) and r.get("type") == "pull_request"
                                                       for r in body):
         got = "pr"
@@ -449,7 +445,8 @@ def _requires_pr(slug, branch):
     elif code != 200:
         return None
     else:
-        code, body = yield Need("gh-api", f"repos/{slug}/branches/{b}/protection")
+        code, body = yield Need("forge-api", "github", "github.com",
+                                f"repos/{slug}/branches/{b}/protection")
         if code == 200 and isinstance(body, dict):
             got = "pr" if body.get("required_pull_request_reviews") else "open"
         elif code == 404 and (_says(body, "not protected") or _says(body, "branch not found")):
@@ -497,12 +494,10 @@ def _judge(p, env):
         return None
     if url is None:
         return ask(say("ruleset_repo_unknown", branch=hits[0], remote=remote))
-    m = _GITHUB.search(url)
-    if not m:
+    r = sw.remote(url)
+    if not r or r.forge != "github":
         return None
-    if {".", ".."} & set(m.groups()):
-        return None
-    slug = f"{m.group(1)}/{m.group(2)}"
+    slug = r.repo
     asked = None
     for branch in hits:
         got = yield from _requires_pr(slug, branch)
@@ -522,7 +517,7 @@ def check(doc):
     cwd = payload["cwd"]
     pushes, admin, refused = _walk(doc, cmd, cwd, env.get("HOME"))
     if admin:
-        return deny(ADMIN)
+        return deny(say("ruleset_admin"))
     asked = None
     for p in pushes:
         v = yield from _judge(p, env)

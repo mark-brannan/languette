@@ -37,6 +37,9 @@ The guards run as `PreToolUse` hooks in Claude Code today, on shell commands,
 `gh` and GitHub MCP calls, and messages to other sessions; other agent hosts
 are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 
+It is in beta: versions are patch-only; configuration keys stay but may gain
+aliases ([#153](https://github.com/mark-brannan/languette/issues/153)).
+
 ### Claude Code
 
 ```
@@ -45,7 +48,10 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 ```
 
 It needs `python3` 3.11 or newer, standard library only. `shfmt` (the parser it trusts
-most) and `gh` (for the guards that ask GitHub) are optional.
+most) and `gh` (for the guards that ask GitHub) are optional. Without
+`python3`, every Bash call is denied: the guards fail closed.
+With no GitHub lookup, a Bash call waits a median 166-219 ms (p90 up to 318 ms) for the
+guards: one hook process, on 16 cores of WSL2 under load. A lookup adds a network round trip.
 
 ### macOS
 
@@ -105,8 +111,8 @@ Each guard checks for one kind of hazard:
 - [`require-well-formed`](features/require-well-formed.feature): a Bash command that
   doesn't parse; the other guards skip it
 - [`guard-disks`](features/guard-disks.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
-- [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub issue create, transfer
-  or delete in one human turn, or any inside a loop
+- [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub or GitLab issue create,
+  transfer or delete in one human turn, or any inside a loop
 - [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb, `systemctl stop sshd`
 - [`guard-infra`](languette/guards/guard_infra.py): `terraform destroy`, `kubectl delete` and
   other infrastructure destroys, until you approve that one run
@@ -121,13 +127,13 @@ Each guard checks for one kind of hazard:
 - [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
   `find -delete` outside a generated or agent-owned directory
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
-- [`guard-secrets`](languette/guards/guard_secrets.py): a pasted credential
+- [`guard-secrets`](features/guard-secrets.feature): a pasted credential
 - [`guard-worktrees`](features/guard-worktrees.feature): opt-in; a branch switch in a `$HOME`
   that is a worktree, chezmoi's forced apply, `destroy` and `purge` (an ask), or a reach into
   another session's worktree
-- [`guard-bypass-hooks`](languette/guards/guard_bypass_hooks.py): `--no-verify` on commit, push,
+- [`guard-bypass-hooks`](features/guard-bypass-hooks.feature): `--no-verify` on commit, push,
   merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
-- [`guard-bypass-labels`](languette/guards/guard_bypass_labels.py): a session
+- [`guard-bypass-labels`](features/guard-bypass-labels.feature): a session
   applying a label the `bypass_labels` setting names (none by default)
 - [`guard-bypass-ruleset`](languette/guards/guard_bypass_ruleset.py): a push direct to
   main where pull requests are normally required (agents could potentially bypass using your credentials)
@@ -215,6 +221,9 @@ parse, that has a key a command does not (only `id`, `match`, `cost`,
 meant. Spent approvals are kept beside the session transcript, in
 `<transcript>.languette-ask`.
 
+In an unattended session, an ask is a deny
+(planned: [#164](https://github.com/mark-brannan/languette/issues/164)).
+
 ## Deny always
 
 A repo lists the commands it forbids in `.languette/deny-always.json`:
@@ -232,7 +241,7 @@ Matches, lookup and a broken file work as for ask-first; `{"cmd":
 
 Every guard is on by default except `guard-worktrees`,
 `guard-review-threads`, `guard-signed-comments`, `guard-sudo` and
-`prose-budget-commit`, which are opt-in; `guard-signed-comments` is experimental, and checks a signature only for the settings you give it: `signed_comments_opening` and `signed_comments_signature` are empty by default, and empty checks nothing. Turn one off (or those on) with
+`prose-budget-commit`, which are opt-in; `guard-signed-comments` is experimental, and checks a signature only for the settings you give it: `signed_comments_opening` and `signed_comments_signature` are empty by default, and empty checks nothing. On, it also denies any comment not posted from a bot's account (a GitHub App's, its login ending in `[bot]`), and any through a GitHub MCP tool, whose account it cannot read: a session that posts under a person's own gh login is denied until it posts through a GitHub App. Turn one off (or those on) with
 `/plugin configure languette@languette`,
 or at install, by its name with underscores:
 
@@ -339,6 +348,14 @@ measured, which is why the guards treat unset as on.
 
 </details>
 
+## Privacy and support
+
+Guards that need GitHub's answer ask through your own `gh`. Session state
+stays in local files. Decisions are recorded only if you turn on
+`record_decisions`.
+
+Questions and bugs: [GitHub issues](https://github.com/mark-brannan/languette/issues).
+
 ## Strong guards
 
 A guard is a pure function of the command and the facts it asked for; it
@@ -362,7 +379,7 @@ for beyond the command, it declares:
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
 | `guard-github-issues` | the payload's `session_id`, the transcript, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
-| `guard-signed-comments` | the files a comment's body is read from, and the `signed_comments_opening` and `signed_comments_signature` settings |
+| `guard-signed-comments` | the files a comment's body is read from, the `signed_comments_opening` and `signed_comments_signature` settings, and the gh login, from GitHub through `gh` |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
 | `guard-worktrees` | `$HOME` and what `git rev-parse --show-toplevel` resolves to; git, for where each path lands, and a record per session in `$TMPDIR` |

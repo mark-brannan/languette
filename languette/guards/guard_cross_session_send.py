@@ -232,13 +232,13 @@ def check(doc):
     target = f"`{_shown(to)}`" if to else "an unnamed target"
     if mode in _UNSEEN_ASK or not isinstance(mode, str):
         if closed:
-            return None if mode in _UNSEEN_ASK else ask(_ask_reason(target, ti))
+            return None if mode in _UNSEEN_ASK else _ask_user(target, ti)
         why = (f"this session read untrusted content ({state['read']})" if not lost
                else "this guard cannot tell whether this session read untrusted content")
         return deny(say("cross_session_deny", guard=NAME, target=target, why=why,
                         mode=mode or "an unknown permission mode", way_out=_WAY_OUT))
-    return ask(_ask_reason(target, ti))
+    return _ask_user(target, ti)
 
 
-def _ask_reason(target, ti):
-    return say("cross_session_ask", guard=NAME, target=target, first_line=_first_line(ti.get("message")))
+def _ask_user(target, ti):
+    return ask(say("cross_session_ask", guard=NAME, target=target, first_line=_first_line(ti.get("message"))))

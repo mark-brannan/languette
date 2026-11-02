@@ -79,6 +79,29 @@ Feature: guard-git-work-loss
       | git commit -m 'block git commit -a'     | is silent | a commit message that mentions -a |
       | git commit -S -m x                      | is silent | -S is not -a                      |
 
+  Scenario Outline: a deny of a chain says one refused segment refuses the whole command
+    When the agent runs `<command>`
+    Then the guard denies, naming "run each command in its own Bash call"
+
+    Examples:
+      | command                  | note                            |
+      | git status && git add -A | the refused segment comes second |
+      | git add -A \| cat        | a pipe is a chain too           |
+
+  Scenario: a deny of one command has no chain footer
+    When the agent runs `git add -A`
+    Then the guard denies, not naming "in its own Bash call"
+
+  Scenario: a heredoc body's lines are not a chain
+    When the agent runs:
+      """
+      git commit -a -F - <<EOF
+      first line
+      second line
+      EOF
+      """
+    Then the guard denies, not naming "in its own Bash call"
+
   Scenario Outline: popping, dropping or clearing the shared stash is denied
     When the agent runs `<command>`
     Then the guard <verdict>
@@ -406,6 +429,8 @@ Feature: guard-git-work-loss
       | /usr/bin/git add -A                 | denies    | a full path                        |
       | git stash drop stash@{3}            | is silent | by ref                             |
       | git stash drop abc123               | is silent | by sha                             |
+      | git push --delete origin claude/foo | is silent | deleting a branch that is not main |
+      | git push origin :claude/foo         | is silent | the same, by refspec               |
 
     @also_guard-sudo
     Examples:
@@ -418,8 +443,6 @@ Feature: guard-git-work-loss
       | git push --delete origin main       | denies    |                                    |
       | git push -d origin main             | denies    |                                    |
       | git push origin :main               | denies    |                                    |
-      | git push --delete origin claude/foo | is silent | deleting a branch that is not main |
-      | git push origin :claude/foo         | is silent | the same, by refspec               |
 
   Scenario: a footgun after a heredoc is still run
     When the agent runs:

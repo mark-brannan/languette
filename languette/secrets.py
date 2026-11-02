@@ -24,14 +24,22 @@ than too little.
 
 A finding names the word by index, so a writer redacts by position in the
 word stream, never by regex over the raw text. Standard library only.
+
+The caller's own rules come from the project's .languette/secrets.json:
+project_rules reads it through a Need, so the detector stays a function.
 """
 
 import math
 import re
 from collections import namedtuple
 
+from re import _parser as _sre          # 3.11+ (requires-python floor)
+
+from languette import paths
 from languette import scan as sw
 from languette import secret_rules
+from languette.messages import say
+from languette.verdict import Refuse
 
 # how: "shape" (a known token format) or "context" (named as a credential).
 # rule: the rule id ("github-pat", "context:--password", "context:url").
@@ -299,3 +307,80 @@ def quote(doc):
     rules, which are read by a gather step a guard does not run."""
     text, _ = mask(doc.text, texts=doc_scans(doc))
     return None if text is None else text.strip()
+
+
+# The project's own rules (docs/design/guard-rules.md, "Trust tiers"): data that adds shapes, never code.
+CONFIG = ".languette/secrets.json"
+MAX_REGEX = 512
+
+
+def _nested_repeat(pattern):
+    """Does pattern put an unbounded repeat inside another? `(a+)+`, `(a*)*`,
+    `(\\w+\\s?)+` are the shapes that backtrack for minutes on the wrong input.
+    Read from the stdlib's own parse of the pattern (a private module, so a
+    parse that fails here is no finding: re.compile judges the pattern)."""
+    def walk(items, inside):
+        for op, av in items:
+            if op in (_sre.MAX_REPEAT, _sre.MIN_REPEAT):
+                lo, hi, sub = av
+                unbounded = hi == _sre.MAXREPEAT
+                if (unbounded and inside) or walk(sub, inside or unbounded):
+                    return True
+            elif op == _sre.SUBPATTERN:
+                if walk(av[-1], inside):
+                    return True
+            elif op == _sre.BRANCH:
+                if any(walk(b, inside) for b in av[1]):
+                    return True
+            elif op in (_sre.ASSERT, _sre.ASSERT_NOT):
+                if walk(av[1], inside):
+                    return True
+        return False
+    try:
+        return walk(_sre.parse(pattern), False)
+    except Exception:  # noqa: BLE001 -- the parser's own refusal is re.compile's to report
+        return False
+
+
+_SHIPPED = frozenset(r.id for r in secret_rules.RULES)
+
+
+def _load(path):
+    """The project's rules, or Refuse naming what is wrong with the file."""
+    cfg = yield from paths.read_json(path)
+    if not isinstance(cfg, dict) or not isinstance(cfg.get("patterns"), list):
+        raise Refuse(say("sec_top"))
+    rules, seen = [], set()
+    for n, p in enumerate(cfg["patterns"]):
+        where = f"patterns[{n}]"
+        if not isinstance(p, dict):
+            raise Refuse(say("sec_not_object", where=where))
+        for key in ("id", "regex"):
+            if not isinstance(p.get(key), str) or not p[key].strip():
+                raise Refuse(say("sec_key_empty", where=where, key=key))
+        if p["id"] in seen:
+            raise Refuse(say("sec_id_dup", where=where, id=p["id"]))
+        if p["id"] in _SHIPPED:
+            raise Refuse(say("sec_id_shipped", where=where, id=p["id"]))
+        seen.add(p["id"])
+        if len(p["regex"]) > MAX_REGEX:
+            raise Refuse(say("sec_regex_long", where=where, max=MAX_REGEX))
+        try:
+            rx = re.compile(p["regex"])
+        except re.error as e:
+            raise Refuse(say("sec_regex_bad", where=where, err=e))
+        if _nested_repeat(p["regex"]):
+            raise Refuse(say("sec_regex_nested", where=where))
+        ent = p.get("entropy", 0.0)
+        if not isinstance(ent, (int, float)) or isinstance(ent, bool) or ent < 0:
+            raise Refuse(say("sec_entropy", where=where))
+        rules.append(Rule(p["id"], p.get("description") or p["id"], rx, float(ent)))
+    return rules
+
+
+def project_rules(payload, env):
+    """The project's own rules, gathered: () when it has no list, Refuse when
+    the list is malformed. guard-secrets judges with them and so does the
+    decision record, which masks what the guard would deny."""
+    path, _ = yield from paths.project_config(payload, env, CONFIG)
+    return (yield from _load(path)) if path else ()

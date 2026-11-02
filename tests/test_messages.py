@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent / "languette"
 def _calls():
     """(file, line, code, blanks or None when **kwargs hides them) for every say("code", ...).
     The rules engine says a rule's `why`: its one such call stands for each shipped rule's, with
-    that call's blanks, at line 0 of the rule set's file."""
+    that call's blanks, at line 0 of the rule set's file. A rule whose test says its own reason has none."""
     found, rule_said = [], []
     for f in sorted(ROOT.rglob("*.py")):
         for n in ast.walk(ast.parse(f.read_text())):
@@ -31,7 +31,7 @@ def _calls():
     for f in sorted((ROOT / "rules").glob("*.py")):
         if f.name != "__init__.py":
             rule_set = importlib.import_module(f"languette.rules.{f.stem}").RULE_SET
-            found += [(f.name, 0, r["why"], rule_said[0]) for r in rule_set["rules"]]
+            found += [(f.name, 0, r["why"], rule_said[0]) for r in rule_set["rules"] if "why" in r]
     return found
 
 

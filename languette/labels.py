@@ -1,4 +1,6 @@
-"""guard-bypass-labels: a label named in the bypass_labels option is a human's
+"""The labels a call applies, and whether one is a human's to apply: what guard-bypass-labels
+(languette/rules/guard_bypass_labels.py, run by its `bypass-labels` test in
+languette/primitives.py) judges. A label named in the bypass_labels option is a human's
 to apply.
 
 A label that waives a CI gate is the user's to apply unless the option names
@@ -43,7 +45,7 @@ import re
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Need, Refuse, deny, planned
+from languette.verdict import Need, Refuse, deny
 
 NAME = "guard-bypass-labels"
 OPTION = "CLAUDE_PLUGIN_OPTION_BYPASS_LABELS"
@@ -123,23 +125,22 @@ def _read(path, ctx):
     the call could rewrite it first."""
     cwd, env, moved = ctx["cwd"], ctx["env"], ctx["moved"]
     if not ctx["alone"]:
-        raise Refuse("is read at hook time, and another command in the same call could rewrite it before gh "
-                     "reads it; run the gh on its own")
+        raise Refuse(say("bl_alone"))
     p = path
     if p == "~" or p.startswith("~/"):
         if not env.get("HOME"):
-            raise Refuse("names a home directory the guard cannot see")
+            raise Refuse(say("bl_home"))
         p = env["HOME"] + p[1:]
     if not os.path.isabs(p):
         if moved or not (isinstance(cwd, str) and os.path.isabs(cwd)):
-            raise Refuse("is a relative path, and the guard cannot tell where the command stands")
+            raise Refuse(say("bl_relative"))
         p = os.path.join(cwd, p)
     if p not in ctx["files"]:
         ctx["wanted"].append(p)
-        raise Refuse("is not read yet")        # plan asks for it, judge walks the command again
+        raise Refuse(say("bl_not_read"))        # plan asks for it, judge walks the command again
     got = ctx["files"][p]
     if isinstance(got, Refuse):
-        raise Refuse(str(got))
+        raise got
     return got
 
 
@@ -147,11 +148,11 @@ def _text(got):
     """A planned read's answer: the file's text, or the Refuse the world's
     exception comes to."""
     if isinstance(got, UnicodeDecodeError):
-        return Refuse(f"cannot be read ({got})")
+        return Refuse(say("unreadable_file", err=got))
     if isinstance(got, OSError):
-        return Refuse(f"cannot be read ({got.strerror or got})")
+        return Refuse(say("unreadable_file", err=got.strerror or got))
     if isinstance(got, ValueError):            # not a regular file, or past MAX_READ
-        return Refuse(str(got))
+        return Refuse(say("passed", text=got))
     if isinstance(got, Exception):
         raise got
     return got
@@ -160,17 +161,17 @@ def _text(got):
 def _payloads(src, live, ctx):
     """The JSON texts an --input value feeds gh api."""
     if live:
-        raise Refuse(f"the --input path `{src}` is built at run time")
+        raise Refuse(say("bl_input_live", src=src))
     if src == "-":
         if not ctx["bodies"]:
-            raise Refuse("the --input payload comes from stdin and no heredoc in the command feeds it")
+            raise Refuse(say("bl_input_stdin"))
         if any(live for _, live in ctx["bodies"]):
-            raise Refuse("the heredoc feeding --input is built at run time (an unquoted delimiter and a $ or backtick)")
+            raise Refuse(say("bl_heredoc_live"))
         return [body for body, _ in ctx["bodies"]]
     try:
         return [_read(src, ctx)]
     except Refuse as e:
-        raise Refuse(f"the --input file `{src}` {e}")
+        raise Refuse(say("bl_input_file", src=src, err=e))
 
 
 def _input(f, src, live, path, ctx):
@@ -393,7 +394,3 @@ def judge(parsed, answers):
     if f.unseen:
         return deny(say("bypass_label_unseen", guard=NAME, unseen=f.unseen[0], labels=", ".join(bad)))
     return None
-
-
-def check(doc):
-    return (yield from planned(doc, parse, plan, judge))
