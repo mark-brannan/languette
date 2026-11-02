@@ -88,7 +88,7 @@ class Machine:
 def machine():
     m = Machine()
     # Not under /tmp: guard-recursive-delete allows all of /tmp, so the doctor's `rm -rf ~` would pass.
-    m.home = Path(tempfile.mkdtemp(prefix="languette-smoke-home-", dir="/var/tmp"))
+    m.home = Path(os.path.realpath(tempfile.mkdtemp(prefix="languette-smoke-home-", dir="/var/tmp")))
     yield m
     shutil.rmtree(m.home, ignore_errors=True)
 
