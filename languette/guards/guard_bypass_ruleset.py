@@ -53,7 +53,6 @@ _EXPORT = frozenset("export declare typeset".split())
 _GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
 _ALL = frozenset("--all --branches --mirror".split())
 _UNREADABLE = re.compile(r"[$`*?\[{]")
-_GITHUB = re.compile(r"github\.com(?::\d+)?[:/]+([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?\Z", re.IGNORECASE)
 # The operators a separator's text is made of, as Scan piles them up (`;}&&` for `; } &&`).
 _OPS = re.compile(r"\|\||&&|\|&|\||&|;|\n|\(|\)|\{|\}|`")
 _PIPE = ("|", "|&")
@@ -438,7 +437,7 @@ def _requires_pr(slug, branch):
     if cached and cached[1] == "pr" and (yield Need("clock")) - cached[0] < TTL:
         return "pr"
     b = quote(branch, safe="")
-    code, body = yield Need("gh-api", f"repos/{slug}/rules/branches/{b}")
+    code, body = yield Need("forge-api", "github", "github.com", f"repos/{slug}/rules/branches/{b}")
     if code == 200 and isinstance(body, list) and any(isinstance(r, dict) and r.get("type") == "pull_request"
                                                       for r in body):
         got = "pr"
@@ -447,7 +446,8 @@ def _requires_pr(slug, branch):
     elif code != 200:
         return None
     else:
-        code, body = yield Need("gh-api", f"repos/{slug}/branches/{b}/protection")
+        code, body = yield Need("forge-api", "github", "github.com",
+                                f"repos/{slug}/branches/{b}/protection")
         if code == 200 and isinstance(body, dict):
             got = "pr" if body.get("required_pull_request_reviews") else "open"
         elif code == 404 and (_says(body, "not protected") or _says(body, "branch not found")):
@@ -495,12 +495,10 @@ def _judge(p, env):
         return None
     if url is None:
         return ask(say("ruleset_repo_unknown", branch=hits[0], remote=remote))
-    m = _GITHUB.search(url)
-    if not m:
+    r = sw.remote(url)
+    if not r or r.forge != "github":
         return None
-    if {".", ".."} & set(m.groups()):
-        return None
-    slug = f"{m.group(1)}/{m.group(2)}"
+    slug = r.repo
     asked = None
     for branch in hits:
         got = yield from _requires_pr(slug, branch)
