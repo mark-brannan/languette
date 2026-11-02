@@ -262,6 +262,22 @@ Feature: guard-private-terms
     When the agent runs `gh pr comment 3 -R o/r --body "repro under {HOME}/x"`
     Then the guard is silent
 
+  Scenario: a session starting on a host with no redacted terms file writes the defaults
+    Given CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE is unset
+    And XDG_CONFIG_HOME is "{TMP}/xdg"
+    When the session starts from "startup"
+    Then the file "{TMP}/xdg/languette/redacted-terms.tsv" holds the default redacted terms
+
+  Scenario: a session starting where the file is already there leaves it alone
+    Given CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE is unset
+    And XDG_CONFIG_HOME is "{TMP}/xdg"
+    And the file "{TMP}/xdg/languette/redacted-terms.tsv" holds:
+      """
+      mine
+      """
+    When the session starts from "startup"
+    Then the file "{TMP}/xdg/languette/redacted-terms.tsv" still holds "mine"
+
   Scenario Outline: another spelling of the home directory is redacted too, another user's is not
     Given CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE is unset
     When the agent runs `gh issue comment 3 -R o/r -b '<path>/x'`

@@ -112,6 +112,7 @@ class Act(Need):
         worktree-leave  rec, text           what the next call may adopt (<rec>.arrive)
         door-open       session             guard-github-issues' door, fresh; any claim dropped
         door-spend      session             that door and its claim, gone
+        terms-init      (none)              the default redacted terms file, where none is there
     """
 
     __slots__ = ()

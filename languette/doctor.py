@@ -589,11 +589,12 @@ def _defaults():
     return terms.defaults(Path(terms.DEFAULTS).read_text(encoding="utf-8"))
 
 
-def write_initial(kind, options):
+def write_initial(kind, options, env=None):
     """(mark, text): write the kind's file where the guard reads it, the redacted file with every
-    default, the blocked one with a header and no terms; None where a file is already there."""
-    path, _ = terms.where(kind, _env(options))
-    if os.path.lexists(path):
+    default, the blocked one with a header and no terms; None where a file is already there.
+    `env` is the guard's environment where the options are already in it (the hook's)."""
+    path, _ = terms.where(kind, _env(options) if env is None else env)
+    if not path or os.path.lexists(path):
         return None
     where = _tilde(path)
     if kind == "redacted":

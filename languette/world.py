@@ -33,7 +33,8 @@ _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 KINDS = frozenset("git gh-api pr-list which read path physical clock ruleset-cache claim worktree run door "
                   "send-state hostname".split())
 ACTS = {"ruleset-keep": "_ruleset_keep", "send-keep": "_send_keep", "worktree-keep": "_wt_keep",
-        "worktree-leave": "_wt_leave", "door-open": "_door_open", "door-spend": "_door_spend"}
+        "worktree-leave": "_wt_leave", "door-open": "_door_open", "door-spend": "_door_spend",
+        "terms-init": "_terms_init"}
 DOOR = "languette-guard-github-issues."   # + the session id, under $TMPDIR
 SEND_STATE = "languette-guard-cross-session-send."   # + session id, under $TMPDIR
 SEND_SUBAGENTS_MAX = 500            # names and ids kept per session; the oldest go first
@@ -445,6 +446,12 @@ class World:
             raise
 
     # --- acts ------------------------------------------------------------
+
+    def _terms_init(self):
+        """Write the default redacted terms file where the guard reads it, when none is there
+        (doctor.write_initial, as install does). The plugin's options are in this environment."""
+        from languette import doctor
+        doctor.write_initial("redacted", {}, self.env)
 
     def act(self, a):
         """Do one Act. Silent on any failure: an act comes after the verdict and
