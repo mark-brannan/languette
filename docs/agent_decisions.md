@@ -578,3 +578,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t175946z
 - names: modules issue_writes.py, opened_prs.py; tests issue-writes, pr-opens; handlers issue-door, door-open, door-spend, issue-timelines; rule ids issue-write, second-pr Undo: rename ([#349](https://github.com/mark-brannan/languette/pull/349))
+
+### 20261102t180000z
+- test_purity KNOWN entry for the door Needs re-keyed to issue_writes.py, the same two entries Undo: drop the entry ([#349](https://github.com/mark-brannan/languette/pull/349))
