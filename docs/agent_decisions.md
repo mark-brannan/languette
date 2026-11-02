@@ -545,3 +545,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t075737z
 - The hook line in docs/decisions.md is a pencil call under the maintainer 2026-10-30 line, not a dated maintainer line; that line links the maintainer comment r4421665440 on #308 instead of a #301 comment Undo: reword the line and revert the link ([#334](https://github.com/mark-brannan/languette/pull/334#discussion_r4439905544)) ([#334](https://github.com/mark-brannan/languette/pull/334))
+
+### 20261102t171723z
+- terms-init looks for the file before importing doctor; write_initial(kind, env) takes one environment Undo: revert b74c1f8 ([#338](https://github.com/mark-brannan/languette/pull/338))
