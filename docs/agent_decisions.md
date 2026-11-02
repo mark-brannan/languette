@@ -548,3 +548,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t171723z
 - terms-init looks for the file before importing doctor; write_initial(kind, env) takes one environment Undo: revert b74c1f8 ([#338](https://github.com/mark-brannan/languette/pull/338))
+
+### 20261102t173402z
+- guard-bypass-ruleset's and guard-cross-session-send's walks and handlers live in languette/pushes.py and languette/untrusted_reads.py, named for what each walk finds Undo: rename the two modules ([#348](https://github.com/mark-brannan/languette/pull/348))
