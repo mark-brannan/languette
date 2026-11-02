@@ -3,7 +3,6 @@ subprocess against a fake HOME of its own, with `claude` and the forge clients s
 first on PATH and this repo as the plugin's install path. conftest.py
 imports these, so pytest-bdd finds them."""
 
-import socket
 import json
 import os
 import re
@@ -263,7 +262,7 @@ def _holds_nothing(doctor, path):
 
 @given(parsers.parse('"{path}" holds the fixture "{name}"'))
 def _holds_fixture(doctor, path, name):
-    doctor.overrides[doctor.expand(path)] = fixture_text(name, str(doctor.home), socket.gethostname())
+    doctor.overrides[doctor.expand(path)] = fixture_text(name, str(doctor.home))
 
 
 @when("the doctor runs")
@@ -274,13 +273,13 @@ def _runs(doctor):
 @when(parsers.re(r'the doctor runs with `(?P<flag>--[a-z]+)` and the fixture "(?P<name>[^"]+)"(?: plus the line "(?P<extra>[^"]*)")?'))
 def _runs_with_fixture(doctor, flag, name, extra):
     post = doctor.aside / "post.md"
-    post.write_text(fixture_text(name, str(doctor.home), socket.gethostname()) + (f"\n{extra}" if extra else ""))
+    post.write_text(fixture_text(name, str(doctor.home)) + (f"\n{extra}" if extra else ""))
     doctor.run(doctor.home / "project", flag, str(post))
 
 
 @then(parsers.re(r'it prints the fixture "(?P<name>[^"]+)"'))
 def _prints_fixture(doctor, name):
-    want = fixture_text(name, str(doctor.home), socket.gethostname()).strip()
+    want = fixture_text(name, str(doctor.home)).strip()
     assert want in doctor.out, f"{want!r} not in:\n{doctor.out}{doctor.err}"
 
 
@@ -390,7 +389,7 @@ def _runs_with(doctor, args):
 
 @when(parsers.re(r'the doctor runs with `(?P<args>[^`]+)` and the fixture "(?P<name>[^"]+)" on stdin'))
 def _runs_with_stdin(doctor, args, name):
-    doctor.run(doctor.home / "project", *args.split(), stdin=fixture_text(name, str(doctor.home), socket.gethostname()))
+    doctor.run(doctor.home / "project", *args.split(), stdin=fixture_text(name, str(doctor.home)))
 
 
 @when(parsers.re(r'the doctor runs with `(?P<args>[^`]+)` and answers (?P<answer>yes|no)'))

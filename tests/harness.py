@@ -105,6 +105,17 @@ class Ctx:
         self._dirs.append(d)
         return d
 
+    def system_path(self):
+        """The default PATH plus a directory linking gh and timeout (or gtimeout) from the real PATH, so a
+        guard's `which` finds them where the OS keeps them (Homebrew's /opt/homebrew/bin on macOS) and
+        nothing else on the real PATH reaches the scenario."""
+        d = self.mkdtemp()
+        for tool in ("gh", "timeout", "gtimeout"):
+            found = shutil.which(tool)
+            if found:
+                os.symlink(found, os.path.join(d, tool))
+        return d + os.pathsep + os.defpath
+
     def doordir(self):
         # Lazy and once per scenario: the guard-github-issues state lives at
         # $TMPDIR/languette-guard-github-issues.<session>, and a scenario that opens
@@ -179,6 +190,8 @@ class Ctx:
                    **self.scenario_env()}
             if self.bare or self.stubs:
                 env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
+            elif "PATH" not in env:
+                env["PATH"] = self.system_path()
             if self.stub_log:
                 env["LANGUETTE_STUB_LOG"] = self.stub_log
             if self.arg:
@@ -290,7 +303,7 @@ class FakeHome:
         `stdin` as its input, nothing when None."""
         env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "LANGUETTE_")) and k not in SCRUB}
         env.update(HOME=str(self.home), USER=self.home.name, PATH=f"{self.bin}{os.pathsep}{path}", TMPDIR=str(self.aside),
-                   PYTHONPATH=str(ROOT), **self.env)
+                   PYTHONPATH=str(ROOT), HOSTNAME=PINNED_HOST, **self.env)
         self.before = self.snapshot()
         r = subprocess.run([sys.executable, "-m", "languette", *args], cwd=cwd, env=env, capture_output=True,
                            text=True, timeout=60, input=stdin or "")

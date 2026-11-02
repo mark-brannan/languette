@@ -72,7 +72,8 @@ jobs:
             curl -fsSL -o shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_darwin_arm64
             echo "1481240d2a90d4f0b530688d76d4f9117d17a756b6027cfa42b96f0707317f83  shfmt" | shasum -a 256 -c -
             sudo install -m 755 shfmt /usr/local/bin/shfmt
-            # guard-git-stacked-base wants a timeout; macOS ships none, Homebrew's coreutils has gtimeout.
+            # guard-git-stacked-base wants a timeout; macOS ships none, Homebrew's coreutils has gtimeout
+            # (the scenarios pass the runner's PATH on, so /opt/homebrew/bin is searched).
             brew install coreutils
           else
             sudo apt-get update -q

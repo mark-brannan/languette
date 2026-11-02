@@ -44,7 +44,7 @@ are planned ([#5](https://github.com/mark-brannan/languette/issues/5)).
 /plugin install languette@languette
 ```
 
-It needs `python3`, standard library only. `shfmt` (the parser it trusts
+It needs `python3` 3.11 or newer, standard library only. `shfmt` (the parser it trusts
 most) and `gh` (for the guards that ask GitHub) are optional.
 
 ### macOS
