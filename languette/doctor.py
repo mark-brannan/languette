@@ -589,11 +589,11 @@ def _defaults():
     return terms.defaults(Path(terms.DEFAULTS).read_text(encoding="utf-8"))
 
 
-def write_initial(kind, options, env=None):
+def write_initial(kind, env):
     """(mark, text): write the kind's file where the guard reads it, the redacted file with every
     default, the blocked one with a header and no terms; None where a file is already there.
-    `env` is the guard's environment where the options are already in it (the hook's)."""
-    path, _ = terms.where(kind, _env(options) if env is None else env)
+    `env` is the guard's environment, the installed options in it (_env, or the hook's own)."""
+    path, _ = terms.where(kind, env)
     if not path or os.path.lexists(path):
         return None
     where = _tilde(path)
@@ -625,17 +625,19 @@ def default_terms_rows(cwd):
     options say the guard reads it, as --init-redacted-terms does; a file already there is left
     alone and says nothing."""
     options = installed_options(cwd)
-    if not terms.where("redacted", _env(options))[0]:
+    env = _env(options)
+    if not terms.where("redacted", env)[0]:
         return []
-    done = write_initial("redacted", options)
+    done = write_initial("redacted", env)
     return [(done[0], "redacted terms", done[1])] if done else []
 
 
 def init(kind, options):
     """Write the kind's file, never over one that exists."""
-    done = write_initial(kind, options)
+    env = _env(options)
+    done = write_initial(kind, env)
     if done is None:
-        path, _ = terms.where(kind, _env(options))
+        path, _ = terms.where(kind, env)
         repair = "; to repair it: languette doctor --restore-redacted-terms" if kind == "redacted" else ""
         done = FAIL, f"{_tilde(path)} exists{repair}"
     print(f"{done[0]} {done[1]}")

@@ -20,7 +20,7 @@ import time
 from urllib.parse import quote
 
 from languette import paths
-from languette import scan as sw
+from languette import scan as sw, terms
 
 GIT_TIMEOUT = 5
 FORGE_TIMEOUT = 10
@@ -456,9 +456,13 @@ class World:
 
     def _terms_init(self):
         """Write the default redacted terms file where the guard reads it, when none is there
-        (doctor.write_initial, as install does). The plugin's options are in this environment."""
+        (doctor.write_initial, as install does). The plugin's options are in this environment.
+        The path is looked for first: doctor is imported only on the session that writes."""
+        path, _ = terms.where("redacted", self.env)
+        if not path or os.path.lexists(path):
+            return
         from languette import doctor
-        doctor.write_initial("redacted", {}, self.env)
+        doctor.write_initial("redacted", self.env)
 
     def act(self, a):
         """Do one Act. Silent on any failure: an act comes after the verdict and
