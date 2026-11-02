@@ -42,7 +42,7 @@ def _out(event, fields):
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
     from languette.guards import (guard_bypass_ruleset,
-                                  guard_cross_session_send, guard_disks, guard_duplicate_prs,
+                                  guard_cross_session_send, guard_duplicate_prs,
                                   guard_git_work_loss, guard_github_issues,
                                   guard_review_threads,
                                   guard_signed_comments, require_well_formed,
@@ -52,6 +52,7 @@ try:
     from languette.rules import (ask_first as _ask_first, deny_always as _deny_always,
                                  guard_bypass_hooks as _guard_bypass_hooks,
                                  guard_bypass_labels as _guard_bypass_labels,
+                                 guard_disks as _guard_disks,
                                  guard_git_stacked_base as _guard_git_stacked_base,
                                  guard_host_availability as _guard_host_availability,
                                  guard_infra as _guard_infra,
@@ -70,6 +71,7 @@ try:
     deny_always, guard_sudo = engine.Guard(_deny_always), engine.Guard(_guard_sudo)
     guard_bypass_labels = engine.Guard(_guard_bypass_labels)
     guard_private_terms = engine.Guard(_guard_private_terms)
+    guard_disks = engine.Guard(_guard_disks)
     guard_host_availability = engine.Guard(_guard_host_availability)
     guard_permissions = engine.Guard(_guard_permissions)
     guard_pipe_to_shell = engine.Guard(_guard_pipe_to_shell)
