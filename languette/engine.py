@@ -16,7 +16,10 @@ unset, the entry matches nothing. `host_verbs` names a table of systemctl verbs
 that take the host down, which need no unit. An entry may instead be `{"test": name}`, one of the named tests in
 languette/primitives.py, whose answer fills the message. A test that needs facts of the world
 asks for them and gives the verdict itself, a deny or a context; its rule has no `why`. `action`
-is "deny", the one action this engine reads yet. `why` names the message that explains it, filled
+is "deny", the one action this engine reads yet. `handler`, optional, names a stateful guard's
+code in primitives.HANDLERS: when the match selects the call, the handler is given the Document,
+the guard's name and what the match found (`cmd`, `verb` and a test's fields), gathers the facts
+it needs as Needs, writes as Acts, and gives the verdict itself; its rule has no `why`. `why` names the message that explains it, filled
 with the command word it matched (`cmd`), the stop it found (`verb`) and `way_user`.
 `read`, optional, says how scan reads the call's words, for every entry:
 `process_prose` false makes pkill, ps and kin commands, and `launchers` false
@@ -35,6 +38,7 @@ command, naming the file and the fault. Guard(module) is a guard as run.py
 drives one: a NAME and check(doc).
 """
 
+import inspect
 import os
 
 from languette import paths, primitives
@@ -55,6 +59,13 @@ def _shipped(r, where):
     if r.get("action") != "deny":
         raise sw.BadRules(f'{where}.action must be "deny"')
     m = r.get("match")
+    if "handler" in r:
+        if not inspect.isgeneratorfunction(primitives.HANDLERS.get(r["handler"])):
+            raise sw.BadRules(f"{where}.handler must name a handler languette holds")
+        if "why" in r or (isinstance(m, list) and any(isinstance(e, dict) and primitives.judges(e.get("test"))
+                                                      for e in m)):
+            raise sw.BadRules(f"{where}: a rule with a handler has no why, and no test that judges")
+        return                                 # the handler says its own reason
     if isinstance(m, list) and m and all(isinstance(e, dict) and isinstance(e.get("test"), str)
                                          and primitives.judges(e["test"]) for e in m):
         return                                 # the test says its own reason
@@ -120,7 +131,7 @@ def load(rule_set):
                                 or not isinstance(units.get("names", []), list)
                                 or ("names" in units and not (units["names"] and all(isinstance(x, str) for x in units["names"])))):
         raise sw.BadRules("units must be an object holding setting (and optionally drop) or names, a non-empty list of strings")
-    rules = sw.load_rules({"rules": rule_set["rules"]}, "rules", ("action", "why"), _shipped, many=True,
+    rules = sw.load_rules({"rules": rule_set["rules"]}, "rules", ("action", "why", "handler"), _shipped, many=True,
                           match_keys=sw.SHIPPED_MATCH_KEYS)
     for n, r in enumerate(rules):
         for i, e in enumerate(r["match"]):
@@ -202,7 +213,12 @@ class Guard:
             hit = yield from _hit(doc, rule, self._read, self.RULE_SET.get("units"))
             if isinstance(hit, dict):
                 return hit
-            if hit:
+            if hit and "handler" in rule:
+                found = {"cmd": hit[0], "verb": hit[1], **hit[2]}
+                got = yield from primitives.HANDLERS[rule["handler"]](doc, self.NAME, found)
+                if got is not None:
+                    return got
+            elif hit:
                 have = {"cmd": hit[0], "verb": hit[1], "way_user": WAY_USER, **hit[2]}
                 return say(rule["why"], **{k: v for k, v in have.items() if "{" + k + "}" in MESSAGES[rule["why"]]})
         for rule in shipped:

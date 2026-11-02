@@ -20,12 +20,8 @@ Latin-1 and a few others, case-folded. Standard library only.
 
 import re
 
-try:
-    from re import _constants as C
-    from re import _parser as P
-except ImportError:                                    # Python before 3.11
-    import sre_constants as C
-    import sre_parse as P
+from re import _constants as C
+from re import _parser as P
 
 _ALPHA = frozenset(chr(i) for i in range(0x250)) | {"中", "٣"}
 _CATEGORY = {"DIGIT": r"\d", "NOT_DIGIT": r"\D", "SPACE": r"\s", "NOT_SPACE": r"\S", "WORD": r"\w", "NOT_WORD": r"\W"}

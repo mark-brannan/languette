@@ -1,4 +1,5 @@
-"""guard-git-stacked-base: deleting a remote branch that an open pull request
+"""guard-git-stacked-base's walk and its handler (languette/rules/guard_git_stacked_base.py
+is the rule set): deleting a remote branch that an open pull request
 still names as its base or its head is denied. The spec is
 features/guard-git-stacked-base.feature.
 
@@ -24,7 +25,6 @@ from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Need, ask, deny
 
-NAME = "guard-git-stacked-base"
 GH = re.compile(r"(?:^|/)(?:gh|glab)\Z")
 _UNRESOLVED = re.compile(r"[$`*?\[]")
 _REPO = re.compile(r"(?:^|/)repos/[^/]+/[^/]+/")
@@ -114,45 +114,50 @@ def deletions(doc):
     return out
 
 
-def _unreadable(b):
-    return ask(say("sb_unreadable", guard=NAME, b=b, list=LIST))
+def _unreadable(guard, b):
+    return ask(say("sb_unreadable", guard=guard, b=b, list=LIST))
 
 
-def check(doc):
-    payload = doc.payload
+def deleted(doc):
+    """The `branch-deletions` test: {"deleted": deletions(doc)}, or None when there are none."""
     cmd = doc.text
     if not cmd or ("push" not in cmd and "refs/heads/" not in cmd):
         return None
-    found = deletions(doc)
-    if not found:
-        return None
-    if any(b == "?" for _, b in found):
-        return ask(say("sb_unresolved", guard=NAME, list=LIST))
-    if any(r == "?" for r, _ in found):
-        return ask(say("sb_other_repo", guard=NAME))
+    out = deletions(doc)
+    return {"deleted": out} if out else None
+
+
+def open_prs(doc, guard, found):
+    """The `open-prs` handler: asks GitHub, through `gh pr list` under a timeout, whether an
+    open PR names a deleted branch as its base or its head; asks when it cannot tell."""
+    deleted = found["deleted"]
+    if any(b == "?" for _, b in deleted):
+        return ask(say("sb_unresolved", guard=guard, list=LIST))
+    if any(r == "?" for r, _ in deleted):
+        return ask(say("sb_other_repo", guard=guard))
     if not (yield Need("which", "gh")):
-        return ask(say("sb_no_gh", guard=NAME))
+        return ask(say("sb_no_gh", guard=guard))
     bound = None
     for t in ("timeout", "gtimeout"):          # GNU coreutils' name, then Homebrew's
         if (yield Need("which", t)):
             bound = t
             break
     if not bound:
-        return ask(say("sb_no_timeout", guard=NAME, list=LIST))
-    cwd = payload["cwd"]
-    for repo, b in dict.fromkeys(found):
+        return ask(say("sb_no_timeout", guard=guard, list=LIST))
+    cwd = doc.payload["cwd"]
+    for repo, b in dict.fromkeys(deleted):
         for side, field in (("--base", "baseRefName"), ("--head", "headRefName")):
             argv = [bound, str(TIMEOUT), "gh", "pr", "list", "--state", "open"]
             argv += [side, b] if repo == "-" else ["-R", repo, side, b]
             out = yield Need("pr-list", cwd, *argv, "--json", "number,title,baseRefName,headRefName")
             if not out:
-                return _unreadable(b)
+                return _unreadable(guard, b)
             try:
                 prs = [f"#{p['number']} {p['title']}" for p in json.loads(out) if p.get(field) == b]
             except (ValueError, TypeError, KeyError, AttributeError):
-                return ask(say("sb_unparsed", guard=NAME, b=b))
+                return ask(say("sb_unparsed", guard=guard, b=b))
             if prs and side == "--base":
-                return deny(say("sb_base_open", guard=NAME, b=b, prs="\n".join(prs), advice=say("sb_advice", b=b)))
+                return deny(say("sb_base_open", guard=guard, b=b, prs="\n".join(prs), advice=say("sb_advice", b=b)))
             if prs:
-                return deny(say("sb_head_open", guard=NAME, b=b, prs="\n".join(prs)))
+                return deny(say("sb_head_open", guard=guard, b=b, prs="\n".join(prs)))
     return None
