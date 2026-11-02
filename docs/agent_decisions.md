@@ -584,3 +584,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t180011z
 - design doc left unedited; its stage-3 line still reads true Undo: edit the stage-3 line ([#349](https://github.com/mark-brannan/languette/pull/349))
+
+### 20261102t185711z
+- Option tables stay in each guard as rule data; only the getopt walk lives in scan, and scan's PROGRAMS is not folded in Undo: revert 5eca6db ([#333](https://github.com/mark-brannan/languette/pull/333#discussion_r4446470798)) ([#333](https://github.com/mark-brannan/languette/pull/333))
