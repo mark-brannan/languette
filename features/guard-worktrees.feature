@@ -517,6 +517,139 @@ Feature: guard-worktrees
       When the agent runs `chezmoi purge && git switch some-branch`
       Then the guard denies
 
+  Rule: rcm's forced rcup and rcdn, dotbot's config, homeshick's forced link and home-manager's switch and uninstall ask
+
+    Background:
+      Given HOME is "{TMP}"
+      And the directory "{TMP}/subdir"
+      And a project directory
+
+    # The same ask as chezmoi's, from one table of rows (program, verb, flags).
+    # Each is read by its shape; the program need not be installed.
+    #
+    # rcup -f replaces existing files without asking; rcdn removes everything
+    # rcup installed. homeshick link --force replaces what a castle conflicts
+    # with. dotbot's `force`, `relink` and `clean` are keys in the config that
+    # -c names, which the command never shows, so a call that applies a config
+    # asks. home-manager switch swaps the managed files for links into the
+    # read-only Nix store and uninstall removes them. A dry run, help and the
+    # unforced rcup and homeshick link (which prompt) pass.
+    Scenario Outline: a dotfile-manager call that overwrites or removes in $HOME asks
+      Given the working directory is "<cwd>"
+      When the agent runs `<command>`
+      Then the guard asks, naming "<named>"
+
+      Examples:
+        | cwd      | command                                          | named                        |
+        | {TMP}    | rcup -f                                          | `rcup -f`                    |
+        | {PROJ}   | rcup -f                                          | `rcup -f`                    |
+        | /tmp     | rcup -f                                          | `rcup -f`                    |
+        | {TMP}    | rcup -fv                                         | `rcup -f`                    |
+        | {TMP}    | rcup -v -f -d ~/dots                             | `rcup -f`                    |
+        | {TMP}    | rcup -d ~/dots -f                                | `rcup -f`                    |
+        | {TMP}    | rcup -fd ~/dots                                  | `rcup -f`                    |
+        | {TMP}    | rcup -f ~/.bashrc                                | `rcup -f`                    |
+        | {TMP}    | /usr/bin/rcup -f                                 | `rcup -f`                    |
+        | {TMP}    | rcdn                                             | `rcdn`                       |
+        | {TMP}    | rcdn -v                                          | `rcdn`                       |
+        | {TMP}    | rcdn -d ~/dots -t vim                            | `rcdn`                       |
+        | {TMP}    | homeshick link castle --force                    | `homeshick link --force`     |
+        | {TMP}    | homeshick symlink castle --force                 | `homeshick symlink --force`  |
+        | {TMP}    | homeshick --force link castle                    | `homeshick link --force`     |
+        | {TMP}    | homeshick link -f castle                         | `homeshick link -f`          |
+        | {TMP}    | homeshick link castle --forc                     | `homeshick link --force`     |
+        | {TMP}    | dotbot -c install.conf.yaml                      | `dotbot -c`                  |
+        | {TMP}    | dotbot -d ~/dots -c install.conf.yaml            | `dotbot -c`                  |
+        | {TMP}    | dotbot -cinstall.conf.yaml                       | `dotbot -c`                  |
+        | {TMP}    | dotbot --config-file install.conf.yaml           | `dotbot --config-file`       |
+        | {TMP}    | dotbot --config=install.conf.yaml                | `dotbot --config-file`       |
+        | {TMP}    | ~/dots/dotbot/bin/dotbot -c install.conf.yaml    | `dotbot -c`                  |
+        | {TMP}    | home-manager switch                              | `home-manager switch`        |
+        | {TMP}    | home-manager switch --flake ~/dots#me            | `home-manager switch`        |
+        | {TMP}    | home-manager --flake ~/dots switch               | `home-manager switch`        |
+        | {TMP}    | home-manager -b bak switch                       | `home-manager switch`        |
+        | {TMP}    | home-manager --option cores 4 switch             | `home-manager switch`        |
+        | {TMP}    | home-manager uninstall                           | `home-manager uninstall`     |
+        | {TMP}    | home-manager --builders x switch                 | `home-manager switch`        |
+        | {TMP}    | home-manager --extra-substituters u switch       | `home-manager switch`        |
+        | {TMP}    | home-manager --max-silent-time 5 switch         | `home-manager switch`        |
+        | {TMP}    | home-manager -b switch                           | `home-manager switch`        |
+        | {TMP}    | home-manager switch --dry                        | `home-manager switch`        |
+        | {TMP}    | homeshick --unlisted x link castle --force       | `homeshick link --force`     |
+        | {TMP}    | dotbot --version rcup -f                         | `rcup -f`                    |
+        | {TMP}    | echo hi && rcdn                                  | `rcdn`                       |
+        | {TMP}    | sh -c 'rcup -f'                                  | `rcup -f`                    |
+        | {TMP}    | rcup -f && home-manager uninstall                | `home-manager uninstall`     |
+
+    Scenario Outline: a dotfile-manager call that changes nothing in $HOME, or only after a prompt, passes
+      Given the working directory is "{TMP}"
+      When the agent runs `<command>`
+      Then the guard is silent
+
+      Examples:
+        | command                                          |
+        | rcup                                             |
+        | rcup -v                                          |
+        | rcup -d f                                        |
+        | rcup -t f                                        |
+        | rcup -fg                                         |
+        | rcup -- -f                                       |
+        | rcdn -h                                          |
+        | rcdn -V                                          |
+        | rcdn -g                                          |
+        | lsrc                                             |
+        | mkrc ~/.bashrc                                   |
+        | homeshick link castle                            |
+        | homeshick --force pull castle                    |
+        | homeshick list                                   |
+        | homeshick link -- --force                        |
+        | dotbot --version                                 |
+        | dotbot -h                                        |
+        | dotbot -d ~/dots                                 |
+        | home-manager build                               |
+        | home-manager generations                         |
+        | home-manager packages                            |
+        | home-manager switch --dry-run                    |
+        | home-manager switch -n                           |
+        | home-manager uninstall -n                        |
+        | home-manager --help                              |
+        | echo 'rcup -f'                                   |
+        | echo rcdn                                        |
+        | which rcdn                                       |
+        | man rcdn                                         |
+        | git commit -m 'home-manager switch'              |
+        | notrcdn                                          |
+        | dotbot-helper -c x                               |
+
+    Scenario: a dotfile-manager ask is a deny where the user cannot be asked
+      Given the working directory is "{TMP}"
+      And the permission mode is "dontAsk"
+      When the agent runs `rcup -f`
+      Then the guard denies
+
+    Scenario: two dotfile-manager asks in one command give one ask naming both
+      Given the working directory is "{TMP}"
+      When the agent runs `rcup -f && chezmoi purge`
+      Then the guard asks, naming "`rcup -f`"
+      And the guard asks, naming "`chezmoi purge`"
+
+    # A valued option the table lacks would hide the verb if it were read by position, so the
+    # verb is any word before a bare --; a value spelled like it asks, the cost of failing closed.
+    # home-manager's script matches options exactly, so --dry is no --dry-run.
+    Scenario: a chezmoi ask and a dotfile-manager ask in one command say both hazards
+      Given the working directory is "{TMP}"
+      When the agent runs `chezmoi apply --force && rcdn`
+      Then the guard asks, naming "`chezmoi apply --force`"
+      And the guard asks, naming "`rcdn`"
+      And the guard asks, naming "chezmoi's own prompt"
+      And the guard asks, naming "rcdn and home-manager uninstall remove"
+
+    Scenario: a dotfile-manager ask and a branch switch in one command is the switch's deny
+      Given the working directory is "{TMP}"
+      And a git repository at "{TMP}"
+      When the agent runs `rcdn && git switch some-branch`
+      Then the guard denies
+
   Rule: a session may not reach into a linked worktree that is not its own
 
     Background:

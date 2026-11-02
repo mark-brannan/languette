@@ -65,14 +65,13 @@ _WHOLE = re.compile(r"(?:\.|\./|\./\*|:/|:/\.|\*)\Z")
 _UNRESOLVED = re.compile(r"\A[:~]|[$`*?\[{}]")
 STATUS_TIMEOUT = 5
 STOW = re.compile(r"(?:^|/)stow\Z")
-# stow's own option table (its Getopt::Long spec): long name -> takes a value. Like git, stow
-# takes any unambiguous prefix of a long name, and a value either after `=` or as the next word.
-_STOW_LONG = {"adopt": False, "compat": False, "dotfiles": False, "no-folding": False, "simulate": False,
-              "no": False, "verbose": False, "help": False, "version": False, "stow": False,
-              "delete": False, "restow": False, "dir": True, "target": True, "ignore": True,
-              "defer": True, "override": True}
-_STOW_SHORT = {"n": "simulate", "v": "verbose", "p": "compat", "S": "stow", "D": "delete", "R": "restow",
-               "V": "version", "h": "help", "d": "dir", "t": "target"}
+# stow's own option table (its Getopt::Long spec), as scan.getopt reads it: option -> words its
+# value takes. Like git, stow takes any unambiguous prefix of a long name.
+_STOW = {**{"--" + o: 0 for o in "adopt compat dotfiles no-folding simulate no verbose help version stow delete "
+                                 "restow".split()},
+         **{"--" + o: 1 for o in "dir target ignore defer override".split()}, "-d": 1, "-t": 1}
+_STOW_SHORT = {"-n": "--simulate", "-v": "--verbose", "-p": "--compat", "-S": "--stow", "-D": "--delete",
+               "-R": "--restow", "-V": "--version", "-h": "--help"}
 # Words that re-aim the tree a discard is judged in, or the config git reads. A git global
 # option naming a tree or config counts only as one of git's own (`sh -c` is not git's -c);
 # the environment's spelling and any config naming a work tree count in any word. A cd,
@@ -456,48 +455,21 @@ def _staging_where_agents_work(doc, names):
     raise Refuse(say("wl_add_all"))
 
 
-def _stow_long(t):
-    """The stow long option `--name[=value]` names, or None when it names none or several."""
-    name = t[2:].partition("=")[0]
-    if name in _STOW_LONG:
-        return name
-    hit = [f for f in _STOW_LONG if f.startswith(name)] if name else []
-    return hit[0] if len(hit) == 1 else None
-
-
 def _stow_adopts(a):
     """True when the stow words `a` run --adopt on some package that is stowed or restowed.
     An action option (-S, -D, -R) holds for the package names after it, the default being
-    stow. An unknown option is skipped as flag-only, so it cannot hide an --adopt after it."""
-    adopt, action, stowed, i, n = False, "stow", False, 0, len(a)
-    while i < n:
-        t = a[i]
-        i += 1
-        if t in ("--", "--end-of-options"):
-            stowed = stowed or (i < n and action != "delete")
-            break
-        if t.startswith("--"):
-            name = _stow_long(t)
-            if name in ("help", "version", "simulate", "no"):
-                return False
-            if name == "adopt":
-                adopt = True
-            elif name in ("stow", "delete", "restow"):
-                action = name
-            elif _STOW_LONG.get(name) and "=" not in t:
-                i += 1
-        elif t.startswith("-") and t != "-":
-            for j, ch in enumerate(t[1:], 1):
-                name = _STOW_SHORT.get(ch)
-                if name in ("help", "version", "simulate"):
-                    return False
-                if name in ("stow", "delete", "restow"):
-                    action = name
-                elif _STOW_LONG.get(name):
-                    i += j == len(t) - 1
-                    break
-        else:
-            stowed = stowed or action != "delete"
+    stow. An unknown option is read as flag-only, so it cannot hide an --adopt after it."""
+    adopt, action, stowed = False, "--stow", False
+    for opt, _ in sw.getopt(a, _STOW, abbreviate=True, ends=("--", "--end-of-options")):
+        opt = _STOW_SHORT.get(opt, opt)
+        if opt is None:
+            stowed = stowed or action != "--delete"
+        elif opt in ("--help", "--version", "--simulate", "--no"):
+            return False
+        elif opt == "--adopt":
+            adopt = True
+        elif opt in ("--stow", "--delete", "--restow"):
+            action = opt
     return adopt and stowed
 
 

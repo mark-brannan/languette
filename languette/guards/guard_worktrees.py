@@ -3,7 +3,7 @@ spec is features/guard-worktrees.feature.
 
   checkout-home  a `git`/`yadm`/`vcsh` checkout or switch that would move the branch
                  checked out in $HOME, when $HOME is itself a worktree; and
-                 chezmoi's forced apply, destroy and purge
+                 chezmoi's forced apply, destroy and purge, and the rows of ROWS
   foreign        a reach into a linked worktree that is not this session's own,
                  by a Bash word, a file tool's path, or EnterWorktree(path=...)
 
@@ -48,6 +48,11 @@ unforced apply or update passes, since chezmoi prompts before it overwrites a
 target changed since it last wrote one, and with no TTY the prompt errors
 rather than answering itself.
 
+The other managers are the rows of ROWS, asked the same way: `rcup -f`, `rcdn`,
+`homeshick link --force`, `dotbot -c` (whose config holds `force`, `relink` and
+`clean`, unseen on the command line), `home-manager switch` and `uninstall`. Each
+row's quiet flags (a dry run, help) pass.
+
 foreign. Another session's worktree is never a place to work:
 the session that owns a worktree may archive it mid-turn under anyone who
 reached in. Any path-shaped word (or the word after -C, or a cd target) that
@@ -69,6 +74,7 @@ one-command recipe for the session's own worktree.
 
 import os
 import re
+from collections import namedtuple
 
 from languette import scan as sw
 from languette.messages import say
@@ -87,7 +93,6 @@ _TILDE_LOST = re.compile(r"~(?:-|[+-]?[0-9]+)(?:/|\Z)")
 _FS_CHANGE = re.compile(r"(?:^|/)(?:ln|link|mv|cp|rsync|tar|unzip|cpio)\Z")
 # chezmoi: its global options that take a value as the next word (-R/--refresh-externals
 # takes one only glued on); past them the first word that is no option is the verb.
-_CHEZMOI = re.compile(r"(?:^|/)chezmoi\Z")
 _CHEZMOI_VALUED = frozenset("-c --config --config-format -D --destination -S --source -W --working-tree "
                             "-o --output --cache --persistent-state --age-recipient --age-recipient-file "
                             "--mode --override-data --override-data-file --color --progress "
@@ -138,6 +143,78 @@ def _chezmoi_hit(s, c, b):
         return verb
     if force and (verb == "apply" or (verb == "update" and apply is not False) or (verb == "init" and apply)):
         return verb + " --force"
+    return None
+
+
+# The other dotfile managers' apply, force and teardown verbs, one row each (program,
+# verbs, flags), read by the shape of the command: none need be installed. A row hits
+# when one of its verbs (aliases, as a tuple; None: any call) is a word, one of its flags is set
+# (empty: none needed) and none of its quiet flags is (a dry run, help). The hazard of
+# each is in its comment, and wt_dotfiles says them all.
+Row = namedtuple("Row", "program verbs flags quiet")
+ROWS = (
+    Row("rcup", None, ("-f",), ("-g", "-h", "-V")),                # replaces existing files, unasked
+    Row("rcdn", None, (), ("-g", "-h", "-V")),                     # removes everything rcup installed
+    Row("homeshick", ("link", "symlink"), ("-f", "--force"), ()),               # replaces what a castle conflicts with
+    # dotbot's `force`, `relink` and `clean` are keys of the config that -c names; the
+    # command line never shows them, so any call that applies a config asks.
+    Row("dotbot", None, ("-c", "--config-file"), ()),
+    Row("home-manager", ("switch",), (), ("-n", "--dry-run", "-h", "--help")),     # links into the Nix store
+    Row("home-manager", ("uninstall",), (), ("-n", "--dry-run", "-h", "--help")),  # removes the generation's files
+)
+# Each program's options as scan.getopt reads them: option -> how many words its value takes, 0
+# for a flag; one not listed is a flag. A long option may be any unique prefix only for
+# ABBREVIATING, whose parsers read it so.
+OPTIONS = {
+    "rcup": {"-" + c: 1 for c in "BdItUxS"},
+    "rcdn": {"-" + c: 1 for c in "BdItUxS"},
+    "homeshick": {"--force": 0, "--quiet": 0, "--skip": 0, "--batch": 0, "--verbose": 0},
+    "dotbot": {"-c": 1, "-d": 1, "-p": 1, "--config-file": 1, "--base-directory": 1, "--plugin": 1,
+               "--plugin-dir": 1, "--only": 0, "--except": 0},
+    "home-manager": {"-b": 1, "-f": 1, "-I": 1, "-A": 1, "-j": 1, "--file": 1, "--flake": 1, "--max-jobs": 1,
+                     "--cores": 1, "--option": 2, "--override-input": 2, "--extra-experimental-features": 1,
+                     "--dry-run": 0, "--help": 0},
+}
+
+
+ABBREVIATING = frozenset(("dotbot", "homeshick"))
+_MANAGER = re.compile(r"(?:^|/)(chezmoi|" + "|".join(map(re.escape, OPTIONS)) + r")\Z")
+
+
+def _manager_hit(s, c, b, program):
+    """The spelling of the row of ROWS the call of `program` at c in segment c..b hits,
+    as the program's own words (`rcup -f`, `homeshick link --force`), or None. Options
+    are read up to a bare --. The verb is any word before it that is no option: an
+    option the table lacks may take a value, and reading the verb by position would let
+    its value hide `switch`, so a value spelled like the verb asks too."""
+    stop = next((j for j in range(c + 1, b + 1) if s.w[j] == "--"), b + 1)
+    words = {s.w[j] for j in range(c + 1, stop) if s.k[j] == "w" and not s.w[j].startswith("-")}
+    seen = {o for o, _ in sw.getopt(s.w[c + 1:b + 1], OPTIONS[program], program in ABBREVIATING) if o}
+    for row in ROWS:
+        verb = next((v for v in row.verbs if v in words), None) if row.verbs else None
+        if (row.program == program and (row.verbs is None or verb) and (not row.flags or seen & set(row.flags))
+                and not seen & set(row.quiet)):
+            return " ".join(x for x in (program, verb, next((f for f in row.flags if f in seen), None)) if x)
+    return None
+
+
+_READERS = sw.PROSE_PROCESS | {"man"}  # commands that name a manager, not run it
+
+
+def _home_ask(s, a, b, nested):
+    """(kind, spelling) of a dotfile-manager call in segment a..b that overwrites or
+    removes in $HOME, or None: kind is "chezmoi" or "dotfiles" (a row of ROWS). Every
+    manager's word in the segment is read, in one scan, not only the first."""
+    while (z := sw.cmd_index(s, a, b, _MANAGER, nested, prose=_READERS)) is not None:
+        program = _MANAGER.search(s.w[z]).group(1)
+        if program == "chezmoi":
+            hit = _chezmoi_hit(s, z, b)
+            hit = hit and "chezmoi " + hit
+        else:
+            hit = _manager_hit(s, z, b, program)
+        if hit:
+            return ("chezmoi" if program == "chezmoi" else "dotfiles", hit)
+        a = z + 1
     return None
 
 
@@ -193,7 +270,7 @@ def _expand(raw, base, home):
 def _home_events(doc):
     """The command's moves, in order: ("DENY", the wrapper as it is typed) for a
     checkout/switch by a wrapper whose work tree is always $HOME,
-    ("ASK", spelling) for a chezmoi call that overwrites or removes in $HOME,
+    ("ASK", (kind, spelling)) for a dotfile-manager call that overwrites or removes in $HOME,
     ("CD", v), ("ENV", kind, v) for a GIT_DIR=/GIT_WORK_TREE= outside a git
     segment, ("FS",) for a segment that may make a link or move, copy or
     unpack one into place (a `git mv` too), and ("G", [(kind, v)]) for one git
@@ -212,8 +289,7 @@ def _home_events(doc):
                 continue
             g = sw.cmd_index(s, a, b, sw.GIT, nested)
             if g is None:
-                z = sw.cmd_index(s, a, b, _CHEZMOI, nested)
-                if z is not None and (hit := _chezmoi_hit(s, z, b)):
+                if hit := _home_ask(s, a, b, nested):
                     out.append(("ASK", hit))
                     continue
                 for i in range(a, b + 1):
@@ -325,8 +401,8 @@ def _landings(raw, bases, home):
 
 
 class _Ask(Exception):
-    """A control's question to the user, not a refusal: the chezmoi spellings it
-    asks about. A later control's deny still outranks it."""
+    """A control's question to the user, not a refusal: the spellings of
+    the dotfile-manager calls it asks about. A later control's deny still outranks it."""
 
 
 def _generic(prog, cwd):
@@ -798,5 +874,13 @@ def check(doc):
         if note:
             notes.append(note)
     if asked:
-        return ask(say("wt_chezmoi", guard=NAME, hits=", ".join(f"`chezmoi {h}`" for h in dict.fromkeys(asked))))
+        def hits(kind):
+            return ", ".join(f"`{h}`" for k, h in dict.fromkeys(asked) if k == kind)
+
+        said = []
+        if hits("chezmoi"):
+            said.append(say("wt_chezmoi", hits=hits("chezmoi")))
+        if hits("dotfiles"):
+            said.append(say("wt_dotfiles", hits=hits("dotfiles")))
+        return ask(say("wt_home_ask", guard=NAME, said=" ".join(said)))
     return context(say("passed", text="\n\n".join(notes))) if notes else None

@@ -973,6 +973,37 @@ def operands(words, valued=(), options=False):
     return out
 
 
+def getopt(words, options, abbreviate=False, ends=("--",)):
+    """Read `words` as a getopt_long parser does: yield (option, word) for each option set,
+    and (None, word) for each operand, every word past one of `ends` included. `options`
+    maps an option (`-c`, `--file`) to how many words its value takes when not glued on with
+    = or to its short letter, 0 for a flag; an option it lacks is a flag, so it cannot hide
+    what follows it. A cluster `-xvf` sets each letter up to a valued one, whose value is the
+    rest. With `abbreviate`, a unique prefix of a long option in `options` is that option."""
+    i, n = 0, len(words)
+    while i < n:
+        w = words[i]
+        i += 1
+        if w in ends:
+            yield from ((None, x) for x in words[i:])
+            return
+        if w.startswith("--"):
+            name, eq, _ = w.partition("=")
+            same = [o for o in options if o == name]
+            same = same or [o for o in options if abbreviate and o.startswith("--") and o.startswith(name)]
+            name = same[0] if len(same) == 1 else name
+            yield name, w
+            i += 0 if eq else options.get(name, 0)
+        elif w.startswith("-") and w != "-":
+            for j, ch in enumerate(w[1:], 1):
+                yield "-" + ch, w
+                if options.get("-" + ch):
+                    i += options["-" + ch] if j == len(w) - 1 else 0
+                    break
+        else:
+            yield None, w
+
+
 def word(s, i):
     """The text of word i: q for a quoted word holding whitespace (the w list
     has $Q there), w for any other."""
