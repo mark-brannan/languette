@@ -429,6 +429,8 @@ Feature: guard-git-work-loss
       | /usr/bin/git add -A                 | denies    | a full path                        |
       | git stash drop stash@{3}            | is silent | by ref                             |
       | git stash drop abc123               | is silent | by sha                             |
+      | git push --delete origin claude/foo | is silent | deleting a branch that is not main |
+      | git push origin :claude/foo         | is silent | the same, by refspec               |
 
     @also_guard-sudo
     Examples:
@@ -441,8 +443,6 @@ Feature: guard-git-work-loss
       | git push --delete origin main       | denies    |                                    |
       | git push -d origin main             | denies    |                                    |
       | git push origin :main               | denies    |                                    |
-      | git push --delete origin claude/foo | is silent | deleting a branch that is not main |
-      | git push origin :claude/foo         | is silent | the same, by refspec               |
 
   Scenario: a footgun after a heredoc is still run
     When the agent runs:

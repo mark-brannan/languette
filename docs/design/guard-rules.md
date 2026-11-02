@@ -60,10 +60,11 @@ value is never read as a subcommand, and where the subcommand sits. git's
 comes from #197's finder; infra's `VALUED` table is the same thing for six
 programs.
 
-The registry grows when a rule needs a primitive, not before. Seventeen
-predicates serve one guard each today; those are that guard's own logic and
-stay beside it, named, until a second guard asks. A primitive two guards
-share lands in scan or verdict first (decisions: "New guards").
+The registry grows when a rule needs a primitive, not before. Seventeen predicates serve one guard each today; those are
+that guard's own logic and stay in `primitives.py` or a module it names (the text guards' walks of a post are `labels.py`
+and `posts.py`), a rule naming one as `{"test": name}`, until a second guard asks. A test that needs a fact (where a target
+really is) yields a Need and gives its own verdict, as the text guards do; a rule set whose guard also judges a call with no
+command, an MCP tool's, says `"calls": "any"`. A primitive two guards share lands in scan or verdict first (decisions: "New guards").
 
 Sequence is a fact, never a condition: the five guards that would lose
 precision as pure data (git-work-loss relaxations, bypass-ruleset binding,
@@ -129,8 +130,7 @@ list; what it built is then described above.
 1. The registry: the shared selectors first (the `gh api` walk, cd
    tracking, word-live, the valued-option tables), each landing with the
    guards that repeat it moved onto it.
-2. The command guards move, smallest first, two to a change, the rest waiting on the primitives their rules name; then the text guards, whose
-   `secret_rules`, term list and label list are already data.
+2. The command guards move, smallest first, two to a change, the rest waiting on the primitives their rules name.
 3. The stateful guards: their rules move, their handlers stay code.
 4. The repo tier, once its bounds are decided.
 

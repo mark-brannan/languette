@@ -176,11 +176,11 @@ def _fetch(p):
     try:
         return (yield Need("read", p, paths.MAX_READ))
     except UnicodeDecodeError as e:
-        return Refuse(f"cannot be read ({e})")
+        return Refuse(say("unreadable_file", err=e))
     except OSError as e:
-        return Refuse(f"cannot be read ({e.strerror or e})")
+        return Refuse(say("unreadable_file", err=e.strerror or e))
     except ValueError as e:                    # not a regular file, or past MAX_READ
-        return Refuse(str(e))
+        return Refuse(say("passed", text=e))
 
 
 def _abs(p, cwd, cd, env):
@@ -218,7 +218,7 @@ def _body(post, cwd, cd, docs, writes, env):
             text += "".join(body + "\n" for body, _ in docs)    # its one write is a heredoc: that text, not the file's
         else:
             p = _abs(v, cwd, cd, env)
-            got = Refuse("is a relative path after a cd, and the guard cannot tell where the command stands") \
+            got = Refuse(say("dp_relative_cd")) \
                 if p is None else (yield from _fetch(p))
             if isinstance(got, Refuse):
                 return _deny(say("dup_body_file", v=v, got=got))

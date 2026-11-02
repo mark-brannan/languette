@@ -1517,7 +1517,7 @@ _MATCH_KEYS = ("args", "cmd", "flags", "script")
 # A match the rules engine reads (languette/engine.py): `at` too, and `cmd` alone is the whole program.
 ENGINE_MATCH_KEYS = (*_MATCH_KEYS, "at")
 # A shipped rule set's: a stop of a unit too (stop_of), which no tier but the shipped one may say.
-SHIPPED_MATCH_KEYS = (*ENGINE_MATCH_KEYS, "program", "unit", "verbs")
+SHIPPED_MATCH_KEYS = (*ENGINE_MATCH_KEYS, "program", "unit", "verbs", "host_verbs", "test")
 
 
 def _listed(v, what, each=r".+", of="non-empty strings"):
@@ -1528,6 +1528,10 @@ def _listed(v, what, each=r".+", of="non-empty strings"):
 def _check_match(m, w, keys=_MATCH_KEYS):
     if not isinstance(m, dict) or set(m) - set(keys):
         raise BadRules(f"{w} must be an object holding only {', '.join(keys)}")
+    if "test" in m:                            # a named test (primitives.TESTS) stands alone
+        if set(m) != {"test"} or not isinstance(m["test"], str):
+            raise BadRules(f"{w}.test must be a test's name, alone in its entry")
+        return
     cmds = m["cmd"] if isinstance(m.get("cmd"), list) and m["cmd"] and "unit" in m else [m.get("cmd")]
     if not all(isinstance(c, str) and re.fullmatch(r"[A-Za-z0-9._+-]+", c) for c in cmds):
         raise BadRules(f"{w}.cmd must be a bare command name")
@@ -1638,7 +1642,7 @@ def match_rule(doc, match, prose=PROSE_PROCESS, launchers=True):
 
 
 _CTL_OTHER = {"--user", "-H", "--host", "-M", "--machine"}
-_CTL_HOST = {"isolate", "rescue", "emergency", "halt", "poweroff", "reboot", "kexec", "soft-reboot"}
+CTL_HOST = {"isolate", "rescue", "emergency", "halt", "poweroff", "reboot", "kexec", "soft-reboot"}
 _CTL_STOP = {"stop", "restart", "try-restart", "reload-or-restart", "try-reload-or-restart", "kill"}
 # Options that take a separate value; the value is not the verb. A missing one only fails closed.
 _CTL_ARG = {"-t", "--type", "-p", "--property", "-s", "--signal", "-n", "--lines", "-o", "--output",
@@ -1856,21 +1860,6 @@ def _opens_backtick(s, b):
             and sum(op.count("`") for op in s.op[:j]) % 2 == 0)
 
 
-def service_stop(s, a, b, hit, host_verbs=_CTL_HOST, verbs=CTL_STOPS):
-    """`<verb>` or `<verb> <unit>` when the segment's host `systemctl` runs one of `host_verbs`,
-    or a verb of `verbs` (verb: the long options it needs) on a unit `hit` accepts; else None."""
-    got = stop_of(s, a, b, {"cmd": "systemctl", "verbs": verbs}, hit, host_verbs)
-    return got and got[1]
-
-
-def sysv_stop(s, a, b, hit, verbs=SERVICE_STOPS):
-    """`<command> <unit> <verb>` (`<script> <verb>` for an init script) when the segment's SysV
-    `service`, `invoke-rc.d`, `rc-service` or `/etc/init.d/<unit>` runs a verb of `verbs` on a unit
-    `hit` accepts; else None. The verb is any word of the segment, not only the second."""
-    got = stop_of(s, a, b, {"cmd": list(SYSV_CMDS), "program": "sysv", "verbs": verbs}, hit)
-    return got and " ".join(got)
-
-
 def _literals(p):
     """The literal names a unit pattern holds: its unit names, or for a glob its literal runs."""
     if not any(c in p for c in "*?["):
@@ -1945,7 +1934,7 @@ def _stop_hit(doc, match, prose):
     for t, _ in doc.texts(prose):
         s = doc.scan(t)
         for a, b in s.segments():
-            got = a <= b and stop_of(s, a, b, match, hit)
+            got = a <= b and stop_of(s, a, b, match, hit, match.get("host_verbs", ()))
             if got:
                 return " ".join(got)
     return None

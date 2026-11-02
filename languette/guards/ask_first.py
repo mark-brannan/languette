@@ -54,8 +54,7 @@ def _config(payload, env):
     dir gives no answer either: unknown is not the same as none."""
     path, usable = yield from paths.project_config(payload, env, CONFIG)
     if path is None and not usable:
-        raise Refuse(f"the payload's cwd {payload.get('cwd') or '(none)'!r} is not a directory, "
-                     "so the repo's list cannot be found")
+        raise Refuse(say("af_cwd_not_dir", cwd=repr(payload.get("cwd") or "(none)")))
     return path
 
 
@@ -73,8 +72,7 @@ def _load(path):
     labels = {}
     for n, c in enumerate(commands):
         if c["approve_label"] in labels:
-            raise Refuse(f"commands[{n}].approve_label '{c['approve_label']}' is shared with another command; "
-                         "a click must approve exactly one")
+            raise Refuse(say("af_label_shared", n=n, label=c["approve_label"]))
         labels[c["approve_label"]] = c
     return commands
 

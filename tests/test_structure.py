@@ -24,6 +24,9 @@ from hamcrest import assert_that, empty, equal_to
 ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {f.stem: importlib.import_module(f"languette.guards.{f.stem}")
           for f in sorted((ROOT / "languette" / "guards").glob("*.py")) if f.stem != "__init__"}
+# The walks that left languette/guards/ with their guards (what a call applies, what a post carries):
+# read by the same checks, since moving a file is not removing a copy.
+WALKS = {m: importlib.import_module(f"languette.{m}") for m in ("labels", "posts")}
 SHARED = {m: importlib.import_module(f"languette.{m}") for m in ("scan", "paths", "verdict", "document", "secrets", "refs")}
 
 # The fields of the call Document reads once; a guard reads them from the Document.
@@ -33,18 +36,13 @@ ANSWERS = {"Refuse", "deny", "ask", "context"}
 
 # A constant two or more guards keep: the names, as one set each; a found set
 # must fall inside one of these.
-KNOWN_TWICE = {
-    frozenset({"guard_permissions._FIND", "guard_recursive_delete._FIND"}),
-}
+KNOWN_TWICE = set()
 # Reads of a DOCUMENT_FIELDS key from the payload, at most, per guard.
-KNOWN_PAYLOAD_READS = {"guard_bypass_labels": 2, "guard_cross_session_send": 8, "guard_duplicate_prs": 2,
-                       "guard_github_issues": 3, "guard_private_terms": 3, "guard_signed_comments": 2,
-                       "guard_worktrees": 4, "prose_budget_commit": 2}
+KNOWN_PAYLOAD_READS = {"guard_cross_session_send": 8, "guard_duplicate_prs": 2,
+                       "guard_github_issues": 3, "guard_signed_comments": 2,
+                       "guard_worktrees": 4, "labels": 2, "posts": 3, "prose_budget_commit": 2}
 # Answers whose text is anything but a messages.say call, at most, per guard.
-KNOWN_INLINE_TEXT = {"ask_first": 2, "guard_bypass_labels": 12, "guard_bypass_ruleset": 10, "guard_cross_session_send": 2,
-                     "guard_duplicate_prs": 4, "guard_permissions": 1,
-                     "guard_secrets": 9, "guard_worktrees": 2,
-                     "prose_budget_commit": 1}
+KNOWN_INLINE_TEXT = {}
 
 
 def _imported(tree):
@@ -71,12 +69,12 @@ def _constants(mod, skip=()):
 def _guard_constants():
     """guard.NAME -> value, for the constants a guard makes itself (re.compile caches equal
     patterns, so identity cannot tell a copy from an import; the source can)."""
-    return {f"{g}.{k}": v for g, mod in GUARDS.items()
+    return {f"{g}.{k}": v for g, mod in {**GUARDS, **WALKS}.items()
             for k, v in _constants(mod, skip=_imported(_source(g))).items()}
 
 
 def _source(g):
-    return ast.parse((ROOT / "languette" / "guards" / f"{g}.py").read_text())
+    return ast.parse(Path({**GUARDS, **WALKS}[g].__file__).read_text())
 
 
 def _key(n):
@@ -141,14 +139,14 @@ def test_every_rule_set_loads_and_has_its_feature():
 
 def test_a_guard_reads_the_call_through_the_document():
     found = Counter()
-    for g in GUARDS:
+    for g in {**GUARDS, **WALKS}:
         found[g] += sum(_key(n) in DOCUMENT_FIELDS for n in ast.walk(_source(g)))
     assert_that(_over(found, KNOWN_PAYLOAD_READS), equal_to({}))
 
 
 def test_a_guard_says_its_text_through_messages():
     found = Counter()
-    for g in GUARDS:
+    for g in {**GUARDS, **WALKS}:
         for t in map(_answer_text, ast.walk(_source(g))):
             if t is not None and not _said(t):
                 found[g] += 1

@@ -11,10 +11,13 @@ languette/rules/, one module per guard, shaped as the file it will become:
 which selects the call. An entry may be a stop of a unit: `program` names the
 program's description in scan, `verbs` a table of its stop verbs (VERBS), and
 `unit` is "listed": the units are the set's `units`, a plugin option holding a
-comma-separated list, with the `drop` suffix each unit loses; unset, the entry
-matches nothing. `action` is "deny", the one action this
-engine reads yet. `why` names the message that explains it, filled with the
-command word it matched (`cmd`), the stop it found (`verb`) and `way_user`.
+comma-separated list, with the `drop` suffix each unit loses, or fixed `names`;
+unset, the entry matches nothing. `host_verbs` names a table of systemctl verbs
+that take the host down, which need no unit. An entry may instead be `{"test": name}`, one of the named tests in
+languette/primitives.py, whose answer fills the message. A test that needs facts of the world
+asks for them and gives the verdict itself, a deny or a context; its rule has no `why`. `action`
+is "deny", the one action this engine reads yet. `why` names the message that explains it, filled
+with the command word it matched (`cmd`), the stop it found (`verb`) and `way_user`.
 `read`, optional, says how scan reads the call's words, for every entry:
 `process_prose` false makes pkill, ps and kin commands, and `launchers` false
 stops the look through npx and kin. `file`, optional, names a rule file
@@ -22,7 +25,8 @@ shipped beside the rule sets, read when present; its rules add denies, as
 `repo`'s do. `repo`, optional, names the file a project keeps, found as
 ask-first finds its list, whose rules add denies: the repo tier, which says
 nothing else, and whose `why` is the repo's own words. Its rules take an
-optional `action`, which must be "deny". `opt_in`, optional, names the plugin
+optional `action`, which must be "deny". `calls`, optional, is "command" (the default: a call
+with no command is no finding) or "any": the guard judges a call that carries none, an MCP tool's. `opt_in`, optional, names the plugin
 option that must be "true" for the guard to run, as an opt-in guard module's
 OPT_IN does.
 
@@ -33,19 +37,27 @@ drives one: a NAME and check(doc).
 
 import os
 
-from languette import paths
+from languette import paths, primitives
 from languette import scan as sw
 from languette.messages import MESSAGES, say
 from languette.verdict import WAY_USER, Need, Refuse, judged
 
-_SET_KEYS = frozenset({"guard", "rules", "repo", "opt_in", "file", "read", "units"})
+_SET_KEYS = frozenset({"guard", "rules", "repo", "opt_in", "file", "read", "units", "calls"})
 _READ_KEYS = frozenset({"process_prose", "launchers"})
-VERBS = {"systemctl-stops": sw.CTL_STOPS, "sysv-stops": sw.SERVICE_STOPS}   # the tables an entry's `verbs` names
+# The tables an entry's `verbs` names; the last is the SysV stops of a service the session runs on,
+# a smaller table than sysv-stops, as the host's guard has always read it.
+VERBS = {"systemctl-stops": sw.CTL_STOPS, "sysv-stops": sw.SERVICE_STOPS,
+         "sysv-core-stops": {v: [] for v in ("stop", "restart", "force-reload", "try-restart", "--full-restart")}}
+HOST_VERBS = {"systemctl-host": sw.CTL_HOST}     # the tables an entry's `host_verbs` names: they take the host down
 
 
 def _shipped(r, where):
     if r.get("action") != "deny":
         raise sw.BadRules(f'{where}.action must be "deny"')
+    m = r.get("match")
+    if isinstance(m, list) and m and all(isinstance(e, dict) and isinstance(e.get("test"), str)
+                                         and primitives.judges(e["test"]) for e in m):
+        return                                 # the test says its own reason
     if r.get("why") not in MESSAGES:
         raise sw.BadRules(f"{where}.why must name a message in languette/messages.py")
 
@@ -64,12 +76,22 @@ def _file(r, where):
         raise sw.BadRules(f"{where}.why must be a non-empty string")
 
 
-def _unit(e, where, units):
-    """A unit entry names its program and its verb table, and the set lists the units."""
-    if "unit" not in e:
-        if {"program", "verbs"} & set(e):
-            raise sw.BadRules(f"{where}: program and verbs belong to an entry with a unit")
+def _unit(e, where, units, calls="command"):
+    """A unit entry names its program and its verb table, and the set lists the units. A test
+    entry names a test primitives holds; a set that judges any call has only test entries,
+    since a call with no command gives a command entry nothing to match."""
+    if calls == "any" and "test" not in e:
+        raise sw.BadRules(f'{where}: a rule set that says calls "any" needs every match entry to be a test')
+    if "test" in e:
+        if e["test"] not in primitives.TESTS:
+            raise sw.BadRules(f"{where}.test must name a test languette holds")
         return
+    if "unit" not in e:
+        if {"program", "verbs", "host_verbs"} & set(e):
+            raise sw.BadRules(f"{where}: program, verbs and host_verbs belong to an entry with a unit")
+        return
+    if e.get("host_verbs", next(iter(HOST_VERBS))) not in HOST_VERBS:
+        raise sw.BadRules(f"{where}.host_verbs must name a verb table languette holds")
     if e.get("program") not in sw.PROGRAMS or e.get("verbs", next(iter(VERBS))) not in VERBS:
         raise sw.BadRules(f"{where}.program and .verbs must name a program and a verb table languette holds")
     if e["unit"] != "listed" or not units:
@@ -79,25 +101,30 @@ def _unit(e, where, units):
 def load(rule_set):
     """The rule set's rules, checked, or BadRules naming the fault."""
     if not isinstance(rule_set, dict) or set(rule_set) - _SET_KEYS or not {"guard", "rules"} <= set(rule_set):
-        raise sw.BadRules("the rule set must be an object holding guard and rules, and optionally repo and opt_in")
+        raise sw.BadRules("the rule set must be an object holding guard and rules, and optionally the keys _SET_KEYS lists")
     if not isinstance(rule_set["guard"], str) or not rule_set["guard"]:
         raise sw.BadRules("guard must be a guard's name")
     if "repo" in rule_set and (not isinstance(rule_set["repo"], str) or not rule_set["repo"].startswith(".languette/")):
         raise sw.BadRules("repo must be a path under .languette/")
+    if rule_set.get("calls", "command") not in ("command", "any"):
+        raise sw.BadRules('calls must be "command" or "any"')
     if "file" in rule_set and (not isinstance(rule_set["file"], str) or "/" in rule_set["file"]):
         raise sw.BadRules("file must be the name of a file beside the rule sets")
     read = rule_set.get("read", {})
     if not isinstance(read, dict) or set(read) - _READ_KEYS or not all(isinstance(v, bool) for v in read.values()):
         raise sw.BadRules("read must be an object holding only process_prose and launchers, each true or false")
     units = rule_set.get("units")
-    if "units" in rule_set and (not isinstance(units, dict) or set(units) - {"setting", "drop"}
-                                or not isinstance(units.get("setting"), str)):
-        raise sw.BadRules("units must be an object holding setting, and optionally drop")
+    if "units" in rule_set and (not isinstance(units, dict) or set(units) - {"setting", "drop", "names"}
+                                or ("names" in units) == ("setting" in units)
+                                or not isinstance(units.get("setting", ""), str)
+                                or not isinstance(units.get("names", []), list)
+                                or ("names" in units and not (units["names"] and all(isinstance(x, str) for x in units["names"])))):
+        raise sw.BadRules("units must be an object holding setting (and optionally drop) or names, a non-empty list of strings")
     rules = sw.load_rules({"rules": rule_set["rules"]}, "rules", ("action", "why"), _shipped, many=True,
                           match_keys=sw.SHIPPED_MATCH_KEYS)
     for n, r in enumerate(rules):
         for i, e in enumerate(r["match"]):
-            _unit(e, f"rules[{n}].match[{i}]", units)
+            _unit(e, f"rules[{n}].match[{i}]", units, rule_set.get("calls", "command"))
     return rules
 
 
@@ -106,17 +133,30 @@ def _resolved(e, env, units):
     if "unit" not in e:
         return e
     drop = units.get("drop", "")
-    listed = [x[:-len(drop)] if drop and x.endswith(drop) else x for x in sw.listed(env.get(units["setting"]))]
-    return {**e, "unit": {"units": listed}, "verbs": VERBS.get(e.get("verbs"), {})}
+    listed = units.get("names") or [x[:-len(drop)] if drop and x.endswith(drop) else x
+                                    for x in sw.listed(env.get(units["setting"]))]
+    return {**e, "unit": {"units": listed}, "verbs": VERBS.get(e.get("verbs"), {}),
+            "host_verbs": HOST_VERBS.get(e.get("host_verbs"), ())}
 
 
 def _hit(doc, rule, read, units):
     """(the command word of the first of the rule's match entries the call runs, the stop it
-    found or None), or None. A file's rule has one entry, not a list."""
+    found or None, the fields a test gave for the message), or None. A test entry has no
+    command word; one that judges gives the verdict, not a tuple. A file's rule has one
+    entry, not a list."""
     for e in rule["match"] if isinstance(rule["match"], list) else [rule["match"]]:
+        if "test" in e:
+            got = primitives.TESTS[e["test"]](doc)
+            if primitives.judges(e["test"]):
+                got = yield from got
+                if got is not None:
+                    return got
+            elif got is not None:
+                return e["test"], None, got
+            continue
         n, _, said = sw.match_rule(doc, _resolved(e, doc.env, units), **read)
         if n:
-            return (e["cmd"] if isinstance(e["cmd"], str) else e["cmd"][0]), said
+            return (e["cmd"] if isinstance(e["cmd"], str) else e["cmd"][0]), said, {}
     return None
 
 
@@ -144,7 +184,7 @@ class Guard:
                       **({} if read.get("launchers", True) else {"launchers": False})}
 
         def check(doc):
-            return judged(doc, self.NAME, self._judge)
+            return judged(doc, self.NAME, self._judge, self.RULE_SET.get("calls") == "any")
         self.check = check
 
     def _judge(self, doc):
@@ -159,12 +199,14 @@ class Guard:
             except Refuse as e:
                 return say("rules_bad", file=self.RULE_FILE, err=e)
         for rule in rules:
-            hit = _hit(doc, rule, self._read, self.RULE_SET.get("units"))
+            hit = yield from _hit(doc, rule, self._read, self.RULE_SET.get("units"))
+            if isinstance(hit, dict):
+                return hit
             if hit:
-                have = {"cmd": hit[0], "verb": hit[1], "way_user": WAY_USER}
+                have = {"cmd": hit[0], "verb": hit[1], "way_user": WAY_USER, **hit[2]}
                 return say(rule["why"], **{k: v for k, v in have.items() if "{" + k + "}" in MESSAGES[rule["why"]]})
         for rule in shipped:
-            hit = _hit(doc, rule, self._read, self.RULE_SET.get("units"))
+            hit = yield from _hit(doc, rule, self._read, self.RULE_SET.get("units"))
             if hit:
                 return _denial(rule, hit[0], self.RULE_FILE)
         if "repo" not in self.RULE_SET:
@@ -178,7 +220,7 @@ class Guard:
         except Refuse as e:
             return say("rules_bad", file=path, err=e)
         for rule in found:
-            hit = _hit(doc, rule, self._read, self.RULE_SET.get("units"))
+            hit = yield from _hit(doc, rule, self._read, self.RULE_SET.get("units"))
             if hit:
                 return _denial(rule, hit[0], path)
         return None

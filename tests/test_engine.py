@@ -31,10 +31,29 @@ def _with_rule(**changes):
     ({**GOOD, "file": "../x.json"}, "file must be the name of a file"),
     (_with_rule(match=[{"cmd": "foo", "unit": "listed", "program": "pkill"}]), 'unit must be "listed"'),
     (_with_rule(match=[{"cmd": "foo", "program": "pkill"}]), "belong to an entry with a unit"),
+    (_with_rule(match=[{"test": "no-such-test"}]), "test must name a test languette holds"),
+    (_with_rule(match=[{"test": "fork-bomb", "cmd": "foo"}]), "test must be a test's name, alone"),
+    ({**GOOD, "rules": [{"id": "r", "match": [{"test": "fork-bomb"}], "action": "deny"}]}, "why must name a message"),
+    (_with_rule(match=[{"cmd": "foo", "unit": "listed", "host_verbs": "x"}]), "host_verbs must name a verb table"),
+    ({**GOOD, "units": {"setting": "X", "names": ["a"]}}, "units must be an object"),
+    ({**GOOD, "units": {"names": []}}, "units must be an object"),
+    ({**GOOD, "units": {"names": [1]}}, "units must be an object"),
+    ({**GOOD, "calls": "some"}, 'calls must be "command" or "any"'),
+    ({**GOOD, "calls": "any"}, 'needs every match entry to be a test'),
 ])
 def test_a_rule_set_that_does_not_load_names_the_fault(rule_set, fault):
     with pytest.raises(scan.BadRules, match=re.escape(fault)):
         engine.load(rule_set)
+
+
+def test_a_repo_rule_may_not_name_a_test():
+    with pytest.raises(scan.BadRules, match="holding only"):
+        scan.load_rules({"rules": [{"id": "r", "match": {"test": "fork-bomb"}}]}, "rules", match_keys=scan.ENGINE_MATCH_KEYS)
+
+
+def test_a_rule_whose_test_judges_has_no_why():
+    rule = {"id": "r", "match": [{"test": "recursive-delete"}], "action": "deny"}
+    assert_that([r["id"] for r in engine.load({**GOOD, "rules": [rule]})], equal_to(["r"]))
 
 
 def test_a_rule_set_that_loads_gives_its_rules():

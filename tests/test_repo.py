@@ -15,8 +15,8 @@ from hamcrest import assert_that, contains_string, empty, equal_to, has_length, 
 import readme_table
 from harness import hooks_json_commands, hooks_json_prompt_command
 from languette import engine, run, scan
-from languette.guards import (guard_bypass_labels, guard_duplicate_prs, guard_github_issues, guard_private_terms,
-                              guard_signed_comments)
+from languette import posts
+from languette.guards import guard_duplicate_prs, guard_github_issues, guard_signed_comments
 
 ROOT = Path(__file__).resolve().parent.parent
 # Spelled out, not read from run.GUARDS, so a guard dropped from run.GUARDS fails the comparisons below.
@@ -306,31 +306,31 @@ def test_the_guard_github_issues_matcher_leaves_other_tools_alone(tool):
 
 def _mcp_tools_the_guard_private_terms_handles():
     # From the guard's own TOOLS, so a tool added there must be matched here.
-    suffixes = _mcp_suffixes(guard_private_terms.TOOLS)
+    suffixes = _mcp_suffixes(posts.TOOLS)
     assert suffixes >= {"create_issue", "add_issue_comment", "create_pull_request", "pull_request_review_write"}
     return sorted(f"{prefix}{s}" for s in suffixes for prefix in ("mcp__github__", "mcp__plugin_github_github__"))
 
 
 @pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_private_terms_handles())
 def test_the_guard_private_terms_matcher_covers_the_tool(tool):
-    assert_that(_reaches(guard_private_terms, tool), is_(True))
+    assert_that(_reaches(run.guard_private_terms, tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__list_pull_requests"])
 def test_the_guard_private_terms_matcher_leaves_other_tools_alone(tool):
-    assert_that(_reaches(guard_private_terms, tool), is_(False))
+    assert_that(_reaches(run.guard_private_terms, tool), is_(False))
 
 
 # Any MCP tool may carry a labels field; the guard itself tells writes from reads.
 @pytest.mark.parametrize("tool", ["Bash", "mcp__github__update_issue", "mcp__plugin_github_github__issue_write",
                                   "mcp__gitea__edit_issue"])
 def test_the_guard_bypass_labels_matcher_covers_the_tool(tool):
-    assert_that(_reaches(guard_bypass_labels, tool), is_(True))
+    assert_that(_reaches(run.guard_bypass_labels, tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "Write", "Edit"])
 def test_the_guard_bypass_labels_matcher_leaves_other_tools_alone(tool):
-    assert_that(_reaches(guard_bypass_labels, tool), is_(False))
+    assert_that(_reaches(run.guard_bypass_labels, tool), is_(False))
 
 
 @pytest.mark.parametrize("tool", ["Bash"] + sorted(f"{prefix}{s}" for s in _mcp_suffixes(guard_duplicate_prs.TOOLS)
