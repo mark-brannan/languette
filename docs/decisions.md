@@ -4,6 +4,24 @@ Decisions that settle languette's public interface. The README says what the
 interface is; this file says what was decided and why, one line each. Every
 line is the maintainer's (@mark-brannan) unless it says otherwise.
 
+## Backups family default: 2026-11-01
+
+- The `backups` family (the copies you would recover from, and the keys
+  that decrypt them) defaults to `block`: no approve button. The denial
+  names the copy at risk and says the user runs the command themselves
+  or sets `backups=ask`. The family promise gains a clause: your
+  backups it never touches.
+  ([#153](https://github.com/mark-brannan/languette/issues/153))
+- Why: the harm is unrecoverable by definition, a hurried click in a
+  disk-full triage is the wrong place for that yes, and an unattended
+  session has no button either way. The family's 28 rules match no
+  command in the maintainer's private corpus of 108k real commands
+  (measured 2026-10-09), so the default is cheap to hold; dcg denies
+  the same rules outright, by severity (its `packs/mod.rs`, v0.15.2).
+- A listed-resource exception (a snapshot set the user names, pruned
+  under a policy they wrote) is the Backups family issue's to design,
+  not the default's.
+
 ## ask-first config: 2026-10-02 and 2026-10-03
 
 - The config lives at `.languette/ask-first.json`, replacing

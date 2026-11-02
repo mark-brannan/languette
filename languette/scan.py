@@ -41,6 +41,7 @@ Wrapper = namedtuple("Wrapper", "home repo")
 GIT_WRAPPERS = {"git": Wrapper(False, False), "yadm": Wrapper(True, False), "vcsh": Wrapper(True, True)}
 GIT = re.compile(r"(?:^|/)(?:" + "|".join(GIT_WRAPPERS) + r")\Z")
 GH = re.compile(r"(?:^|/)gh\Z")
+GLAB = re.compile(r"(?:^|/)glab\Z")
 # A word that is cd, pushd or popd: the builtins that move the working directory.
 CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 # git's global options that take the next word as their value.
@@ -996,6 +997,46 @@ GH_API_FIELDS = ("-f", "-F", "--field", "--raw-field")
 # `gh api` flags whose value no guard reads.
 GH_API_VALUED = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 
+# `glab api` reads its words as `gh api` does, but for these: --form sends a
+# field too, and these flags' values no guard reads. It takes no -R.
+GLAB_API_FIELDS = GH_API_FIELDS + ("--form",)
+GLAB_API_VALUED = frozenset("-H --header --hostname --output --placeholder".split())
+
+# The forges, a row each (docs/design/forges.md): the client an agent runs,
+# the host the service answers on and the other names a remote's URL gives it,
+# the first label of a self-hosted install's host (gitlab.example.com), and
+# the shape of a repo's path there.
+FORGES = {
+    "github": {"cli": "gh", "host": "github.com", "aliases": ("ssh.github.com", "www.github.com"), "label": None,
+               "repo": re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")},
+    "gitlab": {"cli": "glab", "host": "gitlab.com", "aliases": ("altssh.gitlab.com", "www.gitlab.com"),
+               "label": "gitlab", "repo": re.compile(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+")},
+}
+# A remote's URL: scheme://[user@]host[:port]/path, or scp-like [user@]host:path.
+_REMOTE_URL = re.compile(r"(?:[A-Za-z][A-Za-z0-9+.-]*://(?:[^@/]*@)?(?P<url>[^/:@]+)(?::\d*)?/"
+                         r"|(?:[^@/:]*@)?(?P<scp>[^/:@]+):)(?P<path>.+)\Z")
+
+Remote = namedtuple("Remote", "forge host repo")
+
+
+def remote(url):
+    """The Remote a git remote's URL names: forge, a FORGES key; host, lower-cased, an
+    alias read as the forge's host; repo, its path less .git and slashes, in the forge's
+    repo shape. None when the URL names no host, no row's host fits it, or the path is
+    not a repo there."""
+    m = _REMOTE_URL.match((url or "").strip())
+    if not m:
+        return None
+    host = (m["url"] or m["scp"]).lower()
+    repo = re.sub(r"\.git\Z", "", m["path"].strip("/"))
+    for forge, row in FORGES.items():
+        if host in row["aliases"]:
+            host = row["host"]
+        if host == row["host"] or row["label"] and host.split(".")[0] == row["label"] and "." in host:
+            ok = row["repo"].fullmatch(repo) and not {".", ".."} & set(repo.split("/"))
+            return Remote(forge, host, repo) if ok else None
+    return None
+
 
 def _gh_valued(s, i, hi, spaced, long_eq, short, default):
     """(value, index of the flag's last word) when word i is the flag: `spaced`
@@ -1066,16 +1107,17 @@ class GhArg(namedtuple("GhArg", "flag text live")):
         return self.flag in ("-F", "--field")
 
 
-def gh_api_arg(s, i, hi):
+def gh_api_arg(s, i, hi, fields=GH_API_FIELDS):
     """(GhArg, index of its last word) when word i of `gh api` is a field or
     --input flag, in any spelling pflag reads: -f k=v, -fk=v, -f=k=v,
-    --field k=v, --field=k=v, --input p, --input=p. Else None."""
+    --field k=v, --field=k=v, --input p, --input=p. Else None. `fields` is
+    the client's field flags (GLAB_API_FIELDS for `glab api`)."""
     t = word(s, i)
-    if t in GH_API_FIELDS or t == "--input":
+    if t in fields or t == "--input":
         return (GhArg(t, word(s, i + 1), s.live[i + 1]), i + 1) if i < hi else (GhArg(t, None, False), i)
     if t[:2] in ("-f", "-F") and len(t) > 2:
         return GhArg(t[:2], t[3:] if t[2] == "=" else t[2:], s.live[i]), i
-    for flag in ("--field=", "--raw-field=", "--input="):
+    for flag in [f + "=" for f in fields if f.startswith("--")] + ["--input="]:
         if t.startswith(flag):
             return GhArg(flag[:-1], t[len(flag):], s.live[i]), i
     return None
@@ -1096,8 +1138,10 @@ class GhApi(namedtuple("GhApi", "path operands method args flags skipped")):
         return bool(self.args)
 
 
-def gh_api(s, lo, hi):
-    """The GhApi of `gh api`'s words lo..hi, the words after `api`."""
+def gh_api(s, lo, hi, cli="gh"):
+    """The GhApi of `gh api`'s words lo..hi, the words after `api`; `glab api`'s
+    when `cli` is "glab"."""
+    fields, valued = (GLAB_API_FIELDS, GLAB_API_VALUED) if cli == "glab" else (GH_API_FIELDS, GH_API_VALUED)
     method, operands, args, flags, skipped = "", [], [], [], set()
     i = lo
     while i <= hi:
@@ -1106,10 +1150,10 @@ def gh_api(s, lo, hi):
             method, j = m
             skipped.update(range(i + 1, j + 1))
             i = j
-        elif a := gh_api_arg(s, i, hi):
+        elif a := gh_api_arg(s, i, hi, fields):
             arg, i = a
             args.append(arg)
-        elif t in GH_API_VALUED:
+        elif t in valued:
             skipped.add(i + 1)
             i += 1
         elif t.startswith("-"):
@@ -1472,6 +1516,8 @@ class BadRules(ValueError):
 _MATCH_KEYS = ("args", "cmd", "flags", "script")
 # A match the rules engine reads (languette/engine.py): `at` too, and `cmd` alone is the whole program.
 ENGINE_MATCH_KEYS = (*_MATCH_KEYS, "at")
+# A shipped rule set's: a stop of a unit too (stop_of), which no tier but the shipped one may say.
+SHIPPED_MATCH_KEYS = (*ENGINE_MATCH_KEYS, "program", "unit", "verbs")
 
 
 def _listed(v, what, each=r".+", of="non-empty strings"):
@@ -1482,7 +1528,8 @@ def _listed(v, what, each=r".+", of="non-empty strings"):
 def _check_match(m, w, keys=_MATCH_KEYS):
     if not isinstance(m, dict) or set(m) - set(keys):
         raise BadRules(f"{w} must be an object holding only {', '.join(keys)}")
-    if not isinstance(m.get("cmd"), str) or not re.fullmatch(r"[A-Za-z0-9._+-]+", m["cmd"]):
+    cmds = m["cmd"] if isinstance(m.get("cmd"), list) and m["cmd"] and "unit" in m else [m.get("cmd")]
+    if not all(isinstance(c, str) and re.fullmatch(r"[A-Za-z0-9._+-]+", c) for c in cmds):
         raise BadRules(f"{w}.cmd must be a bare command name")
     if keys is _MATCH_KEYS and not {"args", "script", "flags"} & set(m):
         raise BadRules(f"{w} needs args or script (or flags), or it would match every {m['cmd']}")
