@@ -472,6 +472,7 @@ _DISK_VALUE_OPTS = {
 }
 _DISK_CD_FLAGS = ("-P", "-L", "-e", "-@", "--")
 
+_DISKS_GUARD = "guard-disks"
 _DISKS_WAY_OUT = say("disks_way_out")
 
 
@@ -531,7 +532,7 @@ class _DiskJudge:
         self.moved, self.dev_moved, self.targets = False, False, []
 
     def refuse(self, what, why):
-        raise Refuse(say("judged", guard="guard-disks", why=say("disks_refused", what=what, why=why, way_out=_DISKS_WAY_OUT)))
+        raise Refuse(say("judged", guard=_DISKS_GUARD, why=say("disks_refused", what=what, why=why, way_out=_DISKS_WAY_OUT)))
 
     def lands_in_dev(self, s, a, b):
         """A cd (or `env -C`, `sudo -D`) in a..b that may leave the working directory under /dev, or
@@ -640,11 +641,11 @@ def _disks_verdict(targets, home, bases, physical):
         if not paths.under(abs_, roots):
             kind = "a device node" if abs_.startswith("/dev/") else "outside the scratchpad, /tmp and agent worktrees"
             why = say("disks_blocked", what=what, raw=raw, abs_=abs_, kind=kind, way_out=_DISKS_WAY_OUT)
-            return deny(say("judged", guard="guard-disks", why=why))
+            return deny(say("judged", guard=_DISKS_GUARD, why=why))
         phys = physical(abs_)
         if phys != abs_ and not paths.under(phys, roots):
             why = say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys, way_out=_DISKS_WAY_OUT)
-            return deny(say("judged", guard="guard-disks", why=why))
+            return deny(say("judged", guard=_DISKS_GUARD, why=why))
     return None
 
 
@@ -652,7 +653,7 @@ def disks(doc):
     """A command that overwrites a disk: `dd` with of= under /dev, mkfs*, wipefs and shred on anything
     but the agent's own area, and a redirection or tee onto a disk device. A target this test cannot
     resolve to one allowed path is denied on sight, with a reason naming what it saw."""
-    return (yield from paths.check_targets(doc, "guard-disks", _DiskJudge, None, None, None, _disks_verdict))
+    return (yield from paths.check_targets(doc, _DISKS_GUARD, _DiskJudge, None, None, None, _disks_verdict))
 
 
 TESTS = {"power-word": power_word, "fork-bomb": fork_bomb, "pipe-to-shell": pipe_to_shell,

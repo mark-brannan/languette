@@ -242,7 +242,7 @@ def judge_segments(judge, scans):
 def parse_targets(doc, name, judge, allow_var):
     """The parse of a guard that judges target paths: `judge(cwd, home)` walks the
     command and gathers its targets; `allow_var` names the env var of extra
-    allowed paths. "found" is a finding parse alone comes to."""
+    allowed paths; None when the guard has no allow var. "found" is a finding parse alone comes to."""
     payload, env = doc.payload, doc.env
     out = {"found": None, "home": None, "allow": None, "targets": [], "refused": None, "bases": []}
     if doc.text is None:
