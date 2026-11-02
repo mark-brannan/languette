@@ -339,6 +339,14 @@ measured, which is why the guards treat unset as on.
 
 </details>
 
+## Privacy and support
+
+Guards that need GitHub's answer ask through your own `gh`. Session state
+stays in local files. Decisions are recorded only if you turn on
+`record_decisions`.
+
+Questions and bugs: [GitHub issues](https://github.com/mark-brannan/languette/issues).
+
 ## Strong guards
 
 A guard is a pure function of the command and the facts it asked for; it
