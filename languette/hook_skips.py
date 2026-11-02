@@ -1,4 +1,5 @@
-"""guard-bypass-hooks: `--no-verify` on `git commit`, `push`, `merge`, `pull`,
+"""guard-bypass-hooks' walk and its handler (languette/rules/guard_bypass_hooks.py is the
+rule set): `--no-verify` on `git commit`, `push`, `merge`, `pull`,
 `rebase` and `am`, `-n` on commit and am, and `git -c core.hooksPath=...` (or
 `--config-env`) run only after the user said yes to that one run, through
 AskUserQuestion; with no approval they are denied.
@@ -27,7 +28,6 @@ from languette.messages import say
 from languette.secrets import quote
 from languette.verdict import approve, deny
 
-NAME = "guard-bypass-hooks"
 APPROVE_LABEL = "Skip hooks once"
 
 # Options that take the next word as a value, so a message that is just
@@ -99,22 +99,28 @@ def _runs(doc):
     return n, loop
 
 
-def check(doc):
-    cmd = doc.text
-    if not cmd or not cmd.strip():
+def skips(doc):
+    """The `skips-hooks` test: {"runs": how many times the command skips the hooks, "looped":
+    whether any of it is in a loop}, or None when it never does."""
+    if not doc.text or not doc.text.strip():
         return None
     runs, looped = _runs(doc)
-    if not runs:
-        return None
-    if looped:
-        return deny(say("loop_hooks", guard=NAME))
+    return {"runs": runs, "looped": looped} if runs else None
+
+
+def approval(doc, guard, found):
+    """The `hooks-approval` handler: each run that skips the hooks spends one of the user's
+    approvals; short of one per run, or in a loop, the call is denied."""
+    runs = found["runs"]
+    if found["looped"]:
+        return deny(say("loop_hooks", guard=guard))
     shown = quote(doc) or say("command_withheld")
     approved, done = yield from approve(
         {APPROVE_LABEL: runs},
-        lambda e: say("transcript_unreadable", guard=NAME, err=e, cmd=shown,
+        lambda e: say("transcript_unreadable", guard=guard, err=e, cmd=shown,
                       then="Fix what the blocking hook reported, or ask the user to run it themselves."))
     if done:
         return done[0]
     have = len(approved[APPROVE_LABEL])
-    return deny(say("hooks_skipped", guard=NAME, cmd=shown, runs=runs, runs_s="s" * (runs > 1),
+    return deny(say("hooks_skipped", guard=guard, cmd=shown, runs=runs, runs_s="s" * (runs > 1),
                     have=have, have_s="s" * (have != 1), label=APPROVE_LABEL))
