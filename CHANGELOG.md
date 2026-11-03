@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.14](https://github.com/mark-brannan/languette/compare/v0.0.13...v0.0.14) (2026-11-02)
+
+
+### Features
+
+* **guard-private-terms:** SessionStart writes the default redacted terms file when none is there ([#338](https://github.com/mark-brannan/languette/issues/338)) ([6d14a9c](https://github.com/mark-brannan/languette/commit/6d14a9c2b3f1d5c8ff8b5cd7eaa3531fca5f63f6))
+* **guard-worktrees:** checkout-home asks on rcup -f, rcdn, homeshick link --force, dotbot -c and home-manager switch and uninstall ([#333](https://github.com/mark-brannan/languette/issues/333)) ([0594e93](https://github.com/mark-brannan/languette/commit/0594e93740a458e3172ea83b7b2e4b19f5d491cd))
+
 ## [0.0.13](https://github.com/mark-brannan/languette/compare/v0.0.12...v0.0.13) (2026-11-02)
 
 
