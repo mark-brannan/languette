@@ -47,20 +47,21 @@ def _out(event, fields):
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
-    from languette.guards import (guard_duplicate_prs,
-                                  guard_git_work_loss, guard_github_issues,
+    from languette.guards import (guard_git_work_loss,
                                   guard_review_threads,
                                   guard_signed_comments, require_well_formed,
                                   guard_worktrees,
                                   prose_budget_commit)
-    from languette import engine, posts, record, secrets
+    from languette import engine, issue_writes, opened_prs, posts, record, secrets
     from languette.rules import (ask_first as _ask_first, deny_always as _deny_always,
                                  guard_bypass_hooks as _guard_bypass_hooks,
                                  guard_bypass_labels as _guard_bypass_labels,
                                  guard_bypass_ruleset as _guard_bypass_ruleset,
                                  guard_cross_session_send as _guard_cross_session_send,
                                  guard_disks as _guard_disks,
+                                 guard_duplicate_prs as _guard_duplicate_prs,
                                  guard_git_stacked_base as _guard_git_stacked_base,
+                                 guard_github_issues as _guard_github_issues,
                                  guard_host_availability as _guard_host_availability,
                                  guard_infra as _guard_infra,
                                  guard_private_terms as _guard_private_terms,
@@ -92,6 +93,7 @@ try:
     ask_first, guard_infra = engine.Guard(_ask_first), engine.Guard(_guard_infra)
     guard_bypass_ruleset = engine.Guard(_guard_bypass_ruleset)
     guard_cross_session_send = engine.Guard(_guard_cross_session_send)
+    guard_github_issues, guard_duplicate_prs = engine.Guard(_guard_github_issues), engine.Guard(_guard_duplicate_prs)
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
                                          "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"}))
@@ -100,7 +102,7 @@ except Exception as e:  # noqa: BLE001
 # (hook event, tool name pattern or None for an event with no tool, guards in
 # the order they judge). guard-cross-session-send judges SendMessage; on the
 # other events it only keeps its per-session state, and never objects.
-STATE_EVENTS = frozenset({"PostToolUse", "PostToolUseFailure", "SubagentStart", "SessionStart", "UserPromptSubmit"})
+STATE_EVENTS = engine.STATE_EVENTS
 _SEND_STATE_TOOLS = re.compile(r"(?:WebFetch|WebSearch|Bash|Agent|mcp__.+)\Z")
 GUARDS = (
     ("PreToolUse", re.compile(r"Bash\Z"), (require_well_formed, guard_git_work_loss, guard_recursive_delete, ask_first,
@@ -110,9 +112,9 @@ GUARDS = (
                                            guard_scheduled_jobs, guard_sudo, guard_git_stacked_base,
                                            guard_review_threads, guard_secrets, prose_budget_commit)),
     ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
-    ("PreToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
+    ("PreToolUse", issue_writes.TOOLS, (guard_github_issues,)),
     ("PreToolUse", posts.TOOLS, (guard_private_terms,)),
-    ("PreToolUse", guard_duplicate_prs.TOOLS, (guard_duplicate_prs,)),
+    ("PreToolUse", opened_prs.TOOLS, (guard_duplicate_prs,)),
     ("PreToolUse", guard_signed_comments.TOOLS, (guard_signed_comments,)),
     ("PreToolUse", re.compile(r"(?:Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree)\Z"), (guard_worktrees,)),
     ("PreToolUse", re.compile(r"SendMessage\Z"), (guard_cross_session_send,)),
@@ -122,8 +124,8 @@ GUARDS = (
     ("SessionStart", None, (guard_cross_session_send, guard_private_terms)),
     # guard-github-issues' door: a human turn opens it, a write that ran spends it.
     ("UserPromptSubmit", None, (guard_github_issues,)),
-    ("PostToolUse", guard_github_issues.TOOLS, (guard_github_issues,)),
-    ("PostToolUseFailure", guard_github_issues.TOOLS, (guard_github_issues,)),
+    ("PostToolUse", issue_writes.TOOLS, (guard_github_issues,)),
+    ("PostToolUseFailure", issue_writes.TOOLS, (guard_github_issues,)),
 )
 
 

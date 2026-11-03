@@ -15,8 +15,8 @@ from hamcrest import assert_that, contains_string, empty, equal_to, has_length, 
 import readme_table
 from harness import hooks_json_commands, hooks_json_prompt_command
 from languette import engine, run, scan
-from languette import posts
-from languette.guards import guard_duplicate_prs, guard_github_issues, guard_signed_comments
+from languette import issue_writes, opened_prs, posts
+from languette.guards import guard_signed_comments
 
 ROOT = Path(__file__).resolve().parent.parent
 # Spelled out, not read from run.GUARDS, so a guard dropped from run.GUARDS fails the comparisons below.
@@ -234,7 +234,7 @@ def test_every_call_to_a_guard_generator_is_a_yield_from():
     # answer, and nothing else fails: the ports' likeliest bug (#79).
     files = sorted((ROOT / "languette" / "guards").glob("*.py")) + [
         ROOT / "languette" / f"{m}.py" for m in ("hook_skips", "branch_deletions", "infra_runs", "listed_runs",
-                                                 "pushes", "untrusted_reads")]
+                                                 "pushes", "untrusted_reads", "issue_writes", "opened_prs")]
     trees = {f.stem: ast.parse(f.read_text()) for f in files}
     gens = {m: _generators(t) for m, t in trees.items()}
     bad = []
@@ -258,7 +258,14 @@ def test_the_readme_table_is_the_scenarios_table():
 def test_the_prompt_hook_has_the_shape_that_opens_the_door():
     assert_that(prompt_hooks_shape((ROOT / "hooks/hooks.json").read_text()), empty())
     assert_that("--guard" in hooks_json_prompt_command(), is_(False))
-    assert_that(run.wired("UserPromptSubmit", None), equal_to([guard_github_issues]))
+    assert_that(run.wired("UserPromptSubmit", None), equal_to([run.guard_github_issues]))
+
+
+def test_a_rule_set_names_under_on_every_state_event_run_wires_its_guard_to():
+    # An event run.py wires a guard to and its on leaves out goes to the rules, which record nothing.
+    for g in {g for _, _, gs in run.GUARDS for g in gs if isinstance(g, engine.Guard)}:
+        events = {ev for ev, _, gs in run.GUARDS for x in gs if x is g and ev in engine.STATE_EVENTS}
+        assert_that((g.NAME, events), equal_to((g.NAME, set(g.RULE_SET.get("on", {})))))
 
 
 def _prompt_hooks(*hooks):
@@ -291,19 +298,19 @@ def _mcp_suffixes(tools):
 
 def _mcp_tools_the_guard_handles():
     # From the guard's own TOOLS, so a tool added there must be matched here.
-    suffixes = _mcp_suffixes(guard_github_issues.TOOLS)
+    suffixes = _mcp_suffixes(issue_writes.TOOLS)
     assert suffixes >= {"create_issue", "transfer_issue", "delete_issue", "issue_write"}
     return sorted(f"{prefix}{s}" for s in suffixes for prefix in ("mcp__github__", "mcp__plugin_github_github__"))
 
 
 @pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_handles())
 def test_the_guard_github_issues_matcher_covers_the_tool(tool):
-    assert_that(_reaches(guard_github_issues, tool), is_(True))
+    assert_that(_reaches(run.guard_github_issues, tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__add_issue_comment"])
 def test_the_guard_github_issues_matcher_leaves_other_tools_alone(tool):
-    assert_that(_reaches(guard_github_issues, tool), is_(False))
+    assert_that(_reaches(run.guard_github_issues, tool), is_(False))
 
 
 def _mcp_tools_the_guard_private_terms_handles():
@@ -335,15 +342,15 @@ def test_the_guard_bypass_labels_matcher_leaves_other_tools_alone(tool):
     assert_that(_reaches(run.guard_bypass_labels, tool), is_(False))
 
 
-@pytest.mark.parametrize("tool", ["Bash"] + sorted(f"{prefix}{s}" for s in _mcp_suffixes(guard_duplicate_prs.TOOLS)
+@pytest.mark.parametrize("tool", ["Bash"] + sorted(f"{prefix}{s}" for s in _mcp_suffixes(opened_prs.TOOLS)
                                                    for prefix in ("mcp__github__", "mcp__plugin_github_github__")))
 def test_the_guard_duplicate_pr_matcher_covers_the_tool(tool):
-    assert_that(_reaches(guard_duplicate_prs, tool), is_(True))
+    assert_that(_reaches(run.guard_duplicate_prs, tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__update_pull_request", "mcp__github__list_pull_requests"])
 def test_the_guard_duplicate_pr_matcher_leaves_other_tools_alone(tool):
-    assert_that(_reaches(guard_duplicate_prs, tool), is_(False))
+    assert_that(_reaches(run.guard_duplicate_prs, tool), is_(False))
 
 
 def _mcp_tools_the_guard_signed_comments_handles():

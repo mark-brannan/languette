@@ -1,5 +1,6 @@
-"""guard-duplicate-prs: a second open PR on an issue an open PR already
-references is denied. The spec is features/guard-duplicate-prs.feature.
+"""guard-duplicate-prs' walk and its handler (languette/rules/guard_duplicate_prs.py is the
+rule set): a second open PR on an issue an open PR already references is denied. The spec
+is features/guard-duplicate-prs.feature.
 
 Two sessions working one issue each open a PR for it, minutes apart, and
 neither reads the issue first: the work is done twice and the review is
@@ -36,7 +37,6 @@ from languette.messages import say
 from languette.refs import remote_url
 from languette.verdict import Need, Refuse, ask, deny
 
-NAME = "guard-duplicate-prs"
 # The tools hooks.json wires this guard to; the MCP one by its name's tail.
 TOOLS = re.compile(r"(?:Bash|mcp__.*__(?:create_pull_request))\Z")
 _MCP = re.compile(r"mcp__.*__create_pull_request\Z")
@@ -57,8 +57,8 @@ _HTML = re.compile(rf"github\.com/({_NAME}/{_NAME})/(?:pull|issues)/[0-9]+")
 _APPEND = re.compile(r""">>[ \t]*(["']?)([^\s;|&<>"']+)\1""")
 
 
-def _deny(why):
-    return deny(say("judged", guard=NAME, why=why))
+def _deny(guard, why):
+    return deny(say("judged", guard=guard, why=why))
 
 
 def refs(rx, text, repo):
@@ -192,7 +192,7 @@ def _abs(p, cwd, cd, env):
     return os.path.normpath(p) if p else p
 
 
-def _body(post, cwd, cd, docs, writes, env):
+def _body(post, cwd, cd, docs, writes, env, guard):
     """The text of the body `post` sends, or the deny that says why it cannot be read.
     `writes` maps each path the command writes to (times written, whether a heredoc
     writes it, whether it is appended to); a heredoc's text stands for the file only
@@ -202,26 +202,26 @@ def _body(post, cwd, cd, docs, writes, env):
         if kind == "text":
             text += v + "\n"
         elif kind == "opaque":
-            return _deny(say("dup_body_opaque", v=v))
+            return _deny(guard, say("dup_body_opaque", v=v))
         elif kind == "stdin":
             if not docs:
-                return _deny(say("dup_body_stdin"))
+                return _deny(guard, say("dup_body_stdin"))
             text += "".join(body + "\n" for body, _ in docs)
         elif got := writes.get(_abs(v, cwd, cd, env) or v):
             n, fed, app = got
             if n != 1:
-                return _deny(say("dup_body_rewritten", v=v, n=n))
+                return _deny(guard, say("dup_body_rewritten", v=v, n=n))
             if app:
-                return _deny(say("dup_body_appended", v=v))
+                return _deny(guard, say("dup_body_appended", v=v))
             if not fed:
-                return _deny(say("dup_body_not_heredoc", v=v))
+                return _deny(guard, say("dup_body_not_heredoc", v=v))
             text += "".join(body + "\n" for body, _ in docs)    # its one write is a heredoc: that text, not the file's
         else:
             p = _abs(v, cwd, cd, env)
             got = Refuse(say("dp_relative_cd")) \
                 if p is None else (yield from _fetch(p))
             if isinstance(got, Refuse):
-                return _deny(say("dup_body_file", v=v, got=got))
+                return _deny(guard, say("dup_body_file", v=v, got=got))
             text += got + "\n"
     return text
 
@@ -264,7 +264,7 @@ def _open_prs(slug, n):
     return out if out or len(body) < PAGE else None
 
 
-def _judge(text, slug):
+def _judge(text, slug, guard):
     """deny or ask for one body, or None."""
     closes = refs(CLOSES, text, slug)
     if not closes:
@@ -273,27 +273,31 @@ def _judge(text, slug):
     asked = None
     for repo, n in closes:
         if repo is None:
-            asked = asked or ask(say("dup_repo_unknown", guard=NAME, n=n))
+            asked = asked or ask(say("dup_repo_unknown", guard=guard, n=n))
             continue
         prs = yield from _open_prs(repo, n)
         if prs is None:
-            asked = asked or ask(say("dup_github_silent", guard=NAME, repo=repo, n=n, page=PAGE))
+            asked = asked or ask(say("dup_github_silent", guard=guard, repo=repo, n=n, page=PAGE))
             continue
         for pr_repo, m, title in prs:
             if (pr_repo, m) in gone:
                 continue
             here = lambda r, x: f"#{x}" if r == repo else f"{r}#{x}"
             named = here(pr_repo, m) + (f" ({title})" if title else "")
-            return _deny(say("dup_open", named=named, issue=here(repo, n), pr=here(pr_repo, m)))
+            return _deny(guard, say("dup_open", named=named, issue=here(repo, n), pr=here(pr_repo, m)))
     return asked
 
 
-def check(doc):
-    payload, env, tool = doc.payload, doc.env, doc.tool
+def opened(doc):
+    """The `pr-opens` test: {"posts": each PR the call opens, "cd": whether the command runs a
+    cd, "docs": its heredoc bodies, "writes": each path it writes to, as (times written,
+    whether a heredoc writes it, whether it is appended to)}, or None when no PR it opens
+    carries a body."""
+    env, tool = doc.env, doc.tool
     if not isinstance(tool, str):
         return None
     ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
-    cwd = payload.get("cwd")
+    cwd = doc.payload.get("cwd")
     if tool == "Bash":
         cmd = ti.get("command")
         if not isinstance(cmd, str) or ("gh" not in cmd):
@@ -323,17 +327,26 @@ def check(doc):
         k = _abs(w, cwd, cd, env) or w
         if k in writes:
             writes[k] = (writes[k][0], writes[k][1], True)
+    return {"posts": found, "cd": cd, "docs": docs, "writes": writes}
+
+
+def timelines(doc, guard, found):
+    """The `issue-timelines` handler: each body the call sends is read, and every issue it
+    closes is looked up in that issue's timeline on GitHub; an open PR already there is a deny,
+    unless the body supersedes it. It asks when GitHub or the repo cannot tell, and denies a
+    body it cannot read."""
+    cwd, cd = doc.payload.get("cwd"), found["cd"]
     asked = None
-    for post in found:
+    for post in found["posts"]:
         if not post.parts:
             continue
-        text = yield from _body(post, cwd, cd, docs, writes, env)
+        text = yield from _body(post, cwd, cd, found["docs"], found["writes"], doc.env, guard)
         if isinstance(text, dict):
             return text
         if not CLOSES.search(text):
             continue
         slug = yield from _slug(post.repo, cd, cwd)
-        v = yield from _judge(text, slug)
+        v = yield from _judge(text, slug, guard)
         if v and v["permissionDecision"] == "deny":
             return v
         asked = asked or v

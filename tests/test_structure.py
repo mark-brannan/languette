@@ -26,11 +26,11 @@ GUARDS = {f.stem: importlib.import_module(f"languette.guards.{f.stem}")
           for f in sorted((ROOT / "languette" / "guards").glob("*.py")) if f.stem != "__init__"}
 # The walks that left languette/guards/ with their guards (what a call applies, what a post carries,
 # the hooks a git call skips, the remote branches it deletes, the infrastructure it destroys, the runs
-# a repo lists, where a push lands, what a session read and sends): read by the same checks, since
-# moving a file is not removing a copy.
+# a repo lists, where a push lands, what a session read and sends, the issues a call writes, the PRs
+# it opens): read by the same checks, since moving a file is not removing a copy.
 WALKS = {m: importlib.import_module(f"languette.{m}")
          for m in ("labels", "posts", "hook_skips", "branch_deletions", "infra_runs", "listed_runs",
-                   "pushes", "untrusted_reads")}
+                   "pushes", "untrusted_reads", "issue_writes", "opened_prs")}
 SHARED = {m: importlib.import_module(f"languette.{m}") for m in ("scan", "paths", "verdict", "document", "secrets", "refs")}
 
 # The fields of the call Document reads once; a guard reads them from the Document.
@@ -42,9 +42,8 @@ ANSWERS = {"Refuse", "deny", "ask", "context"}
 # must fall inside one of these.
 KNOWN_TWICE = set()
 # Reads of a DOCUMENT_FIELDS key from the payload, at most, per guard.
-KNOWN_PAYLOAD_READS = {"guard_duplicate_prs": 2,
-                       "guard_github_issues": 3, "guard_signed_comments": 2,
-                       "guard_worktrees": 4, "labels": 2, "posts": 3, "prose_budget_commit": 2}
+KNOWN_PAYLOAD_READS = {"guard_signed_comments": 2,
+                       "guard_worktrees": 4, "labels": 2, "posts": 2, "prose_budget_commit": 2}
 # Answers whose text is anything but a messages.say call, at most, per guard.
 KNOWN_INLINE_TEXT = {}
 

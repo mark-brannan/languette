@@ -11,7 +11,7 @@ from hamcrest import assert_that, contains_string, equal_to
 from languette import engine, primitives, scan
 from languette.rules import guard_protected_services
 from languette.document import Document
-from languette.verdict import Need, deny
+from languette.verdict import Act, Need, deny
 
 GOOD = {"guard": "guard-x", "rules": [{"id": "r", "match": [{"cmd": "foo"}], "action": "deny", "why": "sudo_root"}]}
 
@@ -45,6 +45,9 @@ def _with_rule(**changes):
     (_with_rule(handler="open-prs"), "a rule with a handler has no why"),
     ({**GOOD, "rules": [{"id": "r", "match": [{"test": "secrets"}], "action": "deny", "handler": "open-prs"}]},
      "no test that judges"),
+    ({**GOOD, "on": ["PostToolUse"]}, "on must be an object"),
+    ({**GOOD, "on": {"PreToolUse": "open-prs"}}, "on must be an object mapping events"),
+    ({**GOOD, "on": {"PostToolUse": "no-such-handler"}}, "handlers languette holds"),
 ])
 def test_a_rule_set_that_does_not_load_names_the_fault(rule_set, fault):
     with pytest.raises(scan.BadRules, match=re.escape(fault)):
@@ -102,3 +105,25 @@ def test_a_handler_is_given_what_the_match_found_and_its_verdict_stands(monkeypa
         check.send(5)
     assert_that(stop.value.value, equal_to(deny("at 5")))
     assert_that(seen, equal_to([("guard-x", {"cmd": "foo", "verb": None})]))
+
+
+def test_an_event_on_names_goes_to_its_handler_and_the_rules_judge_the_rest(monkeypatch):
+    seen = []
+
+    def handler(doc, guard, found):
+        seen.append((doc.event, guard, found))
+        yield Act("door-open", "s")
+        return None
+    monkeypatch.setitem(primitives.HANDLERS, "h", handler)
+    guard = engine.Guard(types.SimpleNamespace(RULE_SET={**GOOD, "on": {"PostToolUse": "h"}},
+                                               __name__="languette.rules.guard_x"))
+    call = {"tool_name": "Bash", "tool_input": {"command": "foo"}, "cwd": "/"}
+    check = guard.check(Document({**call, "hook_event_name": "PostToolUse"}, {}))
+    assert_that(next(check), equal_to(Act("door-open", "s")))
+    with pytest.raises(StopIteration) as stop:
+        check.send(None)
+    assert_that(stop.value.value, equal_to(None))
+    assert_that(seen, equal_to([("PostToolUse", "guard-x", {})]))
+    with pytest.raises(StopIteration) as stop:            # the rules judge PreToolUse: foo is denied
+        next(guard.check(Document(call, {})))
+    assert_that(stop.value.value["permissionDecision"], equal_to("deny"))

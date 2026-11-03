@@ -196,17 +196,13 @@ def _sid(doc):
 
 # --- the state hooks: record, never object ------------------------------------
 
-def recorded(doc):
-    """The `session-record` test: on a state event (any event but PreToolUse) of a known
-    session, {"sid", "op", "arg"} for World's send-keep, or None when it changes nothing."""
-    sid = _sid(doc)
-    rec = _record(doc, doc.event) if sid and doc.event != "PreToolUse" else None
-    return {"sid": sid, "op": rec[0], "arg": rec[1]} if rec else None
-
-
 def keep(doc, guard, found):
-    """The `session-keep` handler: writes the record, and never objects."""
-    yield Act("send-keep", found["sid"], found["op"], found["arg"])  # a write that fails leaves an open door (World._send_keep)
+    """The `session-keep` handler, on every state event the rule set's `on` names: writes what
+    the event records for a known session, and never objects."""
+    sid = _sid(doc)
+    rec = _record(doc, doc.event) if sid and doc.event != "PreToolUse" else None   # a call yet to run: nothing
+    if rec:
+        yield Act("send-keep", sid, *rec)      # a write that fails leaves an open door (World._send_keep)
     return None
 
 

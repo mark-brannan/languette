@@ -1,11 +1,11 @@
-"""guard-github-issues: one GitHub or GitLab issue create, transfer or delete per human
-turn; never two in one call, never one in a loop. An issue number is an
+"""guard-github-issues' walk and its handlers (languette/rules/guard_github_issues.py is the
+rule set): one GitHub or GitLab issue create, transfer or delete per human turn; never two in one call, never one in a loop. An issue number is an
 identifier things link to where no agent can see, so minting or moving one is
 a one-way door. The spec is features/guard-github-issues.feature.
 
-The human's turn opens the door (UserPromptSubmit); a write claims it before
-the call (PreToolUse) and spends it once the call has run (PostToolUse,
-PostToolUseFailure). Each guard is its own hook process and cannot see the
+The human's turn opens the door (UserPromptSubmit, the `door-open` handler); a write
+claims it before the call (PreToolUse, the `issue-door` handler) and spends it once the
+call has run (PostToolUse, PostToolUseFailure, the `door-spend` handler). Each guard is its own hook process and cannot see the
 others' verdicts, so a claim whose call has an error result in the transcript
 but was never spent belongs to a call another guard denied: it never ran, and
 the next write takes the claim over. A claim with no result yet is in flight.
@@ -36,7 +36,6 @@ from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Act, Need, approve, deny
 
-NAME = "guard-github-issues"
 # The tools hooks.json wires this guard to; the MCP ones by their name's tail.
 TOOLS = re.compile(r"(?:Bash|mcp__.*__(?:create_issue|issue_write|transfer_issue|delete_issue))\Z")
 _MCP_WRITE = re.compile(r"mcp__.*__(?:create_issue|transfer_issue|delete_issue)\Z")
@@ -194,42 +193,49 @@ def _never_ran(transcript, call):
     return any(pat.search(line) and re.search(r'"is_error": ?true', line) for line in transcript.splitlines())
 
 
-def check(doc):
-    payload = doc.payload
-    event = payload.get("hook_event_name") or "PreToolUse"
-    session = _session(payload)
-    if event == "UserPromptSubmit":
-        yield Act("door-open", session)        # a door that cannot open stays shut
-        return None
-    if event in ("PostToolUse", "PostToolUseFailure"):
-        # The call ran (or tried to): spend the door whatever the verdict was, so a
-        # failed create cannot be followed by a second in the same turn. A call
-        # that cannot be read spends it too.
-        try:
-            found, _ = _writes(doc)
-        except Exception:  # noqa: BLE001
-            found = [None]
-        if found:
-            yield Act("door-spend", session)
-        return None
+def written(doc):
+    """The `issue-writes` test: {"writes": [(verb, issue number or None, repo or None)], "loop":
+    whether one sits in a loop}, or {"unreadable": the error's kind} when the call cannot be read;
+    None when it writes no issue identifier."""
     try:
         found, loop = _writes(doc)
     except Exception as e:  # noqa: BLE001 -- fails closed
-        return deny(say("gi_unreadable", guard=NAME, kind=type(e).__name__))
-    n = len(found)
-    if n == 0:
-        return None
+        return {"unreadable": type(e).__name__}
+    return {"writes": found, "loop": loop} if found else None
+
+
+def door(doc, guard, found):
+    """The `issue-door` handler: one write, outside a loop, takes the human turn's door, or a yes
+    to its label opens the shut one; a batch, a loop or a call that cannot be read is denied."""
+    if "unreadable" in found:
+        return deny(say("gi_unreadable", guard=guard, kind=found["unreadable"]))
+    n = len(found["writes"])
     if n > 1:
-        return deny(say("gi_batch", guard=NAME, n=n))
-    if loop:
-        return deny(say("gi_loop", guard=NAME))
-    why = yield from _door(payload, session)
+        return deny(say("gi_batch", guard=guard, n=n))
+    if found["loop"]:
+        return deny(say("gi_loop", guard=guard))
+    why = yield from _door(doc.payload, _session(doc.payload))
     if why is None:
         return None
-    label = _label(*found[0])
+    label = _label(*found["writes"][0])
     _, done = yield from approve(
-        {label: 1}, lambda e: say("gi_transcript", guard=NAME, err=e, why=why, ask=say("gi_ask", label=label)))
-    return done[0] if done else deny(say("gi_door", guard=NAME, why=why, ask=say("gi_ask", label=label)))
+        {label: 1}, lambda e: say("gi_transcript", guard=guard, err=e, why=why, ask=say("gi_ask", label=label)))
+    return done[0] if done else deny(say("gi_door", guard=guard, why=why, ask=say("gi_ask", label=label)))
+
+
+def door_open(doc, guard, found):
+    """The `door-open` handler, on UserPromptSubmit: the human's turn opens the door."""
+    yield Act("door-open", _session(doc.payload))   # a door that cannot open stays shut
+    return None
+
+
+def door_spend(doc, guard, found):
+    """The `door-spend` handler, on PostToolUse and PostToolUseFailure: the call ran (or tried
+    to), so the door is spent whatever the verdict was, and a failed create cannot be followed by
+    a second in the same turn. A call that cannot be read spends it too."""
+    if written(doc):
+        yield Act("door-spend", _session(doc.payload))
+    return None
 
 
 def _door(payload, session):
