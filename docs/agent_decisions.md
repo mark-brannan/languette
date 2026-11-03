@@ -587,3 +587,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261102t185711z
 - Option tables stay in each guard as rule data; only the getopt walk lives in scan, and scan's PROGRAMS is not folded in Undo: revert 5eca6db ([#333](https://github.com/mark-brannan/languette/pull/333#discussion_r4446470798)) ([#333](https://github.com/mark-brannan/languette/pull/333))
+
+### 20261103t193128z
+- guard-private-terms' SessionStart write moves onto on as the terms-init handler, rather than loosening the test that every state event run.py wires a rule-set guard to is one its on names Undo: loosen tests/test_repo.py's on-consistency test to allow a wired state event with no on entry ([#349](https://github.com/mark-brannan/languette/pull/349))
