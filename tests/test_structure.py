@@ -43,7 +43,7 @@ ANSWERS = {"Refuse", "deny", "ask", "context"}
 KNOWN_TWICE = set()
 # Reads of a DOCUMENT_FIELDS key from the payload, at most, per guard.
 KNOWN_PAYLOAD_READS = {"guard_signed_comments": 2,
-                       "guard_worktrees": 4, "labels": 2, "posts": 3, "prose_budget_commit": 2}
+                       "guard_worktrees": 4, "labels": 2, "posts": 2, "prose_budget_commit": 2}
 # Answers whose text is anything but a messages.say call, at most, per guard.
 KNOWN_INLINE_TEXT = {}
 

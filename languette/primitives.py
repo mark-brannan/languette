@@ -681,7 +681,8 @@ HANDLERS = {"hooks-approval": hook_skips.approval, "open-prs": branch_deletions.
             "branch-rules": pushes.branch_rules,
             "send-door": untrusted_reads.door, "session-keep": untrusted_reads.keep,
             "issue-door": issue_writes.door, "door-open": issue_writes.door_open,
-            "door-spend": issue_writes.door_spend, "issue-timelines": opened_prs.timelines}
+            "door-spend": issue_writes.door_spend, "issue-timelines": opened_prs.timelines,
+            "terms-init": posts.terms_init}
 
 
 def judges(name):

@@ -1,6 +1,7 @@
 """Text bound for a public GitHub repo, judged twice: what guard-private-terms
 (languette/rules/guard_private_terms.py, run by its `private-terms` test in
-languette/primitives.py) decides. The spec is features/guard-private-terms.feature.
+languette/primitives.py) decides; its `terms-init` handler, on SessionStart, writes the
+default redacted terms file where none is there. The spec is features/guard-private-terms.feature.
 
 Once a private term is in a public issue or PR it is in GitHub's history and
 every mirror of it; the undo is a support ticket, not an edit. So the check
@@ -359,12 +360,16 @@ def _changes(texts, applied):
     return ", ".join(dict.fromkeys(out))
 
 
+def terms_init(doc, guard, found):
+    """The `terms-init` handler, on SessionStart: the default redacted terms file is written
+    where none is there. Not a verdict: the plugin path has no `languette install`, so the
+    hook writes it (World._terms_init)."""
+    yield Act("terms-init")
+    return None
+
+
 def check(doc):
     payload, env = doc.payload, doc.env
-    if payload.get("hook_event_name") == "SessionStart":
-        # Not a verdict: the plugin path has no `languette install`, so the default file is written here.
-        yield Act("terms-init")
-        return None
     tool = doc.tool
     if not isinstance(tool, str) or not tool:
         return None
