@@ -641,3 +641,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261105t225107z
 - A spend finding is recorded in the decision record as decision none; the record format is unchanged Undo: record spend findings as decision ask ([#358](https://github.com/mark-brannan/languette/pull/358))
+
+### 20261105t225122z
+- The runner's spend denies open with languette:, so the transcript reads a later failure as a call that never ran Undo: prefix each spend deny with the asking guard's name ([#358](https://github.com/mark-brannan/languette/pull/358))
