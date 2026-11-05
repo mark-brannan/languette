@@ -71,6 +71,26 @@ Feature: guard-git-stacked-base
       | gh api --method=DELETE repos/o/r/git/refs/heads/claude/base-branch |
       | gh api -X=DELETE repos/o/r/git/refs/heads/claude/base-branch       |
 
+  # GitLab retargets an open merge request only when its target is deleted as part of
+  # that branch's merge: https://docs.gitlab.com/user/project/merge_requests/. glab's
+  # own docs: https://docs.gitlab.com/cli/mr/list/ (open by default; -t,
+  # --target-branch, -s, --source-branch, -F, --output json) and /cli/api/ (-X).
+  # The REST path: https://docs.gitlab.com/api/branches/ (DELETE .../repository/branches/:branch).
+  Scenario Outline: on GitLab, deleting a branch an open merge request targets or comes from is denied
+    Given a clone of "https://gitlab.com/g/p.git" at "{TMP}/gl" on branch "claude/topic"
+    And the working directory is "{TMP}/gl"
+    When the agent runs `<command>`
+    Then the guard <verdict>
+    And the stub "timeout" was called with "<lookup>"
+
+    Examples:
+      | command                                                                  | verdict | lookup |
+      | git push origin --delete claude/base-branch                              | denies, naming "is the target branch of open merge request(s)" | 20 glab mr list --target-branch claude/base-branch -F json |
+      | git push origin :claude/lonely                                           | denies, naming "!3 unrelated" | 20 glab mr list --source-branch claude/lonely -F json |
+      | glab api -X DELETE projects/:id/repository/branches/claude%2Fbase-branch | denies, naming "!1 stacked change" | 20 glab mr list --target-branch claude/base-branch |
+      | glab api -X DELETE projects/g%2Fq/repository/branches/claude%2Fbase-branch | denies, naming "GitLab does not retarget" | 20 glab mr list -R g/q --target-branch claude/base-branch |
+      | git push origin --delete claude/spare                                    | is silent | 20 glab mr list --source-branch claude/spare -F json |
+
   Scenario Outline: the bypasses the shared scanner exists to close stay closed
     When the agent runs `<command>`
     Then the guard denies

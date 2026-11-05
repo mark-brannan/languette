@@ -384,6 +384,17 @@ MESSAGES = {
         "around it on the user's bypass. Push a branch and open a PR. A direct push is the user's "
         "to make, from their own terminal."
     ),
+    "ruleset_needs_mr": (
+        "guard-bypass-ruleset: `{branch}` on {slug} is a protected branch no role may push to, so it "
+        "takes a merge request, and this push would go around it on the user's bypass. Push a branch "
+        "and open a merge request. A direct push is the user's to make, from their own terminal."
+    ),
+    "ruleset_gitlab_silent": (
+        "guard-bypass-ruleset: this pushes to `{branch}` on {slug}, and GitLab couldn't say "
+        "whether `{branch}` takes a merge request (glab missing, signed out, offline or "
+        "an error):\n  glab api projects/{slug_q}/protected_branches/{branch_q}\n"
+        "An agent that pushes with your credentials can use your bypass."
+    ),
     "ruleset_github_silent": (
         "guard-bypass-ruleset: this pushes to `{branch}` on {slug}, and GitHub couldn't say "
         "whether `{branch}` requires a pull request (gh missing, signed out, offline or "
@@ -428,7 +439,7 @@ MESSAGES = {
     ),
     "dup_repo_unknown": (
         "{guard}: this PR would close #{n}, and the hook can't tell which repo it is opened "
-        "on (no --repo, and the working directory's origin is not on github.com, or a cd "
+        "on (no --repo, and the working directory's origin is not on that forge, or a cd "
         "moves it), so it can't check whether an open PR already references #{n}. Pass "
         "--repo owner/name, or read the issue first."
     ),
@@ -438,6 +449,19 @@ MESSAGES = {
         "timeline past {page} events):\n"
         "  gh api repos/{repo}/issues/{n}/timeline\n"
         "Read the issue before opening a second PR on it."
+    ),
+    "dup_gitlab_silent": (
+        "{guard}: this merge request would close {repo}#{n}, and GitLab couldn't say whether an "
+        "open merge request already relates to it (glab missing, signed out, offline, an error, or "
+        "a page past {page} merge requests):\n"
+        "  glab api projects/{path}/issues/{n}/related_merge_requests\n"
+        "Read the issue before opening a second merge request on it."
+    ),
+    "dup_open_mr": (
+        "Merge request {named} is open and already relates to {issue}, which this merge request "
+        "would close too, so this command is blocked. If this one replaces it, close {pr} first "
+        "or say `Supersedes {pr}` in this description. If both are wanted, drop the closing "
+        "keyword here and link the issue in prose."
     ),
     "dup_open": (
         "PR {named} is open and already references {issue}, which this PR would close "
@@ -461,7 +485,7 @@ MESSAGES = {
         "  gh -R <owner>/<repo> pr list --state open --json number,baseRefName,headRefName"
     ),
     "sb_no_gh": (
-        "{guard}: this deletes a remote branch, but `gh` is not installed, so open PRs based on it can't "
+        "{guard}: this deletes a remote branch, but `{cli}` is not installed, so open PRs based on it can't "
         "be checked. Deleting a branch an open PR points at closes that PR silently."
     ),
     "sb_no_timeout": (
@@ -478,6 +502,22 @@ MESSAGES = {
         "bottom-up with `gh pr merge --delete-branch` (which this hook never fires on), or retarget the "
         "dependents to their next base first:\n  gh pr list --base {b} --json number,title\n"
         "  gh pr edit <n> --base <new-base>"
+    ),
+    "sb_advice_gl": (
+        "GitLab retargets a merge request only when its target branch is deleted as part of that "
+        "branch's own merge. Merge bottom-up with `glab mr merge --remove-source-branch` (which this hook "
+        "never fires on), or retarget the dependents first:\n  glab mr list --target-branch {b}\n"
+        "  glab mr update <n> --target-branch <new-target>"
+    ),
+    "sb_base_open_gl": (
+        "{guard}: `{b}` is the target branch of open merge request(s):\n{prs}"
+        "\nDeleting it leaves every one of them aimed at a branch that is gone -- GitLab does not "
+        "retarget a merge request whose target is deleted outside its merge.\n\n{advice}"
+    ),
+    "sb_head_open_gl": (
+        "{guard}: `{b}` is the source branch of open merge request(s):\n{prs}"
+        "\nDeleting it strands them and throws the work away. Merge or close the merge request first; "
+        "`glab mr merge --remove-source-branch` deletes the branch the safe way."
     ),
     "sb_base_open": (
         "{guard}: `{b}` is the base branch of open PR(s):\n{prs}"

@@ -14,6 +14,11 @@ doors are watched:
   only make the guard stricter, never silent.
 - `gh pr merge --admin`, which exists only to merge past a PR's rules.
 
+On GitLab the rule is a protected branch: one no role below Administrator may
+push to takes a merge request, and a user, group or deploy key let push there
+anyway is its bypass. glab's `mr merge` has no flag that merges past the
+rules, so the push is GitLab's one door. Not protected (GitLab's 404) is open.
+
 Both deny. The user's own terminal never reaches a hook, so the user keeps
 the bypass. When GitHub cannot answer (no gh, signed out, offline, a 10 s
 timeout, an error) or the destination cannot be read (a variable refspec,
@@ -33,7 +38,7 @@ of a pipeline, in an and-or list that is backgrounded or carries on past
 `||`), a cd an earlier command in its and-or list may skip, and a `popd` leave the
 directory unknown, so the guard asks. Not watched: pushes to
 any other branch, tags and deletions (guard-git-work-loss and guard-git-stacked-base
-judge those), remotes off github.com or behind an ssh host alias, `gh api`
+judge those), remotes on neither forge or behind an ssh host alias, `gh api`
 writes to a ref or a merge endpoint, an alias from the user's own gitconfig
 or `gh alias`, and `push.default=matching` (a bare `git push origin` pushing
 every matching branch).
@@ -459,6 +464,29 @@ def _requires_pr(slug, branch):
     return got
 
 
+def _requires_mr(host, slug, branch):
+    """"pr", "open", or None when GitLab can't answer. A protected branch no role below
+    Administrator may push to takes a merge request; a user, group or deploy key allowed to
+    push there anyway (or a custom role) is that rule's bypass, as a ruleset's bypass actor is on GitHub."""
+    key = f"{host}/{slug}"
+    cached = yield Need("ruleset-cache", key, branch)
+    if cached and cached[1] == "pr" and (yield Need("clock")) - cached[0] < TTL:
+        return "pr"
+    code, body = yield Need("forge-api", "gitlab", host,
+                            f"projects/{quote(slug, safe='')}/protected_branches/{quote(branch, safe='')}")
+    if code == 200 and isinstance(body, dict) and isinstance(body.get("push_access_levels"), list):
+        roles = [e.get("access_level") for e in body["push_access_levels"] if isinstance(e, dict)
+                 and not any(e.get(k) is not None for k in ("user_id", "group_id", "deploy_key_id", "member_role_id"))]
+        got = "open" if any(isinstance(x, int) and 0 < x < 60 for x in roles) else "pr"
+    elif code == 404 and isinstance(body, dict) and str(body.get("message", "")).lower() == "404 not found":
+        got = "open"                           # no protection; a missing project names itself in the message
+    else:
+        return None
+    if got == "pr":
+        yield Act("ruleset-keep", key, branch, got)
+    return got
+
+
 def _judge(p, env):
     """deny or ask for one push, or None."""
     remote, dsts = p.remote, list(p.dsts)
@@ -496,17 +524,25 @@ def _judge(p, env):
     if url is None:
         return ask(say("ruleset_repo_unknown", branch=hits[0], remote=remote))
     r = sw.remote(url)
-    if not r or r.forge != "github":
+    if not r or r.forge not in ("github", "gitlab"):
         return None
-    slug = r.repo
+    slug, gitlab = r.repo, r.forge == "gitlab"
     asked = None
     for branch in hits:
-        got = yield from _requires_pr(slug, branch)
+        if gitlab:
+            got = yield from _requires_mr(r.host, slug, branch)
+        else:
+            got = yield from _requires_pr(slug, branch)
+        if got == "pr" and gitlab:
+            return deny(say("ruleset_needs_mr", branch=branch, slug=slug))
         if got == "pr":
             return deny(say("ruleset_needs_pr", branch=branch, slug=slug))
-        if got is None:
-            asked = asked or ask(say("ruleset_github_silent", branch=branch, slug=slug,
-                                       branch_q=quote(branch, safe="")))
+        bq = quote(branch, safe="")
+        if got is None and gitlab:
+            asked = asked or ask(say("ruleset_gitlab_silent", branch=branch, slug=slug, branch_q=bq,
+                                     slug_q=quote(slug, safe="")))
+        elif got is None:
+            asked = asked or ask(say("ruleset_github_silent", branch=branch, slug=slug, branch_q=bq))
     return asked
 
 

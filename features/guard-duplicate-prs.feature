@@ -291,3 +291,33 @@ Feature: guard-duplicate-prs
     Given the working directory is "relative/dir"
     When the agent runs `gh pr create -t t -b "Closes #114"`
     Then the guard denies, naming "no working directory"
+
+  # glab's own docs: https://docs.gitlab.com/cli/mr/create/ (alias new; -d,
+  # --description, --description-file, -i, --related-issue; -b is the target
+  # branch) and /cli/api/ (-f sends a POST). The lookup:
+  # https://docs.gitlab.com/api/issues/ (GET .../issues/:issue_iid/related_merge_requests,
+  # state "opened"); the closing pattern: https://docs.gitlab.com/user/project/issues/managing_issues/.
+  Scenario Outline: on GitLab, an open merge request already on the issue denies, and anything else does not
+    Given a clone of "https://gitlab.com/g/p.git" at "{TMP}/gl" on branch "claude/topic"
+    And the working directory is "{TMP}/gl"
+    And GLAB_RELATED is <related>
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | related     | command                                                             | verdict |
+      | "open-mr"   | glab mr create -t t -d "Closes #114"                                | denies, naming "Merge request !120 (the first one) is open and already relates to #114" |
+      | "open-mr"   | glab mr new -t t -b main --description="Implements #114"            | denies, naming "Supersedes !120" |
+      | "open-mr"   | glab mr create -t t -d "Fixes https://gitlab.com/g/p/-/issues/114"  | denies, naming "!120" |
+      | "open-mr"   | glab mr create -R g/p -t t -d "Resolving g/p#114"                   | denies, naming "!120" |
+      | "open-mr"   | glab mr create -t t -i 114                                          | denies, naming "!120" |
+      | "open-mr"   | glab api projects/:id/merge_requests -f title=t -f description='Closes #114' | denies, naming "!120" |
+      | "open-mr"   | glab api projects/g%2Fp/merge_requests -f description='Closes #114' | denies, naming "!120" |
+      | "open-mr"   | glab mr create -t t -d "Closes #114. Supersedes !120."              | is silent |
+      | "open-mr"   | glab mr create -t t -d "Closes #114, replaces g/p!120"              | is silent |
+      | "open-mr"   | glab mr create -t t -d "Part of #114"                               | is silent |
+      | "open-mr"   | glab mr create -t "Closes #114" -d "a fix"                          | is silent |
+      | "open-mr"   | glab api projects/:id/merge_requests                                | is silent |
+      | "merged-mr" | glab mr create -t t -d "Closes #114"                                | is silent |
+      | unset       | glab mr create -t t -d "Closes #114"                                | is silent |
+      | "full"      | glab mr create -t t -d "Closes #114"                                | asks, naming "a page past 100 merge requests" |

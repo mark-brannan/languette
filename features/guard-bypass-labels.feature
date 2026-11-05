@@ -360,6 +360,41 @@ Feature: guard-bypass-labels
         | gh label edit ready -n=churn-ok                             |
         | gh api -X PATCH repos/o/r/labels/ready -f new_name=churn-ok |
 
+  Rule: on GitLab, glab's flags and glab api apply labels as gh's do
+
+    # glab's own docs: https://docs.gitlab.com/cli/mr/create/ and /cli/mr/update/
+    # (-l, --label), /cli/issue/update/ (-l, --label), /cli/label/edit/ (-n,
+    # --new-name), /cli/api/ (-f, -F, --form send a POST). The fields and mutations:
+    # https://docs.gitlab.com/api/merge_requests/ (labels, add_labels),
+    # /api/labels/ (PUT .../labels/:label_id, new_name), and
+    # /api/graphql/reference/mutations/ (mergeRequestSetLabels labelIds, updateIssue addLabelIds).
+    Scenario Outline: a bypass label through glab is denied, and glab's other words are not
+      When the agent runs `<command>`
+      Then the guard <verdict>
+
+      Examples:
+        | command                                                                  | verdict                      |
+        | glab mr create -t t -d b --label churn-ok                                | denies, naming "churn-ok"    |
+        | glab mr new -t t -d b -l ready,Mixed-Loops-OK                            | denies, naming "mixed-loops-ok" |
+        | glab mr update 12 -lchurn-ok                                             | denies, naming "churn-ok"    |
+        | glab mr update 12 --label=churn-ok                                       | denies, naming "churn-ok"    |
+        | glab issue update 3 -l churn-ok                                          | denies, naming "churn-ok"    |
+        | glab label edit -l 5 --new-name churn-ok                                 | denies, naming "churn-ok"    |
+        | glab label edit -l 5 -n CHURN-OK -R g/p                                  | denies, naming "churn-ok"    |
+        | glab api -X PUT projects/:id/merge_requests/12 -f add_labels=churn-ok    | denies, naming "churn-ok"    |
+        | glab api -X PUT projects/g%2Fp/labels/ready -f new_name=churn-ok         | denies, naming "churn-ok"    |
+        | glab api graphql -f query='mutation { mergeRequestSetLabels(input:{projectPath:"g/p",iid:"1",labelIds:["x"]}) { errors } }' | denies, naming "label IDs" |
+        | glab api graphql -f query='mutation { updateIssue(input:{projectPath:"g/p",iid:"1",addLabelIds:["x"]}) { errors } }' | denies, naming "label IDs" |
+        | glab mr update 12 --unlabel churn-ok                                     | is silent                    |
+        | glab mr list -l churn-ok                                                 | is silent                    |
+        | glab mr create -t t -d "churn-ok, by hand" -l ready                      | is silent                    |
+        | glab api projects/:id/merge_requests -X GET -f labels=churn-ok           | is silent                    |
+
+      @also_guard-github-issues
+      Examples:
+        | command                                                                  | verdict                      |
+        | glab issue create -t t -d b -l churn-ok                                  | denies, naming "churn-ok"    |
+
   Rule: a label named in text, a read, or another label is not a bypass applied
 
     Scenario Outline: text, a read, a filter or another label is silent

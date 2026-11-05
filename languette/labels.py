@@ -12,7 +12,7 @@ apply to its own PR is not a gate, so a session may then not apply a named
 label, in any repo, public or private. Names are compared case-folded, as
 GitHub compares label names.
 
-Three routes reach a label, and each is read:
+Four routes reach a label, and each is read:
 
 - gh's flags: --label, --add-label and -l on `gh pr|issue create|new|edit`,
   --name/-n on `gh label edit`, since a rename puts the new name on every
@@ -22,6 +22,10 @@ Three routes reach a label, and each is read:
   `new_name` on a labels/ path), a JSON payload passed by --input (a file,
   or `-` fed by a heredoc) on any path, and a graphql mutation that applies
   or renames labels by ID, which the guard cannot map to names;
+- glab's, on GitLab: --label/-l on `glab mr|issue create|new|update`,
+  --new-name/-n on `glab label edit`, and `glab api` read as gh api is, on
+  projects/:id/issues, merge_requests and labels paths, with `add_labels`
+  beside `labels` and graphql's labelIds, addLabelIds and labelsWidget;
 - an MCP tool's field whose name says label, at any depth, and every string
   field of a tool whose name says label, unless the tool's name leads with a
   read verb (list, get, search, read) and says nothing that writes. An
@@ -53,11 +57,25 @@ DEFAULT = ()                                   # no label is guarded until the o
 
 WRITES = frozenset("create new edit".split())
 LABEL_FLAGS = frozenset("--label --add-label -l".split())
+# Each forge's client, a row (docs/design/forges.md): the groups and verbs that
+# apply labels, their label flags and glued spellings, and `label edit`'s rename.
+_CLIENTS = {
+    "gh": {"groups": ("pr", "issue"), "writes": WRITES, "label": (LABEL_FLAGS, ("--label=", "--add-label=")),
+           "rename": (frozenset(("--name", "-n")), ("--name=",))},
+    "glab": {"groups": ("mr", "issue"), "writes": frozenset("create new update".split()),
+             "label": (frozenset(("--label", "-l")), ("--label=",)),
+             "rename": (frozenset(("--new-name", "-n")), ("--new-name=",))},
+}
 # Paths whose write can carry labels in an --input payload.
 REPO = r"(?:repos/[^/]+/[^/]+|repositories/[^/]+)"
-LABEL_PATH = re.compile(REPO + r"/(?:issues(?:/[^/]+(?:/labels)?)?|labels/[^/]+)/?")
-RENAME_PATH = re.compile(REPO + r"/labels/[^/]+/?")
-GRAPHQL_LABELS = re.compile(r"addLabelsToLabelable|labelIds|updateLabel")
+# GitLab's: a project, by id or URL-encoded path, its issues, merge requests and labels.
+PROJECT = r"(?:api/v4/)?projects/[^/]+"
+LABEL_PATH = re.compile(r"(?:" + REPO + r"/(?:issues(?:/[^/]+(?:/labels)?)?|labels/[^/]+)"
+                        r"|" + PROJECT + r"/(?:issues|merge_requests)(?:/[^/]+)?|" + PROJECT + r"/labels(?:/[^/]+)?)/?")
+RENAME_PATH = re.compile(r"(?:" + REPO + r"/labels/[^/]+|" + PROJECT + r"/labels(?:/[^/]+)?)/?")
+# GitHub's addLabelsToLabelable and updateLabel; GitLab's labelIds and addLabelIds
+# (updateIssue, mergeRequestSetLabels) and a work item's labelsWidget.
+GRAPHQL_LABELS = re.compile(r"addLabelsToLabelable|[lL]abelIds|updateLabel|labelsWidget")
 GRAPHQL_WHY = "the graphql mutation applies or renames labels by ID, and label IDs are names the guard cannot read"
 DEPTH = 4                                      # heredocs feeding shells feeding heredocs
 READS = frozenset("list get search read".split())
@@ -194,8 +212,8 @@ def _input(f, src, live, path, ctx):
         if isinstance(doc, list):
             f.names(doc, "the --input payload")
         elif isinstance(doc, dict):
-            for key in ("labels", "new_name"):
-                if key in doc and (key == "labels" or RENAME_PATH.fullmatch(path)):
+            for key in ("labels", "add_labels", "new_name"):
+                if key in doc and (key != "new_name" or RENAME_PATH.fullmatch(path)):
                     f.names(doc[key], f"the --input payload's {key}")
     if src == "-" and not any(_parses(t) for t in texts) and LABEL_PATH.fullmatch(path):
         f.unseen.append("no heredoc in the command holds the JSON the --input payload reads from stdin")
@@ -209,8 +227,8 @@ def _parses(t):
         return False
 
 
-def _api(f, s, i, b, ctx):
-    api = sw.gh_api(s, i, b)
+def _api(f, s, i, b, ctx, cli="gh"):
+    api = sw.gh_api(s, i, b, cli)
     if api.method in ("GET", "HEAD") or (api.method == "" and not api.sends):
         return
     fields = [(a.flag, a.text or "", a.live) for a in api.args if a.flag != "--input"]
@@ -251,17 +269,18 @@ def _api(f, s, i, b, ctx):
 def _gh(f, s, g, b, ctx):
     if g + 2 > b:
         return
-    group, act = s.w[g + 1], s.w[g + 2]
+    cli, group, act = sw.client(s.w[g]), s.w[g + 1], s.w[g + 2]
     if group == "api":
-        _api(f, s, g + 2, b, ctx)
+        _api(f, s, g + 2, b, ctx, cli)
         return
-    if group == "alias":
+    row = _CLIENTS[cli]
+    if group == "alias" and cli == "gh":
         _alias(f, s, g, b, act)
         return
-    if group in ("pr", "issue") and act in WRITES:
-        flags, glued = LABEL_FLAGS, ("--label=", "--add-label=")
+    if group in row["groups"] and act in row["writes"]:
+        flags, glued = row["label"]
     elif group == "label" and act == "edit":
-        flags, glued = frozenset(("--name", "-n")), ("--name=",)
+        flags, glued = row["rename"]
     else:
         return
     short = next(x for x in flags if len(x) == 2)
@@ -301,12 +320,12 @@ def _bash(f, doc, cmd, cwd, env, depth=0, alone=True):
     bodies = doc.heredocs(cmd)
     ctx = {"cwd": cwd, "env": env, "bodies": bodies, "files": f.files, "wanted": f.wanted,
            "moved": any(sw.cd_present(s) for s, _ in scans),
-           "alone": alone and sw.alone(scans, sw.GH)}
+           "alone": alone and sw.alone(scans, sw.CLIENTS)}
     for s, nested in scans:
         for a, b in s.segments():
             if a > b:
                 continue
-            g = sw.cmd_index(s, a, b, sw.GH, nested)
+            g = sw.cmd_index(s, a, b, sw.CLIENTS, nested)
             if g is not None:
                 _gh(f, s, g, b, ctx)
     # A heredoc fed to a shell (`sh <<EOF`, `cat <<EOF | sh`) is a command of

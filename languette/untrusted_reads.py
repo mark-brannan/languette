@@ -49,6 +49,13 @@ _GH_WRITES = frozenset("create new edit close reopen delete transfer comment mer
 # echoes PR text, a release or gist its body, a repo its README.
 _GH_VIEWS = {"run": ("view", "download"), "release": ("view", "download"), "gist": ("view",),
              "repo": ("view",), "workflow": ("view",)}
+# glab's, on GitLab (docs/design/forges.md): issue and mr verbs that only write, and the
+# other groups' verbs that show what others wrote: a job's log, a pipeline, a release, a
+# project's README. A note verb writes, but for its `list`.
+_GLAB_WRITES = frozenset("create new edit update close reopen delete del note comment subscribe unsubscribe "
+                         "approve revoke merge accept rebase todo".split())
+_GLAB_VIEWS = {"ci": ("view", "trace", "get"), "pipe": ("view", "trace", "get"), "pipeline": ("view", "trace", "get"),
+               "release": ("view", "download"), "repo": ("view",), "project": ("view",)}
 # An MCP tool is a read unless its name is clearly a write: a write verb and no read verb.
 _MCP_READ = frozenset("read get list search fetch query find view download export retrieve".split())
 _MCP_WRITE = frozenset("write create update delete add remove push merge set edit post send submit close assign "
@@ -64,20 +71,25 @@ _REF = re.compile(r" \[[^\]\n]*\]\Z")
 _WAY_OUT = say("cross_session_way_out")
 
 
-def _gh_reads(s, lo, hi):
-    """Does `gh` with words lo..hi read issue, PR, search or API content, or view a run, release, gist, repo or workflow?"""
+def _gh_reads(s, lo, hi, cli="gh"):
+    """Does `gh` with words lo..hi read issue, PR, search or API content, or view a run, release, gist, repo or
+    workflow? `glab`'s (cli "glab"): issue, merge request or API content, or a pipeline, job log, release or repo."""
     i = sw.gh_verb(s, lo, hi)
     if i is None:
         return False
     sub, rest = sw.word(s, i), [sw.word(s, j) for j in range(i + 1, hi + 1)]
-    if sub == "search":
+    groups, writes, views = (("issue", "mr"), _GLAB_WRITES, _GLAB_VIEWS) if cli == "glab" else \
+        (("issue", "pr"), _GH_WRITES, _GH_VIEWS)
+    if sub == "search" and cli == "gh":
         return True
-    if sub in ("issue", "pr") or sub in _GH_VIEWS:
-        verb = next((w for j, w in enumerate(rest) if not w.startswith("-")
-                     and not (j and rest[j - 1] in sw.GH_REPO_FLAGS)), None)
-        return verb not in _GH_WRITES if sub in ("issue", "pr") else verb in _GH_VIEWS[sub]
+    if sub in groups or sub in views:
+        verbs = [w for j, w in enumerate(rest) if not w.startswith("-") and not (j and rest[j - 1] in sw.GH_REPO_FLAGS)]
+        verb = verbs[0] if verbs else None
+        if cli == "glab" and verb in ("note", "comment") and verbs[1:2] == ["list"]:
+            return True
+        return verb not in writes if sub in groups else verb in views[sub]
     if sub == "api":
-        api = sw.gh_api(s, i + 1, hi)
+        api = sw.gh_api(s, i + 1, hi, cli)
         if api.method in ("POST", "PUT", "PATCH", "DELETE"):
             return False
         graphql = api.path == "graphql"
@@ -89,7 +101,7 @@ def _gh_reads(s, lo, hi):
 
 def bash_read(doc):
     """What the Bash command fetched from the network, or None: a curl or wget
-    anywhere among its words, fetch as the command run, or a `gh` read."""
+    anywhere among its words, fetch as the command run, or a `gh` or `glab` read."""
     for text, nested in doc.texts():
         s = doc.scan(text)
         for i, w in enumerate(s.w):
@@ -98,12 +110,13 @@ def bash_read(doc):
         for a, b in s.segments():
             if a <= b and sw.cmd_index(s, a, b, _FETCH, True) is not None:
                 return "`fetch`"
-            g = sw.cmd_index(s, a, b, sw.GH, nested) if a <= b else None
+            g = sw.cmd_index(s, a, b, sw.CLIENTS, nested) if a <= b else None
             if g is None:
                 continue
-            if _gh_reads(s, g + 1, b):
+            cli = sw.client(s.w[g])
+            if _gh_reads(s, g + 1, b, cli):
                 words = [sw.word(s, i) for i in range(g + 1, b + 1)]
-                return "`gh " + " ".join(sw.operands(words, sw.PROGRAMS["gh api"]["valued"])[:2]) + "`"
+                return f"`{cli} " + " ".join(sw.operands(words, sw.PROGRAMS["gh api"]["valued"])[:2]) + "`"
     return None
 
 

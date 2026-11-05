@@ -212,6 +212,38 @@ Feature: guard-cross-session-send
       | gh api -X POST repos/o/r/issues -f title=t |
       | gh api repos/o/r/issues -f title=t         |
 
+  # glab's own docs: https://docs.gitlab.com/cli/issue/ and /cli/mr/ (their
+  # verbs; mr view alias show, merge alias accept, note alias comment),
+  # /cli/mr/note/ (its list), /cli/ci/ (view, trace, get; aliases pipe,
+  # pipeline), /cli/ci/trace/ (a job's log), /cli/release/ (view, download),
+  # /cli/repo/ (view; alias project) and /cli/api/ (GET unless -X or a field).
+  Scenario Outline: on GitLab, a glab read opens the door and a glab write does not
+    Given the permission mode is "bypassPermissions"
+    When the agent runs `<command>`
+    And the agent sends "api-worker" the message `see above`
+    Then the guard <verdict>
+
+    Examples:
+      | command                                          | verdict                              |
+      | glab issue view 12 -R g/p                        | denies, naming "glab issue view"     |
+      | glab mr show 7 --comments                        | denies, naming "glab mr show"        |
+      | glab -R g/p mr list                              | denies, naming "glab mr list"        |
+      | glab mr diff 7                                   | denies, naming "glab mr diff"        |
+      | glab mr note list 7                              | denies, naming "glab mr note"        |
+      | glab ci trace 123                                | denies, naming "glab ci trace"       |
+      | glab release view v1                             | denies, naming "glab release view"   |
+      | glab repo view g/p                               | denies, naming "glab repo view"      |
+      | glab api projects/:id/issues/12/notes            | denies, naming "glab api"            |
+      | glab api graphql -f query='{ currentUser { username } }' | denies, naming "glab api graphql" |
+      | glab mr approve 7                                | is silent                            |
+      | glab mr rebase 7                                 | is silent                            |
+      | glab issue close 12                              | is silent                            |
+      | glab ci list                                     | is silent                            |
+      | glab release create v1                           | is silent                            |
+      | glab api -X DELETE projects/:id/issues/12/notes/9 | is silent                           |
+      | glab api projects/:id/merge_requests/7/notes -f body=x | is silent                      |
+      | glab api graphql -f query='mutation { x }'       | is silent                            |
+
   Scenario: a read that failed still opens the door
     Given the permission mode is "bypassPermissions"
     When the agent runs `gh issue view 12 -R o/r; false`, which fails
