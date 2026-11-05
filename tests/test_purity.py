@@ -73,9 +73,8 @@ CALLS = {"open", "io.open", "io.FileIO", "builtins.open", "codecs.open", "input"
 # The Need constructor, and the kinds or (kind, op) pairs the world answers with
 # a write: an approval spent, a record kept, a door taken. Act owns those.
 NEED = ("Need", "verdict.Need")
-# Door claim takes the door when it stands, a rename and a write (world._take).
-WRITES = {"claim", "ruleset-keep", "send-keep", ("door", "open"), ("door", "spend"), ("door", "claim"),
-          ("door", "take"), ("worktree", "arrive"), ("worktree", "keep"), ("worktree", "leave")}
+WRITES = {"ruleset-keep", "send-keep", ("door", "open"), ("door", "spend"),
+          ("worktree", "arrive"), ("worktree", "keep"), ("worktree", "leave")}
 BUILTINS = {"open", "input", "breakpoint"}
 # Methods that do I/O on whatever they are called on: Path's, a file's.
 METHODS = {"read_text", "read_bytes", "write_text", "write_bytes", "iterdir", "rglob", "touch", "unlink", "rmdir",
@@ -251,13 +250,8 @@ def test_install_writes_nothing_itself():
     "import random",
     "from uuid import uuid4",
     "import os\nos.getpid()",
-    "from languette.verdict import Need\nyield Need('claim', {})",
     "from languette import verdict\nyield verdict.Need('worktree', 'keep', r, t)",
-    "yield Need('door', 'take', s, c)",
-    "yield Need('door', 'claim', s, c)",
-    "from ..verdict import Need as N\nyield N('claim', {})",
     "from os import *",
-    "yield Need('door', op, s, c)",
     "import os\nos.uname()",
     "import platform",
     "import logging\nlogging.FileHandler('x')",
