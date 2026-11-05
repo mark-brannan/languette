@@ -110,7 +110,7 @@ def _gh_api(s, a, b, nested, out):
     if api.method == "DELETE" and m:
         # :id is the cwd's project; anything else names one glab -R reads.
         project = unquote(m.group(1))
-        repo = "-" if project == ":id" else "?" if _UNRESOLVED.search(project) else project
+        repo = "-" if project == ":id" else "?" if project.isdigit() or _UNRESOLVED.search(project) else project
         _emit(out, repo, unquote(m.group(2)), "gitlab")
         return
     if cli == "glab" or api.method != "DELETE" or "refs/heads/" not in api.path:

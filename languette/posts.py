@@ -99,8 +99,8 @@ _GLAB_ACTS = {**dict.fromkeys(("create", "new", "update"), _GLAB_TEXT),
 _GLAB_MERGE = dict.fromkeys(("merge", "accept"), ("-m", "--message", "--squash-message"))
 # A GitLab REST write on an issue or merge request, its notes among them: the project in group 1.
 _GLAB_PATH = re.compile(r"(?:api/v4/)?projects/([^/]+)/(?:issues|merge_requests)(?:/|\Z)")
-_BACKSTOP = re.compile(r"(?:^|[^A-Za-z0-9_./-])gh\s+(?:issue|pr)\s+(?:create|comment|edit|review|close|reopen|merge)(?:\s|$)",
-                       re.M)
+_BACKSTOP = re.compile(r"(?:^|[^A-Za-z0-9_./-])(?:gh|glab)\s+(?:issue|pr|mr)\s+"
+                       r"(?:create|new|update|note|comment|edit|review|close|reopen|merge|accept)(?:\s|$)", re.M)
 
 
 def _flat(t):
