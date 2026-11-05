@@ -638,3 +638,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261105t225052z
 - In the one spend step the approvals go before the issue door Undo: take the door before the approvals ([#358](https://github.com/mark-brannan/languette/pull/358))
+
+### 20261105t225107z
+- A spend finding is recorded in the decision record as decision none; the record format is unchanged Undo: record spend findings as decision ask ([#358](https://github.com/mark-brannan/languette/pull/358))
