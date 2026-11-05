@@ -1,6 +1,6 @@
 """guard-git-work-loss's walk and its handler (languette/rules/guard_git_work_loss.py is
 the rule set): the git moves that throw work away, and that an agent session never has a
-good reason to make, are denied (one is asked about). The spec is
+good reason to make, are denied (two are asked about: `stow --adopt`, a lease push to a default branch). The spec is
 features/guard-git-work-loss.feature. The `work-losses` test reads each segment's git or
 stow call from its words alone; the `tree-state` handler reads the facts the relaxations
 and the default branches turn on, from git in the payload's cwd, and gives the verdict.
