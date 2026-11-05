@@ -565,7 +565,8 @@ def _judge(doc, f):
             raise _Placed(say("wl_add_all"), f["placed"])
         if "refused" in f:
             raise f["refused"]
-        (yield from _push(doc, f["args"]))
+        if "push" in f:
+            (yield from _push(doc, f["args"]))
     except _Placed as p:
         if f["mine"] and (yield from _staging_where_agents_work(doc, p.names)):
             return
