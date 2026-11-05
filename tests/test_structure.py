@@ -27,10 +27,10 @@ GUARDS = {f.stem: importlib.import_module(f"languette.guards.{f.stem}")
 # The walks that left languette/guards/ with their guards (what a call applies, what a post carries,
 # the hooks a git call skips, the remote branches it deletes, the infrastructure it destroys, the runs
 # a repo lists, where a push lands, what a session read and sends, the issues a call writes, the PRs
-# it opens): read by the same checks, since moving a file is not removing a copy.
+# it opens, the work a git call throws away): read by the same checks, since moving a file is not removing a copy.
 WALKS = {m: importlib.import_module(f"languette.{m}")
          for m in ("labels", "posts", "hook_skips", "branch_deletions", "infra_runs", "listed_runs",
-                   "pushes", "untrusted_reads", "issue_writes", "opened_prs")}
+                   "pushes", "untrusted_reads", "issue_writes", "opened_prs", "work_losses")}
 SHARED = {m: importlib.import_module(f"languette.{m}") for m in ("scan", "paths", "verdict", "document", "secrets", "refs")}
 
 # The fields of the call Document reads once; a guard reads them from the Document.
