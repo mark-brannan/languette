@@ -76,8 +76,7 @@ Claude Code block above. An agent running natively in PowerShell is not protecte
 ### Devcontainer, Codespace and CI
 
 Copy [`devcontainer/src/languette`](devcontainer/src/languette) to
-`.devcontainer/languette`. This line brings Claude Code and languette, wired
-when the container is created:
+`.devcontainer/languette`. This line installs Claude Code and languette:
 
 ```json
 "features": { "./languette": {} }
@@ -92,7 +91,7 @@ Without the plugin system or the installer, see [Installing by hand](#installing
 
 ### Removing it
 
-`languette uninstall` removes what `languette install` wrote, after asking, through Claude Code's own command, so your languette options in `settings.json` go with the plugin.
+`languette uninstall` removes what `languette install` wrote, after asking, through Claude Code's own command.
 
 ### Try it: `languette scan` (experimental)
 
