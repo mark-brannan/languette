@@ -4,6 +4,25 @@ Decisions that settle languette's public interface. The README says what the
 interface is; this file says what was decided and why, one line each. Every
 line is the maintainer's (@mark-brannan) unless it says otherwise.
 
+## Uninstall and the user's options: 2026-11-05
+
+- `languette uninstall` writes nothing to the user's `settings.json`. It runs
+  Claude Code's own `claude plugin uninstall`, which also removes the
+  plugin's options from that file, and the plan says so before the user
+  confirms ([#102](https://github.com/mark-brannan/languette/issues/102),
+  [#355](https://github.com/mark-brannan/languette/pull/355)).
+- It MAY (RFC 2119) offer to put the options back as they were. That offer is
+  not built in #355.
+- Why: "I don't like surprises and the risk of writing at all to that file is
+  mucking it up and hosing someone's claude install. I think we give *an
+  option* to purge languette from their config but this is not a silent
+  action that the plugin should take for uninstall. It has to be
+  explicit/stated...no tacit approval." Then: "oh I see...this is a claude
+  code action. Nope, that's the norm and we'd be violating it if we write
+  back." And: "The plugin can tell you and it can OFFER to put things back
+  the way they started, but we don't want to do extra if the norm is for
+  claude to purge" and "RFC "MAY" offer, to be clear".
+
 ## Backups family default: 2026-11-01
 
 - The `backups` family (the copies you would recover from, and the keys

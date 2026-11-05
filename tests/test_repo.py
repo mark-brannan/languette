@@ -393,3 +393,14 @@ def test_every_shipped_rule_file_loads_and_is_packaged(rule_file):
     assert_that(Path(guard.RULE_FILE), equal_to(rule_file))
     _gathered(guard.file_rules({r["id"] for r in engine.load(guard.RULE_SET)}))
     assert_that((ROOT / "pyproject.toml").read_text(), contains_string('languette = ["rules/*.json", "rules/*.tsv"]'))
+
+
+def test_the_devcontainer_feature_installs_this_release():
+    # Every packaging rung pins to a release (docs/design/install.md); release-please bumps all three.
+    version = re.search(r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text(), re.M)[1]
+    feature = ROOT / "devcontainer/src/languette"
+    assert_that(json.loads((feature / "devcontainer-feature.json").read_text())["version"], equal_to(version))
+    assert_that((feature / "install.sh").read_text(), contains_string(f"version={version} # x-release-please-version"))
+    extra = json.loads((ROOT / "release-please-config.json").read_text())["packages"]["."]["extra-files"]
+    assert_that(sorted(e if isinstance(e, str) else e["path"] for e in extra),
+                equal_to(["devcontainer/src/languette/devcontainer-feature.json", "devcontainer/src/languette/install.sh"]))

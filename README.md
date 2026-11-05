@@ -73,15 +73,25 @@ languette install && languette doctor
 Languette protects Claude Code inside WSL: run `wsl --install`, then the
 Claude Code block above. An agent running natively in PowerShell is not protected.
 
-### Devcontainer, Codespace and CI (planned: [#102](https://github.com/mark-brannan/languette/issues/102))
+### Devcontainer, Codespace and CI
 
-One line in `devcontainer.json` installs languette before the agent starts:
+Copy [`devcontainer/src/languette`](devcontainer/src/languette) to
+`.devcontainer/languette`. This line installs Claude Code and languette:
 
 ```json
-"postCreateCommand": "pipx install languette"
+"features": { "./languette": {} }
 ```
 
+A registry and a CI Action are planned
+([#102](https://github.com/mark-brannan/languette/issues/102)). Claude Code
+[cloud sessions](https://code.claude.com/docs/en/cloud-environments) build no
+dev container.
+
 Without the plugin system or the installer, see [Installing by hand](#installing-by-hand).
+
+### Removing it
+
+`languette uninstall` removes what `languette install` wrote, after asking, through Claude Code's own command.
 
 ### Try it: `languette scan` (experimental)
 
