@@ -99,6 +99,22 @@ Feature: uninstall
     And uninstall did not ask
     And uninstall exits 0
 
+  Scenario: a user-scope plugin with no marketplace listed is removed, since install wrote it
+    Given claude lists languette "cd31356ad5db" installed at user scope
+    When uninstall runs, answering "y"
+    Then uninstall listed, before asking:
+      """
+      Claude Code   languette@languette, plugin cd31356, user scope
+      """
+    And the uninstall "Claude Code" row is ✓ "languette@languette removed"
+    And claude was asked only:
+      """
+      plugin list --json
+      plugin marketplace list --json
+      plugin uninstall languette@languette --scope user
+      """
+    And uninstall exits 0
+
   Scenario: a failed plugin removal stops before the marketplace
     Given claude lists languette "cd31356ad5db" installed at user scope
     And claude lists the languette marketplace

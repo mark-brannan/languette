@@ -17,7 +17,6 @@ import json
 import os
 import shutil
 import sys
-from pathlib import Path
 
 from languette import doctor, install
 
@@ -56,7 +55,9 @@ def _keep_options(kept):
     # Whole or untouched: a cut-off write would leave the user's settings half gone.
     tmp = f"{path}.{os.getpid()}.tmp"
     try:
-        Path(tmp).write_text(json.dumps(s, indent=2) + "\n", encoding="utf-8")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(s, indent=2) + "\n")
         if os.path.exists(path):
             shutil.copymode(path, tmp)
         os.replace(tmp, path)
@@ -79,10 +80,11 @@ def plan(claude, cwd):
         return [], [], (FAIL, "Claude Code", f"{e}, so what install wrote is unknown; nothing removed")
     source = install._marketplace(claude)
     ours = source is not None and install._ours(source)
+    mine = ours or source is None     # no marketplace listed: the plugin is still the one install wrote
     steps, left, fed = [], [], 0
     for inst in found:
         where = f"plugin {doctor._version(inst)}, {inst.get('scope', '?')} scope"
-        if inst.get("id") == PLUGIN and inst.get("scope") == "user" and ours:
+        if inst.get("id") == PLUGIN and inst.get("scope") == "user" and mine:
             steps.append(("Claude Code", f"{PLUGIN}, {where}",
                           ("plugin", "uninstall", PLUGIN, "--scope", "user")))
         else:
