@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.15](https://github.com/mark-brannan/languette/compare/v0.0.14...v0.0.15) (2026-11-05)
+
+
+### Features
+
+* **install:** a devcontainer feature, and languette uninstall ([#355](https://github.com/mark-brannan/languette/issues/355)) ([87369cd](https://github.com/mark-brannan/languette/commit/87369cd5ce23c6cb928073a6d177f6d7b235d263))
+
+
+### Dependencies
+
+* bump the dev-dependencies group with 2 updates ([#351](https://github.com/mark-brannan/languette/issues/351)) ([a307384](https://github.com/mark-brannan/languette/commit/a3073840689a8cf099ed584d559c7118cbceb957))
+
 ## [0.0.14](https://github.com/mark-brannan/languette/compare/v0.0.13...v0.0.14) (2026-11-02)
 
 
