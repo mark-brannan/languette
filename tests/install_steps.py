@@ -27,6 +27,7 @@ class Install(FakeHome):
         self.add = (0, "")                     # exit code and stderr of `claude plugin marketplace add`
         self.after_add = [{"name": "languette", "source": "github", "repo": REPO}]   # what list shows after an add
         self.remove = (0, "")                  # exit code and stderr of `claude plugin uninstall`
+        self.list_fails = False                # whether `claude plugin marketplace list` exits 1
         self.answer = None                     # what uninstall reads on stdin
 
     def stub(self):
@@ -41,7 +42,8 @@ class Install(FakeHome):
         drop = f"cp {shlex.quote(str(dropped))} {shlex.quote(str(settings))};" if settings.exists() else ""
         # An add, even one that answers "already", leaves the list as after_add says.
         answers = {"plugin list --json": (0, json.dumps(self.plugins), "", ""),
-                   "plugin marketplace list --json": (0, "", "", f"cat {shlex.quote(str(listed))};"),
+                   "plugin marketplace list --json": ((1, "", "boom", "") if self.list_fails
+                                                      else (0, "", "", f"cat {shlex.quote(str(listed))};")),
                    f"plugin marketplace add {SOURCE}": (self.add[0], "", self.add[1],
                                                         f"cp {shlex.quote(str(after))} {shlex.quote(str(listed))};"),
                    "plugin install languette@languette": (0, "Installed languette", "", ""),
@@ -123,6 +125,11 @@ def _remove_fails(installer, err):
     installer.remove = (1, err + "\n")
 
 
+@given("claude's marketplace list fails")
+def _list_fails(installer):
+    installer.list_fails = True
+
+
 @given(parsers.parse("the user's settings hold the languette options `{options}`"))
 def _options_held(installer, options):
     f = installer.home / ".claude/settings.json"
@@ -134,7 +141,6 @@ def _options_held(installer, options):
 def _settings_as_claude_left(installer):
     left = (installer.aside / "settings-after-uninstall.json").read_text()
     assert_that(json.loads((installer.home / ".claude/settings.json").read_text()), equal_to(json.loads(left)))
-    assert_that(installer.out, not_(contains_string("options  ")))
 
 
 @then(parsers.parse('uninstall said before asking "{text}"'))

@@ -14,13 +14,18 @@ python_ok() {
 
 if command -v apt-get >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -q
-    python_ok || apt-get install -y -q --no-install-recommends python3 python3-venv
+    # Update only when something is missing, so a base image that has it all builds offline.
+    python_ok || need="python3 python3-venv"
     # The parser the guards trust most; without it they read commands a rung lower.
-    command -v shfmt >/dev/null 2>&1 || apt-get install -y -q --no-install-recommends shfmt || true
+    command -v shfmt >/dev/null 2>&1 || extra="shfmt"
     # For the guards that ask GitHub; without it they ask the user instead.
-    command -v gh >/dev/null 2>&1 || apt-get install -y -q --no-install-recommends gh || true
-    rm -rf /var/lib/apt/lists/*
+    command -v gh >/dev/null 2>&1 || extra="${extra:-} gh"
+    if [ -n "${need:-}${extra:-}" ]; then
+        apt-get update -q
+        [ -z "${need:-}" ] || apt-get install -y -q --no-install-recommends $need
+        for pkg in ${extra:-}; do apt-get install -y -q --no-install-recommends "$pkg" || true; done
+        rm -rf /var/lib/apt/lists/*
+    fi
 fi
 
 if ! python_ok; then

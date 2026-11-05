@@ -131,6 +131,15 @@ Feature: uninstall
       """
     And uninstall exits 0
 
+  Scenario: a marketplace list that fails removes nothing
+    Given claude lists languette "cd31356ad5db" installed at user scope
+    And claude lists the languette marketplace
+    And claude's marketplace list fails
+    When uninstall runs, answering "y"
+    Then the uninstall "Claude Code" row is ✗ "`claude plugin marketplace list --json` failed: boom, so what install wrote is unknown; nothing removed"
+    And uninstall did not ask
+    And uninstall exits 1
+
   Scenario: a failed plugin removal stops before the marketplace
     Given claude lists languette "cd31356ad5db" installed at user scope
     And claude lists the languette marketplace

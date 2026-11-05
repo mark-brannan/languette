@@ -30,7 +30,9 @@ def plan(claude, cwd):
         found = doctor.installs(doctor.settings_files(cwd))
     except doctor.Unreadable as e:
         return [], [], (FAIL, "Claude Code", f"{e}, so what install wrote is unknown; nothing removed")
-    source = install._marketplace(claude)
+    source, why = install._listed(claude)
+    if why:
+        return [], [], (FAIL, "Claude Code", f"{why}, so what install wrote is unknown; nothing removed")
     ours = source is not None and install._ours(source)
     mine = ours or source is None     # no marketplace listed: the plugin is still the one install wrote
     steps, left, fed = [], [], 0
