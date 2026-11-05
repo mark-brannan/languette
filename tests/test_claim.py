@@ -163,3 +163,29 @@ def test_a_click_spent_since_the_guard_looked_is_a_deny(tmp_path, monkeypatch):
 
     out = _respond(tp, monkeypatch, _asking("Run e2e"), racer)
     assert "another call spent the user's approval" in json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+def _spending(world, kind="approvals", *args):
+    findings = [("g0", {"spend": [[kind, *(args or ({"Run e2e": 1},))]]}, None)]
+    return run._spend(world, "PreToolUse", findings, {})
+
+
+def test_a_spend_that_cannot_be_recorded_is_a_deny():
+    class Broken:
+        def spend(self, kind, *args):
+            raise OSError(30, "Read-only file system")
+
+    out = _spending(Broken())
+    assert out["permissionDecision"] == "deny"
+    assert out["permissionDecisionReason"].startswith("languette: cannot record")
+    assert "Read-only file system" in out["permissionDecisionReason"]
+
+
+def test_a_lost_door_is_a_deny():
+    class Taken:
+        def spend(self, kind, *args):
+            return False
+
+    out = _spending(Taken(), "door", "S1", "toolu_B1")
+    assert out["permissionDecision"] == "deny"
+    assert "already in flight this turn" in out["permissionDecisionReason"]
