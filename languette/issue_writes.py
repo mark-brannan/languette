@@ -62,6 +62,7 @@ _CLIENTS = (
 )
 SHUT = ("the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or "
         "the human has not spoken since.")
+IN_FLIGHT = f"an issue create, transfer or delete is already in flight this turn. {SHUT}"
 # An issue a delete or transfer names: its number, a GitHub issue URL, or a GitLab one (group/project/-/issues/n).
 _NUMBER = re.compile(r"#?(\d+)|https?://[^/\s]+/([^/\s]+/[^/\s]+)/issues/(\d+)/?"
                      r"|https?://[^/\s]+/([^/\s]+(?:/[^/\s]+)+)/-/issues/(\d+)/?")
@@ -216,9 +217,10 @@ def door(doc, guard, found):
     if found["loop"]:
         return deny(say("gi_loop", guard=guard))
     why, take = yield from _door(doc.payload, _session(doc.payload))
-    if take:
-        return spend("door", *take)
     label = _label(*found["writes"][0])
+    if take:
+        # Lost after the verdict, the door is another write's: the user's yes is the way left.
+        return spend("door", *take, lost=say("gi_door", guard=guard, why=IN_FLIGHT, ask=say("gi_ask", label=label)))
     _, done = yield from approve(
         {label: 1}, lambda e: say("gi_transcript", guard=guard, err=e, why=why, ask=say("gi_ask", label=label)))
     return done[0] if done else deny(say("gi_door", guard=guard, why=why, ask=say("gi_ask", label=label)))
@@ -246,7 +248,7 @@ def _door(payload, session):
     call = payload.get("tool_use_id")
     call = re.sub(r"[^A-Za-z0-9_-]", "", call) if isinstance(call, str) else ""
     try:
-        got = yield Need("door", "peek", session)
+        got = yield Need("door", session)
     except Exception:  # noqa: BLE001
         return SHUT, None
     if got is True:

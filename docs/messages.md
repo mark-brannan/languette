@@ -92,12 +92,6 @@ disks_refused: `{what}` is blocked: {why}. {way_out}
 disks_blocked: `{what} {raw}` is blocked: {abs_} is {kind}. {way_out}
 ```
 
-## door
-
-```
-door_lost: {guard}: an issue create, transfer or delete is already in flight this turn, so this call is denied. One per human turn.
-```
-
 ## dp
 
 ```

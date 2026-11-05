@@ -22,6 +22,7 @@ from urllib.parse import quote
 
 from languette import paths
 from languette import scan as sw, terms
+from languette.verdict import short
 
 GIT_TIMEOUT = 5
 FORGE_TIMEOUT = 10
@@ -156,16 +157,12 @@ class World:
         self._door_spend(session)
         os.close(os.open(self._door_file(session), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
 
-    def _door(self, op, session):
+    def _door(self, session):
         """guard-github-issues' door for one session, read: a file under $TMPDIR
         that a human turn opens (the door-open act), one identifier write claims
         after the verdict (the door spend, _door_take), and the write's post hook
-        spends (door-spend).
-
-            peek           -> True when the door stands open; else the id the
-                              standing claim holds ("" when there is none)"""
-        if op != "peek":
-            raise ValueError(f"no door op {op!r}")
+        spends (door-spend). True when the door stands open; else the id the
+        standing claim holds ("" when there is none)."""
         door = self._door_file(session)
         held = door + ".held"
         if os.path.lexists(door):
@@ -392,7 +389,7 @@ class World:
         Raises OSError when the payload names no transcript, or it or the spent
         file cannot be read."""
         path = self._transcript() + SPENT
-        self._scan()
+        self._scan()                           # the transcript is read before the lock, not under it
         try:
             f = open(path, encoding="utf-8")
         except FileNotFoundError:              # nothing spent yet
@@ -415,7 +412,7 @@ class World:
             fcntl.flock(f, fcntl.LOCK_EX)
             f.seek(0)
             approved, spent = self._approved(wants, f)
-            if any(len(approved[label]) < n for label, n in wants.items()):
+            if short(approved, wants):
                 return False
             now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             f.writelines(json.dumps({"t": now, "label": label, "approval": i, "call": call}) + "\n"

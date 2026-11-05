@@ -76,7 +76,7 @@ try:
                                  guard_sudo as _guard_sudo, guard_worktrees as _guard_worktrees)
     from languette.document import Document
     from languette.messages import say
-    from languette.verdict import SPEND, Act, deny, verdict
+    from languette.verdict import LOST, SPEND, Act, deny, verdict
     from languette.world import ACTS, World
     # The guards that are a rule set alone (languette/engine.py).
     deny_always, guard_sudo = engine.Guard(_deny_always), engine.Guard(_guard_sudo)
@@ -286,22 +286,23 @@ def _spend(world, event, findings, fields):
     be recorded, makes the call a deny."""
     if event != "PreToolUse" or (fields or {}).get("permissionDecision") == "deny":
         return fields
-    wants, names, todo = {}, [], []
+    wants, names, todo = {}, {}, []
     for name, r, _ in findings:
         for kind, *args in (r.get(SPEND) or ()) if isinstance(r, dict) else ():
             if kind != "approvals":
-                todo.append((name, kind, args))
+                todo.append((name, kind, args, r.get(LOST)))
                 continue
             for label, n in args[0].items():
                 wants[label] = max(wants.get(label, 0), n)
-            names += [name] if name not in names else []
+            names[name] = None
     if wants:
-        todo.insert(0, (", ".join(names), "approvals", [wants]))
-    for name, kind, args in todo:
+        guards = ", ".join(names)
+        todo.insert(0, (guards, "approvals", [wants], say("approval_lost", guards=guards)))
+    for name, kind, args, lost in todo:
         try:
             if world.spend(kind, *args):
                 continue
-            why = say("approval_lost", guards=name) if kind == "approvals" else say("door_lost", guard=name)
+            why = lost
         except Exception as e:  # noqa: BLE001 -- a spend that cannot be made fails closed
             why = say("spend_failed", guards=name, err=e)
         return deny(why)

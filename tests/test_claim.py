@@ -170,22 +170,18 @@ def _spending(world, kind="approvals", *args):
     return run._spend(world, "PreToolUse", findings, {})
 
 
-def test_a_spend_that_cannot_be_recorded_is_a_deny():
-    class Broken:
-        def spend(self, kind, *args):
-            raise OSError(30, "Read-only file system")
+def _broken(kind, *args):
+    raise OSError(30, "Read-only file system")
 
-    out = _spending(Broken())
+
+def test_a_spend_that_cannot_be_recorded_is_a_deny():
+    out = _spending(SimpleNamespace(spend=_broken))
     assert out["permissionDecision"] == "deny"
     assert out["permissionDecisionReason"].startswith("languette: cannot record")
     assert "Read-only file system" in out["permissionDecisionReason"]
 
 
-def test_a_lost_door_is_a_deny():
-    class Taken:
-        def spend(self, kind, *args):
-            return False
-
-    out = _spending(Taken(), "door", "S1", "toolu_B1")
-    assert out["permissionDecision"] == "deny"
-    assert "already in flight this turn" in out["permissionDecisionReason"]
+def test_a_lost_door_is_denied_with_the_guards_reason():
+    findings = [("g0", {"spend": [["door", "claim", "S1", "toolu_B1"]], "lost": "g0: ask for the yes"}, None)]
+    out = run._spend(SimpleNamespace(spend=lambda kind, *args: False), "PreToolUse", findings, {})
+    assert out == deny("g0: ask for the yes")

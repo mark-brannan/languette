@@ -27,10 +27,6 @@ MESSAGES = {
         "languette: another call spent the user's approval while this one was judged ({guards}), "
         "so this call is denied. Ask the user again."
     ),
-    "door_lost": (
-        "{guard}: an issue create, transfer or delete is already in flight this turn, so this call "
-        "is denied. One per human turn."
-    ),
     "spend_failed": (
         "languette: cannot record the user's approval as spent ({guards}: {err}), so this call is "
         "denied. Ask the user to run it themselves."

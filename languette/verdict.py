@@ -54,7 +54,7 @@ class Need:
                                              each label this call may spend, its own first; read only
         run           cwd, timeout, *argv -> (exit code, stdout, stderr); raises on a
                                              program that cannot start or times out
-        door          peek, session       -> guard-github-issues' per-session door: True when it
+        door          session             -> guard-github-issues' per-session door: True when it
                                              stands open, else the id its standing claim holds ("" for
                                              none); read only (world.World._door)
         send-state    session             -> {"subagents": [names, ids], "read": tool or None}
@@ -81,9 +81,15 @@ class Need:
 
 
 SPEND = "spend"                        # a finding's key: what the runner spends for it
+LOST = "lost"                          # a finding's key: its deny reason when the spend is lost
 
 
-def spend(kind, *args):
+def short(approved, wants):
+    """Whether `approved` ({label: ids}) falls short of `wants` ({label: runs})."""
+    return any(len(approved[label]) < n for label, n in wants.items())
+
+
+def spend(kind, *args, lost=None):
     """An ask finding: the call passes once the runner has spent this, after the
     verdict, and only when the verdict lets the call through (run.py). The guard
     spends nothing itself, so no approval goes on a call another guard denies.
@@ -95,8 +101,8 @@ def spend(kind, *args):
                                           guard-github-issues' door, taken for this call
 
     A spend that can no longer be made (a parallel call took it first) makes the
-    call a deny."""
-    return {SPEND: [[kind, *args]]}
+    call a deny, for the reason `lost`; the runner words a lost approvals spend."""
+    return {SPEND: [[kind, *args]], **({LOST: lost} if lost else {})}
 
 
 def approvals(wants):
@@ -121,7 +127,7 @@ def approve(wants, unreadable):
         approved = yield from approvals(wants)
     except (OSError, ValueError) as e:
         return None, (deny(unreadable(e)),)
-    if any(len(approved[label]) < n for label, n in wants.items()):
+    if short(approved, wants):
         return approved, None
     return approved, (spend("approvals", dict(wants)),)
 
