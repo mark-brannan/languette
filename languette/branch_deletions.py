@@ -163,7 +163,9 @@ def open_prs(doc, guard, found):
     GitHub's unless that remote is a GitLab one."""
     deleted = found["deleted"]
     if any(b == "?" for _, b, _ in deleted):
-        return ask(say("sb_unresolved", guard=guard, list=LIST))
+        forges = {f for _, b, f in deleted if b == "?"}
+        lists = [row["list"] for k, row in _LISTS.items() if None in forges or k in forges]   # the cwd's forge is unread
+        return ask(say("sb_unresolved", guard=guard, list="\n".join(lists)))
     if any(r == "?" for r, _, _ in deleted):
         return ask(say("sb_other_repo", guard=guard))
     cwd = doc.payload["cwd"]

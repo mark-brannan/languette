@@ -402,4 +402,5 @@ Feature: guard-bypass-ruleset
       | https://gitlab.example.com/g/p.git  | unset         | main         | denies, naming "takes a merge request"              |
       | https://gitlab.com/g/p.git          | "maintainers" | main         | is silent                                           |
       | https://gitlab.com/g/p.git          | "none"        | main         | is silent                                           |
+      | https://gitlab.com/g/p.git          | "wildcard"    | main         | denies, naming "takes a merge request"              |
       | https://gitlab.com/g/p.git          | unset         | claude/topic | is silent                                           |

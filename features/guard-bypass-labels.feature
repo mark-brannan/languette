@@ -380,6 +380,7 @@ Feature: guard-bypass-labels
         | glab mr update 12 --label=churn-ok                                       | denies, naming "churn-ok"    |
         | glab issue update 3 -l churn-ok                                          | denies, naming "churn-ok"    |
         | glab label edit -l 5 --new-name churn-ok                                 | denies, naming "churn-ok"    |
+        | glab alias set lab 'mr update $1 -l churn-ok'                            | denies, naming "churn-ok"    |
         | glab label edit -l 5 -n CHURN-OK -R g/p                                  | denies, naming "churn-ok"    |
         | glab api -X PUT projects/:id/merge_requests/12 -f add_labels=churn-ok    | denies, naming "churn-ok"    |
         | glab api -X PUT projects/g%2Fp/labels/ready -f new_name=churn-ok         | denies, naming "churn-ok"    |

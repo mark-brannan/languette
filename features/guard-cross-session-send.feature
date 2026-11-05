@@ -231,6 +231,7 @@ Feature: guard-cross-session-send
       | glab mr diff 7                                   | denies, naming "glab mr diff"        |
       | glab mr note list 7                              | denies, naming "glab mr note"        |
       | glab ci trace 123                                | denies, naming "glab ci trace"       |
+      | glab ci artifact main build                      | denies, naming "glab ci artifact"    |
       | glab release view v1                             | denies, naming "glab release view"   |
       | glab repo view g/p                               | denies, naming "glab repo view"      |
       | glab api projects/:id/issues/12/notes            | denies, naming "glab api"            |

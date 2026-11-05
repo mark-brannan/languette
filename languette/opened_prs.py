@@ -65,11 +65,12 @@ _HTML = re.compile(rf"github\.com/({_NAME}/{_NAME})/(?:pull|issues)/[0-9]+")
 # tense, then #N, group/project#N or an issue or work item URL; its MRs are !M.
 _GL_NAME = rf"{_NAME}(?:/{_NAME})+"
 _GL_REF = (rf"(?:(?P<repo>{_GL_NAME})?#(?P<num>[0-9]+)"
-           rf"|https?://[^/\s]+/(?P<urepo>{_GL_NAME})/-/(?:issues|work_items)/(?P<unum>[0-9]+))(?![A-Za-z0-9_/])")
+           rf"|https?://(?P<uhost>[^/\s]+)/(?P<urepo>{_GL_NAME})/-/(?:issues|work_items)/(?P<unum>[0-9]+))"
+           rf"(?![A-Za-z0-9_/])")
 _GL_KEYS = r"(?:clos(?:e[sd]?|ing)|fix(?:e[sd]|ing)?|resolv(?:e[sd]?|ing)|implement(?:s|ed|ing)?)"
 CLOSES_GL = re.compile(rf"(?<![A-Za-z0-9_-]){_GL_KEYS}(?:[ \t]*:[ \t]*|[ \t]+){_GL_REF}", re.IGNORECASE)
 _GL_MR = (rf"(?:(?P<repo>{_GL_NAME})?!(?P<num>[0-9]+)"
-          rf"|https?://[^/\s]+/(?P<urepo>{_GL_NAME})/-/merge_requests/(?P<unum>[0-9]+))(?![A-Za-z0-9_/])")
+          rf"|https?://(?P<uhost>[^/\s]+)/(?P<urepo>{_GL_NAME})/-/merge_requests/(?P<unum>[0-9]+))(?![A-Za-z0-9_/])")
 SUPERSEDES_GL = re.compile(rf"(?<![A-Za-z0-9_-])(?:supersedes|replaces)(?:[ \t]*:[ \t]*|[ \t]+){_GL_MR}",
                            re.IGNORECASE)
 _GL_WEB = re.compile(rf"https?://[^/]+/({_GL_NAME})/-/merge_requests/[0-9]+")
@@ -86,11 +87,15 @@ def _deny(guard, why):
     return deny(say("judged", guard=guard, why=why))
 
 
-def refs(rx, text, repo):
+def refs(rx, text, repo, host=None):
     """[(owner/name, N)] for each reference `rx` finds in `text`, in order; a
-    bare #N is on `repo` (None when unknown)."""
+    bare #N is on `repo` (None when unknown). A URL on another host than `host` is
+    prose, not a reference, as GitLab itself reads it."""
     out = []
     for m in rx.finditer(text):
+        uh = m.groupdict().get("uhost")
+        if host and uh and uh.lower() != host.lower():
+            continue
         r = m.group("repo") or m.group("urepo")
         r = sw.norm_repo(r) if r else repo
         n = int(m.group("num") or m.group("unum"))
@@ -387,17 +392,18 @@ def _judge(text, where, guard, forge="github"):
     """deny or ask for one body, or None. `where` is (host, owner/name) of a bare #N, or None."""
     gitlab = forge == "gitlab"
     host, slug = where or (None, None)
-    closes = refs(CLOSES_GL if gitlab else CLOSES, text, slug)
+    on = (host or sw.FORGES[forge]["host"]) if gitlab else None
+    closes = refs(CLOSES_GL if gitlab else CLOSES, text, slug, on)
     if not closes:
         return None
-    gone = refs(SUPERSEDES_GL if gitlab else SUPERSEDES, text, slug)
+    gone = refs(SUPERSEDES_GL if gitlab else SUPERSEDES, text, slug, on)
     asked = None
     for repo, n in closes:
         if repo is None:
             asked = asked or ask(say("dup_repo_unknown", guard=guard, n=n))
             continue
         if gitlab:
-            prs = yield from _open_mrs(host or sw.FORGES[forge]["host"], repo, n)
+            prs = yield from _open_mrs(on, repo, n)
         else:
             prs = yield from _open_prs(repo, n)
         if prs is None and gitlab:

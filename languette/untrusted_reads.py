@@ -54,7 +54,8 @@ _GH_VIEWS = {"run": ("view", "download"), "release": ("view", "download"), "gist
 # project's README. A note verb writes, but for its `list`.
 _GLAB_WRITES = frozenset("create new edit update close reopen delete del note comment subscribe unsubscribe "
                          "approve revoke merge accept rebase todo".split())
-_GLAB_VIEWS = {"ci": ("view", "trace", "get"), "pipe": ("view", "trace", "get"), "pipeline": ("view", "trace", "get"),
+_GLAB_VIEWS = {"ci": ("view", "trace", "get", "artifact"), "pipe": ("view", "trace", "get", "artifact"),
+               "pipeline": ("view", "trace", "get", "artifact"),
                "release": ("view", "download"), "repo": ("view",), "project": ("view",)}
 # An MCP tool is a read unless its name is clearly a write: a write verb and no read verb.
 _MCP_READ = frozenset("read get list search fetch query find view download export retrieve".split())

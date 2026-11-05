@@ -6,7 +6,9 @@
 # "full" a full page of 100 closed ones; unset is an empty list.
 # For `api .../protected_branches/<b>` it answers GLAB_PROTECTED: unset, a
 # branch no role may push to; "maintainers" one maintainers may push to;
-# "none" GitLab's 404 for a branch that is not protected.
+# "none" GitLab's 404 for a branch that is not protected, "wildcard" its 404 by name
+# for one that only the wildcard `ma*` protects (no role may push there). The list
+# endpoint answers [] for "none", that wildcard entry for "wildcard", else the one entry.
 # For `mr list` it lists three open merge requests whatever the filters, as
 # the gh stub does: !1 is stacked on claude/base-branch, the source of !2.
 printf '%s\n' "$*" >> "${LANGUETTE_STUB_LOG:?}/glab"
@@ -24,9 +26,16 @@ case "$*" in
       *) echo '[]' ;;
     esac
     exit 0 ;;
+  api*/protected_branches\?*)
+    case "${GLAB_PROTECTED:-}" in
+      none) echo '[]' ;;
+      wildcard) echo '[{"name":"ma*","push_access_levels":[{"access_level":0,"user_id":null,"group_id":null}]}]' ;;
+      *) echo '[{"name":"main","push_access_levels":[{"access_level":0,"user_id":null,"group_id":null}]}]' ;;
+    esac
+    exit 0 ;;
   api*/protected_branches/*)
     case "${GLAB_PROTECTED:-}" in
-      none) echo '{"message":"404 Not found"}'; exit 1 ;;
+      none|wildcard) echo '{"message":"404 Not found"}'; exit 1 ;;
       maintainers) level=40 ;;
       *) level=0 ;;
     esac

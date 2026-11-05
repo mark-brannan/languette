@@ -54,6 +54,7 @@ from languette.messages import say
 from languette.verdict import Act, Need, Refuse, ask, deny
 
 TTL = 3600
+PAGE = 100                                     # protected branches per GitLab lookup; one page is read
 
 _EXPORT = frozenset("export declare typeset".split())
 _GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
@@ -464,22 +465,42 @@ def _requires_pr(slug, branch):
     return got
 
 
+def _gl_pushes(entry):
+    """"pr" or "open" for one protected-branch entry, or None when it carries no push levels."""
+    if not isinstance(entry, dict) or not isinstance(entry.get("push_access_levels"), list):
+        return None
+    roles = [e.get("access_level") for e in entry["push_access_levels"] if isinstance(e, dict)
+             and not any(e.get(k) is not None for k in ("user_id", "group_id", "deploy_key_id", "member_role_id"))]
+    return "open" if any(isinstance(x, int) and 0 < x < 60 for x in roles) else "pr"
+
+
+def _gl_wildcard(name, branch):
+    """Does the protected-branch `name` (GitLab wildcards are `*` only) match `branch`?"""
+    return re.fullmatch(".*".join(re.escape(x) for x in name.split("*")), branch) is not None
+
+
 def _requires_mr(host, slug, branch):
     """"pr", "open", or None when GitLab can't answer. A protected branch no role below
     Administrator may push to takes a merge request; a user, group or deploy key allowed to
-    push there anyway (or a custom role) is that rule's bypass, as a ruleset's bypass actor is on GitHub."""
+    push there anyway (or a custom role) is that rule's bypass, as a ruleset's bypass actor is on GitHub.
+    A branch protected only by a wildcard name answers 404 by name, so the list is matched."""
     key = f"{host}/{slug}"
     cached = yield Need("ruleset-cache", key, branch)
     if cached and cached[1] == "pr" and (yield Need("clock")) - cached[0] < TTL:
         return "pr"
-    code, body = yield Need("forge-api", "gitlab", host,
-                            f"projects/{quote(slug, safe='')}/protected_branches/{quote(branch, safe='')}")
+    proj = f"projects/{quote(slug, safe='')}/protected_branches"
+    code, body = yield Need("forge-api", "gitlab", host, f"{proj}/{quote(branch, safe='')}")
     if code == 200 and isinstance(body, dict) and isinstance(body.get("push_access_levels"), list):
-        roles = [e.get("access_level") for e in body["push_access_levels"] if isinstance(e, dict)
-                 and not any(e.get(k) is not None for k in ("user_id", "group_id", "deploy_key_id", "member_role_id"))]
-        got = "open" if any(isinstance(x, int) and 0 < x < 60 for x in roles) else "pr"
+        got = _gl_pushes(body)
     elif code == 404 and isinstance(body, dict) and str(body.get("message", "")).lower() == "404 not found":
-        got = "open"                           # no protection; a missing project names itself in the message
+        code, body = yield Need("forge-api", "gitlab", host, f"{proj}?per_page={PAGE}")
+        if code != 200 or not isinstance(body, list):
+            return None
+        hits = [_gl_pushes(e) for e in body if isinstance(e, dict) and isinstance(e.get("name"), str)
+                and _gl_wildcard(e["name"], branch)]
+        if None in hits or (not hits and len(body) >= PAGE):
+            return None                        # an entry unread, or a match may sit on a later page
+        got = "open" if not hits or "open" in hits else "pr"   # the most permissive matching rule applies
     else:
         return None
     if got == "pr":

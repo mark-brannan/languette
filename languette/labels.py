@@ -16,7 +16,7 @@ Four routes reach a label, and each is read:
 
 - gh's flags: --label, --add-label and -l on `gh pr|issue create|new|edit`,
   --name/-n on `gh label edit`, since a rename puts the new name on every
-  issue and PR that carries the old one, and the expansion of `gh alias
+  issue and PR that carries the old one, and the expansion of `gh|glab alias
   set`, which is those flags for later;
 - gh api: a write whose -f/-F/--field/--raw-field key names a label (or
   `new_name` on a labels/ path), a JSON payload passed by --input (a file,
@@ -274,7 +274,7 @@ def _gh(f, s, g, b, ctx):
         _api(f, s, g + 2, b, ctx, cli)
         return
     row = _CLIENTS[cli]
-    if group == "alias" and cli == "gh":
+    if group == "alias":
         _alias(f, s, g, b, act)
         return
     if group in row["groups"] and act in row["writes"]:

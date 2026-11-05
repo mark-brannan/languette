@@ -309,6 +309,7 @@ Feature: guard-duplicate-prs
       | "open-mr"   | glab mr create -t t -d "Closes #114"                                | denies, naming "Merge request !120 (the first one) is open and already relates to #114" |
       | "open-mr"   | glab mr new -t t -b main --description="Implements #114"            | denies, naming "Supersedes !120" |
       | "open-mr"   | glab mr create -t t -d "Fixes https://gitlab.com/g/p/-/issues/114"  | denies, naming "!120" |
+      | "open-mr"   | glab mr create -t t -d "Fixes https://other.example.com/g/p/-/issues/114" | is silent |
       | "open-mr"   | glab mr create -R g/p -t t -d "Resolving g/p#114"                   | denies, naming "!120" |
       | "open-mr"   | glab mr create -t t -i 114                                          | denies, naming "!120" |
       | "open-mr"   | glab api projects/:id/merge_requests -f title=t -f description='Closes #114' | denies, naming "!120" |
