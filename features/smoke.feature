@@ -84,3 +84,34 @@ Feature: smoke
       | neither shfmt nor bash        | awk                              |
       | no shfmt but bashlex          | awk, at 1:15 per bashlex         |
       | no shfmt but tree-sitter-bash | awk, at 1:6 per tree-sitter-bash |
+
+  Scenario Outline: a pip parser never refuses a command, at the bash -n and awk rungs
+    Given a machine with <machine>
+    When the agent runs `<command>` there
+    Then the hook is silent
+
+    Examples: valid bash that bashlex cannot read (a ParsingError, a NotImplementedError)
+      | machine                       | command                                |
+      | bash and bashlex              | [[ -f x ]] && echo y                   |
+      | bash and bashlex              | declare -a arr=(1 2)                   |
+      | bash and bashlex              | case $x in a) echo 1;; esac            |
+      | no shfmt but bashlex          | [[ -f x ]] && echo y                   |
+      | no shfmt but bashlex          | declare -a arr=(1 2)                   |
+      | no shfmt but bashlex          | case $x in a) echo 1;; esac            |
+
+    Examples: a command bash -n and awk read cleanly, with tree-sitter-bash installed
+      | machine                       | command                                |
+      | bash and tree-sitter-bash     | [[ -f x ]] && echo y                   |
+      | bash and tree-sitter-bash     | echo $((1 + 2))                        |
+      | no shfmt but tree-sitter-bash | [[ -f x ]] && echo y                   |
+      | no shfmt but tree-sitter-bash | echo $((1 + 2))                        |
+
+  Scenario Outline: a pip parser only adds the column to a refusal bash -n made
+    Given a machine with <machine>
+    When the agent runs `echo 'unclosed` there
+    Then the hook denies, read by <reader>
+
+    Examples:
+      | machine                   | reader                               |
+      | bash and bashlex          | bash -n, at 1:15 per bashlex         |
+      | bash and tree-sitter-bash | bash -n, at 1:6 per tree-sitter-bash |
