@@ -47,8 +47,7 @@ def _out(event, fields):
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
-    from languette.guards import (guard_git_work_loss,
-                                  guard_review_threads,
+    from languette.guards import (guard_review_threads,
                                   guard_signed_comments, require_well_formed,
                                   guard_worktrees,
                                   prose_budget_commit)
@@ -61,6 +60,7 @@ try:
                                  guard_disks as _guard_disks,
                                  guard_duplicate_prs as _guard_duplicate_prs,
                                  guard_git_stacked_base as _guard_git_stacked_base,
+                                 guard_git_work_loss as _guard_git_work_loss,
                                  guard_github_issues as _guard_github_issues,
                                  guard_host_availability as _guard_host_availability,
                                  guard_infra as _guard_infra,
@@ -90,6 +90,7 @@ try:
     # Stateful: the rule set names a handler that gathers and judges its facts.
     guard_bypass_hooks = engine.Guard(_guard_bypass_hooks)
     guard_git_stacked_base = engine.Guard(_guard_git_stacked_base)
+    guard_git_work_loss = engine.Guard(_guard_git_work_loss)
     ask_first, guard_infra = engine.Guard(_ask_first), engine.Guard(_guard_infra)
     guard_bypass_ruleset = engine.Guard(_guard_bypass_ruleset)
     guard_cross_session_send = engine.Guard(_guard_cross_session_send)

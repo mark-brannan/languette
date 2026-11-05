@@ -14,7 +14,7 @@ import os
 import re
 
 from languette import (branch_deletions, hook_skips, infra_runs, issue_writes, labels, listed_runs, opened_prs,
-                       paths, posts, pushes, secrets, untrusted_reads)
+                       paths, posts, pushes, secrets, untrusted_reads, work_losses)
 from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Refuse, ask, deny, planned
@@ -670,7 +670,8 @@ TESTS = {"power-word": power_word, "fork-bomb": fork_bomb, "pipe-to-shell": pipe
          "infra-runs": infra_runs.runs, "command": command, "disks": disks,
          "ruleset-pushes": pushes.pushed,
          "send-elsewhere": untrusted_reads.sent,
-         "issue-writes": issue_writes.written, "pr-opens": opened_prs.opened}
+         "issue-writes": issue_writes.written, "pr-opens": opened_prs.opened,
+         "work-losses": work_losses.losses}
 
 # The handlers a rule's `handler` may name: a stateful guard's code, which gathers the facts
 # its rule needs and judges them. handler(doc, guard, found) is a generator, given the call,
@@ -682,7 +683,7 @@ HANDLERS = {"hooks-approval": hook_skips.approval, "open-prs": branch_deletions.
             "send-door": untrusted_reads.door, "session-keep": untrusted_reads.keep,
             "issue-door": issue_writes.door, "door-open": issue_writes.door_open,
             "door-spend": issue_writes.door_spend, "issue-timelines": opened_prs.timelines,
-            "terms-init": posts.terms_init}
+            "terms-init": posts.terms_init, "tree-state": work_losses.tree_state}
 
 
 def judges(name):

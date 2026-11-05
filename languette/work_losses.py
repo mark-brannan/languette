@@ -1,6 +1,9 @@
-"""guard-git-work-loss: the git moves that throw work away, and that an agent
-session never has a good reason to make, are denied (one is asked about). The spec is
-features/guard-git-work-loss.feature.
+"""guard-git-work-loss's walk and its handler (languette/rules/guard_git_work_loss.py is
+the rule set): the git moves that throw work away, and that an agent session never has a
+good reason to make, are denied (one is asked about). The spec is
+features/guard-git-work-loss.feature. The `work-losses` test reads each segment's git or
+stow call from its words alone; the `tree-state` handler reads the facts the relaxations
+and the default branches turn on, from git in the payload's cwd, and gives the verdict.
 
   blanket staging   git add -A / --all / . / ./ / -u with no path, git commit -a; -A with paths
                     is allowed where an agent works (below), when every path resolves strictly
@@ -44,18 +47,19 @@ from languette.verdict import Need, Refuse, ask, deny
 
 
 class Ask(Refuse):
-    # Subclasses Refuse only so _segment and its callers carry it up the same path; it asks, not denies.
+    # Subclasses Refuse only so _judge and tree_state carry it up the same path; it asks, not denies.
     pass
 
 
 class _Placed(Refuse):
-    # `git add -A <paths>`: denied unless _segment finds the command runs where an agent works
+    # `git add -A <paths>`: denied unless _judge finds the command runs where an agent works
     # and every path lands strictly inside its tree.
     def __init__(self, msg, names):
         super().__init__(msg)
         self.names = names
 
-NAME = "guard-git-work-loss"
+
+# Each rule's own switch, CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_<RULE>, by git subcommand.
 RULE = {"add": "BLANKET_STAGING", "commit": "BLANKET_STAGING", "stash": "STASH", "push": "FORCE_PUSH",
         "checkout": "DISCARD", "restore": "DISCARD", "clean": "DISCARD", "reset": "DISCARD",
         "branch": "BRANCH_DELETE"}
@@ -478,29 +482,38 @@ def _off(env, rule):
     return env.get(f"CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_{rule}") == "false"
 
 
+
+
 def _stow(s, a, b, nested, env):
-    """`stow --adopt` asks; a stow call without it, or one that only deletes, does not.
+    """`stow --adopt` asks: its reason, or None. A stow call without it, or one that only
+    deletes, does not.
 
     A stray ask on a reader such as `man stow --adopt` is accepted: it only asks, never denies."""
     k = sw.cmd_index(s, a, b, STOW, nested)
     if k is None or _off(env, "ADOPT"):
-        return
-    if _stow_adopts(s.w[k + 1:b + 1]):
-        raise Ask(say("wl_stow_adopt"))
+        return None
+    return say("wl_stow_adopt") if _stow_adopts(s.w[k + 1:b + 1]) else None
 
 
-def _segment(doc, s, a, b, nested, env):
+def _git(s, a, b, nested, env):
+    """What the segment's git call does that may throw work away, read from its words alone:
+    {"sub", "args", "rule" (its switch's name), "mine" (git is the segment's own command and
+    runs no wrapper's home), and one of "refused" (the Refuse its words earn), "placed" (the paths
+    of an `add -A` that may land where an agent works) or "push" (a push the default branches
+    judge)}, or None for a call that loses nothing, or whose rule is off."""
     g = sw.cmd_index(s, a, b, sw.GIT, nested)
     if g is None:
-        return
+        return None
     i = sw.git_subcommand(s, g, b)
     if i > b:
-        return
+        return None
     sub = s.w[i]
     rule = RULE.get(sub)
     if rule and _off(env, rule):
-        return
+        return None
     args = s.w[i + 1:b + 1]
+    found = {"sub": sub, "args": args, "rule": rule,
+             "mine": not sw.git_wrapper(s.w[g])[1].home and _own_command(s, a, b, g)}
     try:
         if sub == "add":
             _add(args)
@@ -509,7 +522,7 @@ def _segment(doc, s, a, b, nested, env):
         elif sub == "stash":
             _stash(args)
         elif sub == "push":
-            (yield from _push(doc, args))
+            return {**found, "push": True} if _push_may_hurt(args) else None
         elif sub in ("checkout", "restore"):
             _discard(sub, args)
         elif sub == "clean":
@@ -519,36 +532,68 @@ def _segment(doc, s, a, b, nested, env):
         elif sub == "reset":
             _reset(args)
     except _Placed as p:
-        if not sw.git_wrapper(s.w[g])[1].home and _own_command(s, a, b, g) and (yield from _staging_where_agents_work(doc, p.names)):
+        return {**found, "placed": p.names}
+    except Refuse as r:
+        return {**found, "refused": r}
+    return None
+
+
+def losses(doc):
+    """The `work-losses` test: {"segments": [{"git": what _git found or None, "stow": the
+    reason a `stow --adopt` asks or None}, ...]} for the segments that hold either, in the
+    command's order, or None when none does."""
+    if not doc.text:
+        return None
+    env = doc.env or {}
+    found = []
+    for text, nested in doc.texts():
+        s = doc.scan(text)
+        for a, b in s.segments():
+            if a <= b:
+                seg = {"git": _git(s, a, b, nested, env), "stow": _stow(s, a, b, nested, env)}
+                if seg["git"] or seg["stow"]:
+                    found.append(seg)
+    return {"segments": found} if found else None
+
+
+def _judge(doc, f):
+    """Raise Refuse, or Ask, for the git call _git found, once the facts its relaxations
+    turn on are read: the default branches for a push, whether a discard loses nothing,
+    whether an `add -A` lands where an agent works."""
+    try:
+        if "placed" in f:
+            raise _Placed(say("wl_add_all"), f["placed"])
+        if "refused" in f:
+            raise f["refused"]
+        (yield from _push(doc, f["args"]))
+    except _Placed as p:
+        if f["mine"] and (yield from _staging_where_agents_work(doc, p.names)):
             return
         raise Refuse(say("wl_add_all_paths"))
     except Refuse as r:
-        if (rule == "DISCARD" and not sw.git_wrapper(s.w[g])[1].home and _own_command(s, a, b, g)
-                and (yield from _nothing_to_lose(doc, sub, args))):
+        if f["rule"] == "DISCARD" and f["mine"] and (yield from _nothing_to_lose(doc, f["sub"], f["args"])):
             return
-        if sub == "reset" and _upstream_target(args):
+        if f["sub"] == "reset" and _upstream_target(f["args"]):
             raise Refuse(say("wl_reset_upstream", why=r))
         raise
 
 
-def check(doc):
-    env = doc.env or {}
-    cmd = doc.text
-    if not cmd:
-        return None
+def tree_state(doc, guard, found):
+    """The `tree-state` handler: each segment the `work-losses` test found, in order, judged
+    against the tree it runs in. The first refusal denies; else the first ask asks. A
+    segment whose git call asks is not asked about again for its stow."""
     asked = None
     try:
-        for text, nested in doc.texts():
-            s = doc.scan(text)
-            for a, b in s.segments():
-                if a <= b:
-                    try:
-                        yield from _segment(doc, s, a, b, nested, env)
-                        _stow(s, a, b, nested, env)
-                    except Ask as r:
-                        asked = asked or r
+        for seg in found["segments"]:
+            try:
+                if seg["git"]:
+                    yield from _judge(doc, seg["git"])
+                if seg["stow"]:
+                    raise Ask(seg["stow"])
+            except Ask as r:
+                asked = asked or r
     except Refuse as r:
-        return deny(say("judged", guard=NAME, why=r))
+        return deny(say("judged", guard=guard, why=r))
     if asked:
-        return ask(say("judged", guard=NAME, why=asked))
+        return ask(say("judged", guard=guard, why=asked))
     return None
