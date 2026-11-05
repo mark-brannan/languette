@@ -4,8 +4,9 @@ Feature: uninstall
   {REPO}, asks, and on a yes asks the `claude` command to remove them, the
   plugin first. Anything install did not write is left and named: an install
   at another scope, a marketplace of the same name from elsewhere. The terms
-  files and the plugin's options are left; Claude Code drops the options when
-  it removes the plugin, so they are written back. Rows in the doctor's format,
+  files are left. Uninstall writes nothing to the user's settings itself;
+  Claude Code's own uninstall drops the plugin's options from settings.json,
+  and the plan says so before asking. Rows in the doctor's format,
   a non-zero exit on any ✗. Each scenario runs it in "{HOME}/project" against
   a fake HOME, with the stub `claude` install.feature uses.
 
@@ -63,14 +64,29 @@ Feature: uninstall
     And uninstall exits 0
     And the fake HOME is as it was before uninstall
 
-  Scenario: the plugin's options are still in the user's settings afterwards
+  Scenario: the plan says Claude Code's uninstall removes the options
     Given claude lists languette "cd31356ad5db" installed at user scope
     And claude lists the languette marketplace
     And the user's settings hold the languette options `{"guard_worktrees": true}`
     When uninstall runs, answering "y"
-    Then the uninstall "options" row is ✓ "kept in ~/.claude/settings.json"
-    And the user's settings hold the languette options `{"guard_worktrees": true}`
+    Then uninstall said before asking "Claude Code's uninstall also removes your languette options from settings.json."
     And uninstall exits 0
+
+  Scenario: the options go with the plugin and uninstall writes nothing to settings.json
+    Given claude lists languette "cd31356ad5db" installed at user scope
+    And claude lists the languette marketplace
+    And the user's settings hold the languette options `{"guard_worktrees": true}`
+    When uninstall runs, answering "y"
+    Then the user's settings are as Claude Code's uninstall left them
+    And uninstall exits 0
+
+  Scenario: without a yes the options stay, since nothing ran
+    Given claude lists languette "cd31356ad5db" installed at user scope
+    And claude lists the languette marketplace
+    And the user's settings hold the languette options `{"guard_worktrees": true}`
+    When uninstall runs, answering ""
+    Then uninstall said before asking "Claude Code's uninstall also removes your languette options from settings.json."
+    And the user's settings hold the languette options `{"guard_worktrees": true}`
 
   Scenario: the terms files are left as they are
     Given claude lists languette "cd31356ad5db" installed at user scope

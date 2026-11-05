@@ -9,7 +9,7 @@ import shlex
 from pathlib import Path
 
 import pytest
-from hamcrest import assert_that, contains_string, equal_to, not_
+from hamcrest import assert_that, contains_string, equal_to, has_item, not_
 from pytest_bdd import given, parsers, then, when
 
 from harness import FakeHome
@@ -128,6 +128,19 @@ def _options_held(installer, options):
     f = installer.home / ".claude/settings.json"
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps({"pluginConfigs": {PLUGIN: {"options": json.loads(options)}}}))
+
+
+@then("the user's settings are as Claude Code's uninstall left them")
+def _settings_as_claude_left(installer):
+    left = (installer.aside / "settings-after-uninstall.json").read_text()
+    assert_that(json.loads((installer.home / ".claude/settings.json").read_text()), equal_to(json.loads(left)))
+    assert_that(installer.out, not_(contains_string("options  ")))
+
+
+@then(parsers.parse('uninstall said before asking "{text}"'))
+def _said_before(installer, text):
+    head, _, _ = installer.out.partition("Remove them? [y/N] ")
+    assert_that(head.splitlines(), has_item(text))
 
 
 @then(parsers.parse("the user's settings hold the languette options `{options}`"))

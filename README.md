@@ -92,7 +92,7 @@ Without the plugin system or the installer, see [Installing by hand](#installing
 
 ### Removing it
 
-`languette uninstall` removes what `languette install` wrote, after asking.
+`languette uninstall` removes what `languette install` wrote, after asking, through Claude Code's own command, so your languette options in `settings.json` go with the plugin.
 
 ### Try it: `languette scan` (experimental)
 

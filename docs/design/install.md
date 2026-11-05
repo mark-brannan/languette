@@ -41,8 +41,9 @@ says so, with the fix beneath.
 ## uninstall
 
 The reverse of install, and only of install: it lists what install wrote,
-removes it on a yes, and names what it leaves. The terms files and the
-plugin's options stay, so a later install finds the user's configuration.
+removes it on a yes, and names what it leaves. The terms files stay. It goes
+through Claude Code's own uninstall and writes nothing to the user's
+settings itself; that command removes the plugin's options, and the plan says so first.
 
 ## doctor
 

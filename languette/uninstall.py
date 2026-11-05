@@ -7,13 +7,12 @@ What install wrote is the user-scope languette@languette plugin and the
 languette marketplace added from this repo, both through the `claude` command,
 so uninstall asks `claude` to remove those two and nothing else. An install at
 project or local scope, a marketplace of the same name from elsewhere, the
-terms files and the plugin's options are left. Claude Code
-drops the plugin's options from the user's settings when it uninstalls the
-plugin, so they are written back, as they were, for a later install to find.
+terms files are left. Uninstall writes nothing to the user's
+settings itself: Claude Code's own uninstall drops the plugin's options from
+settings.json, and the plan says so before asking.
 Like install, it sits outside the guard pipeline. Standard library only.
 """
 
-import json
 import os
 import shutil
 import sys
@@ -22,53 +21,6 @@ from languette import doctor, install
 
 OK, WARN, FAIL = doctor.OK, doctor.WARN, doctor.FAIL
 PLUGIN, MARKETPLACE = install.PLUGIN, install.MARKETPLACE
-
-
-def _settings_path():
-    return doctor._config_dir() / "settings.json"
-
-
-def _options():
-    """The plugin's options in the user's settings; None when there are none or the file will not say."""
-    try:
-        s = doctor._json(_settings_path(), missing={})
-    except doctor.Unreadable:
-        return None
-    configs = s.get("pluginConfigs") if isinstance(s, dict) else None
-    return configs.get(PLUGIN) if isinstance(configs, dict) else None
-
-
-def _keep_options(kept):
-    """(mark, label, text): `kept` written back as the plugin's options where Claude Code removed them."""
-    path = _settings_path()
-    where = doctor._tilde(path)
-    lost = f"; they were {json.dumps(kept, separators=(',', ':'))}"
-    try:
-        s = doctor._json(path, missing={})
-    except doctor.Unreadable as e:
-        return FAIL, "options", f"{e}{lost}"
-    if not isinstance(s, dict) or not isinstance(s.setdefault("pluginConfigs", {}), dict):
-        return FAIL, "options", f"{where} has a shape uninstall does not know{lost}"
-    if s["pluginConfigs"].get(PLUGIN) == kept:
-        return OK, "options", f"left in {where}"
-    s["pluginConfigs"][PLUGIN] = kept
-    # Whole or untouched: a cut-off write would leave the user's settings half gone.
-    tmp = f"{path}.{os.getpid()}.tmp"
-    try:
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(json.dumps(s, indent=2) + "\n")
-        if os.path.exists(path):
-            shutil.copymode(path, tmp)
-        os.replace(tmp, path)
-    except OSError as e:
-        return FAIL, "options", f"{where} cannot be written ({e.strerror or e}){lost}"
-    finally:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-    return OK, "options", f"kept in {where}"
 
 
 def plan(claude, cwd):
@@ -127,17 +79,17 @@ def claude_rows(cwd, ask=_ask):
     print("Will remove from Claude Code:")
     for label, text, _ in steps:
         print(f"    {label:<13} {text}")
-    print("Leaves the plugin's options and the terms files as they are.")
+    if any(args[1] == "uninstall" for _, _, args in steps):
+        print("Claude Code's uninstall also removes your languette options from settings.json.")
+    print("Leaves the terms files as they are.")
     if not ask():
         return left + [(WARN, "uninstall", "nothing removed")]
-    kept, rows = _options(), list(left)
+    rows = list(left)
     for label, text, args in steps:
         r, why = install._claude(claude, *args)
         if why or r.returncode != 0:
             return rows + [(FAIL, label, why or install._first_line(r))]
         rows.append((OK, label, f"{text.split(',')[0]} removed"))
-        if args[1] == "uninstall" and kept is not None:
-            rows.append(_keep_options(kept))
     return rows
 
 
