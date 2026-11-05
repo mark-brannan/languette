@@ -131,8 +131,7 @@ list; what it built is then described above.
    tracking, word-live, the valued-option tables), each landing with the
    guards that repeat it moved onto it.
 2. The command guards move, smallest first, two to a change, the rest waiting on the primitives their rules name.
-3. The stateful guards: their rules move, their handlers stay code. A rule's `handler` is built; `on` comes with the door.
-4. The repo tier, once its bounds are decided.
+3. The repo tier, once its bounds are decided.
 
 Lines, from the survey: ~3000 of guard code become data plus engine, ~1500
 stay code, ~2000 are messages and stay where they are.
