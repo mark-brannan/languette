@@ -85,7 +85,7 @@ Feature: smoke
       | no shfmt but bashlex          | awk, at 1:15 per bashlex         |
       | no shfmt but tree-sitter-bash | awk, at 1:6 per tree-sitter-bash |
 
-  Scenario Outline: a pip parser never refuses a command, at any rung
+  Scenario Outline: a pip parser never refuses a command, at the bash -n and awk rungs
     Given a machine with <machine>
     When the agent runs `<command>` there
     Then the hook is silent
