@@ -235,7 +235,7 @@ def test_every_call_to_a_guard_generator_is_a_yield_from():
     files = sorted((ROOT / "languette" / "guards").glob("*.py")) + [
         ROOT / "languette" / f"{m}.py" for m in ("hook_skips", "branch_deletions", "infra_runs", "listed_runs",
                                                  "pushes", "untrusted_reads", "issue_writes", "opened_prs",
-                                                 "work_losses")]
+                                                 "work_losses", "worktree_reaches")]
     trees = {f.stem: ast.parse(f.read_text()) for f in files}
     gens = {m: _generators(t) for m, t in trees.items()}
     bad = []
