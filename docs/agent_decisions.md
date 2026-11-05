@@ -590,3 +590,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261103t193128z
 - guard-private-terms' SessionStart write moves onto on as the terms-init handler, rather than loosening the test that every state event run.py wires a rule-set guard to is one its on names Undo: loosen tests/test_repo.py's on-consistency test to allow a wired state event with no on entry ([#349](https://github.com/mark-brannan/languette/pull/349))
+
+### 20261105t194119z
+- languette uninstall asks [y/N] as doctor --restore-redacted-terms does; no flag ([#355](https://github.com/mark-brannan/languette/pull/355))
