@@ -605,3 +605,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261105t194408z
 - languette uninstall asks [y/N] as doctor --restore-redacted-terms does; no flag ([#355](https://github.com/mark-brannan/languette/pull/355))
+
+### 20261105t194435z
+- the devcontainer feature has no options and installs its pinned release, bumped by release-please extra-files ([#355](https://github.com/mark-brannan/languette/pull/355))
