@@ -611,3 +611,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261105t194450z
 - the devcontainer feature wires Claude Code at postCreateCommand, not at build time ([#355](https://github.com/mark-brannan/languette/pull/355))
+
+### 20261105t194502z
+- the devcontainer feature dependsOn the node and claude-code features, so the README block is one line ([#355](https://github.com/mark-brannan/languette/pull/355))
