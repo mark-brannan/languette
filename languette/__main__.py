@@ -1,5 +1,5 @@
-"""The `languette` command: `languette install`, `languette doctor` or
-`languette scan`; from a clone, `python3 -m languette ...`; from a plugin install, `python3 -I
+"""The `languette` command: `languette install`, `languette uninstall`,
+`languette doctor` or `languette scan`; from a clone, `python3 -m languette ...`; from a plugin install, `python3 -I
 "$PLUGIN_ROOT/languette/__main__.py" ...`. `scan` is experimental: its
 output may change in any release while "languette_scan" is a v0 version."""
 
@@ -80,6 +80,13 @@ def main(argv=None):
                                      "the plugin is already installed. Exits 1 on any ✗.")
     ins.add_argument("host", nargs="?", default="claude", type=_host, metavar="HOST",
                      help="the coding agent to wire: claude (the default, and the only one today)")
+    uni = sub.add_parser("uninstall", help="remove what languette install wrote; exits 1 on any ✗",
+                         description="List what languette install wrote for Claude Code, its plugin at user "
+                                     "scope and its marketplace, and remove them on a yes, through the claude "
+                                     "command. The plugin's options, its data and the terms files are left. "
+                                     "Exits 1 on any ✗.")
+    uni.add_argument("host", nargs="?", default="claude", type=_host, metavar="HOST",
+                     help="the coding agent to unwire: claude (the default, and the only one today)")
     doc = sub.add_parser("doctor", help="say whether languette protects Claude Code here; exits 1 on any ✗",
                          description="Say whether languette protects Claude Code on this machine, from the current "
                                      "directory. Exits 1 on any ✗.", add_help=False)
@@ -118,6 +125,9 @@ def main(argv=None):
     if args.command == "install":
         from languette import install
         return install.main(args.host)
+    if args.command == "uninstall":
+        from languette import uninstall
+        return uninstall.main(args.host)
     from languette import doctor
     return doctor.main(args)
 
