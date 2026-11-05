@@ -623,3 +623,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261105t205753z
 - the guard name is threaded as the handler's guard argument, not a module constant ([#356](https://github.com/mark-brannan/languette/pull/356))
+
+### 20261105t205809z
+- guard-rules.md Path there renumbers the repo tier from 4 to 3 ([#356](https://github.com/mark-brannan/languette/pull/356))
