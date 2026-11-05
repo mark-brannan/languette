@@ -109,9 +109,9 @@ Feature: smoke
   Scenario Outline: a pip parser only adds the column to a refusal bash -n made
     Given a machine with <machine>
     When the agent runs `echo 'unclosed` there
-    Then the hook denies, read by bash -n
+    Then the hook denies, read by <reader>
 
     Examples:
-      | machine                   |
-      | bash and bashlex          |
-      | bash and tree-sitter-bash |
+      | machine                   | reader                               |
+      | bash and bashlex          | bash -n, at 1:15 per bashlex         |
+      | bash and tree-sitter-bash | bash -n, at 1:6 per tree-sitter-bash |
