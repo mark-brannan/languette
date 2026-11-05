@@ -51,6 +51,8 @@ _LISTS = {
 }
 # A GitLab REST branch deletion: the project in group 1, the branch, URL-encoded, in group 2.
 _GL_BRANCH = re.compile(r"(?:api/v4/)?projects/([^/]+)/repository/branches/(.+)")
+# ... and the sweep that deletes every merged, unprotected branch without naming one.
+_GL_MERGED = re.compile(r"(?:api/v4/)?projects/([^/]+)/repository/merged_branches")
 
 
 def _emit(out, repo, ref, forge=None):
@@ -113,6 +115,12 @@ def _gh_api(s, a, b, nested, out):
         repo = "-" if project == ":id" else "?" if project.isdigit() or _UNRESOLVED.search(project) else project
         _emit(out, repo, unquote(m.group(2)), "gitlab")
         return
+    sweep = _GL_MERGED.fullmatch(api.path) if cli == "glab" else None
+    if api.method == "DELETE" and sweep:
+        project = unquote(sweep.group(1))
+        repo = "-" if project == ":id" else "?" if project.isdigit() or _UNRESOLVED.search(project) else project
+        _emit(out, repo, "?", "gitlab")      # no branch is named: open_prs asks
+        return
     if cli == "glab" or api.method != "DELETE" or "refs/heads/" not in api.path:
         return
     # The endpoint names its repository; {owner}/{repo} is the cwd's.
@@ -150,7 +158,8 @@ def _unreadable(guard, b, listed=LIST):
 def deleted(doc):
     """The `branch-deletions` test: {"deleted": deletions(doc)}, or None when there are none."""
     cmd = doc.text
-    if not cmd or ("push" not in cmd and "refs/heads/" not in cmd and "repository/branches" not in cmd):
+    if not cmd or ("push" not in cmd and "refs/heads/" not in cmd and "repository/branches" not in cmd
+                    and "merged_branches" not in cmd):
         return None
     out = deletions(doc)
     return {"deleted": out} if out else None

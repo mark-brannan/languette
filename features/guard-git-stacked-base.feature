@@ -91,6 +91,12 @@ Feature: guard-git-stacked-base
       | glab api -X DELETE projects/g%2Fq/repository/branches/claude%2Fbase-branch | denies, naming "GitLab does not retarget" | 20 glab mr list -R g/q --target-branch claude/base-branch |
       | git push origin --delete claude/spare                                    | is silent | 20 glab mr list --source-branch claude/spare -F json |
 
+  Scenario: on GitLab, the merged-branches sweep names no branch, so it asks
+    Given a clone of "https://gitlab.com/g/p.git" at "{TMP}/gl" on branch "claude/topic"
+    And the working directory is "{TMP}/gl"
+    When the agent runs `glab api -X DELETE projects/:id/repository/merged_branches`
+    Then the guard asks
+
   Scenario Outline: the bypasses the shared scanner exists to close stay closed
     When the agent runs `<command>`
     Then the guard denies

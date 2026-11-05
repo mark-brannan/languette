@@ -226,6 +226,7 @@ Feature: guard-cross-session-send
     Examples:
       | command                                          | verdict                              |
       | glab issue view 12 -R g/p                        | denies, naming "glab issue view"     |
+      | glab incident view 12 -R g/p                     | denies, naming "glab incident view"  |
       | glab mr show 7 --comments                        | denies, naming "glab mr show"        |
       | glab -R g/p mr list                              | denies, naming "glab mr list"        |
       | glab mr diff 7                                   | denies, naming "glab mr diff"        |

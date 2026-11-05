@@ -79,7 +79,7 @@ def _gh_reads(s, lo, hi, cli="gh"):
     if i is None:
         return False
     sub, rest = sw.word(s, i), [sw.word(s, j) for j in range(i + 1, hi + 1)]
-    groups, writes, views = (("issue", "mr"), _GLAB_WRITES, _GLAB_VIEWS) if cli == "glab" else \
+    groups, writes, views = (("issue", "mr", "incident"), _GLAB_WRITES, _GLAB_VIEWS) if cli == "glab" else \
         (("issue", "pr"), _GH_WRITES, _GH_VIEWS)
     if sub == "search" and cli == "gh":
         return True

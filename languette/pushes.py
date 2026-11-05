@@ -17,7 +17,7 @@ doors are watched:
 On GitLab the rule is a protected branch: one no role below Administrator may
 push to takes a merge request, and a user, group or deploy key let push there
 anyway is its bypass. glab's `mr merge` has no flag that merges past the
-rules, so the push is GitLab's one door. Not protected (GitLab's 404) is open.
+rules, so the push is GitLab's one door. Not protected, by name or by a wildcard, is open.
 
 Both deny. The user's own terminal never reaches a hook, so the user keeps
 the bypass. When GitHub cannot answer (no gh, signed out, offline, a 10 s

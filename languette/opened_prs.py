@@ -340,6 +340,9 @@ def _slug(post, cd, cwd, env):
             return (r.host, r.repo.lower()) if r.forge == forge else None
         r = repo.strip("/").lower()
         host = (env.get("GITLAB_HOST") or sw.FORGES[forge]["host"]).lower()
+        parts = r.split("/")
+        if forge == "gitlab" and len(parts) >= 3 and re.search(r"[.:]", parts[0]):
+            host, r = parts[0], "/".join(parts[1:])      # [HOST/]GROUP/PROJECT, as glab splits it
         return (host, r) if sw.FORGES[forge]["repo"].fullmatch(r) else None
     if cd or not cwd:
         return None
