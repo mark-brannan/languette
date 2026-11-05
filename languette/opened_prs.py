@@ -63,17 +63,20 @@ SUPERSEDES = re.compile(rf"(?<![A-Za-z0-9_-])(?:supersedes|replaces)(?:[ \t]*:[ 
 _HTML = re.compile(rf"github\.com/({_NAME}/{_NAME})/(?:pull|issues)/[0-9]+")
 # GitLab's closing pattern (docs/design/forges.md): close, fix, resolve or implement in any
 # tense, then #N, group/project#N or an issue or work item URL; its MRs are !M.
-_GL_NAME = rf"{_NAME}(?:/{_NAME})+"
+_GL_NAME = rf"{_NAME}(?:/(?!-/){_NAME})+"
 _GL_REF = (rf"(?:(?P<repo>{_GL_NAME})?#(?P<num>[0-9]+)"
-           rf"|https?://(?P<uhost>[^/\s]+)/(?P<urepo>{_GL_NAME})/-/(?:issues|work_items)/(?P<unum>[0-9]+))"
+           rf"|https?://(?P<uhost>[^/\s]+)/(?P<urepo>{_GL_NAME})/(?:-/)?(?:issues|work_items)/(?P<unum>[0-9]+))"
            rf"(?![A-Za-z0-9_/])")
 _GL_KEYS = r"(?:clos(?:e[sd]?|ing)|fix(?:e[sd]|ing)?|resolv(?:e[sd]?|ing)|implement(?:s|ed|ing)?)"
-CLOSES_GL = re.compile(rf"(?<![A-Za-z0-9_-]){_GL_KEYS}(?:[ \t]*:[ \t]*|[ \t]+){_GL_REF}", re.IGNORECASE)
+CLOSES_GL = re.compile(rf"(?<![A-Za-z0-9_-]){_GL_KEYS}(?:[ \t]*:[ \t]*|[ \t]+)(?:issues?[ \t]+)?{_GL_REF}",
+                       re.IGNORECASE)
+# GitLab reads "Closes #1, #2" and "Closes #1 and #2" as closing both.
+_GL_MORE = re.compile(rf"(?:[ \t]*,?[ \t]+and[ \t]+|[ \t]*,[ \t]*){_GL_REF}", re.IGNORECASE)
 _GL_MR = (rf"(?:(?P<repo>{_GL_NAME})?!(?P<num>[0-9]+)"
-          rf"|https?://(?P<uhost>[^/\s]+)/(?P<urepo>{_GL_NAME})/-/merge_requests/(?P<unum>[0-9]+))(?![A-Za-z0-9_/])")
+          rf"|https?://(?P<uhost>[^/\s]+)/(?P<urepo>{_GL_NAME})/(?:-/)?merge_requests/(?P<unum>[0-9]+))(?![A-Za-z0-9_/])")
 SUPERSEDES_GL = re.compile(rf"(?<![A-Za-z0-9_-])(?:supersedes|replaces)(?:[ \t]*:[ \t]*|[ \t]+){_GL_MR}",
                            re.IGNORECASE)
-_GL_WEB = re.compile(rf"https?://[^/]+/({_GL_NAME})/-/merge_requests/[0-9]+")
+_GL_WEB = re.compile(rf"https?://[^/]+/({_GL_NAME})/(?:-/)?merge_requests/[0-9]+")
 # glab mr create's flags that take a value (-b is the target branch, never a body).
 _GL_VALUED = frozenset("-a --assignee -H --head -l --label -m --milestone --reviewer -s --source-branch "
                        "-b --target-branch --template -t --title --attach".split())
@@ -87,20 +90,21 @@ def _deny(guard, why):
     return deny(say("judged", guard=guard, why=why))
 
 
-def refs(rx, text, repo, host=None):
+def refs(rx, text, repo, host=None, more=None):
     """[(owner/name, N)] for each reference `rx` finds in `text`, in order; a
     bare #N is on `repo` (None when unknown). A URL on another host than `host` is
     prose, not a reference, as GitLab itself reads it."""
     out = []
     for m in rx.finditer(text):
-        uh = m.groupdict().get("uhost")
-        if host and uh and uh.lower() != host.lower():
-            continue
-        r = m.group("repo") or m.group("urepo")
-        r = sw.norm_repo(r) if r else repo
-        n = int(m.group("num") or m.group("unum"))
-        if (r, n) not in out:
-            out.append((r, n))
+        while m:
+            uh = m.groupdict().get("uhost")
+            if not (host and uh and uh.lower() != host.lower()):
+                r = m.group("repo") or m.group("urepo")
+                r = sw.norm_repo(r) if r else repo
+                n = int(m.group("num") or m.group("unum"))
+                if (r, n) not in out:
+                    out.append((r, n))
+            m = more.match(text, m.end()) if more else None
     return out
 
 
@@ -393,7 +397,7 @@ def _judge(text, where, guard, forge="github"):
     gitlab = forge == "gitlab"
     host, slug = where or (None, None)
     on = (host or sw.FORGES[forge]["host"]) if gitlab else None
-    closes = refs(CLOSES_GL if gitlab else CLOSES, text, slug, on)
+    closes = refs(CLOSES_GL if gitlab else CLOSES, text, slug, on, _GL_MORE if gitlab else None)
     if not closes:
         return None
     gone = refs(SUPERSEDES_GL if gitlab else SUPERSEDES, text, slug, on)
