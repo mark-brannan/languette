@@ -29,6 +29,8 @@ MACHINES = {
     "neither shfmt nor bash": ((), None, None),
     "no shfmt but bashlex": ((), "LANGUETTE_SMOKE_BASHLEX_PY", "bashlex"),
     "no shfmt but tree-sitter-bash": ((), "LANGUETTE_SMOKE_TREESITTER_PY", "tree_sitter, tree_sitter_bash"),
+    "bash and bashlex": (("bash",), "LANGUETTE_SMOKE_BASHLEX_PY", "bashlex"),
+    "bash and tree-sitter-bash": (("bash",), "LANGUETTE_SMOKE_TREESITTER_PY", "tree_sitter, tree_sitter_bash"),
 }
 
 
