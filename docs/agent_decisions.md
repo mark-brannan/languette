@@ -626,3 +626,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261105t205809z
 - guard-rules.md Path there renumbers the repo tier from 4 to 3 ([#356](https://github.com/mark-brannan/languette/pull/356))
+
+### 20261105t214417z
+- GitLab protected branch takes a merge request when no role below Administrator may push; user, group, deploy key or custom-role push entries are the bypass GitLab protected_branches 404 with message exactly 404 Not found is unprotected; other 404 asks glab mr create -i N read as closing #N GitLab -R without a URL is on GITLAB_HOST, else gitlab.com stacked-base git push deletion judged on the cwd remote's forge, GitHub when unknown cross-session-send glab issue/mr verbs read unless listed writes; mr checkout is a read private-terms glab mr merge -d is a switch, not a description ([#357](https://github.com/mark-brannan/languette/pull/357))
