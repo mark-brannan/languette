@@ -49,7 +49,6 @@ def _out(event, fields):
 try:
     from languette.guards import (guard_review_threads,
                                   guard_signed_comments, require_well_formed,
-                                  guard_worktrees,
                                   prose_budget_commit)
     from languette import engine, issue_writes, opened_prs, posts, record, secrets
     from languette.rules import (ask_first as _ask_first, deny_always as _deny_always,
@@ -70,7 +69,7 @@ try:
                                  guard_protected_services as _guard_protected_services,
                                  guard_recursive_delete as _guard_recursive_delete,
                                  guard_scheduled_jobs as _guard_scheduled_jobs, guard_secrets as _guard_secrets,
-                                 guard_sudo as _guard_sudo)
+                                 guard_sudo as _guard_sudo, guard_worktrees as _guard_worktrees)
     from languette.document import Document
     from languette.messages import say
     from languette.verdict import Act, deny, verdict
@@ -95,6 +94,7 @@ try:
     guard_bypass_ruleset = engine.Guard(_guard_bypass_ruleset)
     guard_cross_session_send = engine.Guard(_guard_cross_session_send)
     guard_github_issues, guard_duplicate_prs = engine.Guard(_guard_github_issues), engine.Guard(_guard_duplicate_prs)
+    guard_worktrees = engine.Guard(_guard_worktrees)
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
                                          "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"}))

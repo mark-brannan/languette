@@ -1,5 +1,10 @@
-"""guard-worktrees: two controls over where a session's git work lands. The
-spec is features/guard-worktrees.feature.
+"""guard-worktrees' walk and its handler (languette/rules/guard_worktrees.py is the rule
+set): two controls over where a session's git work lands. The spec is
+features/guard-worktrees.feature. The `worktree-reaches` test reads, from the call's words
+alone, what each control that is on judges: the checkout-home moves and the foreign words,
+with their cd and -C targets in order. The `own-places` handler follows the command's
+virtual cwd through them, asks git and the session's record where each lands, and gives
+the verdict.
 
   checkout-home  a `git`/`yadm`/`vcsh` checkout or switch that would move the branch
                  checked out in $HOME, when $HOME is itself a worktree; and
@@ -7,11 +12,13 @@ spec is features/guard-worktrees.feature.
   foreign        a reach into a linked worktree that is not this session's own,
                  by a Bash word, a file tool's path, or EnterWorktree(path=...)
 
-Opt-in: hooks.json runs it only when the option guard_worktrees is exactly
-true, and run.py without --guard skips it unless that option is set. A
-control is skipped when its own option (guard_worktrees_checkout_home,
-guard_worktrees_foreign) is exactly false; the first control to object wins,
-and a note is given only when neither does.
+Opt-in: the rule set's opt_in, so run.py without --guard skips it unless the option
+guard_worktrees is exactly true. A control is skipped when its own option
+(guard_worktrees_checkout_home, guard_worktrees_foreign) is exactly false, which the test
+reads, as the engine holds no switch per rule; the first control to deny wins, a deny
+outranks the other's ask, and a note is given only when neither objects. The two are one
+rule for that reason: the engine gives the first rule's finding, and would neither let the
+foreign deny outrank a checkout-home ask nor keep the foreign control's record on that call.
 
 checkout-home. yadm and vcsh hardcode --work-tree=$HOME, so any such checkout/switch
 that is not a file restore (`checkout [<ref>] -- <path>`) is denied, from any
@@ -81,8 +88,9 @@ from languette.messages import say
 from languette.refs import remote_heads
 from languette.verdict import Act, Need, Refuse, ask, context, deny
 
-NAME = "guard-worktrees"
-OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES"
+# Each control's own switch, off only when exactly "false".
+CHECKOUT_HOME = "CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME"
+FOREIGN = "CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_FOREIGN"
 MAX_CANDIDATES = 48
 # A spelling that names the same directory from anywhere: absolute, $HOME, ~ or ~user.
 _HOMEISH = re.compile(r"(?:/|~(?:[^/+\-0-9][^/]*)?(?:/|\Z)|\$HOME(?:/|\Z)|\$\{HOME\}(?:/|\Z))")
@@ -373,7 +381,7 @@ def _resolve_all(raw, bases, home):
     return res, miss
 
 
-def _landings(raw, bases, home):
+def _landings(raw, bases, home, guard):
     """Where a literal word that does not resolve would land: the nearest
     existing directory above it, against each base it missed on. A word the
     guard can't read (a variable other than HOME, a `$( )`, a glob) lands
@@ -392,7 +400,7 @@ def _landings(raw, bases, home):
         if (yield from _resolve_arg(w, base, home)):
             continue
         try:
-            d, _ = yield from _resolve_dir(w, base, home)
+            d, _ = yield from _resolve_dir(w, base, home, guard)
         except Refuse:
             return None
         if d:
@@ -405,7 +413,7 @@ class _Ask(Exception):
     the dotfile-manager calls it asks about. A later control's deny still outranks it."""
 
 
-def _generic(prog, cwd):
+def _generic(prog, cwd, guard):
     """The deny for a branch switch in $HOME. For plain `git`, its recipe names the remote
     HEAD's branch, read here and only on this path; `<base>` for a wrapper (its repository is not
     the working directory's), where the repository names none, or a name the shell would read as
@@ -421,15 +429,13 @@ def _generic(prog, cwd):
             heads = ()
         if heads and re.fullmatch(r"[A-Za-z0-9._][A-Za-z0-9._/-]*", heads[0]):
             base = heads[0]
-    return Refuse(say("wt_checkout_home", guard=NAME, prog=prog, base=base))
+    return Refuse(say("wt_checkout_home", guard=guard, prog=prog, base=base))
 
 
-def _checkout_home(doc):
+def _checkout_home(doc, events, guard):
+    """The checkout-home control, given the command's moves (_home_events): a note, or
+    Refuse, or _Ask."""
     payload, env = doc.payload, doc.env
-    cmd = (payload.get("tool_input") or {}).get("command")
-    if not isinstance(cmd, str) or not cmd:
-        return
-    events = _home_events(doc)
     asks = list(dict.fromkeys(ev[1] for ev in events if ev[0] == "ASK"))
     events = [ev for ev in events if ev[0] != "ASK"]
     if all(ev[0] == "FS" for ev in events):
@@ -437,7 +443,7 @@ def _checkout_home(doc):
             raise _Ask(asks)
         return
     if not (yield Need("which", "git")):
-        raise Refuse(say("wt_git_missing_checkout", guard=NAME))
+        raise Refuse(say("wt_git_missing_checkout", guard=guard))
     home = (yield from _canon(env.get("HOME") or "")) or ""
     pcwd = payload.get("cwd")
     cwd = (yield from _canon(pcwd)) if isinstance(pcwd, str) and pcwd else None
@@ -485,7 +491,7 @@ def _checkout_home(doc):
     changed = False
     for ev in events:
         if ev[0] == "DENY":
-            raise (yield from _generic(ev[1], None))
+            raise (yield from _generic(ev[1], None, guard))
         if ev[0] == "FS":
             changed = True
         elif ev[0] == "ENV":
@@ -509,16 +515,16 @@ def _checkout_home(doc):
                 else:
                     lost = True
                     # A literal path not made yet is judged where it lands.
-                    land = yield from _landings(v, cands, home)
+                    land = yield from _landings(v, cands, home, guard)
                     visited = visited and (None if land is None else visited + land)
         else:
             if not home:
-                raise Refuse(say("wt_home_unresolved_checkout", guard=NAME))
+                raise Refuse(say("wt_home_unresolved_checkout", guard=guard))
             bases, blind, pinned, unpinned, seen = cands, lost, False, False, visited
             for tk, tv in env_targets + ev[1]:
                 tv = yield from user_word(tv)
                 if tk == "C":
-                    land = None if changed else (yield from _landings(tv, bases, home))
+                    land = None if changed else (yield from _landings(tv, bases, home, guard))
                     bases, miss = yield from _resolve_all(tv, bases, home)
                     blind = blind or changed or miss or not bases
                     seen = seen and (None if land is None else seen + bases + land)
@@ -531,23 +537,23 @@ def _checkout_home(doc):
                 unpinned = unpinned or changed or miss or not res or (blind and not _HOMEISH.match(tv))
                 for r in res:
                     if (tk == "GITDIR" and (yield from gitdir_is_home(r))) or (tk == "WORKTREE" and r == home):
-                        raise (yield from _generic("git", cwd))
+                        raise (yield from _generic("git", cwd, guard))
             if unpinned:
-                raise Refuse(say("wt_repo_unclear", guard=NAME))
+                raise Refuse(say("wt_repo_unclear", guard=guard))
             # --git-dir pins where the command resolves; -C moved the bases; --work-tree does neither.
             if pinned:
                 continue
             if blind:
                 if not seen:
-                    raise Refuse(say("wt_dir_unclear", guard=NAME))
+                    raise Refuse(say("wt_dir_unclear", guard=guard))
                 for d in dict.fromkeys(seen):
                     if not (yield from own_place(d)):
-                        raise Refuse(say("wt_dir_unclear", guard=NAME))
-                note = say("wt_dir_unclear_note", guard=NAME)
+                        raise Refuse(say("wt_dir_unclear", guard=guard))
+                note = say("wt_dir_unclear_note", guard=guard)
                 continue
             for d in bases:
                 if (yield from targets_home(d)):
-                    raise (yield from _generic("git", cwd))
+                    raise (yield from _generic("git", cwd, guard))
     if asks:
         raise _Ask(asks)
     return note
@@ -716,13 +722,13 @@ def _recipe(sess, d):
     return f"git --git-dir={gcd or '<git-dir>'} worktree add {scratch}/<name> && cd {scratch}/<name>"
 
 
-def _deny_path(sess, env, word, ft):
+def _deny_path(sess, env, word, ft, guard):
     branch = yield from _git("/", "-C", ft, "symbolic-ref", "-q", "--short", "HEAD")
     recipe = yield from _recipe(sess, ft)
-    raise Refuse(say("wt_foreign", guard=NAME, word=word, ft=ft, recipe=recipe, branch=branch or "<branch>"))
+    raise Refuse(say("wt_foreign", guard=guard, word=word, ft=ft, recipe=recipe, branch=branch or "<branch>"))
 
 
-def _resolve_dir(raw, base, home):
+def _resolve_dir(raw, base, home, guard):
     """(canonical nearest existing directory, the part below it that does not
     exist yet), or ("", "") when the word can't be judged."""
     r = yield from _expand(raw, base, home)
@@ -744,25 +750,27 @@ def _resolve_dir(raw, base, home):
     if not (yield Need("path", "isdir", r)):
         return "", ""
     if "/../" in f"/{rest}/":
-        raise Refuse(say("wt_dotdot_missing", guard=NAME, raw=raw))
+        raise Refuse(say("wt_dotdot_missing", guard=guard, raw=raw))
     return (yield Need("path", "realpath", r)), rest
 
 
-def _foreign(doc):
+def _foreign(doc, words, guard):
+    """The foreign control, given the Bash command's words (_foreign_words; [] for a call
+    with none): Refuse, or None once this call's arrivals are left for the next."""
     payload, env = doc.payload, doc.env
     # git is what every foreignness answer is asked of: without it, every path
     # would read as nobody's worktree.
     if not (yield Need("which", "git")):
-        raise Refuse(say("wt_git_missing_owner", guard=NAME))
-    tool = payload.get("tool_name")
+        raise Refuse(say("wt_git_missing_owner", guard=guard))
+    tool = doc.tool
     pcwd = payload["cwd"]
     home = yield from _canon(env.get("HOME") or "")
     if not home:
-        raise Refuse(say("wt_home_unresolved_owner", guard=NAME))
+        raise Refuse(say("wt_home_unresolved_owner", guard=guard))
     own_top = (yield from _git("/", "-C", pcwd, "rev-parse", "--show-toplevel")) or ""
     sess = _Session(payload, env, own_top, home)
     yield from sess.arrive(bool(own_top) and (yield Need("path", "isfile", os.path.join(own_top, ".git"))))
-    ti = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
+    ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
 
     if tool == "EnterWorktree":
         p = ti.get("path")
@@ -770,7 +778,7 @@ def _foreign(doc):
             yield from sess.leave("enter")
             return
         recipe = yield from _recipe(sess, p)
-        raise Refuse(say("wt_enter_existing", guard=NAME, recipe=recipe))
+        raise Refuse(say("wt_enter_existing", guard=guard, recipe=recipe))
 
     def foreign_top(d):
         t = yield from _git("/", "-C", d, "rev-parse", "--show-toplevel")
@@ -781,11 +789,11 @@ def _foreign(doc):
         return t
 
     def check_word(word, base):
-        d, rest = yield from _resolve_dir(word, base, home)
+        d, rest = yield from _resolve_dir(word, base, home, guard)
         if d:
             ft = yield from foreign_top(d)
             if ft:
-                yield from _deny_path(sess, env, word, ft)
+                yield from _deny_path(sess, env, word, ft, guard)
         return d, rest
 
     if tool in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
@@ -794,9 +802,6 @@ def _foreign(doc):
             yield from check_word(fp, pcwd)
         return
     if tool != "Bash":
-        return
-    cmd = ti.get("command")
-    if not isinstance(cmd, str) or not cmd:
         return
     arrivals, adds, vcwd, n = [], [], pcwd, 0
 
@@ -807,11 +812,11 @@ def _foreign(doc):
         for c in cs:
             if not base:
                 break
-            d, rest = yield from _resolve_dir(c, base, home)
+            d, rest = yield from _resolve_dir(c, base, home, guard)
             base = "" if rest else d
         if not base:
             return None
-        d, rest = yield from _resolve_dir(word, base, home)
+        d, rest = yield from _resolve_dir(word, base, home, guard)
         if not d:
             return None
         p = d.rstrip("/") + "/" + os.path.normpath(rest) if rest else d
@@ -819,7 +824,7 @@ def _foreign(doc):
             return None
         return None if sess.under_scratch(p) else p
 
-    for ev in _foreign_words(doc):
+    for ev in words:
         if ev[0] == "T":
             vcwd = pcwd
             continue
@@ -853,19 +858,38 @@ def _foreign(doc):
         yield from sess.leave("\n".join(arrivals + ["add\t" + p for p in adds]))
 
 
-CONTROLS = (("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_CHECKOUT_HOME", _checkout_home),
-            ("CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES_FOREIGN", _foreign))
+def _command(doc):
+    """The call's command, when it carries a string one to walk, else None."""
+    cmd = (doc.tool_input or {}).get("command")
+    return cmd if isinstance(cmd, str) and cmd else None
 
 
-def check(doc):
+def reaches(doc):
+    """The `worktree-reaches` test: what each control that is on reads from the call's words
+    alone, {"home": the checkout-home moves (_home_events), or None with that control off or
+    no command; "reaches": the foreign words (_foreign_words), [] for a call that is not a
+    Bash command, or None with that control off}, or None with both off. The foreign
+    control judges every call it sees: a file tool's path, EnterWorktree, and the record."""
     if not isinstance(doc.payload, dict):
         return None
+    env = doc.env
+    home = None if env.get(CHECKOUT_HOME) == "false" or not _command(doc) else _home_events(doc)
+    words = None
+    if env.get(FOREIGN) != "false":
+        words = _foreign_words(doc) if doc.tool == "Bash" and _command(doc) else []
+    return None if home is None and words is None else {"home": home, "reaches": words}
+
+
+def own_places(doc, guard, found):
+    """The `own-places` handler: each control the test found on, checkout-home first. The
+    first refusal denies; else the dotfile managers' calls are asked about; else the notes,
+    if any, are given."""
     notes, asked = [], []
-    for option, control in CONTROLS:
-        if doc.env.get(option) == "false":
+    for key, control in (("home", _checkout_home), ("reaches", _foreign)):
+        if found.get(key) is None:
             continue
         try:
-            note = yield from control(doc)
+            note = yield from control(doc, found[key], guard)
         except _Ask as q:
             asked += q.args[0]
             continue
@@ -882,5 +906,5 @@ def check(doc):
             said.append(say("wt_chezmoi", hits=hits("chezmoi")))
         if hits("dotfiles"):
             said.append(say("wt_dotfiles", hits=hits("dotfiles")))
-        return ask(say("wt_home_ask", guard=NAME, said=" ".join(said)))
+        return ask(say("wt_home_ask", guard=guard, said=" ".join(said)))
     return context(say("passed", text="\n\n".join(notes))) if notes else None
