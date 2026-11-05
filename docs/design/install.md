@@ -38,6 +38,12 @@ it is missing, since the plugin path has no `languette` command and install neve
 and blocks nothing: a write it cannot make leaves the file missing, and the doctor's redacted terms row
 says so, with the fix beneath.
 
+## uninstall
+
+The reverse of install, and only of install: it lists what install wrote,
+removes it on a yes, and names what it leaves. The terms files stay. It goes
+through Claude Code's own uninstall, writing nothing to settings; the plan says so.
+
 ## doctor
 
 The install's check, run after it and in CI: each host, the guards on, the
@@ -48,6 +54,7 @@ role in configuration is its own design (#274).
 
 Each rung builds on the one below: the Claude Code plugin; the PyPI wheel,
 stdlib only, which `pipx` and `uv tool` install as is; the Homebrew tap,
-which brings `shfmt` and `gh` with it; then a single-file `.pyz` on each
-release, a Nix flake, a devcontainer feature and a GitHub Action (planned:
-#102). Every rung pins to a release tag, and every deny names its version.
+which brings `shfmt` and `gh` with it; a devcontainer feature, in the repo
+until a features registry carries it; then a single-file `.pyz` on each
+release, a Nix flake and a GitHub Action (planned: #102). Every rung pins to
+a release tag, and every deny names its version.

@@ -1,0 +1,16 @@
+{
+  "id": "languette",
+  "version": "0.0.14",
+  "name": "languette",
+  "description": "Fail-closed guards against risky actions by coding agents, wired into Claude Code when the container is created.",
+  "documentationURL": "https://github.com/mark-brannan/languette#devcontainer-codespace-and-ci",
+  "licenseURL": "https://github.com/mark-brannan/languette/blob/main/LICENSE",
+  "dependsOn": {
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/python"
+  ],
+  "postCreateCommand": "languette install"
+}
