@@ -63,16 +63,23 @@ def _ours(source):
     return s == REPO.lower() or s.endswith("github.com/" + REPO.lower()) or s.endswith("github.com:" + REPO.lower())
 
 
-def _marketplace(claude):
-    """The source of the marketplace named languette, or None when none is listed."""
-    r, _ = _claude(claude, "plugin", "marketplace", "list", "--json")
+def _listed(claude):
+    """(source of the marketplace named languette or None when none is listed, why the list is unknown)."""
+    r, why = _claude(claude, "plugin", "marketplace", "list", "--json")
+    if why or r.returncode != 0:
+        return None, why or f"`claude plugin marketplace list --json` failed: {_first_line(r)}"
     try:
-        listed = json.loads(r.stdout) if r and r.returncode == 0 else []
+        listed = json.loads(r.stdout)
     except ValueError:
-        return None
+        return None, "`claude plugin marketplace list --json` printed no JSON"
     found = [m for m in listed if isinstance(m, dict) and m.get("name") == MARKETPLACE] \
         if isinstance(listed, list) else []
-    return _source(found[0]) if found else None
+    return (_source(found[0]) if found else None), None
+
+
+def _marketplace(claude):
+    """The source of the marketplace named languette, or None when none is listed or the list is unknown."""
+    return _listed(claude)[0]
 
 
 def _foreign(source):
