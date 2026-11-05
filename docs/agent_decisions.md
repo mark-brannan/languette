@@ -620,3 +620,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261105t205734z
 - names: languette/worktree_reaches.py, test worktree-reaches, handler own-places, rule id reach ([#356](https://github.com/mark-brannan/languette/pull/356))
+
+### 20261105t205753z
+- the guard name is threaded as the handler's guard argument, not a module constant ([#356](https://github.com/mark-brannan/languette/pull/356))
