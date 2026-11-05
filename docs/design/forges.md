@@ -45,12 +45,12 @@ they become rule data, one `match` entry per client (planned).
 | Guard | GitLab |
 |---|---|
 | guard-github-issues | issue create, delete and move through glab (see the guard's header) |
-| guard-private-terms | `glab issue\|mr` create, update, note and merge text; `glab api` notes and writes; graphql createNote and its kin |
-| guard-bypass-labels | `-l/--label` on `glab issue\|mr create\|update`, `glab label edit --new-name`, `glab api` labels and add_labels, graphql labelIds |
-| guard-duplicate-prs | `glab mr create` descriptions, judged by GitLab's closing pattern against each issue's related merge requests |
-| guard-git-stacked-base | branch deletions by git or `glab api`, judged by `glab mr list` on target and source branch: GitLab retargets only on a merge that deletes the branch |
+| guard-private-terms | `glab issue\|mr` create, update, note and merge text; `glab api` and graphql notes |
+| guard-bypass-labels | `-l` on `glab issue\|mr create\|update`, `glab label edit -n`, `glab api` labels, graphql labelIds |
+| guard-duplicate-prs | `glab mr create` descriptions, judged against each issue's related merge requests |
+| guard-git-stacked-base | branch deletions by git or `glab api`, judged by `glab mr list` on target and source branch |
 | guard-cross-session-send | glab's issue, merge request, note, pipeline, job log, release and repo reads, and `glab api` reads |
-| guard-bypass-ruleset | a push to a protected default branch no role may push to; a user, group or deploy key allowed there is the bypass. glab has no admin merge |
+| guard-bypass-ruleset | a push to a protected default branch no role may push to; a user or group allowed there is the bypass |
 | guard-review-threads, guard-signed-comments | none: GitLab's resolvable discussions and its bot accounts answer in another API shape (planned) |
 | GitLab's MCP tools | (planned), once their names are verified |
 
