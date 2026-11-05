@@ -57,6 +57,8 @@ def _keep_options(kept):
     tmp = f"{path}.{os.getpid()}.tmp"
     try:
         Path(tmp).write_text(json.dumps(s, indent=2) + "\n", encoding="utf-8")
+        if os.path.exists(path):
+            shutil.copymode(path, tmp)
         os.replace(tmp, path)
     except OSError as e:
         return FAIL, "options", f"{where} cannot be written ({e.strerror or e}){lost}"
@@ -86,7 +88,10 @@ def plan(claude, cwd):
         else:
             at = f" for {doctor._tilde(inst['projectPath'])}" if isinstance(inst.get("projectPath"), str) else ""
             left.append((WARN, "Claude Code", f"{inst.get('id', '?')}, {where}{at}, left: install did not write it"))
-    if ours:
+    if ours and left:
+        left.append((WARN, "marketplace", f"{MARKETPLACE}, added from {source}, left: {len(left)} install(s) "
+                                          "still come from it"))
+    elif ours:
         steps.append(("marketplace", f"{MARKETPLACE}, added from {source}",
                       ("plugin", "marketplace", "remove", MARKETPLACE, "--scope", "user")))
     elif source is not None:

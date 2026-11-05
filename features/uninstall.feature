@@ -85,13 +85,8 @@ Feature: uninstall
     And claude lists the languette marketplace
     When uninstall runs, answering "y"
     Then the uninstall "Claude Code" row is ! "languette@languette, plugin cd31356, project scope for ~/project, left: install did not write it"
-    And the uninstall "marketplace" row is ✓ "languette removed"
-    And claude was asked only:
-      """
-      plugin list --json
-      plugin marketplace list --json
-      plugin marketplace remove languette --scope user
-      """
+    And the uninstall "marketplace" row is ! "languette, added from {REPO}, left: 1 install(s) still come from it"
+    And uninstall did not ask
     And uninstall exits 0
 
   Scenario: a marketplace of the same name from another repo is left, with its plugin

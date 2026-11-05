@@ -9,7 +9,7 @@ version=0.0.14 # x-release-please-version
 venv=/usr/local/lib/languette
 
 python_ok() {
-    command -v python3 >/dev/null 2>&1 && python3 -c 'import sys, venv; sys.exit(sys.version_info < (3, 11))' 2>/dev/null
+    command -v python3 >/dev/null 2>&1 && python3 -c 'import sys, ensurepip; sys.exit(sys.version_info < (3, 11))' 2>/dev/null
 }
 
 if command -v apt-get >/dev/null 2>&1; then

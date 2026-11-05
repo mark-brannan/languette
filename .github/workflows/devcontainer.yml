@@ -17,6 +17,8 @@ permissions:
 
 jobs:
   test:
+    # The release PR bumps the pinned version before that wheel is on PyPI.
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
