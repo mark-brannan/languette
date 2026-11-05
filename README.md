@@ -76,15 +76,12 @@ Claude Code block above. An agent running natively in PowerShell is not protecte
 ### Devcontainer, Codespace and CI
 
 Copy [`devcontainer/src/languette`](devcontainer/src/languette) to
-`.devcontainer/languette` and add it after Claude Code in `devcontainer.json`.
-The container is wired when it is created; `languette doctor` checks it.
+`.devcontainer/languette`, then one line in `devcontainer.json` brings Claude
+Code and languette, wired when the container is created; `languette doctor`
+checks it.
 
 ```json
-"features": {
-  "ghcr.io/devcontainers/features/node:1": {},
-  "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
-  "./languette": {}
-}
+"features": { "./languette": {} }
 ```
 
 A features registry and a GitHub Action for CI are planned

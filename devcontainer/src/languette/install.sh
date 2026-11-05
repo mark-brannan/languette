@@ -1,6 +1,6 @@
 #!/bin/sh
-# The devcontainer feature's build step, run as root: python3 3.11 or newer
-# and shfmt where apt can bring them, then languette from PyPI, pinned to this
+# The devcontainer feature's build step, run as root: python3 3.11 or newer,
+# shfmt and gh where apt can bring them, then languette from PyPI, pinned to this
 # release, on PATH for every user. The wiring needs the container's own user
 # and network, so it is the feature's postCreateCommand, `languette install`.
 set -eu
@@ -18,6 +18,8 @@ if command -v apt-get >/dev/null 2>&1; then
     python_ok || apt-get install -y -q --no-install-recommends python3 python3-venv
     # The parser the guards trust most; without it they read commands a rung lower.
     command -v shfmt >/dev/null 2>&1 || apt-get install -y -q --no-install-recommends shfmt || true
+    # For the guards that ask GitHub; without it they ask the user instead.
+    command -v gh >/dev/null 2>&1 || apt-get install -y -q --no-install-recommends gh || true
     rm -rf /var/lib/apt/lists/*
 fi
 
