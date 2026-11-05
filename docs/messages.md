@@ -9,6 +9,12 @@ af_cwd_not_dir: the payload's cwd {cwd} is not a directory, so the repo's list c
 af_label_shared: commands[{n}].approve_label '{label}' is shared with another command; a click must approve exactly one
 ```
 
+## approval
+
+```
+approval_lost: languette: another call spent the user's approval while this one was judged ({guards}), so this call is denied. Ask the user again.
+```
+
 ## ask
 
 ```
@@ -84,6 +90,12 @@ disks_way_out: Work on an image file in /tmp or the scratchpad instead; a real d
 disks_cd_moved: a `cd` earlier in this command may move the working directory into /dev and the hook cannot follow it. Name the target by a literal absolute path (/tmp/out.txt: the hook does not expand $VAR, $(...) or ~ here), or write the file with the Write tool instead of a redirect
 disks_refused: `{what}` is blocked: {why}. {way_out}
 disks_blocked: `{what} {raw}` is blocked: {abs_} is {kind}. {way_out}
+```
+
+## door
+
+```
+door_lost: {guard}: an issue create, transfer or delete is already in flight this turn, so this call is denied. One per human turn.
 ```
 
 ## dp
@@ -360,6 +372,12 @@ signature_person: {guard}: this posts to GitHub as {login}, a person's account, 
 signature_mcp_account: {guard}: {tool} posts with its MCP server's own token, and this hook cannot read whose account that is, so it cannot tell that a bot posts it. Post it with gh, through the agent's GitHub App.{also}
 signature_account_unread: {guard}: this posts to GitHub, and gh could not say which account it posts as ({got}). Approve only if it posts through the agent's GitHub App, whose login ends in [bot].
 signature_also:  It is not signed as an agent's either: {problems}. {shape}
+```
+
+## spend
+
+```
+spend_failed: languette: cannot record the user's approval as spent ({guards}: {err}), so this call is denied. Ask the user to run it themselves.
 ```
 
 ## sudo

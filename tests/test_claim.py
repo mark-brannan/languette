@@ -1,5 +1,6 @@
-"""A click pays for one run: spending is atomic, recorded against the tool call,
-and comes back when the transcript shows the call never ran."""
+"""A click pays for one run: a guard only reads it, the runner spends it once
+after the verdict, atomically, recorded against the tool call, and it comes
+back when the transcript shows the call never ran."""
 
 import json
 import re
@@ -9,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from languette import run
-from languette.verdict import Need
+from languette.verdict import Need, approve, deny
 from languette.world import World
 
 ASK = {"type": "assistant", "message": {"role": "assistant", "content": [{
@@ -27,7 +28,10 @@ def _transcript(tmp_path, *recs):
 
 
 def _claim(tp, call, wants=None):
-    return World({}, {"transcript_path": str(tp), "tool_use_id": call}).answer(Need("claim", wants or {"Run e2e": 1}))
+    """(what the guard reads, whether the runner's spend went through)."""
+    w = World({}, {"transcript_path": str(tp), "tool_use_id": call})
+    wants = wants or {"Run e2e": 1}
+    return w.answer(Need("approvals", wants)), w.spend("approvals", wants)
 
 
 def _result(call, content, is_error=True, tur=None):
@@ -95,15 +99,67 @@ def test_a_spend_from_before_calls_were_recorded_stays_spent(tmp_path):
     assert not _claim(tp, "toolu_B1")[1]
 
 
-def test_two_guards_wanting_one_label_for_one_command_need_one_click(tmp_path, monkeypatch):
+def test_reading_the_approvals_writes_nothing(tmp_path):
     tp = _transcript(tmp_path)
+    w = World({}, {"transcript_path": str(tp), "tool_use_id": "toolu_B1"})
+    assert w.answer(Need("approvals", {"Run e2e": 1})) == {"Run e2e": ["toolu_A"]}
+    assert not (tmp_path / "t.jsonl.languette-ask").exists()
 
+
+def _asking(label):
     def check(doc):
-        approved, spent = yield Need("claim", {"Run e2e": 1})
-        return None if spent else {"permissionDecision": "deny", "permissionDecisionReason": "no click"}
+        _, done = yield from approve({label: 1}, lambda e: f"unreadable: {e}")
+        return done[0] if done else deny("no click")
+    return check
 
-    guards = tuple(SimpleNamespace(NAME=f"g{i}", check=check) for i in range(2))
+
+def _respond(tp, monkeypatch, *checks, call="toolu_B1"):
+    guards = tuple(SimpleNamespace(NAME=f"g{i}", check=c) for i, c in enumerate(checks))
     monkeypatch.setattr(run, "GUARDS", (("PreToolUse", re.compile(r"Bash\Z"), guards),))
     payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "npm run e2e"},
-               "cwd": "/", "transcript_path": str(tp), "tool_use_id": "toolu_B1"}
-    assert run.respond(json.dumps(payload), {}) == ""
+               "cwd": "/", "transcript_path": str(tp), "tool_use_id": call}
+    return run.respond(json.dumps(payload), {})
+
+
+def _spent(tmp_path):
+    f = tmp_path / "t.jsonl.languette-ask"
+    return [json.loads(line) for line in f.read_text().splitlines()] if f.exists() else []
+
+
+def test_two_guards_wanting_one_label_for_one_command_need_one_click(tmp_path, monkeypatch):
+    tp = _transcript(tmp_path)
+    assert _respond(tp, monkeypatch, _asking("Run e2e"), _asking("Run e2e")) == ""
+    assert [r["approval"] for r in _spent(tmp_path)] == ["toolu_A"]
+
+
+def test_two_labels_answered_in_one_question_are_one_click(tmp_path, monkeypatch):
+    both = {"type": "assistant", "message": {"role": "assistant", "content": [{
+        "type": "tool_use", "id": "toolu_C", "name": "AskUserQuestion",
+        "input": {"questions": [{"question": "Run it?", "options": [{"label": "Run e2e"}]},
+                                {"question": "Skip hooks?", "options": [{"label": "Skip hooks once"}]}]}}]}}
+    yes = {"type": "user", "message": {"role": "user", "content": [{
+        "type": "tool_result", "tool_use_id": "toolu_C", "content": "answered"}]},
+        "toolUseResult": {"answers": {"Run it?": "Run e2e", "Skip hooks?": "Skip hooks once"}}}
+    tp = tmp_path / "t.jsonl"
+    tp.write_text(json.dumps(both) + "\n" + json.dumps(yes) + "\n")
+    assert _respond(tp, monkeypatch, _asking("Run e2e"), _asking("Skip hooks once")) == ""
+    assert sorted((r["label"], r["approval"], r["call"]) for r in _spent(tmp_path)) == [
+        ("Run e2e", "toolu_C", "toolu_B1"), ("Skip hooks once", "toolu_C", "toolu_B1")]
+
+
+def test_a_deny_from_another_guard_spends_nothing(tmp_path, monkeypatch):
+    tp = _transcript(tmp_path)
+    out = _respond(tp, monkeypatch, _asking("Run e2e"), lambda doc: deny("not this"))
+    assert json.loads(out)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert _spent(tmp_path) == []
+
+
+def test_a_click_spent_since_the_guard_looked_is_a_deny(tmp_path, monkeypatch):
+    tp = _transcript(tmp_path)
+
+    def racer(doc):
+        _claim(tp, "toolu_OTHER")              # a parallel call spends the click between read and spend
+        return None
+
+    out = _respond(tp, monkeypatch, _asking("Run e2e"), racer)
+    assert "another call spent the user's approval" in json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]

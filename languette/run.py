@@ -20,7 +20,11 @@ back, and returns its finding. This runner answers every Need through
 languette.world, the only module that does I/O, and throws world's exception
 into the guard when the fact can't be had. A write it wants it yields as a
 languette.verdict.Act: the runner sends None back, and does every Act through
-world once the verdict is out. Guards run one at a time, in one loop.
+world once the verdict is out. A guard that needs the user's approval spends
+nothing: it reads the approval and returns an ask finding
+(languette.verdict.spend), and the runner spends every guard's ask once, after
+the verdict, only when the verdict lets the call through (_spend). Guards run
+one at a time, in one loop.
 Every guard sees the payload as sent: the runner never fills in a cwd, and
 denies a PreToolUse payload without an absolute one before any guard runs.
 """
@@ -72,7 +76,7 @@ try:
                                  guard_sudo as _guard_sudo, guard_worktrees as _guard_worktrees)
     from languette.document import Document
     from languette.messages import say
-    from languette.verdict import Act, deny, verdict
+    from languette.verdict import SPEND, Act, deny, verdict
     from languette.world import ACTS, World
     # The guards that are a rule set alone (languette/engine.py).
     deny_always, guard_sudo = engine.Guard(_deny_always), engine.Guard(_guard_sudo)
@@ -269,8 +273,39 @@ def _respond(stdin_text, env, only):
         r, crashed = _finding(g, doc, world, acts)
         findings.append((g.NAME, r, crashed))
     judged = (world, payload, findings, acts, doc)
-    fields = verdict(event, findings, doc.mode, lambda: doc.chained)
+    fields = _spend(world, event, findings, verdict(event, findings, doc.mode, lambda: doc.chained))
     return (_out(event, fields) if fields else ""), judged
+
+
+def _spend(world, event, findings, fields):
+    """`fields`, the verdict, once what the ask findings want is spent
+    (languette.verdict.spend): once, after the verdict, and only when it lets the
+    call through, so a deny spends nothing. Every guard's approval labels go in
+    one claim, a label asked for twice spending once, so one click is one run
+    whichever guards asked. A spend lost to a parallel call, or one that cannot
+    be recorded, makes the call a deny."""
+    if event != "PreToolUse" or (fields or {}).get("permissionDecision") == "deny":
+        return fields
+    wants, names, todo = {}, [], []
+    for name, r, _ in findings:
+        for kind, *args in (r.get(SPEND) or ()) if isinstance(r, dict) else ():
+            if kind != "approvals":
+                todo.append((name, kind, args))
+                continue
+            for label, n in args[0].items():
+                wants[label] = max(wants.get(label, 0), n)
+            names += [name] if name not in names else []
+    if wants:
+        todo.insert(0, (", ".join(names), "approvals", [wants]))
+    for name, kind, args in todo:
+        try:
+            if world.spend(kind, *args):
+                continue
+            why = say("approval_lost", guards=name) if kind == "approvals" else say("door_lost", guard=name)
+        except Exception as e:  # noqa: BLE001 -- a spend that cannot be made fails closed
+            why = say("spend_failed", guards=name, err=e)
+        return deny(why)
+    return fields
 
 
 def _state_failed(payload, env):

@@ -87,10 +87,7 @@ METHODS = {"read_text", "read_bytes", "write_text", "write_bytes", "iterdir", "r
 # only shrinks. A direct read never goes on it: every read a guard makes is a
 # Need (#114), and test_no_guard_is_let_off_a_direct_read holds it there.
 KNOWN = {
-    # Needs that write as they read, under one lock or rename; they move with
-    # the approval spend (#84).
-    "verdict.py": ["Need claim"],
-    "issue_writes.py": ["Need door claim", "Need door take"],
+    # A Need that writes as it reads, under a rename.
     "worktree_reaches.py": ["Need worktree arrive"],
     # The parser ladder's shfmt rung (docs/decisions.md, "Runtime dependencies").
     "scan.py": ["import shutil", "import subprocess", "subprocess.run", "subprocess.TimeoutExpired", "shutil.which"],
@@ -178,7 +175,7 @@ def test_no_guard_and_not_the_verdict_reaches_past_the_process():
 
 
 def test_no_guard_is_let_off_a_direct_read():
-    """Only the write Needs (#84) and the parser ladder stay on KNOWN: a guard,
+    """Only the write Needs and the parser ladder stay on KNOWN: a guard,
     or a helper it imports, that reads for itself fails the check."""
     let_off = {rel: [w for w in calls if not w.startswith("Need ")] for rel, calls in KNOWN.items() if rel != LADDER}
     assert_that({rel: w for rel, w in let_off.items() if w}, equal_to({}))
