@@ -7,7 +7,7 @@ What install wrote is the user-scope languette@languette plugin and the
 languette marketplace added from this repo, both through the `claude` command,
 so uninstall asks `claude` to remove those two and nothing else. An install at
 project or local scope, a marketplace of the same name from elsewhere, the
-plugin's data, the terms files and the plugin's options are left. Claude Code
+terms files and the plugin's options are left. Claude Code
 drops the plugin's options from the user's settings when it uninstalls the
 plugin, so they are written back, as they were, for a later install to find.
 Like install, it sits outside the guard pipeline. Standard library only.
@@ -82,7 +82,7 @@ def plan(claude, cwd):
         where = f"plugin {doctor._version(inst)}, {inst.get('scope', '?')} scope"
         if inst.get("id") == PLUGIN and inst.get("scope") == "user" and ours:
             steps.append(("Claude Code", f"{PLUGIN}, {where}",
-                          ("plugin", "uninstall", PLUGIN, "--scope", "user", "--keep-data")))
+                          ("plugin", "uninstall", PLUGIN, "--scope", "user")))
         else:
             at = f" for {doctor._tilde(inst['projectPath'])}" if isinstance(inst.get("projectPath"), str) else ""
             left.append((WARN, "Claude Code", f"{inst.get('id', '?')}, {where}{at}, left: install did not write it"))
@@ -119,7 +119,7 @@ def claude_rows(cwd, ask=_ask):
     print("Will remove from Claude Code:")
     for label, text, _ in steps:
         print(f"    {label:<13} {text}")
-    print("Leaves the plugin's options, its data and the terms files as they are.")
+    print("Leaves the plugin's options and the terms files as they are.")
     if not ask():
         return left + [(WARN, "uninstall", "nothing removed")]
     kept, rows = _options(), list(left)

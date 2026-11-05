@@ -45,7 +45,7 @@ class Install(FakeHome):
                    f"plugin marketplace add {SOURCE}": (self.add[0], "", self.add[1],
                                                         f"cp {shlex.quote(str(after))} {shlex.quote(str(listed))};"),
                    "plugin install languette@languette": (0, "Installed languette", "", ""),
-                   f"plugin uninstall {PLUGIN} --scope user --keep-data": (self.remove[0], "", self.remove[1],
+                   f"plugin uninstall {PLUGIN} --scope user": (self.remove[0], "", self.remove[1],
                                                                           "" if self.remove[0] else drop),
                    "plugin marketplace remove languette --scope user": (0, "Removed languette", "", "")}
         cases = "".join(f"  {shlex.quote(asked)}) {run} printf '%s' {shlex.quote(out)}; "

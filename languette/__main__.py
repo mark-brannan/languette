@@ -83,7 +83,7 @@ def main(argv=None):
     uni = sub.add_parser("uninstall", help="remove what languette install wrote; exits 1 on any ✗",
                          description="List what languette install wrote for Claude Code, its plugin at user "
                                      "scope and its marketplace, and remove them on a yes, through the claude "
-                                     "command. The plugin's options, its data and the terms files are left. "
+                                     "command. The plugin's options and the terms files are left. "
                                      "Exits 1 on any ✗.")
     uni.add_argument("host", nargs="?", default="claude", type=_host, metavar="HOST",
                      help="the coding agent to unwire: claude (the default, and the only one today)")

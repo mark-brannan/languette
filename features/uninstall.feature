@@ -45,7 +45,7 @@ Feature: uninstall
       """
       plugin list --json
       plugin marketplace list --json
-      plugin uninstall languette@languette --scope user --keep-data
+      plugin uninstall languette@languette --scope user
       plugin marketplace remove languette --scope user
       """
     And uninstall exits 0
@@ -114,7 +114,7 @@ Feature: uninstall
       """
       plugin list --json
       plugin marketplace list --json
-      plugin uninstall languette@languette --scope user --keep-data
+      plugin uninstall languette@languette --scope user
       """
     And uninstall exits 1
 
