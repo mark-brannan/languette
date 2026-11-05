@@ -635,3 +635,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261105t225032z
 - An ask finding that meets another guard's permission prompt is still spent before the prompt; a declined prompt gives the click back through the transcript Undo: deny an ask finding that meets another guard's permission prompt ([#358](https://github.com/mark-brannan/languette/pull/358))
+
+### 20261105t225052z
+- In the one spend step the approvals go before the issue door Undo: take the door before the approvals ([#358](https://github.com/mark-brannan/languette/pull/358))
