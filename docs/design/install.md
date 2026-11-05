@@ -40,14 +40,9 @@ says so, with the fix beneath.
 
 ## uninstall
 
-The reverse of install, and only of install: it removes what install wrote
-and nothing else, listed before it acts, and acts on a yes. For Claude Code
-that is the plugin at user scope and the marketplace added from this repo,
-removed through the host's own command. An install at another scope or a
-marketplace of the same name from elsewhere is named and left. The terms
-files and the plugin's options stay, so a later install finds the user's
-configuration as it was; where the host drops the options with the plugin,
-uninstall writes them back. Rows and exit as install.
+The reverse of install, and only of install: it lists what install wrote,
+removes it on a yes, and names what it leaves. The terms files and the
+plugin's options stay, so a later install finds the user's configuration.
 
 ## doctor
 
@@ -59,13 +54,7 @@ role in configuration is its own design (#274).
 
 Each rung builds on the one below: the Claude Code plugin; the PyPI wheel,
 stdlib only, which `pipx` and `uv tool` install as is; the Homebrew tap,
-which brings `shfmt` and `gh` with it; a devcontainer feature, kept in the
-repo under `devcontainer/` until a features registry carries it; then a
-single-file `.pyz` on each release, a Nix flake and a GitHub Action (planned:
-#102). Every rung pins to a release tag, and every deny names its version.
-
-The devcontainer feature installs the package when the image is built and
-runs `languette install` when the container is created, as the container's
-user; its test is the doctor, run in a container built with Claude Code.
-Claude Code's cloud sessions build no dev container: their environment's setup
-script is the place for languette there.
+which brings `shfmt` and `gh` with it; a devcontainer feature, in the repo
+until a features registry carries it; then a single-file `.pyz` on each
+release, a Nix flake and a GitHub Action (planned: #102). Every rung pins to
+a release tag, and every deny names its version.

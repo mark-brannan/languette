@@ -76,25 +76,23 @@ Claude Code block above. An agent running natively in PowerShell is not protecte
 ### Devcontainer, Codespace and CI
 
 Copy [`devcontainer/src/languette`](devcontainer/src/languette) to
-`.devcontainer/languette`, then one line in `devcontainer.json` brings Claude
-Code and languette, wired when the container is created; `languette doctor`
-checks it.
+`.devcontainer/languette`. This line brings Claude Code and languette, wired
+when the container is created:
 
 ```json
 "features": { "./languette": {} }
 ```
 
-A features registry and a GitHub Action for CI are planned
-([#102](https://github.com/mark-brannan/languette/issues/102)). Claude Code's
+A registry and a CI Action are planned
+([#102](https://github.com/mark-brannan/languette/issues/102)). Claude Code
 [cloud sessions](https://code.claude.com/docs/en/cloud-environments) build no
-dev container, so the feature does not reach them.
+dev container.
 
 Without the plugin system or the installer, see [Installing by hand](#installing-by-hand).
 
 ### Removing it
 
-`languette uninstall` lists what `languette install` wrote, asks, and removes
-it; the plugin's options and the terms files stay.
+`languette uninstall` removes what `languette install` wrote, after asking.
 
 ### Try it: `languette scan` (experimental)
 
