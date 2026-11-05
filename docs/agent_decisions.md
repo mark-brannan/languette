@@ -596,3 +596,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261105t194148z
 - uninstall removes the plugin with --keep-data and the marketplace with --scope user only ([#355](https://github.com/mark-brannan/languette/pull/355))
+
+### 20261105t194202z
+- the devcontainer feature has no options and installs its pinned release, bumped by release-please extra-files ([#355](https://github.com/mark-brannan/languette/pull/355))
