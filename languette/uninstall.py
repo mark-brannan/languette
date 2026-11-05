@@ -79,7 +79,7 @@ def plan(claude, cwd):
         return [], [], (FAIL, "Claude Code", f"{e}, so what install wrote is unknown; nothing removed")
     source = install._marketplace(claude)
     ours = source is not None and install._ours(source)
-    steps, left = [], []
+    steps, left, fed = [], [], 0
     for inst in found:
         where = f"plugin {doctor._version(inst)}, {inst.get('scope', '?')} scope"
         if inst.get("id") == PLUGIN and inst.get("scope") == "user" and ours:
@@ -88,8 +88,9 @@ def plan(claude, cwd):
         else:
             at = f" for {doctor._tilde(inst['projectPath'])}" if isinstance(inst.get("projectPath"), str) else ""
             left.append((WARN, "Claude Code", f"{inst.get('id', '?')}, {where}{at}, left: install did not write it"))
-    if ours and left:
-        left.append((WARN, "marketplace", f"{MARKETPLACE}, added from {source}, left: {len(left)} install(s) "
+            fed += inst.get("id") == PLUGIN
+    if ours and fed:
+        left.append((WARN, "marketplace", f"{MARKETPLACE}, added from {source}, left: {fed} install(s) "
                                           "still come from it"))
     elif ours:
         steps.append(("marketplace", f"{MARKETPLACE}, added from {source}",
