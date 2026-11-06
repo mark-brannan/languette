@@ -798,6 +798,12 @@ Feature: guard-git-work-loss
       When the agent runs `git add -A src/x.py`
       Then the guard denies
 
+    Scenario: -A with paths is denied in a linked worktree this session did not enter
+      Given the session did not enter "{TMP}/repo/.claude/worktrees/feat"
+      And the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `git add -A src/x.py`
+      Then the guard denies
+
     Scenario: -A with paths passes in a repo in the session's scratchpad
       Given the session is "aaaaaaaa-1111-4222-8333-444444444444"
       And CLAUDE_CODE_TMPDIR is "{TMP}/scratch/claude-tmpdir"
