@@ -96,7 +96,7 @@ Feature: guard-bypass-ruleset
       | git push --dry-run origin main            | a dry run pushes nothing                  |
       | git push -n origin main                   | the short dry run                         |
       | git push origin --delete claude/topic     | a deletion, other guards' to judge        |
-      | git push git@gitlab.com:o/r.git main      | not on github.com                         |
+      | git push git@codeberg.org:o/r.git main    | on no forge this guard has a row for      |
       | echo git push origin main                 | text, not a push                          |
       | gh pr merge 5 --squash --auto             | a merge that waits for the rules          |
       | gh api repos/$R/pulls/5                   | a run-time path under a literal api       |
@@ -382,3 +382,25 @@ Feature: guard-bypass-ruleset
     And the agent runs it again
     Then the guard denies
     And the stub "gh" was called 1 times
+
+  # GitLab's rule is a protected branch: https://docs.gitlab.com/api/protected_branches/
+  # (GET /projects/:id/protected_branches/:name; push_access_levels, access_level 0 is
+  # no access, 60 Administrator; user_id and group_id name who else may push). glab's
+  # own docs: https://docs.gitlab.com/cli/api/ (--hostname for a self-hosted host) and
+  # /cli/mr/merge/, which has no flag that merges past the rules.
+  Scenario Outline: on GitLab, a push to a protected default branch no role may push to is denied
+    Given a clone of "<url>" at "{TMP}/gl" on branch "claude/topic"
+    And the working directory is "{TMP}/gl"
+    And GLAB_PROTECTED is <protected>
+    When the agent runs `git push origin <branch>`
+    Then the guard <verdict>
+
+    Examples:
+      | url                                 | protected     | branch       | verdict                                             |
+      | https://gitlab.com/g/p.git          | unset         | main         | denies, naming "takes a merge request"              |
+      | git@gitlab.com:g/sub/p.git          | unset         | HEAD:main    | denies, naming "`main` on g/sub/p"                  |
+      | https://gitlab.example.com/g/p.git  | unset         | main         | denies, naming "takes a merge request"              |
+      | https://gitlab.com/g/p.git          | "maintainers" | main         | is silent                                           |
+      | https://gitlab.com/g/p.git          | "none"        | main         | is silent                                           |
+      | https://gitlab.com/g/p.git          | "wildcard"    | main         | denies, naming "takes a merge request"              |
+      | https://gitlab.com/g/p.git          | unset         | claude/topic | is silent                                           |

@@ -107,10 +107,14 @@ dup_body_file: --body-file {v} {got}, so the body cannot be checked for an issue
 dup_body_rewritten: --body-file {v} is changed again in this same command (written {n} times), so neither a heredoc nor the file on disk is the text gh sends. Write the body to that path from one heredoc and nothing else in this command, or write the file in an earlier command and retry.
 dup_body_appended: --body-file {v} is appended to in this same command, so the text gh sends is the file's old text plus the append, not the heredoc alone. Write the body to that path with `>` from one heredoc, or write the file in an earlier command and retry.
 dup_body_not_heredoc: --body-file {v} is changed in this same command, and not from a heredoc, so the file on disk is not yet the text gh sends. Write the body to that path from a heredoc in this command, or write the file in an earlier command and retry.
-dup_repo_unknown: {guard}: this PR would close #{n}, and the hook can't tell which repo it is opened on (no --repo, and the working directory's origin is not on github.com, or a cd moves it), so it can't check whether an open PR already references #{n}. Pass --repo owner/name, or read the issue first.
+dup_repo_unknown: {guard}: this PR would close #{n}, and the hook can't tell which repo it is opened on (no --repo, and the working directory's origin is not on GitHub or GitLab, or a cd moves it), so it can't check whether an open PR already references #{n}. Pass --repo owner/name, or read the issue first.
 dup_github_silent: {guard}: this PR would close {repo}#{n}, and GitHub couldn't say whether an open PR already references it (gh missing, signed out, offline, an error, or a timeline past {page} events):
       gh api repos/{repo}/issues/{n}/timeline
     Read the issue before opening a second PR on it.
+dup_gitlab_silent: {guard}: this merge request would close {repo}#{n}, and GitLab couldn't say whether an open merge request already relates to it (glab missing, signed out, offline, an error, or a page past {page} merge requests):
+      glab api projects/{path}/issues/{n}/related_merge_requests
+    Read the issue before opening a second merge request on it.
+dup_open_mr: Merge request {named} is open and already relates to {issue}, which this merge request would close too, so this command is blocked. If this one replaces it, close {pr} first or say `Supersedes {pr}` in this description. If both are wanted, drop the closing keyword here and link the issue in prose.
 dup_open: PR {named} is open and already references {issue}, which this PR would close too, so this command is blocked. If this PR replaces it, close {pr} first or say `Supersedes {pr}` in this body. If both are wanted, drop the closing keyword here and link the issue in prose.
 ```
 
@@ -294,6 +298,10 @@ ruleset_admin: guard-bypass-ruleset: `gh pr merge --admin` merges past the PR's 
 ruleset_head_unknown: guard-bypass-ruleset: this {prog} push sends the current branch, and the hook can't tell which branch that is (another directory, or a detached HEAD), so it can't check whether the push goes around a rule that requires a pull request.
 ruleset_repo_unknown: guard-bypass-ruleset: this pushes to `{branch}` through remote `{remote}`, in a repository the hook can't find (a cd or -C it can't follow, or GIT_DIR), so it can't ask GitHub whether `{branch}` requires a pull request. An agent that pushes with your credentials can use your bypass.
 ruleset_needs_pr: guard-bypass-ruleset: `{branch}` on {slug} requires a pull request, and this push would go around it on the user's bypass. Push a branch and open a PR. A direct push is the user's to make, from their own terminal.
+ruleset_needs_mr: guard-bypass-ruleset: `{branch}` on {slug} is a protected branch no role may push to, so it takes a merge request, and this push would go around it on the user's bypass. Push a branch and open a merge request. A direct push is the user's to make, from their own terminal.
+ruleset_gitlab_silent: guard-bypass-ruleset: this pushes to `{branch}` on {slug}, and GitLab couldn't say whether `{branch}` takes a merge request (glab missing, signed out, offline or an error):
+      glab api projects/{slug_q}/protected_branches/{branch_q}
+    An agent that pushes with your credentials can use your bypass.
 ruleset_github_silent: guard-bypass-ruleset: this pushes to `{branch}` on {slug}, and GitHub couldn't say whether `{branch}` requires a pull request (gh missing, signed out, offline or an error):
       gh api repos/{slug}/rules/branches/{branch_q}
     An agent that pushes with your credentials can use your bypass.
@@ -309,13 +317,24 @@ sb_unresolved: {guard}: this deletes a remote branch named by a variable or a gl
     {list}
 sb_other_repo: {guard}: this deletes a remote branch in a repository other than the current directory's (`git -C`, `--git-dir`, `GIT_DIR=`), so its open PRs can't be checked from here. Confirm none names the branch as base or head:
       gh -R <owner>/<repo> pr list --state open --json number,baseRefName,headRefName
-sb_no_gh: {guard}: this deletes a remote branch, but `gh` is not installed, so open PRs based on it can't be checked. Deleting a branch an open PR points at closes that PR silently.
+sb_no_gh: {guard}: this deletes a remote branch, but `{cli}` is not installed, so open PRs or merge requests based on it can't be checked. Deleting a branch an open PR points at closes that PR silently.
 sb_no_timeout: {guard}: this deletes a remote branch, but neither `timeout` nor `gtimeout` is installed (macOS: `brew install coreutils`), so the open-PR list can't be read without risking a hang. Deleting a branch an open PR points at closes that PR silently. Confirm by hand first:
     {list}
 sb_unparsed: {guard}: deleting remote branch `{b}`, but the open-PR list could not be parsed, so PRs stacked on it can't be checked.
 sb_advice: A stacked PR is retargeted only when its base disappears because the base PR merged. Merge bottom-up with `gh pr merge --delete-branch` (which this hook never fires on), or retarget the dependents to their next base first:
       gh pr list --base {b} --json number,title
       gh pr edit <n> --base <new-base>
+sb_advice_gl: GitLab retargets a merge request only when its target branch is deleted as part of that branch's own merge. Merge bottom-up with `glab mr merge --remove-source-branch` (which this hook never fires on), or retarget the dependents first:
+      glab mr list --target-branch {b}
+      glab mr update <n> --target-branch <new-target>
+sb_base_open_gl: {guard}: `{b}` is the target branch of open merge request(s):
+    {prs}
+    Deleting it leaves every one of them aimed at a branch that is gone -- GitLab does not retarget a merge request whose target is deleted outside its merge.
+    
+    {advice}
+sb_head_open_gl: {guard}: `{b}` is the source branch of open merge request(s):
+    {prs}
+    Deleting it strands them and throws the work away. Merge or close the merge request first; `glab mr merge --remove-source-branch` deletes the branch the safe way.
 sb_base_open: {guard}: `{b}` is the base branch of open PR(s):
     {prs}
     Deleting it closes every one of them -- GitHub does not retarget a PR whose base is deleted outside a merge, and each has to be reopened and retargeted by hand.

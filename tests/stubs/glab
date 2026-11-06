@@ -1,0 +1,55 @@
+#!/bin/sh
+# A stand-in for glab: no test reaches the network. It logs its arguments to
+# $LANGUETTE_STUB_LOG/glab. GLAB_FAIL makes it fail.
+# For `api .../issues/<n>/related_merge_requests...` it answers GLAB_RELATED:
+# "open-mr" open merge request !120 on g/p, "merged-mr" the same merged,
+# "full" a full page of 100 closed ones; unset is an empty list.
+# For `api .../protected_branches/<b>` it answers GLAB_PROTECTED: unset, a
+# branch no role may push to; "maintainers" one maintainers may push to;
+# "none" GitLab's 404 for a branch that is not protected, "wildcard" its 404 by name
+# for one that only the wildcard `ma*` protects (no role may push there). The list
+# endpoint answers [] for "none", that wildcard entry for "wildcard", else the one entry.
+# For `mr list` it lists three open merge requests whatever the filters, as
+# the gh stub does: !1 is stacked on claude/base-branch, the source of !2.
+printf '%s\n' "$*" >> "${LANGUETTE_STUB_LOG:?}/glab"
+[ -n "${GLAB_FAIL:-}" ] && exit 1
+mr() {   # iid, state
+  printf '{"iid":%s,"title":"the first one","state":"%s","web_url":"https://gitlab.com/g/p/-/merge_requests/%s"}' "$1" "$2" "$1"
+}
+case "$*" in
+  api*/issues/*/related_merge_requests*)
+    case "${GLAB_RELATED:-}" in
+      open-mr) printf '['; mr 120 opened; echo ']' ;;
+      merged-mr) printf '['; mr 120 merged; echo ']' ;;
+      full) printf '['; i=1; while [ "$i" -lt 100 ]; do mr "$i" closed; printf ','; i=$((i + 1)); done
+            mr 100 closed; echo ']' ;;
+      *) echo '[]' ;;
+    esac
+    exit 0 ;;
+  api*/protected_branches\?*)
+    case "${GLAB_PROTECTED:-}" in
+      none) echo '[]' ;;
+      wildcard) echo '[{"name":"ma*","push_access_levels":[{"access_level":0,"user_id":null,"group_id":null}]}]' ;;
+      *) echo '[{"name":"main","push_access_levels":[{"access_level":0,"user_id":null,"group_id":null}]}]' ;;
+    esac
+    exit 0 ;;
+  api*/protected_branches/*)
+    case "${GLAB_PROTECTED:-}" in
+      none|wildcard) echo '{"message":"404 Not found"}'; exit 1 ;;
+      maintainers) level=40 ;;
+      *) level=0 ;;
+    esac
+    printf '{"name":"main","push_access_levels":[{"access_level":%s,"user_id":null,"group_id":null}],' "$level"
+    echo '"merge_access_levels":[{"access_level":40}],"allow_force_push":false}'
+    exit 0 ;;
+  mr\ list*)
+    cat <<JSON
+[
+ {"iid":1,"title":"stacked change","target_branch":"claude/base-branch","source_branch":"claude/stacked-one"},
+ {"iid":2,"title":"the base change","target_branch":"main","source_branch":"claude/base-branch"},
+ {"iid":3,"title":"unrelated","target_branch":"main","source_branch":"claude/lonely"}
+]
+JSON
+    exit 0 ;;
+esac
+exit 1

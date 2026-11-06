@@ -37,13 +37,23 @@ when the client cannot say. Only reads, as every Need.
 ## A guard's rows per forge
 
 A guard's matching says, per forge, which client words, API paths, methods
-and graphql mutations reach its harm. Each ported guard has a scenario per
+and graphql mutations reach its harm, and, for a guard that asks the forge,
+which of its facts answers the guard's question there. Each ported guard has a scenario per
 forge in its feature file. Today the rows sit in the guard; on the engine
 they become rule data, one `match` entry per client (planned).
 
 | Guard | GitLab |
 |---|---|
 | guard-github-issues | issue create, delete and move through glab (see the guard's header) |
-| private-terms, signed-comments, bypass-labels | notes, labels, project visibility (planned) |
-| duplicate-prs, review-threads, bypass-ruleset | merge requests, discussions, protected branches (planned) |
+| guard-private-terms | `glab issue\|mr` create, update, note and merge text; `glab api` and graphql notes |
+| guard-bypass-labels | `-l` on `glab issue\|mr create\|update`, `glab label edit -n`, `glab api` labels, graphql labelIds |
+| guard-duplicate-prs | `glab mr create` descriptions, judged against each issue's related merge requests |
+| guard-git-stacked-base | branch deletions by git or `glab api`, judged by `glab mr list` on target and source branch |
+| guard-cross-session-send | glab's issue, merge request, note, pipeline, job log, release and repo reads, and `glab api` reads |
+| guard-bypass-ruleset | a push to a protected default branch no role may push to; a user or group allowed there is the bypass |
+| guard-review-threads, guard-signed-comments | none: GitLab's resolvable discussions and its bot accounts answer in another API shape (planned) |
 | GitLab's MCP tools | (planned), once their names are verified |
+
+Each row's glab verbs and API paths are cited from glab's and GitLab's own
+docs in that guard's feature file. A verb those docs do not show stays out
+of the row.

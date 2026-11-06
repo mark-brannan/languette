@@ -205,6 +205,38 @@ Feature: guard-private-terms
       | gh pr comment o/r#1 -b Wanderlust                                        |
       | gh api graphql -f query='mutation { addComment(input:{body:"Wanderlust"}) { clientMutationId } }' |
 
+  # glab's own docs: https://docs.gitlab.com/cli/mr/create/, /cli/mr/update/ and
+  # /cli/issue/update/ (-t, --title, -d, --description, --description-file, -l,
+  # --label), /cli/mr/note/create/ and /cli/issue/note/ (-m, --message; alias
+  # comment), /cli/mr/merge/ (-m, --message, --squash-message; alias accept), and
+  # /cli/configuration/ (GITLAB_REPO). The REST paths: https://docs.gitlab.com/api/notes/.
+  Scenario Outline: on GitLab, glab's posts are judged as gh's, against their own project
+    Given CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS is "you/notes,grp/sub/scratch"
+    When the agent runs `<command>`
+    Then the guard <verdict>
+
+    Examples:
+      | command                                                                     | verdict                    |
+      | glab mr create -R g/p -t t -d "seen on Wanderlust"                          | denies, naming "Wanderlust" |
+      | glab mr update 4 -R g/p --title="WANDERLUST: AIS drops"                     | denies, naming "Wanderlust" |
+      | glab mr note create 4 -R g/p -m "ssh to gateway.home.example"               | denies, naming "gateway.home.example" |
+      | glab mr comment 4 -R g/p --message Wanderlust                               | denies, naming "Wanderlust" |
+      | glab issue note 3 -R g/s/p -mWanderlust                                     | denies, naming "Wanderlust" |
+      | glab issue update 3 -R g/p -l Wanderlust                                    | denies, naming "Wanderlust" |
+      | glab mr merge 4 -R g/p --squash-message "from Wanderlust"                   | denies, naming "Wanderlust" |
+      | glab mr accept 4 -R g/p -d -m Wanderlust                                    | denies, naming "Wanderlust" |
+      | GITLAB_REPO=g/p glab mr note 4 -m Wanderlust                                | denies, naming "Wanderlust" |
+      | glab issue note https://gitlab.com/g/p/-/issues/3 -m Wanderlust             | denies, naming "Wanderlust" |
+      | glab api projects/g%2Fp/merge_requests/4/notes -f body=Wanderlust           | denies, naming "Wanderlust" |
+      | glab api graphql -f query='mutation { createNote(input:{noteableId:"x",body:"Wanderlust"}) { errors } }' | denies, naming "Wanderlust" |
+      | glab mr note 4 -R grp/sub/scratch -m Wanderlust                             | is silent                  |
+      | glab issue note https://gitlab.example.com/grp/sub/scratch/-/issues/3 -m Wanderlust | is silent          |
+      | glab api projects/grp%2Fsub%2Fscratch/issues/3/notes -f body=Wanderlust     | is silent                  |
+      | glab mr list -R g/p --search Wanderlust                                     | is silent                  |
+      | glab mr view 4 -R g/p                                                       | is silent                  |
+      | glab api projects/g%2Fp/merge_requests/4/notes                              | is silent                  |
+      | glab mr note 4 -R g/p -m "all public"                                       | is silent                  |
+
   @also_guard-github-issues
   Scenario: a body built at run time that no heredoc feeds cannot be seen, so it is denied
     When the agent runs `gh issue create -R o/r -t t -b "$(date)"`

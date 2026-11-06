@@ -42,6 +42,15 @@ GIT_WRAPPERS = {"git": Wrapper(False, False), "yadm": Wrapper(True, False), "vcs
 GIT = re.compile(r"(?:^|/)(?:" + "|".join(GIT_WRAPPERS) + r")\Z")
 GH = re.compile(r"(?:^|/)gh\Z")
 GLAB = re.compile(r"(?:^|/)glab\Z")
+# Either forge's client (docs/design/forges.md); client() says which a word is.
+CLIENTS = re.compile(r"(?:^|/)(?:gh|glab)\Z")
+PAGE = 100                                     # the largest page GitHub's and GitLab's APIs serve; one is read
+UNRESOLVED = re.compile(r"[$`*?\[]")           # a word the shell would still expand or glob
+
+
+def client(w):
+    """"gh" or "glab" for a word CLIENTS matches, by its last path part."""
+    return w.rsplit("/", 1)[-1]
 # A word that is cd, pushd or popd: the builtins that move the working directory.
 CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 # git's global options that take the next word as their value.
@@ -1194,6 +1203,12 @@ def gh_api(s, lo, hi, cli="gh"):
         i += 1
     path = gh_api_path(next((o for o in operands if o), ""))
     return GhApi(path, tuple(operands), method, tuple(args), tuple(flags), frozenset(skipped))
+
+
+def gl_project(p):
+    """The project a glab api path names, read: "-" for :id (the cwd's), "?" for a numeric
+    id or a word the shell would still expand (no path to look up), else group/project."""
+    return "-" if p == ":id" else "?" if p.isdigit() or UNRESOLVED.search(p) else p
 
 
 def gh_api_path(path):

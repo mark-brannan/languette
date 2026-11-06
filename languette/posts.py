@@ -45,6 +45,15 @@ heredoc body, and the contents of a --body-file/--comment-file/-F/--input file,
 never its path; for MCP, every string in tool_input. Each term is matched
 case-insensitively as plain text.
 
+On GitLab, through glab: `glab issue|mr create|new|update` (-t/--title,
+-d/--description, --description-file, -l/--label), `glab issue|mr note|comment`
+(-m/--message), `glab mr merge|accept` (-m/--message, --squash-message), `glab
+api` writing to projects/:id/issues or merge_requests and their notes, and a
+graphql createNote, updateNote, createDiffNote, mergeRequestCreate,
+mergeRequestUpdate, workItemCreate or workItemUpdate. Its repo is -R/--repo,
+GITLAB_REPO=, a positional GitLab URL or group/project#n (or !n), or the API
+path's project; :id is the cwd's, a numeric id unknown.
+
 The target repo is --repo/-R, GH_REPO=, a positional URL or owner/repo#n, the
 gh api path, or MCP owner/repo; failing those, the cwd's remote (the only one, else the one gh resolves), unless
 the command runs a `cd`. A graphql mutation's repo is unknown. Unknown is
@@ -57,6 +66,7 @@ is not one it knows -> deny, with the fix in the reason.
 """
 
 import re
+from urllib.parse import unquote
 
 from languette import paths
 from languette import scan as sw
@@ -77,9 +87,20 @@ TO_PRIVATE = "target a repo listed in the private_repos option"
 _UNSEEN = re.compile(r"--[A-Za-z-]*(?:body|comment|message)[A-Za-z-]*")
 _ACTS = frozenset("create comment edit review close reopen merge".split())
 _GRAPHQL = re.compile(r"addComment|createIssue|updateIssue|createPullRequest|updatePullRequest|"
-                      r"addPullRequestReview|submitPullRequestReview|addDiscussionComment")
-_BACKSTOP = re.compile(r"(?:^|[^A-Za-z0-9_./-])gh\s+(?:issue|pr)\s+(?:create|comment|edit|review|close|reopen|merge)(?:\s|$)",
-                       re.M)
+                      r"addPullRequestReview|submitPullRequestReview|addDiscussionComment|"
+                      r"createNote|updateNote|createDiffNote|mergeRequestCreate|mergeRequestUpdate|"
+                      r"workItemCreate|workItemUpdate")
+# glab's verbs that post text, each with the flags that carry it (docs/design/forges.md):
+# issue and mr create/update take a title and description, a note its message; mr merge
+# (alias accept) a merge or squash commit message, where -d is a switch, never a description.
+_GLAB_TEXT = ("-t", "--title", "-d", "--description")
+_GLAB_ACTS = {**dict.fromkeys(("create", "new", "update"), _GLAB_TEXT),
+              **dict.fromkeys(("note", "comment"), ("-m", "--message"))}
+_GLAB_MERGE = dict.fromkeys(("merge", "accept"), ("-m", "--message", "--squash-message"))
+# A GitLab REST write on an issue or merge request, its notes among them: the project in group 1.
+_GLAB_PATH = re.compile(r"(?:api/v4/)?projects/([^/]+)/(?:issues|merge_requests)(?:/|\Z)")
+_BACKSTOP = re.compile(r"(?:^|[^A-Za-z0-9_./-])(?:gh|glab)\s+(?:issue|pr|mr)\s+"
+                       r"(?:create|new|update|note|comment|edit|review|close|reopen|merge|accept)(?:\s|$)", re.M)
 
 
 def _flat(t):
@@ -216,16 +237,21 @@ class _Meta:
                         self.assign(s.w[i], s.live[i])
             elif c is not None and sw.CD.match(s.w[c]):
                 self.cdto(c, lo, hi)
-        g = sw.cmd_index(s, lo, hi, sw.GH, nested)
+        g = sw.cmd_index(s, lo, hi, sw.CLIENTS, nested)
         if g is None or g + 1 > hi:
             return
         repo = posrepo = ""
+        cli = sw.client(s.w[g])
+        env = "GITLAB_REPO=" if cli == "glab" else "GH_REPO="
         for i in range(lo, g):
-            if s.k[i] == "w" and s.w[i].startswith("GH_REPO="):
-                repo = s.w[i][8:]
+            if s.k[i] == "w" and s.w[i].startswith(env):
+                repo = s.w[i][len(env):]
         sub = s.w[g + 1]
         if sub == "api":
-            self.api(g, hi)
+            self.api(g, hi, cli)
+            return
+        if cli == "glab":
+            self.glab(g, hi, repo)
             return
         if sub not in ("issue", "pr") or g + 2 > hi or s.w[g + 2] not in _ACTS:
             return
@@ -275,8 +301,56 @@ class _Meta:
         if repo or not posrepo:
             self.add("R", _flat(repo) if repo else "-")
 
-    def api(self, g, hi):
-        api = sw.gh_api(self.s, g + 2, hi)
+    def glab(self, g, hi, repo):
+        """`glab issue|mr` verbs that post text: its title, description, note message, merge
+        commit message and labels; the repo from -R/--repo, GITLAB_REPO= or a GitLab URL."""
+        s, posrepo = self.s, ""
+        sub = s.w[g + 1]
+        verb = sw.gh_verb(s, g + 2, hi)
+        acts = _GLAB_MERGE if sub == "mr" and verb is not None and s.w[verb] in ("merge", "accept") else _GLAB_ACTS
+        if sub not in ("issue", "mr") or verb is None or s.w[verb] not in acts:
+            return
+        i = g + 2
+        while i <= hi:
+            t = sw.word(s, i)
+            if r := sw.gh_repo_flag(s, i, hi, repo):
+                repo, i = r
+            elif t == "--description-file":
+                if i < hi:
+                    i += 1
+                    self.file(sw.word(s, i))
+            elif t.startswith("--description-file="):
+                self.file(t[19:])
+            elif t in acts[s.w[verb]]:
+                if i < hi:
+                    i += 1
+                    self.val(sw.word(s, i), s.live[i], say("pt_what_flag", name=t))
+            elif "=" in t and t.split("=", 1)[0] in acts[s.w[verb]] and t.startswith("--"):
+                self.val(t.split("=", 1)[1], s.live[i], say("pt_what_flag", name=t.split("=", 1)[0]))
+            elif re.match(r"-[tdm].", t) and t[:2] in acts[s.w[verb]]:
+                self.val(t[2:], s.live[i], say("pt_what_flag", name=t[:2]))
+            elif t in ("--label", "-l") and s.w[verb] not in ("merge", "accept"):
+                if i < hi:
+                    i += 1
+                    self.lab(sw.word(s, i))
+            elif t.startswith("--label="):
+                self.lab(t[8:])
+            elif t.startswith("-l") and len(t) > 2 and s.w[verb] not in ("merge", "accept"):
+                self.lab(t[2:])
+            elif _UNSEEN.match(t) or t.startswith("--description"):
+                self.add("UNSEEN", _flat(t))
+            elif m := re.match(r"https?://[^/]+/(.+?)/-/(?:issues|merge_requests)/", t):
+                posrepo = m.group(1)
+            elif re.fullmatch(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+[#!][0-9]+", t):
+                posrepo = re.split(r"[#!]", t, maxsplit=1)[0]
+            i += 1
+        if posrepo:
+            self.add("R", _flat(posrepo))
+        if repo or not posrepo:
+            self.add("R", _flat(repo) if repo else "-")
+
+    def api(self, g, hi, cli="gh"):
+        api = sw.gh_api(self.s, g + 2, hi, cli)
         for a in api.args:
             if a.text is None:
                 continue
@@ -293,6 +367,12 @@ class _Meta:
                 return
             parts = p.split("/")
             self.add("R", parts[1] + "/" + parts[2])
+        elif m := _GLAB_PATH.match(p):
+            if api.method in ("GET", "HEAD") or (api.method == "" and not api.sends):
+                return
+            # :id is the cwd's project; a number names a project the guard cannot map to a path.
+            got = unquote(m.group(1))
+            self.add("R", "-" if got == ":id" else "?" if got.isdigit() or got.startswith(":") else _flat(got))
         elif p == "graphql":
             if any(_GRAPHQL.search(sw.word(self.s, i)) for i in range(g, hi + 1)):
                 self.add("R", "?")          # the target is a node id in the query, never the cwd's origin
