@@ -979,16 +979,36 @@ def word_live(s, i):
 
 
 def _abspath(p):
-    """p normalized with `..` applied as text; the filesystem is not consulted."""
+    """p normalized with `.` and `//` folded; `..` is applied as text, so callers pass only a
+    `..` that cannot cross a symlink (see _dotdot_ok): the filesystem is not consulted."""
     return os.path.normpath("/" + p.lstrip("/"))
 
 
-_SEP = re.compile(r"&&|\|\||\|&?|&|;|\n|\(|\)")
+def _dotdot_ok(t, fresh):
+    """True when cd target t holds no `..` whose lexical reading could differ from the
+    shell's. Only a leading run of `..` from a start that is a realpath (`fresh`) is read;
+    a `..` after a named step, in an absolute target or after an earlier cd may cross a
+    symlink, so the directory is unknown and the guard fails closed."""
+    parts = t.split("/")
+    n = 0
+    while n < len(parts) and parts[n] in ("..", ".", ""):
+        n += 1
+    if ".." in parts[n:]:
+        return False
+    return ".." not in parts[:n] or (fresh and not t.startswith("/"))
 
 
-def _cd_to(s, c, b, here, home, cdpath):
+# The operators a separator's text is made of, as Scan piles them up. A guard that also
+# reads { } and the backtick as openers adds them (pushes does).
+SEP_OPS = re.compile(r"\|\||&&|\|&|\||&|;|\n|\(|\)")
+
+
+def _cd_to(s, c, b, here, home, cdpath, fresh=False):
     """Where the cd/pushd at c (its segment ending at b) lands from `here`, or None
-    when that cannot be read: `-`, popd, a live word, a CDPATH search, an unknown start."""
+    when that cannot be read: `-`, popd, a live word, a CDPATH search, an unknown start, a `..`
+    that may cross a symlink (`fresh`: `here` is the start realpath, no cd has moved it), or
+    a pushd that is not exactly one plain directory (no operand swaps the stack, `+N` rotates
+    it, `-n` leaves the directory alone)."""
     if s.w[c] == "popd":
         return None
     i = c + 1
@@ -996,6 +1016,8 @@ def _cd_to(s, c, b, here, home, cdpath):
         i += 1
     if i <= b and s.w[i] == "--":
         i += 1
+    if s.w[c] == "pushd" and (i > b or re.fullmatch(r"[+-]\d+|-n", s.w[i]) or i < b):
+        return None
     if i > b:
         t = "~"
     elif word_live(s, i) or s.w[i] == "-" or s.k[i] != "w":
@@ -1007,6 +1029,8 @@ def _cd_to(s, c, b, here, home, cdpath):
             return None
         t = home + t[1:]
     elif t.startswith("~"):
+        return None
+    if not _dotdot_ok(t, fresh and here is not None):
         return None
     if t.startswith("/"):
         return _abspath(t)
@@ -1034,10 +1058,10 @@ def cwds(s, start, home=None, cdpath=False):
             alone = not re.search(r"(?<!\|)\|(?!\|)", before + " " + after) and not re.search(r"(?<!&)&(?!&)", after)
             if c is not None and CD.match(s.w[c]):
                 if alone:
-                    alt, here = alt | here, frozenset(_cd_to(s, c, b, h, home, cdpath) for h in here)
+                    alt, here = alt | here, frozenset(_cd_to(s, c, b, h, home, cdpath, here == first) for h in here)
             elif any(s.k[i] == "w" and CD.match(s.w[i]) for i in range(a, b + 1)):
                 alt, here = alt | here, here | {None}
-        for t in _SEP.findall(after):
+        for t in SEP_OPS.findall(after):
             if t == "(":
                 stack.append((here, alt))
             elif t == ")":

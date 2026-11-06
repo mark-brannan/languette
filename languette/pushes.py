@@ -59,7 +59,7 @@ _EXPORT = frozenset("export declare typeset".split())
 _GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
 _ALL = frozenset("--all --branches --mirror".split())
 # The operators a separator's text is made of, as Scan piles them up (`;}&&` for `; } &&`).
-_OPS = re.compile(r"\|\||&&|\|&|\||&|;|\n|\(|\)|\{|\}|`")
+_OPS = re.compile(sw.SEP_OPS.pattern + r"|\{|\}|`")
 _PIPE = ("|", "|&")
 # The openers among the keywords that lead a segment, and the closers.
 _OPEN = {"if": False, "while": True, "until": True, "for": True, "select": True}   # keyword -> a loop

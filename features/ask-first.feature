@@ -485,6 +485,11 @@ Feature: ask-first
         | cd "$D" && tsx run.ts                                     | denies    | a cd to a variable is unknown         |
         | cd research/conformance; cd - && tsx run.ts               | denies    | cd - is unknown                       |
         | cd research/conformance && popd && tsx run.ts             | denies    | popd is unknown                       |
+        | pushd && tsx run.ts                                       | denies    | pushd alone swaps the stack           |
+        | pushd +1 && tsx run.ts                                    | denies    | pushd +1 rotates the stack            |
+        | pushd -n research/conformance; tsx run.ts                 | denies    | pushd -n does not move                |
+        | cd research/conformance/sub && cd .. && tsx run.ts        | denies    | a second .. may cross a symlink       |
+        | cd research/conformance/sub/.. && tsx run.ts              | denies    | .. after a step may cross a symlink   |
         | cd research/conformance \|\| true; tsx run.ts             | denies    | the cd may have failed, or not        |
         | tsx run.ts                                                | is silent | not the listed file                   |
         | cd other && tsx run.ts                                    | is silent | another folder's run.ts               |
