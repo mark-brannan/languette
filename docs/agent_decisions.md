@@ -650,3 +650,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261106t125511z
 - The moved walks' tests are thread-resolves, comment-posts and prose-commits; their handlers thread-replies, signatures and prose-budget. Undo: rename in primitives.py and the rule sets ([#366](https://github.com/mark-brannan/languette/pull/366))
+
+### 20261106t125521z
+- prose-budget-commit reads the commit before it looks for the engine, so a Bash call with no commit asks no which or executable Need. Undo: look up the engine in the test's place, before the walk ([#366](https://github.com/mark-brannan/languette/pull/366))
