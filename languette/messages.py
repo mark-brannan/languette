@@ -22,6 +22,15 @@ MESSAGES = {
         "{guard}: this needs the user's approval, and in {mode} no one is there to approve it, "
         "so it is denied instead of asked. What it would have asked: {why}"
     ),
+    # A spend the runner could not make after the verdict (run._spend).
+    "approval_lost": (
+        "languette: another call spent the user's approval while this one was judged ({guards}), "
+        "so this call is denied. Ask the user again."
+    ),
+    "spend_failed": (
+        "languette: cannot record the user's approval as spent ({guards}: {err}), so this call is "
+        "denied. Ask the user to run it themselves."
+    ),
     # Appended once to a deny of a command with more than one segment (languette.verdict.verdict).
     "chain_footer": (
         "One refused segment refuses the whole command, and the segments before it did not run: "

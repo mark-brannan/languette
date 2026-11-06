@@ -2,7 +2,7 @@
 and the facts a guard may ask for.
 
 A guard's check(doc) reads the call's languette.document.Document and returns
-deny(reason), ask(reason), context(text) or None; or it is a
+deny(reason), ask(reason), context(text), spend(...) or None; or it is a
 generator that yields Needs and Acts and returns one of those. A guard whose
 Needs are all known once the command is parsed writes its check as
 planned(doc, parse, plan, judge).
@@ -50,16 +50,19 @@ class Need:
         worktree      op, *args           -> guard-worktrees' per-session record: arrive rec, top
                                              -> (usable, adopt); recorded rec, top -> bool;
                                              scratchpad sid -> dir, or None
-        claim         {label: runs}       -> ({label: [AskUserQuestion ids]}, spent)
+        approvals     {label: runs}       -> {label: [AskUserQuestion ids]}: the user's yeses to
+                                             each label this call may spend, its own first; read only
         run           cwd, timeout, *argv -> (exit code, stdout, stderr); raises on a
                                              program that cannot start or times out
-        door          op, session, call   -> guard-github-issues' per-session door, claim or take
-                                             (world.World._door)
+        door          session             -> guard-github-issues' per-session door: True when it
+                                             stands open, else the id its standing claim holds ("" for
+                                             none); read only (world.World._door)
         send-state    session             -> {"subagents": [names, ids], "read": tool or None}
         hostname                          -> this machine's name, as the OS gives it
 
-    claim, door and worktree arrive write as they read, under one lock or rename:
-    they move with the approval spend (#84).
+    worktree arrive writes as it reads, under a rename. An approval is never
+    spent here: a guard reads it and returns spend(...), and the runner spends
+    it after the verdict.
     """
 
     __slots__ = ("kind", "args")
@@ -77,29 +80,56 @@ class Need:
         return f"{type(self).__name__}({self.kind!r}{''.join(', ' + repr(a) for a in self.args)})"
 
 
-def claim(wants):
-    """Spend one of the user's approvals per run; `wants` is {approve_label: runs}.
-    `approved, spent = yield from claim(wants)`: approved is {label: tool_use ids},
-    spent is whether every label had its runs' worth, now recorded against this
-    tool call. A click comes back when the transcript shows the call
-    never ran (languette.world). The world's OSError or ValueError, for a payload
-    with no transcript or a transcript that can't be read, is raised from here.
-    One click is one run, whichever guard asked; the guards call it through approve."""
-    return (yield Need("claim", dict(wants)))
+SPEND = "spend"                        # a finding's key: what the runner spends for it
+LOST = "lost"                          # a finding's key: its deny reason when the spend is lost
+
+
+def short(approved, wants):
+    """Whether `approved` ({label: ids}) falls short of `wants` ({label: runs})."""
+    return any(len(approved[label]) < n for label, n in wants.items())
+
+
+def spend(kind, *args, lost=None):
+    """An ask finding: the call passes once the runner has spent this, after the
+    verdict, and only when the verdict lets the call through (run.py). The guard
+    spends nothing itself, so no approval goes on a call another guard denies.
+
+        approvals   {label: runs}         one of the user's yeses per run, recorded
+                                          against this tool call; every guard's
+                                          labels are spent together, in one claim
+        door        claim|take, session, call
+                                          guard-github-issues' door, taken for this call
+
+    A spend that can no longer be made (a parallel call took it first) makes the
+    call a deny, for the reason `lost`; the runner words a lost approvals spend."""
+    return {SPEND: [[kind, *args]], **({LOST: lost} if lost else {})}
+
+
+def approvals(wants):
+    """The user's yeses this call may spend, per label: `approved = yield from
+    approvals({label: runs})` is {label: AskUserQuestion ids}, the ones already
+    recorded against this tool call first, then the unspent. Nothing is written.
+    The world's OSError or ValueError, for a payload with no transcript or a
+    transcript that can't be read, is raised from here."""
+    return (yield Need("approvals", dict(wants)))
 
 
 def approve(wants, unreadable):
-    """claim, for a guard that denies until the user has approved every run:
+    """For a guard that denies until the user has approved every run:
     `approved, done = yield from approve({label: runs}, unreadable)`. `done` is
     None when the approvals fall short (approved says how far, to tell the user
-    what is missing), else a 1-tuple holding the check's result: (None,) when
-    every label was spent, (deny,) when the transcript could not be read, the
-    reason being unreadable(err), the error world raised."""
+    what is missing), else a 1-tuple holding the check's result: the ask
+    finding spend("approvals", wants) when every label has its runs' worth,
+    (deny,) when the transcript could not be read, the reason being
+    unreadable(err), the error world raised. One click is one run, whichever
+    guard asked: the runner spends every guard's labels in one claim."""
     try:
-        approved, spent = yield from claim(wants)
+        approved = yield from approvals(wants)
     except (OSError, ValueError) as e:
         return None, (deny(unreadable(e)),)
-    return approved, (None,) if spent else None
+    if short(approved, wants):
+        return approved, None
+    return approved, (spend("approvals", dict(wants)),)
 
 
 class Act(Need):

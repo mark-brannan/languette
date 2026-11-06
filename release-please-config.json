@@ -5,6 +5,14 @@
       "release-type": "python",
       "package-name": "languette",
       "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "devcontainer/src/languette/devcontainer-feature.json",
+          "jsonpath": "$.version"
+        },
+        "devcontainer/src/languette/install.sh"
+      ],
       "versioning": "always-bump-patch",
       "include-v-in-tag": true,
       "include-component-in-tag": false,

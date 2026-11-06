@@ -2,8 +2,9 @@
 
 The runner (run.py) holds one World per payload and asks it for each Need a
 guard yields (languette.verdict.Need lists the kinds), then, after the verdict,
-does each Act (languette.verdict.Act). World owns the budget:
-one timeout per kind of fact, the ruleset cache, the spent-file lock.
+does each Act (languette.verdict.Act) and spends what the findings ask for
+(languette.verdict.spend). World owns the budget: one timeout per kind of
+fact, the ruleset cache, the spent-file lock.
 Standard library only.
 """
 
@@ -21,6 +22,7 @@ from urllib.parse import quote
 
 from languette import paths
 from languette import scan as sw, terms
+from languette.verdict import short
 
 GIT_TIMEOUT = 5
 FORGE_TIMEOUT = 10
@@ -31,11 +33,13 @@ RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the ol
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
 # A control character: never written into a record line, never read from one.
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
-KINDS = frozenset("git forge-api pr-list which read path physical clock ruleset-cache claim worktree run door "
+KINDS = frozenset("git forge-api pr-list which read path physical clock ruleset-cache approvals worktree run door "
                   "send-state hostname".split())
 ACTS = {"ruleset-keep": "_ruleset_keep", "send-keep": "_send_keep", "worktree-keep": "_wt_keep",
         "worktree-leave": "_wt_leave", "door-open": "_door_open", "door-spend": "_door_spend",
         "terms-init": "_terms_init"}
+# What the runner spends after the verdict (languette.verdict.spend), kind -> method.
+SPENDS = {"approvals": "_claim", "door": "_door_take"}
 DOOR = "languette-guard-github-issues."   # + the session id, under $TMPDIR
 SEND_STATE = "languette-guard-cross-session-send."   # + session id, under $TMPDIR
 SEND_SUBAGENTS_MAX = 500            # names and ids kept per session; the oldest go first
@@ -153,33 +157,35 @@ class World:
         self._door_spend(session)
         os.close(os.open(self._door_file(session), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
 
-    def _door(self, op, session, call):
-        """guard-github-issues' door for one session: a file under $TMPDIR that a
-        human turn opens (the door-open act) and one identifier write claims,
-        then spends (door-spend).
-
-            claim          -> True when this call took the open door; False when
-                              another call won it first; else the id the standing
-                              claim holds ("" when there is none)
-            take           -> True when this call took the standing claim over
-
-        A taker renames the file to a name of its own (atomic: one racer wins)
-        and stamps its id in a file made fresh, so a link planted at the door
-        or the claim is removed, never written through."""
+    def _door(self, session):
+        """guard-github-issues' door for one session, read: a file under $TMPDIR
+        that a human turn opens (the door-open act), one identifier write claims
+        after the verdict (the door spend, _door_take), and the write's post hook
+        spends (door-spend). True when the door stands open; else the id the
+        standing claim holds ("" when there is none)."""
         door = self._door_file(session)
         held = door + ".held"
+        if os.path.lexists(door):
+            return True
+        if not os.path.isfile(held):
+            return ""
+        try:
+            with open(held, encoding="utf-8", errors="replace") as f:
+                return f.read()
+        except OSError:
+            return ""
+
+    def _door_take(self, op, session, call):
+        """The door spend: `claim` takes the open door for this call, `take` the
+        standing claim over; True when this call won it, False when another did
+        first. A taker renames the file to a name of its own (atomic: one racer
+        wins) and stamps its id in a file made fresh, so a link planted at the
+        door or the claim is removed, never written through."""
+        door = self._door_file(session)
         if op == "claim":
-            if os.path.lexists(door):
-                return self._take(door, door, call)
-            if not os.path.isfile(held):
-                return ""
-            try:
-                with open(held, encoding="utf-8", errors="replace") as f:
-                    return f.read()
-            except OSError:
-                return ""
+            return self._take(door, door, call)
         if op == "take":
-            return self._take(held, door, call)
+            return self._take(door + ".held", door, call)
         raise ValueError(f"no door op {op!r}")
 
     @staticmethod
@@ -357,37 +363,62 @@ class World:
                     return d
         return None
 
-    def _claim(self, wants):
-        """Spend one approval per run for this tool call, atomically. `wants` is
-        {approve_label: runs}. Returns ({label: approvals that are this call's or
-        unspent}, spent): when every label has its runs' worth they are recorded
-        against the call and `spent` is True; otherwise nothing is recorded and
-        the guard says what is missing. Read, check and record happen under an
-        exclusive lock on the spent file, so parallel hooks cannot both pass on
-        one click. A click recorded against a call the transcript shows never ran
-        (the user declined it, or a hook denied it) is unspent again; one already
-        recorded against this call counts for it, so one click is one run,
-        whichever guard asked and however often. Raises OSError when the payload
-        names no transcript, or it or the spent file cannot be read or written."""
+    def _call(self):
         call = self.payload.get("tool_use_id")
-        call = call if isinstance(call, str) and call else None
+        return call if isinstance(call, str) and call else None
+
+    def _approved(self, wants, f):
+        """{label: approvals that are this call's or unspent}, from the spent file `f`
+        (None for none yet), and the ids spent. A click recorded against a call
+        the transcript shows never ran (the user declined it, or a hook denied
+        it) is unspent again; one already recorded against this call counts for
+        it, so one click is one run however often it is asked for."""
+        call = self._call()
         answers, never_ran = self._scan()
+        held = [r for r in map(_record, f or ()) if r and (r["call"] is None or r["call"] not in never_ran)]
+        spent = {r["approval"] for r in held}
+        approved = {}
+        for label in wants:
+            mine = [r["approval"] for r in held if call and r["call"] == call and r["label"] == label]
+            approved[label] = mine + [i for i in _yes(answers, label) if i not in spent]
+        return approved, spent
+
+    def _approvals(self, wants):
+        """The approvals this tool call may spend, per label of `wants`
+        ({approve_label: runs}), read under a shared lock and never written.
+        Raises OSError when the payload names no transcript, or it or the spent
+        file cannot be read."""
+        path = self._transcript() + SPENT
+        self._scan()                           # the transcript is read before the lock, not under it
+        try:
+            f = open(path, encoding="utf-8")
+        except FileNotFoundError:              # nothing spent yet
+            return self._approved(wants, None)[0]
+        with f:
+            fcntl.flock(f, fcntl.LOCK_SH)
+            return self._approved(wants, f)[0]
+
+    def _claim(self, wants):
+        """The approvals spend: one approval per run of each label in `wants`
+        ({approve_label: runs}, every asking guard's together), recorded against
+        this tool call, atomically. True when every label had its runs' worth,
+        now recorded; False, with nothing recorded, when one fell short (a
+        parallel call spent it since the guard looked). Read, check and record
+        happen under an exclusive lock on the spent file, so parallel hooks
+        cannot both pass on one click. Raises OSError when the payload names no
+        transcript, or it or the spent file cannot be read or written."""
+        call = self._call()
         with open(self._transcript() + SPENT, "a+", encoding="utf-8") as f:
             fcntl.flock(f, fcntl.LOCK_EX)
             f.seek(0)
-            held = [r for r in map(_record, f) if r and (r["call"] is None or r["call"] not in never_ran)]
-            spent = {r["approval"] for r in held}
-            approved = {}
-            for label in wants:
-                mine = [r["approval"] for r in held if call and r["call"] == call and r["label"] == label]
-                approved[label] = mine + [i for i in _yes(answers, label) if i not in spent]
-            if any(len(approved[label]) < n for label, n in wants.items()):
-                return approved, False
+            approved, spent = self._approved(wants, f)
+            if short(approved, wants):
+                return False
             now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             f.writelines(json.dumps({"t": now, "label": label, "approval": i, "call": call}) + "\n"
                          for label, n in wants.items() for i in approved[label][:n]
                          if i not in spent)
-            return approved, True
+            return True
 
     def _send_file(self, session):
         base = self.env.get("TMPDIR") or "/tmp"
@@ -471,6 +502,12 @@ class World:
             getattr(self, ACTS[a.kind])(*a.args)
         except Exception:  # noqa: BLE001
             pass
+
+    def spend(self, kind, *args):
+        """Spend one thing a finding asked for (SPENDS): True when it is spent,
+        False when a parallel call took it first. Unlike an act, it raises: the
+        runner turns a spend that fails into a deny."""
+        return getattr(self, SPENDS[kind])(*args)
 
     def keep(self, rec):
         """Append one decision record (languette.record). Silent on any failure:
