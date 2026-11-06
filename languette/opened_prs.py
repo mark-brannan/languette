@@ -49,7 +49,6 @@ from languette.verdict import Need, Refuse, ask, deny
 # The tools hooks.json wires this guard to; the MCP one by its name's tail.
 TOOLS = re.compile(r"(?:Bash|mcp__.*__(?:create_pull_request))\Z")
 _MCP = re.compile(r"mcp__.*__create_pull_request\Z")
-PAGE = 100                                     # timeline events per lookup; one page is read
 _CREATE = frozenset("create new".split())
 # gh pr create's flags that take a value, so the value is never read as a flag.
 _VALUED = frozenset("-a --assignee -B --base -H --head -l --label -m --milestone -p --project -r --reviewer "
@@ -220,8 +219,9 @@ def _glab_api(s, g, hi):
     m = _GL_PROJECT.fullmatch(api.path)
     if not m or api.method in ("GET", "HEAD") or (api.method == "" and not api.sends):
         return None
-    # glab fills :id from the cwd's project: None sends _slug to git.
-    post.repo = None if m.group(1) == ":id" else unquote(m.group(1))
+    # glab fills :id from the cwd's project: None sends _slug to git; a numeric id is "?".
+    repo = sw.gl_project(unquote(m.group(1)))
+    post.repo = None if repo == "-" else repo
     return post
 
 
@@ -327,6 +327,12 @@ def _body(post, cwd, cd, docs, writes, env, guard):
     return text
 
 
+def _gl_host(env):
+    """The host a GitLab group/project with no host of its own is on: GITLAB_HOST's,
+    else gitlab.com, as glab picks."""
+    return (env.get("GITLAB_HOST") or sw.FORGES["gitlab"]["host"]).lower()
+
+
 def _slug(post, cd, cwd, env):
     """(host, owner/name) of the repo a bare #N is on, on the post's forge, or None. A GitLab
     -R that is no URL is on GITLAB_HOST's host, else gitlab.com, as glab picks."""
@@ -339,7 +345,7 @@ def _slug(post, cd, cwd, env):
         if r:
             return (r.host, r.repo.lower()) if r.forge == forge else None
         r = repo.strip("/").lower()
-        host = (env.get("GITLAB_HOST") or sw.FORGES[forge]["host"]).lower()
+        host = _gl_host(env)
         parts = r.split("/")
         if forge == "gitlab" and len(parts) >= 3 and re.search(r"[.:]", parts[0]):
             host, r = parts[0], "/".join(parts[1:])      # [HOST/]GROUP/PROJECT, as glab splits it
@@ -356,7 +362,7 @@ def _open_prs(slug, n):
     or None when GitHub can't answer, or fills the page with none: an older
     one may sit past it."""
     code, body = yield Need("forge-api", "github", "github.com",
-                            f"repos/{slug}/issues/{n}/timeline?per_page={PAGE}")
+                            f"repos/{slug}/issues/{n}/timeline?per_page={sw.PAGE}")
     if code != 200 or not isinstance(body, list):
         return None
     out = []
@@ -374,14 +380,14 @@ def _open_prs(slug, n):
         pr = (sw.norm_repo(r), iss["number"], str(iss.get("title") or ""))
         if pr[:2] not in [p[:2] for p in out]:
             out.append(pr)
-    return out if out or len(body) < PAGE else None
+    return out if out or len(body) < sw.PAGE else None
 
 
 def _open_mrs(host, slug, n):
     """[(group/project, M, title)] of the open merge requests GitLab relates to issue n,
     or None when GitLab can't answer, or fills the page with none."""
     code, body = yield Need("forge-api", "gitlab", host,
-                            f"projects/{quote(slug, safe='')}/issues/{n}/related_merge_requests?per_page={PAGE}")
+                            f"projects/{quote(slug, safe='')}/issues/{n}/related_merge_requests?per_page={sw.PAGE}")
     if code != 200 or not isinstance(body, list):
         return None
     out = []
@@ -392,14 +398,15 @@ def _open_mrs(host, slug, n):
         pr = (m.group(1).lower() if m else slug, mr["iid"], str(mr.get("title") or ""))
         if pr[:2] not in [p[:2] for p in out]:
             out.append(pr)
-    return out if out or len(body) < PAGE else None
+    return out if out or len(body) < sw.PAGE else None
 
 
-def _judge(text, where, guard, forge="github"):
-    """deny or ask for one body, or None. `where` is (host, owner/name) of a bare #N, or None."""
+def _judge(text, where, guard, forge="github", default=None):
+    """deny or ask for one body, or None. `where` is (host, owner/name) of a bare #N, or None;
+    `default` the host an explicit group/project#N is on when `where` gives none."""
     gitlab = forge == "gitlab"
     host, slug = where or (None, None)
-    on = (host or sw.FORGES[forge]["host"]) if gitlab else None
+    on = (host or default or sw.FORGES[forge]["host"]) if gitlab else None
     closes = refs(CLOSES_GL if gitlab else CLOSES, text, slug, on, _GL_MORE if gitlab else None)
     if not closes:
         return None
@@ -414,11 +421,11 @@ def _judge(text, where, guard, forge="github"):
         else:
             prs = yield from _open_prs(repo, n)
         if prs is None and gitlab:
-            asked = asked or ask(say("dup_gitlab_silent", guard=guard, repo=repo, n=n, page=PAGE,
+            asked = asked or ask(say("dup_gitlab_silent", guard=guard, repo=repo, n=n, page=sw.PAGE,
                                      path=quote(repo, safe="")))
             continue
         if prs is None:
-            asked = asked or ask(say("dup_github_silent", guard=guard, repo=repo, n=n, page=PAGE))
+            asked = asked or ask(say("dup_github_silent", guard=guard, repo=repo, n=n, page=sw.PAGE))
             continue
         for pr_repo, m, title in prs:
             if (pr_repo, m) in gone:
@@ -490,7 +497,7 @@ def timelines(doc, guard, found):
         if not (CLOSES_GL if post.forge == "gitlab" else CLOSES).search(text):
             continue
         where = yield from _slug(post, cd, cwd, doc.env)
-        v = yield from _judge(text, where, guard, post.forge)
+        v = yield from _judge(text, where, guard, post.forge, _gl_host(doc.env))
         if v and v["permissionDecision"] == "deny":
             return v
         asked = asked or v

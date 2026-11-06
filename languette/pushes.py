@@ -54,7 +54,6 @@ from languette.messages import say
 from languette.verdict import Act, Need, Refuse, ask, deny
 
 TTL = 3600
-PAGE = 100                                     # protected branches per GitLab lookup; one page is read
 
 _EXPORT = frozenset("export declare typeset".split())
 _GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
@@ -493,12 +492,12 @@ def _requires_mr(host, slug, branch):
     if code == 200 and isinstance(body, dict) and isinstance(body.get("push_access_levels"), list):
         got = _gl_pushes(body)
     elif code == 404 and isinstance(body, dict) and str(body.get("message", "")).lower() == "404 not found":
-        code, body = yield Need("forge-api", "gitlab", host, f"{proj}?per_page={PAGE}")
+        code, body = yield Need("forge-api", "gitlab", host, f"{proj}?per_page={sw.PAGE}")
         if code != 200 or not isinstance(body, list):
             return None
         hits = [_gl_pushes(e) for e in body if isinstance(e, dict) and isinstance(e.get("name"), str)
                 and _gl_wildcard(e["name"], branch)]
-        if None in hits or (not hits and len(body) >= PAGE):
+        if None in hits or (not hits and len(body) >= sw.PAGE):
             return None                        # an entry unread, or a match may sit on a later page
         got = "open" if not hits or "open" in hits else "pr"   # the most permissive matching rule applies
     else:

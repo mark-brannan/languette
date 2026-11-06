@@ -101,7 +101,7 @@ dup_body_file: --body-file {v} {got}, so the body cannot be checked for an issue
 dup_body_rewritten: --body-file {v} is changed again in this same command (written {n} times), so neither a heredoc nor the file on disk is the text gh sends. Write the body to that path from one heredoc and nothing else in this command, or write the file in an earlier command and retry.
 dup_body_appended: --body-file {v} is appended to in this same command, so the text gh sends is the file's old text plus the append, not the heredoc alone. Write the body to that path with `>` from one heredoc, or write the file in an earlier command and retry.
 dup_body_not_heredoc: --body-file {v} is changed in this same command, and not from a heredoc, so the file on disk is not yet the text gh sends. Write the body to that path from a heredoc in this command, or write the file in an earlier command and retry.
-dup_repo_unknown: {guard}: this PR would close #{n}, and the hook can't tell which repo it is opened on (no --repo, and the working directory's origin is not on that forge, or a cd moves it), so it can't check whether an open PR already references #{n}. Pass --repo owner/name, or read the issue first.
+dup_repo_unknown: {guard}: this PR would close #{n}, and the hook can't tell which repo it is opened on (no --repo, and the working directory's origin is not on GitHub or GitLab, or a cd moves it), so it can't check whether an open PR already references #{n}. Pass --repo owner/name, or read the issue first.
 dup_github_silent: {guard}: this PR would close {repo}#{n}, and GitHub couldn't say whether an open PR already references it (gh missing, signed out, offline, an error, or a timeline past {page} events):
       gh api repos/{repo}/issues/{n}/timeline
     Read the issue before opening a second PR on it.
@@ -311,7 +311,7 @@ sb_unresolved: {guard}: this deletes a remote branch named by a variable or a gl
     {list}
 sb_other_repo: {guard}: this deletes a remote branch in a repository other than the current directory's (`git -C`, `--git-dir`, `GIT_DIR=`), so its open PRs can't be checked from here. Confirm none names the branch as base or head:
       gh -R <owner>/<repo> pr list --state open --json number,baseRefName,headRefName
-sb_no_gh: {guard}: this deletes a remote branch, but `{cli}` is not installed, so open PRs based on it can't be checked. Deleting a branch an open PR points at closes that PR silently.
+sb_no_gh: {guard}: this deletes a remote branch, but `{cli}` is not installed, so open PRs or merge requests based on it can't be checked. Deleting a branch an open PR points at closes that PR silently.
 sb_no_timeout: {guard}: this deletes a remote branch, but neither `timeout` nor `gtimeout` is installed (macOS: `brew install coreutils`), so the open-PR list can't be read without risking a hang. Deleting a branch an open PR points at closes that PR silently. Confirm by hand first:
     {list}
 sb_unparsed: {guard}: deleting remote branch `{b}`, but the open-PR list could not be parsed, so PRs stacked on it can't be checked.

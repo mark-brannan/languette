@@ -33,7 +33,6 @@ from languette.refs import remote_url
 from languette.messages import say
 from languette.verdict import Need, ask, deny
 
-_UNRESOLVED = re.compile(r"[$`*?\[]")
 _REPO = re.compile(r"(?:^|/)repos/[^/]+/[^/]+/")
 _SHORT_O = re.compile(r"-[^o=-]*o\Z")   # -o, or a cluster ending in it (-fo): the value is the next word
 TIMEOUT = 20
@@ -60,7 +59,7 @@ def _emit(out, repo, ref, forge=None):
         ref = ref[len("refs/heads/"):]
     if ref in ("", "HEAD"):
         return
-    out.append((repo, "?" if _UNRESOLVED.search(ref) else ref, forge))
+    out.append((repo, "?" if sw.UNRESOLVED.search(ref) else ref, forge))
 
 
 def _git_push(s, a, b, nested, out):
@@ -111,15 +110,11 @@ def _gh_api(s, a, b, nested, out):
     m = _GL_BRANCH.fullmatch(api.path) if cli == "glab" else None
     if api.method == "DELETE" and m:
         # :id is the cwd's project; anything else names one glab -R reads.
-        project = unquote(m.group(1))
-        repo = "-" if project == ":id" else "?" if project.isdigit() or _UNRESOLVED.search(project) else project
-        _emit(out, repo, unquote(m.group(2)), "gitlab")
+        _emit(out, sw.gl_project(unquote(m.group(1))), unquote(m.group(2)), "gitlab")
         return
     sweep = _GL_MERGED.fullmatch(api.path) if cli == "glab" else None
     if api.method == "DELETE" and sweep:
-        project = unquote(sweep.group(1))
-        repo = "-" if project == ":id" else "?" if project.isdigit() or _UNRESOLVED.search(project) else project
-        _emit(out, repo, "?", "gitlab")      # no branch is named: open_prs asks
+        _emit(out, sw.gl_project(unquote(sweep.group(1))), "?", "gitlab")      # no branch is named: open_prs asks
         return
     if cli == "glab" or api.method != "DELETE" or "refs/heads/" not in api.path:
         return
@@ -131,7 +126,7 @@ def _gh_api(s, a, b, nested, out):
         m = _REPO.search(w)
         if m:
             rest = re.sub(r"^/?repos/", "", m.group(0)).rstrip("/")
-            if not _UNRESOLVED.search(rest):
+            if not sw.UNRESOLVED.search(rest):
                 repo = rest
     _emit(out, repo, w[w.index("refs/heads/") + len("refs/heads/"):], "github")
 
@@ -192,7 +187,8 @@ def open_prs(doc, guard, found):
             bound = t
             break
     if not bound:
-        return ask(say("sb_no_timeout", guard=guard, list=_LISTS[deleted[0][2]]["list"]))
+        lists = [_LISTS[f]["list"] for f in dict.fromkeys(f for _, _, f in deleted)]
+        return ask(say("sb_no_timeout", guard=guard, list="\n".join(lists)))
     for repo, b, forge in dict.fromkeys(deleted):
         row = _LISTS[forge]
         key, sigil = row["number"]

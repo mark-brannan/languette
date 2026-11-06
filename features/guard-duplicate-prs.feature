@@ -297,6 +297,13 @@ Feature: guard-duplicate-prs
   # branch) and /cli/api/ (-f sends a POST). The lookup:
   # https://docs.gitlab.com/api/issues/ (GET .../issues/:issue_iid/related_merge_requests,
   # state "opened"); the closing pattern: https://docs.gitlab.com/user/project/issues/managing_issues/.
+  Scenario: with no readable remote, an explicit group/project#N is looked up on GITLAB_HOST's host
+    Given GITLAB_HOST is "gitlab.example.com"
+    And GLAB_RELATED is "open-mr"
+    When the agent runs `glab mr create -t t -d "Closes g/p#114"`
+    Then the guard denies, naming "!120"
+    And the stub "glab" was called with "--hostname gitlab.example.com projects/g%2Fp/issues/114/related_merge_requests"
+
   Scenario Outline: on GitLab, an open merge request already on the issue denies, and anything else does not
     Given a clone of "https://gitlab.com/g/p.git" at "{TMP}/gl" on branch "claude/topic"
     And the working directory is "{TMP}/gl"

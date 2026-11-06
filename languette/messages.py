@@ -439,7 +439,7 @@ MESSAGES = {
     ),
     "dup_repo_unknown": (
         "{guard}: this PR would close #{n}, and the hook can't tell which repo it is opened "
-        "on (no --repo, and the working directory's origin is not on that forge, or a cd "
+        "on (no --repo, and the working directory's origin is not on GitHub or GitLab, or a cd "
         "moves it), so it can't check whether an open PR already references #{n}. Pass "
         "--repo owner/name, or read the issue first."
     ),
@@ -485,7 +485,8 @@ MESSAGES = {
         "  gh -R <owner>/<repo> pr list --state open --json number,baseRefName,headRefName"
     ),
     "sb_no_gh": (
-        "{guard}: this deletes a remote branch, but `{cli}` is not installed, so open PRs based on it can't "
+        "{guard}: this deletes a remote branch, but `{cli}` is not installed, so open PRs or merge requests "
+        "based on it can't "
         "be checked. Deleting a branch an open PR points at closes that PR silently."
     ),
     "sb_no_timeout": (

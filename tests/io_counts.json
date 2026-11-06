@@ -3195,6 +3195,7 @@
  "tests/test_features.py::test_with_no_claude_code_tmpdir_the_recipe_finds_the_scratchpad_under_tmpdir": {"git": 4},
  "tests/test_features.py::test_with_no_list_denyalways_is_silent": {"git": 1},
  "tests/test_features.py::test_with_no_list_the_guard_is_silent": {"git": 1},
+ "tests/test_features.py::test_with_no_readable_remote_an_explicit_groupprojectn_is_looked_up_on_gitlab_hosts_host": {"git": 7, "forge-api": 1},
  "tests/test_features.py::test_with_no_record_to_write_an_added_worktree_stays_foreign": {"git": 8},
  "tests/test_features.py::test_with_no_redacted_terms_file_nothing_is_redacted": {"git": 2, "run": 1},
  "tests/test_features.py::test_with_no_repo_named_the_origin_of_the_working_directory_decides_unless_the_command_moves[{TMP}/nogit-gh issue create -t x -b Wanderlust-denies]": {"git": 3},
