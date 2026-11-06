@@ -15,8 +15,7 @@ from hamcrest import assert_that, contains_string, empty, equal_to, has_length, 
 import readme_table
 from harness import hooks_json_commands, hooks_json_prompt_command
 from languette import engine, run, scan
-from languette import issue_writes, opened_prs, posts
-from languette.guards import guard_signed_comments
+from languette import comment_posts, issue_writes, opened_prs, posts
 
 ROOT = Path(__file__).resolve().parent.parent
 # Spelled out, not read from run.GUARDS, so a guard dropped from run.GUARDS fails the comparisons below.
@@ -235,7 +234,8 @@ def test_every_call_to_a_guard_generator_is_a_yield_from():
     files = sorted((ROOT / "languette" / "guards").glob("*.py")) + [
         ROOT / "languette" / f"{m}.py" for m in ("hook_skips", "branch_deletions", "infra_runs", "listed_runs",
                                                  "pushes", "untrusted_reads", "issue_writes", "opened_prs",
-                                                 "work_losses", "worktree_reaches")]
+                                                 "work_losses", "worktree_reaches", "thread_resolves",
+                                                 "comment_posts", "prose_commits")]
     trees = {f.stem: ast.parse(f.read_text()) for f in files}
     gens = {m: _generators(t) for m, t in trees.items()}
     bad = []
@@ -356,7 +356,7 @@ def test_the_guard_duplicate_pr_matcher_leaves_other_tools_alone(tool):
 
 def _mcp_tools_the_guard_signed_comments_handles():
     # From the guard's own TOOLS, so a tool added there must be matched here.
-    suffixes = _mcp_suffixes(guard_signed_comments.TOOLS)
+    suffixes = _mcp_suffixes(comment_posts.TOOLS)
     assert suffixes >= {"add_issue_comment", "add_reply_to_pull_request_comment", "add_comment_to_pending_review",
                         "pull_request_review_write", "update_issue_comment"}
     return sorted(f"{prefix}{s}" for s in suffixes for prefix in ("mcp__github__", "mcp__plugin_github_github__"))
@@ -364,12 +364,12 @@ def _mcp_tools_the_guard_signed_comments_handles():
 
 @pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_signed_comments_handles())
 def test_the_guard_signed_comments_matcher_covers_the_tool(tool):
-    assert_that(_reaches(guard_signed_comments, tool), is_(True))
+    assert_that(_reaches(run.guard_signed_comments, tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__create_issue"])
 def test_the_guard_signed_comments_matcher_leaves_other_tools_alone(tool):
-    assert_that(_reaches(guard_signed_comments, tool), is_(False))
+    assert_that(_reaches(run.guard_signed_comments, tool), is_(False))
 
 
 def _gathered(gen):
