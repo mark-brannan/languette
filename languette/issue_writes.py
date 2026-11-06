@@ -4,11 +4,12 @@ identifier things link to where no agent can see, so minting or moving one is
 a one-way door. The spec is features/guard-github-issues.feature.
 
 The human's turn opens the door (UserPromptSubmit, the `door-open` handler); a write
-claims it before the call (PreToolUse, the `issue-door` handler) and spends it once the
-call has run (PostToolUse, PostToolUseFailure, the `door-spend` handler). Each guard is its own hook process and cannot see the
-others' verdicts, so a claim whose call has an error result in the transcript
-but was never spent belongs to a call another guard denied: it never ran, and
-the next write takes the claim over. A claim with no result yet is in flight.
+claims it before the call (PreToolUse, the `issue-door` handler, whose finding the runner
+spends after the verdict, and only when no guard denies the call) and spends it once the
+call has run (PostToolUse, PostToolUseFailure, the `door-spend` handler). A claim whose
+call has an error result in the transcript but was never spent belongs to a call refused
+after languette let it through (the user declined it, another hook denied it): it never
+ran, and the next write takes the claim over. A claim with no result yet is in flight.
 
 A shut door has a second key: the user's yes, through AskUserQuestion, to an
 option labelled exactly as `_label` names the write: its verb, and the issue
@@ -34,7 +35,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Act, Need, approve, deny
+from languette.verdict import Act, Need, approve, deny, spend
 
 # The tools hooks.json wires this guard to; the MCP ones by their name's tail.
 TOOLS = re.compile(r"(?:Bash|mcp__.*__(?:create_issue|issue_write|transfer_issue|delete_issue))\Z")
@@ -61,6 +62,7 @@ _CLIENTS = (
 )
 SHUT = ("the door is shut. One issue create, transfer or delete per human turn, and this turn's is spent or "
         "the human has not spoken since.")
+IN_FLIGHT = f"an issue create, transfer or delete is already in flight this turn. {SHUT}"
 # An issue a delete or transfer names: its number, a GitHub issue URL, or a GitLab one (group/project/-/issues/n).
 _NUMBER = re.compile(r"#?(\d+)|https?://[^/\s]+/([^/\s]+/[^/\s]+)/issues/(\d+)/?"
                      r"|https?://[^/\s]+/([^/\s]+(?:/[^/\s]+)+)/-/issues/(\d+)/?")
@@ -214,10 +216,11 @@ def door(doc, guard, found):
         return deny(say("gi_batch", guard=guard, n=n))
     if found["loop"]:
         return deny(say("gi_loop", guard=guard))
-    why = yield from _door(doc.payload, _session(doc.payload))
-    if why is None:
-        return None
+    why, take = yield from _door(doc.payload, _session(doc.payload))
     label = _label(*found["writes"][0])
+    if take:
+        # Lost after the verdict, the door is another write's: the user's yes is the way left.
+        return spend("door", *take, lost=say("gi_door", guard=guard, why=IN_FLIGHT, ask=say("gi_ask", label=label)))
     _, done = yield from approve(
         {label: 1}, lambda e: say("gi_transcript", guard=guard, err=e, why=why, ask=say("gi_ask", label=label)))
     return done[0] if done else deny(say("gi_door", guard=guard, why=why, ask=say("gi_ask", label=label)))
@@ -239,31 +242,27 @@ def door_spend(doc, guard, found):
 
 
 def _door(payload, session):
-    """None when this call took the human turn's door; else why it could not."""
+    """(None, the door spend's (op, session, call)) when this call may take the human
+    turn's door; else (why it cannot, None). Nothing is taken here: the runner spends
+    it after the verdict."""
     call = payload.get("tool_use_id")
     call = re.sub(r"[^A-Za-z0-9_-]", "", call) if isinstance(call, str) else ""
     try:
-        got = yield Need("door", "claim", session, call)
+        got = yield Need("door", session)
     except Exception:  # noqa: BLE001
-        return SHUT
+        return SHUT, None
     if got is True:
-        return None
-    if got is False:
-        return f"an issue create, transfer or delete is already in flight this turn. {SHUT}"
+        return None, ("claim", session, call)
     # A standing claim: its call ran if it was spent; still holding with an error
     # result means it was refused and never ran. No result yet: in flight. A
     # result that is not an error ran, whatever its post hook did.
     tp = payload.get("transcript_path")
     if not got or not isinstance(tp, str) or not tp:
-        return SHUT
+        return SHUT, None
     try:
         transcript = yield Need("read", tp)
     except Exception:  # noqa: BLE001
-        return SHUT
+        return SHUT, None
     if not _never_ran(transcript, got):
-        return SHUT
-    try:
-        took = yield Need("door", "take", session, call)
-    except Exception:  # noqa: BLE001
-        took = False
-    return None if took else SHUT
+        return SHUT, None
+    return None, ("take", session, call)

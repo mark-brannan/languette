@@ -71,11 +71,9 @@ CALLS = {"open", "io.open", "io.FileIO", "builtins.open", "codecs.open", "input"
         "exists lexists isdir isfile islink ismount isjunction realpath samefile sameopenfile "
         "getsize getmtime getatime getctime abspath relpath expanduser").split()}
 # The Need constructor, and the kinds or (kind, op) pairs the world answers with
-# a write: an approval spent, a record kept, a door taken. Act owns those.
+# a write, or that name a write Act owns.
 NEED = ("Need", "verdict.Need")
-# Door claim takes the door when it stands, a rename and a write (world._take).
-WRITES = {"claim", "ruleset-keep", "send-keep", ("door", "open"), ("door", "spend"), ("door", "claim"),
-          ("door", "take"), ("worktree", "arrive"), ("worktree", "keep"), ("worktree", "leave")}
+WRITES = {"ruleset-keep", "send-keep", ("worktree", "arrive"), ("worktree", "keep"), ("worktree", "leave")}
 BUILTINS = {"open", "input", "breakpoint"}
 # Methods that do I/O on whatever they are called on: Path's, a file's.
 METHODS = {"read_text", "read_bytes", "write_text", "write_bytes", "iterdir", "rglob", "touch", "unlink", "rmdir",
@@ -87,10 +85,7 @@ METHODS = {"read_text", "read_bytes", "write_text", "write_bytes", "iterdir", "r
 # only shrinks. A direct read never goes on it: every read a guard makes is a
 # Need (#114), and test_no_guard_is_let_off_a_direct_read holds it there.
 KNOWN = {
-    # Needs that write as they read, under one lock or rename; they move with
-    # the approval spend (#84).
-    "verdict.py": ["Need claim"],
-    "issue_writes.py": ["Need door claim", "Need door take"],
+    # A Need that writes as it reads, under a rename.
     "worktree_reaches.py": ["Need worktree arrive"],
     # The parser ladder's shfmt rung (docs/decisions.md, "Runtime dependencies").
     "scan.py": ["import shutil", "import subprocess", "subprocess.run", "subprocess.TimeoutExpired", "shutil.which"],
@@ -178,7 +173,7 @@ def test_no_guard_and_not_the_verdict_reaches_past_the_process():
 
 
 def test_no_guard_is_let_off_a_direct_read():
-    """Only the write Needs (#84) and the parser ladder stay on KNOWN: a guard,
+    """Only the write Needs and the parser ladder stay on KNOWN: a guard,
     or a helper it imports, that reads for itself fails the check."""
     let_off = {rel: [w for w in calls if not w.startswith("Need ")] for rel, calls in KNOWN.items() if rel != LADDER}
     assert_that({rel: w for rel, w in let_off.items() if w}, equal_to({}))
@@ -254,13 +249,12 @@ def test_install_writes_nothing_itself():
     "import random",
     "from uuid import uuid4",
     "import os\nos.getpid()",
-    "from languette.verdict import Need\nyield Need('claim', {})",
+    "from languette.verdict import Need\nyield Need('ruleset-keep', {})",
     "from languette import verdict\nyield verdict.Need('worktree', 'keep', r, t)",
-    "yield Need('door', 'take', s, c)",
-    "yield Need('door', 'claim', s, c)",
-    "from ..verdict import Need as N\nyield N('claim', {})",
+    "yield Need('worktree', 'arrive', r, t)",
+    "from ..verdict import Need as N\nyield N('send-keep', {})",
     "from os import *",
-    "yield Need('door', op, s, c)",
+    "yield Need('worktree', op, r, t)",
     "import os\nos.uname()",
     "import platform",
     "import logging\nlogging.FileHandler('x')",

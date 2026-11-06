@@ -29,7 +29,7 @@ def rungs(engine, monkeypatch):
 
 # Needs that write as they read, under one lock or rename (languette.verdict.Need):
 # (kind, op), op None for a kind with no ops.
-ATOMIC = {("claim", None), ("door", "claim"), ("door", "take"), ("worktree", "arrive")}
+ATOMIC = {("worktree", "arrive")}
 _WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND
 _WRITES = "unlink remove rename renames replace mkdir makedirs rmdir removedirs symlink link chmod truncate".split()
 
@@ -37,7 +37,7 @@ _WRITES = "unlink remove rename renames replace mkdir makedirs rmdir removedirs 
 @pytest.fixture(autouse=True)
 def writes_in_acts(engine, monkeypatch):
     """In-process, a write while run.respond runs raises unless World.act,
-    World.keep or an ATOMIC Need makes it, and the scenario fails on it,
+    World.keep, World.spend or an ATOMIC Need makes it, and the scenario fails on it,
     whatever the guard made of the error. Opens are judged by their flags or
     mode; an fd write needs an open first. /dev/null is not a write."""
     if engine not in IN_PROCESS:
@@ -75,6 +75,7 @@ def writes_in_acts(engine, monkeypatch):
     monkeypatch.setattr(run, "respond", within("respond", run.respond))
     monkeypatch.setattr(world.World, "act", within("allowed", world.World.act))
     monkeypatch.setattr(world.World, "keep", within("allowed", world.World.keep))
+    monkeypatch.setattr(world.World, "spend", within("allowed", world.World.spend))
     monkeypatch.setattr(world.World, "answer", within("allowed", world.World.answer, atomic))
     yield
     assert not strays, f"writes outside an act: {strays}"

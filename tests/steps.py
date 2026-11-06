@@ -554,6 +554,23 @@ def _still_holds(ctx, target, content):
     assert Path(ctx.expand(target)).read_text() == content
 
 
+def _spent_records(ctx):
+    f = ctx.proj / "t.jsonl.languette-ask"
+    return [json.loads(line) for line in f.read_text().splitlines() if line.strip()] if f.exists() else []
+
+
+@then("no approval is spent")
+def _none_spent(ctx):
+    assert _spent_records(ctx) == []
+
+
+@then(parsers.parse('the one approval "{approval}" is spent, on one call'))
+def _one_spent(ctx, approval):
+    recs = _spent_records(ctx)
+    assert {r["approval"] for r in recs} == {approval}, recs
+    assert len({r["call"] for r in recs}) == 1, recs
+
+
 @then("the decision record is empty")
 def _no_record(ctx):
     assert not (Path(ctx.expand("{TMP}")) / "state/languette/decisions.jsonl").exists()
