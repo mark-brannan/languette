@@ -967,6 +967,86 @@ def cd_present(s):
     return any(k == "w" and CD.match(w) for k, w in zip(s.k, s.w))
 
 
+# A word the shell would still expand, glob or brace-expand, so its text is not yet its value.
+UNREADABLE = re.compile(r"[$`*?\[{]")
+
+
+def word_live(s, i):
+    """Word-live: True when word i of scan s is not yet the value the command gets: it carried
+    a $ or backtick the shell acts on, or holds a glob or brace the shell may expand. Quoting
+    is not read, so a quoted `*` counts too: unsure reads as live."""
+    return bool(s.live[i]) or UNREADABLE.search(s.w[i]) is not None
+
+
+def _abspath(p):
+    """p normalized with `..` applied as text; the filesystem is not consulted."""
+    return os.path.normpath("/" + p.lstrip("/"))
+
+
+_SEP = re.compile(r"&&|\|\||\|&?|&|;|\n|\(|\)")
+
+
+def _cd_to(s, c, b, here, home, cdpath):
+    """Where the cd/pushd at c (its segment ending at b) lands from `here`, or None
+    when that cannot be read: `-`, popd, a live word, a CDPATH search, an unknown start."""
+    if s.w[c] == "popd":
+        return None
+    i = c + 1
+    while i <= b and re.fullmatch(r"-[LPe@]+", s.w[i]):
+        i += 1
+    if i <= b and s.w[i] == "--":
+        i += 1
+    if i > b:
+        t = "~"
+    elif word_live(s, i) or s.w[i] == "-" or s.k[i] != "w":
+        return None
+    else:
+        t = s.w[i]
+    if t == "~" or t.startswith("~/"):
+        if not (home and home.startswith("/")) or (i <= b and s.quoted[i]):
+            return None
+        t = home + t[1:]
+    elif t.startswith("~"):
+        return None
+    if t.startswith("/"):
+        return _abspath(t)
+    if here is None or (cdpath and not re.match(r"\.\.?(?:/|\Z)", t)):
+        return None
+    return _abspath(here + "/" + t)
+
+
+def cwds(s, start, home=None, cdpath=False):
+    """Cd tracking: {a: the directories segment a..b of scan s may run in}, a frozenset in
+    which None stands for one that cannot be known, following each top-level cd and pushd
+    from `start` (an absolute path, or None). A cd joined by `&&` moves what follows it;
+    after any other separator the old directory stays possible too, since the cd may have
+    failed. A cd in a pipeline or backgrounded moves nothing, a ( ) subshell's cd ends at
+    its ), and a cd the scan cannot read (cd_to, or one not in command position) leaves
+    the directory unknown. `cdpath`: CDPATH is set, so a relative cd may land anywhere."""
+    first = frozenset([start])
+    here, alt, stack, out = first, frozenset(), [], {}
+    for a, b in s.segments():
+        before = s.op[a - 1] if a > 0 else ""
+        after = s.op[b + 1] if b + 1 < len(s.w) else ""
+        out[a] = here
+        if a <= b:
+            c = seg_cmd(s, a, b)
+            alone = not re.search(r"(?<!\|)\|(?!\|)", before + " " + after) and not re.search(r"(?<!&)&(?!&)", after)
+            if c is not None and CD.match(s.w[c]):
+                if alone:
+                    alt, here = alt | here, frozenset(_cd_to(s, c, b, h, home, cdpath) for h in here)
+            elif any(s.k[i] == "w" and CD.match(s.w[i]) for i in range(a, b + 1)):
+                alt, here = alt | here, here | {None}
+        for t in _SEP.findall(after):
+            if t == "(":
+                stack.append((here, alt))
+            elif t == ")":
+                here, alt = stack.pop() if stack else (first, frozenset())
+            elif t != "&&":
+                here, alt = here | alt, frozenset()
+    return out
+
+
 def operands(words, valued=(), options=False):
     """`words` less each option in `valued` and the word after it, its value;
     the other options stay only when `options`. An option outside `valued` is
@@ -1525,8 +1605,26 @@ def _run_of(words, a):
     return any(words[i:i + len(a)] == a for i in range(len(words) - len(a) + 1))
 
 
-def _hit(match, name, rest):
-    """Does match fit command word `name` followed by words `rest`?"""
+def _script_word(w, sc, place):
+    """Is word `w` the listed script `sc`? It is when it reads as `sc` or ends in `/sc`; with
+    `place`, (the directories the word may run in, the root `sc` is written from), also when
+    it resolves there to the script. Where a directory is unknown (None), or the word is
+    live, any word naming the script's file may be it, so it is."""
+    if w == sc or w.endswith("/" + sc):
+        return True
+    if place is None:
+        return False
+    here, root = place
+    want, name = _abspath(root + "/" + sc), _base(sc)
+    if UNREADABLE.search(w) or w.startswith("~"):
+        return _base(w) == name
+    if w.startswith("/"):
+        return _abspath(w) == want
+    return any(_abspath(h + "/" + w) == want if h else _base(w) == name for h in here)
+
+
+def _hit(match, name, rest, place=None):
+    """Does match fit command word `name` followed by words `rest`? `place`: _script_word's."""
     words = [w for w in rest if not w.startswith("-")]
     cmd = match["cmd"]
     if name in PM:
@@ -1538,7 +1636,7 @@ def _hit(match, name, rest):
             # The first word naming cmd: an option's value (npx -p x cmd) may come first.
             w = next((w for w in words if _base(w) == cmd), None)
             if w is not None:
-                return _hit(match, cmd, rest[rest.index(w) + 1:])
+                return _hit(match, cmd, rest[rest.index(w) + 1:], place)
         return False
     ok = True
     if "args" in match:
@@ -1548,7 +1646,7 @@ def _hit(match, name, rest):
         sc = match["script"]
         while sc.startswith("./"):
             sc = sc[2:]
-        ok = any(w == sc or w.endswith("/" + sc) for w in rest)
+        ok = any(_script_word(w, sc, place) for w in rest)
     if ok and "flags" in match:
         held = {c for w in rest if _CLUSTER.fullmatch(w) for c in w[1:]}
         ok = all(f in held for f in match["flags"])
@@ -1652,20 +1750,34 @@ def _placed_index(s, a, b, rx):
     return next((j for j in range(i + 1, b + 1) if s.k[j] == "w" and rx.search(s.w[j])), None)
 
 
-def _word_hit(doc, match, prose, launchers):
+def _word_hit(doc, match, prose, launchers, at=None):
     """(how many times the command runs `match`, whether any text holds a LOOP word). With
-    `at: "command"`, a word another command takes as its argument does not count (_placed_index)."""
+    `at: "command"`, a word another command takes as its argument does not count (_placed_index).
+    With `at`, (the directory the command starts in, or None, the root a `script` is written
+    from), a word is resolved where it runs (cwds): the start, moved by the text's cd; a
+    nested text starts there only when no outer text moves."""
     placed = match.get("at") == "command"
     launchers = launchers and not placed
     names = {match["cmd"]} | (LAUNCH if launchers else set()) | (PM if match["cmd"] in PM else set())
     rx = re.compile(r"(?:^|/)(?:" + "|".join(re.escape(n) for n in sorted(names)) + r")\Z")
     n, (segs, loop) = 0, segments(doc, prose)
+    places = {}
+    if at is not None and "script" in match:
+        (cwd, root), env = at, doc.env
+        cwd = _abspath(cwd) if isinstance(cwd, str) and cwd.startswith("/") else None
+        moved = any(cd_present(s) for s, _, _, nested in segs if not nested)
+        cdpath = bool(env.get("CDPATH")) or any("CDPATH=" in w for s, *_ in segs for w in s.w)
+        for s, _, _, nested in segs:
+            if id(s) not in places:
+                start = None if nested and moved else cwd
+                places[id(s)] = cwds(s, start, env.get("HOME"), cdpath)
     for s, a, b, nested in segs:
+        place = (places[id(s)][a], root) if places else None
         nested = nested or placed
         g = _placed_index(s, a, b, rx) if placed else cmd_index(s, a, b, rx, nested, prose=prose)
         # cmd_index stops at the first launcher; a later word may be the command.
         while g is not None:
-            if _hit(match, _base(s.w[g]), s.w[g + 1:b + 1]):
+            if _hit(match, _base(s.w[g]), s.w[g + 1:b + 1], place):
                 n += 1
                 break
             if nested:
@@ -1674,16 +1786,18 @@ def _word_hit(doc, match, prose, launchers):
     return n, loop
 
 
-def match_rule(doc, match, prose=PROSE_PROCESS, launchers=True):
+def match_rule(doc, match, prose=PROSE_PROCESS, launchers=True, at=None):
     """The one matcher of command rules: (how many times the command runs `match`, whether any
     text holds a LOOP word, what it did, as the segment reads: `<command> <stop>`, or None). A
     match with a `unit` is a stop on a unit the condition accepts (stop_of), counted once;
     any other is a command word and its words (_hit). `prose` names the commands whose words
-    are not commands; launchers (npx, `pnpm exec`) run `cmd` unless `launchers` is False."""
+    are not commands; launchers (npx, `pnpm exec`) run `cmd` unless `launchers` is False. With
+    `at`, (start directory, root), a `script` is the file at root/script wherever the command
+    runs it from (_word_hit)."""
     if "unit" in match:
         said = _stop_hit(doc, match, prose)
         return (1 if said else 0), False, said
-    n, loop = _word_hit(doc, match, prose, launchers)
+    n, loop = _word_hit(doc, match, prose, launchers, at)
     return n, loop, None
 
 

@@ -58,7 +58,6 @@ TTL = 3600
 _EXPORT = frozenset("export declare typeset".split())
 _GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
 _ALL = frozenset("--all --branches --mirror".split())
-_UNREADABLE = re.compile(r"[$`*?\[{]")
 # The operators a separator's text is made of, as Scan piles them up (`;}&&` for `; } &&`).
 _OPS = re.compile(r"\|\||&&|\|&|\||&|;|\n|\(|\)|\{|\}|`")
 _PIPE = ("|", "|&")
@@ -103,7 +102,7 @@ class _Literals:
                 for i in words:
                     name, _, val = s.w[i].partition("=")
                     # whitespace: an unquoted $NAME splits there into more than one refspec
-                    ok = val and not s.live[i] and not _UNREADABLE.search(val) and not re.search(r"[~\s]", val)
+                    ok = val and not s.live[i] and not sw.UNREADABLE.search(val) and not re.search(r"[~\s]", val)
                     self.bind[name] = (a, val if ok else None)
             elif c is not None and s.w[c] == "export":
                 self.off = True
@@ -147,7 +146,7 @@ def _resolve(base, target, live, home=None, quoted=True):
         if quoted or not (home and home.startswith("/")):
             return None
         target = home + target[1:]
-    if base is None or live or _UNREADABLE.search(target) or target.startswith("~") or target == "-":
+    if base is None or live or sw.UNREADABLE.search(target) or target.startswith("~") or target == "-":
         return None
     return os.path.normpath(target if target.startswith("/") else os.path.join(base, target))
 
@@ -208,7 +207,7 @@ def _push(s, a, b, nested, here, lits=None):
     if row.repo and repo is None and x == "push":
         return _Push(prog, here, None, [IMPLICIT])    # in every repository, a bare push: vcsh push ignores what follows
     if x != "push":
-        if s.live[i] or _UNREADABLE.search(x):
+        if s.live[i] or sw.UNREADABLE.search(x):
             raise Refuse(say("br_sub_live", x=x))
         return None                            # another subcommand
     remote, pos, all_, tags, dry, dashdash = None, [], False, False, False, False
@@ -247,7 +246,7 @@ def _push(s, a, b, nested, here, lits=None):
         remote = s.w[k]
         if s.live[k]:
             raise Refuse(say("br_remote_live", remote=remote))
-    if remote is not None and _UNREADABLE.search(remote):
+    if remote is not None and sw.UNREADABLE.search(remote):
         raise Refuse(say("br_remote_live", remote=remote))
     if all_:
         return _Push(prog, here, remote, [ALL], repo)
@@ -256,7 +255,7 @@ def _push(s, a, b, nested, here, lits=None):
     dsts = []
     for j in pos:
         r = (lits and s.live[j] and lits.word(j, a)) or s.w[j]
-        if (s.live[j] and r is s.w[j]) or _UNREADABLE.search(r):
+        if (s.live[j] and r is s.w[j]) or sw.UNREADABLE.search(r):
             raise Refuse(say("br_refspec_live", refspec=s.w[j]))
         src, _, dst = r.lstrip("+").partition(":")
         if ":" in r and not src:
@@ -279,7 +278,7 @@ def _admin_merge(s, a, b, nested):
         return False
     w = s.w[g + 1:b + 1]
     admin = any(x == "--admin" or x.startswith("--admin=") for x in w)
-    dyn = [s.live[g + 1 + k] or bool(_UNREADABLE.search(x)) for k, x in enumerate(w)]
+    dyn = [sw.word_live(s, g + 1 + k) for k in range(len(w))]
     first, skip, odd = [], False, False        # the group and its verb; a literal -R value is neither
     for k, x in enumerate(w):
         if skip:
