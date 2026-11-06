@@ -240,7 +240,8 @@ def _linked_worktree(ctx, path, repo):
     if ctx.guard == "guard-git-work-loss":
         # That guard relaxes only in a worktree this session entered: it is the session's own
         # unless a scenario says "the session did not enter" it.
-        _session_record(ctx).open("a").write(f"{os.path.realpath(d)}\t{os.stat(Path(d) / '.git').st_ino}\n")
+        with _session_record(ctx).open("a") as f:
+            f.write(f"{os.path.realpath(d)}\t{os.stat(Path(d) / '.git').st_ino}\n")
 
 
 def _session_record(ctx):
@@ -261,7 +262,7 @@ def _symlink(ctx, path, target):
     # $HOME is shared by every scenario in a worker, so an earlier one may have
     # left a directory where this link goes: the link replaces it.
     link = Path(ctx.expand(path))
-    if link.is_symlink():
+    if link.is_symlink() or link.is_file():
         link.unlink()
     elif link.is_dir():
         shutil.rmtree(link)
