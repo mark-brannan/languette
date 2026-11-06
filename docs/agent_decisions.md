@@ -644,3 +644,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261105t225122z
 - The runner's spend denies open with languette:, so the transcript reads a later failure as a call that never ran Undo: prefix each spend deny with the asking guard's name ([#358](https://github.com/mark-brannan/languette/pull/358))
+
+### 20261106t125452z
+- guard-review-threads, guard-signed-comments and prose-budget-commit each move as one rule: splitting would let rule order decide between verdicts the code orders. Undo: split a guard's rule per switch ([#366](https://github.com/mark-brannan/languette/pull/366))
