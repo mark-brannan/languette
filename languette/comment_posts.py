@@ -1,5 +1,9 @@
-"""guard-signed-comments: a comment an agent posts to GitHub is signed as an
-agent's. The spec is features/guard-signed-comments.feature.
+"""guard-signed-comments' walk and its handler (languette/rules/guard_signed_comments.py is
+the rule set): a comment an agent posts to GitHub is signed as an agent's. The spec is
+features/guard-signed-comments.feature. The `comment-posts` test finds, from the call alone,
+the posts it makes and where each body is written; the `signatures` handler reads the
+bodies' files and gh's account, judges each body against the settings, and gives the
+verdict.
 
 Experimental: the convention is one workflow's; the general shape is issue #194.
 
@@ -38,8 +42,6 @@ from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Need, ask, deny
 
-NAME = "guard-signed-comments"
-OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_SIGNED_COMMENTS"
 _MCP = ("add_issue_comment|add_reply_to_pull_request_comment|add_comment_to_pending_review|"
         "pull_request_review_write|update_issue_comment|add_pull_request_review_comment|create_pull_request_review|"
         "create_and_submit_pull_request_review|submit_pending_pull_request_review")
@@ -242,8 +244,10 @@ def _graphql_string(t):
         return None
 
 
-def check(doc):
-    payload, env, tool = doc.payload, doc.env or {}, doc.tool
+def posted(doc):
+    """The `comment-posts` test: {"posts": each post's body sources, "read": the command's
+    _Read, None for an MCP tool's input} for a call that posts a comment, or None."""
+    tool = doc.tool
     ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
     if tool == "Bash":
         cmd = ti.get("command")
@@ -257,6 +261,15 @@ def check(doc):
         return None
     if not any(posts):
         return None
+    return {"posts": posts, "read": r}
+
+
+def signatures(doc, guard, found):
+    """The `signatures` handler: the posts the `comment-posts` test found, each body read
+    where it is written and judged against the opening and signature settings, and gh's
+    account read unless the post is an MCP tool's, whose account this hook cannot read."""
+    payload, env, tool = doc.payload, doc.env or {}, doc.tool
+    posts, r = found["posts"], found["read"]
     sid = payload.get("session_id")
     hexid = sid[:8] if isinstance(sid, str) and re.fullmatch(r"[0-9a-f]{8}", sid[:8]) else None
     first, pattern = env.get(OPENING) or "", env.get(SIGNATURE) or ""
@@ -267,7 +280,7 @@ def check(doc):
             sig = re.compile(pattern.replace("{session}", hexid or _ANY_HEX))
             loose = re.compile(pattern.replace("{session}", _ANY_HEX))
         except re.error as e:
-            return deny(say("signature_not_regex", guard=NAME, pattern=pattern, err=e))
+            return deny(say("signature_not_regex", guard=guard, pattern=pattern, err=e))
     want = ([f"start the first line with `{first}`"] if first else []) + (
         [f"end with a line that matches `{pattern}` whole"
          + (", where {session} is the first 8 hex of the session id" if "{session}" in pattern else "")]
@@ -380,7 +393,7 @@ def check(doc):
             try:
                 got = yield from bodies(src)
             except _Unread as e:
-                return deny(say("signature_unread", guard=NAME, why=e, signed=signed))
+                return deny(say("signature_unread", guard=guard, why=e, signed=signed))
             for body in got:
                 if not body.strip():
                     continue           # nothing posted as text: gh refuses it, or a review posts no comment
@@ -399,16 +412,16 @@ def check(doc):
         return None
     also = say("signature_also", problems="; ".join(problems), shape=shape) if problems else ""
     if r is None:
-        return deny(say("signature_mcp_account", guard=NAME, tool=tool, also=also))
+        return deny(say("signature_mcp_account", guard=guard, tool=tool, also=also))
     if r.account:
         # gh's own account is not the one this command posts as: reading it would answer for another.
         who = f"this command picks gh's account itself, with `{_short(r.account)}`"
     else:
         who = yield from refs.viewer(cwd if isinstance(cwd, str) and cwd.startswith("/") else "/")
     if isinstance(who, str) and not problems:
-        return ask(say("signature_account_unread", guard=NAME, got=who))
+        return ask(say("signature_account_unread", guard=guard, got=who))
     if not isinstance(who, str) and not refs.bot(*who):
-        return deny(say("signature_person", guard=NAME, login=who[0], also=also))
+        return deny(say("signature_person", guard=guard, login=who[0], also=also))
     if not problems:
         return None
-    return deny(say("signature_wrong", guard=NAME, problems="; ".join(problems), shape=shape))
+    return deny(say("signature_wrong", guard=guard, problems="; ".join(problems), shape=shape))

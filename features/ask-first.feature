@@ -456,3 +456,58 @@ Feature: ask-first
       And the working directory is "relative/dir"
       When the agent runs `npm run e2e`
       Then the guard denies
+
+  Rule: a listed script is the file it names, wherever the command runs it from
+
+    Background:
+      Given the file ".languette/ask-first.json" holds:
+        """
+        {"commands": [{"id": "walk",
+          "match": [{"cmd": "tsx", "script": "research/conformance/run.ts"}],
+          "cost": "> 40 minutes",
+          "approve_label": "Run walk"}]}
+        """
+      And the directory "{PROJ}/research/conformance/sub"
+      And the directory "{PROJ}/other"
+
+    Scenario Outline: from the project top, a script reached through a cd
+      When the agent runs `<command>`
+      Then the guard <verdict>
+
+      Examples:
+        | command                                                   | verdict   | note                                  |
+        | cd research/conformance && tsx run.ts                     | denies    | the cd moves the run                  |
+        | cd research && cd conformance && tsx ./run.ts             | denies    | two cds                               |
+        | pushd research/conformance; tsx run.ts                    | denies    | pushd                                 |
+        | cd {PROJ}/research/conformance; tsx run.ts                | denies    | an absolute cd                        |
+        | cd other && tsx ../research/conformance/run.ts            | denies    | up and back down                      |
+        | tsx {PROJ}/research/./conformance/run.ts                  | denies    | an absolute word, not as written      |
+        | cd "$D" && tsx run.ts                                     | denies    | a cd to a variable is unknown         |
+        | cd research/conformance; cd - && tsx run.ts               | denies    | cd - is unknown                       |
+        | cd research/conformance && popd && tsx run.ts             | denies    | popd is unknown                       |
+        | pushd && tsx run.ts                                       | denies    | pushd alone swaps the stack           |
+        | pushd +1 && tsx run.ts                                    | denies    | pushd +1 rotates the stack            |
+        | pushd -n research/conformance; tsx run.ts                 | denies    | pushd -n does not move                |
+        | cd research/conformance/sub && cd .. && tsx run.ts        | denies    | a second .. may cross a symlink       |
+        | cd research/conformance/sub/.. && tsx run.ts              | denies    | .. after a step may cross a symlink   |
+        | cd research/conformance \|\| true; tsx run.ts             | denies    | the cd may have failed, or not        |
+        | tsx run.ts                                                | is silent | not the listed file                   |
+        | cd other && tsx run.ts                                    | is silent | another folder's run.ts               |
+        | cd research/conformance && tsx other.ts                   | is silent | another script in the folder          |
+        | (cd research/conformance) && tsx run.ts                   | is silent | a subshell's cd ends at its )         |
+        | cd research/conformance \| cat; tsx run.ts                | is silent | a cd in a pipeline moves nothing      |
+        | cd "$D" && tsx other.ts                                   | is silent | unknown, but not the script's file    |
+
+    Scenario Outline: from inside the script's folder
+      Given the working directory is "{PROJ}/research/conformance<under>"
+      When the agent runs `<command>`
+      Then the guard <verdict>
+
+      Examples:
+        | under | command           | verdict   |
+        |       | tsx run.ts        | denies    |
+        |       | tsx ./run.ts      | denies    |
+        | /sub  | tsx ../run.ts     | denies    |
+        | /sub  | cd .. && tsx run.ts | denies  |
+        | /sub  | tsx run.ts        | is silent |
+        |       | cd ~ && tsx run.ts | is silent |

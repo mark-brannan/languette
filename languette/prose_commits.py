@@ -1,7 +1,10 @@
-"""prose-budget-commit: before a `git commit`, run the prose-budget engine and
-warn on a finding, so documentation bloat is caught as it is written. CI is
-the gate; this never blocks the commit. The spec is
-features/prose-budget-commit.feature.
+"""prose-budget-commit's walk and its handler (languette/rules/prose_budget_commit.py is the
+rule set): before a `git commit`, run the prose-budget engine and warn on a finding, so
+documentation bloat is caught as it is written. CI is the gate; this never blocks the
+commit. The spec is features/prose-budget-commit.feature. The `prose-commits` test reads
+the command's commits from its words alone; the `prose-budget` handler finds the engine,
+resolves where the commit runs, lists what it reaches past the index, runs the engine and
+gives the warning.
 
 The engine is the command the prose_budget_command option names (an absolute
 path, a path relative to the commit's cwd, or a bare name on PATH), else
@@ -27,8 +30,6 @@ from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Need, context
 
-NAME = "prose-budget-commit"
-OPT_IN = "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT"   # off unless set to true: the warning is for repos whose CI runs prose-budget
 OPTION = "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"
 DEFAULT = "prose-budget"
 ENGINE_TIMEOUT = 50                 # under Claude Code's 60 s hook timeout; past it the engine counts as crashed
@@ -39,8 +40,8 @@ _VALUED = frozenset("-m --message -F --file -C --reuse-message -c --reedit-messa
 CI = "CI fails on this; fix before the push."
 
 
-def _warn(why):
-    return f"{NAME}: {why}"
+def _warn(guard, why):
+    return f"{guard}: {why}"
 
 
 def _done(notes):
@@ -196,22 +197,28 @@ def _engine(env, cwd):
     return None
 
 
-def check(doc):
-    payload, env = doc.payload, doc.env
-    if payload.get("tool_name") != "Bash":
-        return None
-    ti = payload.get("tool_input")
-    cmd = ti.get("command") if isinstance(ti, dict) else None
+def commits(doc):
+    """The `prose-commits` test: {"commits": the command's _Commits} for a Bash command that
+    commits in one place, or None."""
+    cmd = doc.command
     if not isinstance(cmd, str) or not cmd:
-        return None
-    cwd = payload["cwd"]
-    engine = yield from _engine(env, cwd)
-    if engine is None:
         return None
     c = _Commits(doc)
     if not c.seen:
         return None
     if c.multi:                         # one check cannot serve two repositories
+        return None
+    return {"commits": c}
+
+
+def budget(doc, guard, found):
+    """The `prose-budget` handler: the engine, found on the machine, run on what the commit
+    the `prose-commits` test found would commit, in the directory it commits in; each
+    finding is a warning and the call still runs."""
+    env, c = doc.env, found["commits"]
+    cwd = doc.payload["cwd"]
+    engine = yield from _engine(env, cwd)
+    if engine is None:
         return None
     d = cwd
     for step in (c.ccd, c.cdir):
@@ -232,9 +239,9 @@ def check(doc):
     if found is not None:
         rc, out = found
         if rc == 1:
-            notes.append(_warn(f"prose-budget --staged found:\n{out}\n{CI}"))
+            notes.append(_warn(guard, f"prose-budget --staged found:\n{out}\n{CI}"))
         elif rc == 2:
-            notes.append(_warn("prose-budget --staged could not check the staged prose (exit 2: a bad budgets "
+            notes.append(_warn(guard, "prose-budget --staged could not check the staged prose (exit 2: a bad budgets "
                                f"config, or an engine too old for --staged):\n{out}\nA bad config fails CI too; "
                                "fix it, or update the engine, before the push."))
 
@@ -248,11 +255,11 @@ def check(doc):
     if found is not None:
         rc, out = found
         if rc == 1:
-            notes.append(_warn("this commit reaches prose outside the staged index (git commit -a/--all, a pathspec "
+            notes.append(_warn(guard, "this commit reaches prose outside the staged index (git commit -a/--all, a pathspec "
                                "commit, or a git add in the same command) -- checked those files directly and "
                                f"prose-budget found:\n{out}\n{CI}"))
         elif rc == 2:
-            notes.append(_warn("prose-budget --file could not check those files (exit 2: a bad budgets config, or "
+            notes.append(_warn(guard, "prose-budget --file could not check those files (exit 2: a bad budgets config, or "
                                f"an engine too old for --file):\n{out}\nA bad config fails CI too; fix it, or "
                                "update the engine, before the push."))
     return _done(notes)

@@ -6,8 +6,7 @@ runs nothing."""
 import pytest
 
 from languette.document import Document
-from languette.guards import prose_budget_commit
-from languette.run import guard_bypass_ruleset
+from languette.run import guard_bypass_ruleset, prose_budget_commit
 from languette.verdict import Need
 
 ENV = {"HOME": "/home/u", "XDG_CONFIG_HOME": "/home/u/.config"}
