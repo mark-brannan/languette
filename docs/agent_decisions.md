@@ -653,3 +653,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261106t125521z
 - prose-budget-commit reads the commit before it looks for the engine, so a Bash call with no commit asks no which or executable Need. Undo: look up the engine in the test's place, before the walk ([#366](https://github.com/mark-brannan/languette/pull/366))
+
+### 20261106t125532z
+- prose-budget-commit's rule says action deny while its handler only warns, as tree-state's asks and own-places gives context. Undo: give the engine a warn action ([#366](https://github.com/mark-brannan/languette/pull/366))
