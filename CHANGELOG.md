@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.16](https://github.com/mark-brannan/languette/compare/v0.0.15...v0.0.16) (2026-11-06)
+
+
+### Features
+
+* **guards:** GitLab rows for six GitHub-reading guards ([#357](https://github.com/mark-brannan/languette/issues/357)) ([699d38a](https://github.com/mark-brannan/languette/commit/699d38ab88edcd5152c5f6dbadc26eaacfcae78e))
+* **run:** spend the user's approval once, after the verdict ([#358](https://github.com/mark-brannan/languette/issues/358)) ([bb76d28](https://github.com/mark-brannan/languette/commit/bb76d2874ca7fc13ef2e7c76e50364e7de94c060))
+
 ## [0.0.15](https://github.com/mark-brannan/languette/compare/v0.0.14...v0.0.15) (2026-11-05)
 
 
