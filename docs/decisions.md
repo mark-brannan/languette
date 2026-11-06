@@ -4,6 +4,17 @@ Decisions that settle languette's public interface. The README says what the
 interface is; this file says what was decided and why, one line each. Every
 line is the maintainer's (@mark-brannan) unless it says otherwise.
 
+## Rules engine: 2026-11-05
+
+- Current thinking: the aim is a rules engine with no hand-built guards; a
+  few deep special cases are "ok (maybe)", an exit.
+  The test: "if we add this new guard in the engine, will it pollute the data
+  access layer, or the engine, or the rules/config, in such a way that it's a
+  step function increase in difficulty to maintain? Yes, then consider a
+  special case outside the rules engine. No, figure it out using the
+  established pattern".
+  Sharpens the "few deep special cases" line under New guards.
+
 ## Uninstall and the user's options: 2026-11-05
 
 - `languette uninstall` writes nothing to the user's `settings.json`. It runs
@@ -148,13 +159,8 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
   verdict in the same PR, and the siblings that repeat it move onto it, or
   an issue names them. A guard that reads sequential or external facts (PR
   state, review threads, a transcript) is the exception, not the shape.
-- 2026-11-05, current thinking: the aim is a rules engine with no hand-built
-  guards; a few deep special cases are "ok (maybe)", an exit.
-  The test: "if we add this new guard in the engine, will it pollute the data
-  access layer, or the engine, or the rules/config, in such a way that it's a
-  step function increase in difficulty to maintain? Yes, then consider a
-  special case outside the rules engine. No, figure it out using the
-  established pattern".
+- Current thinking, not settled: guards trend toward a rules engine with a
+  few deep special cases.
 - 2026-10-30: guard-sudo and deny-always enter by #198's stage 2, no `ready`
   issue; [#314](https://github.com/mark-brannan/languette/pull/314) ships its config.
 
