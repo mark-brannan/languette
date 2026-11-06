@@ -148,17 +148,13 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
   verdict in the same PR, and the siblings that repeat it move onto it, or
   an issue names them. A guard that reads sequential or external facts (PR
   state, review threads, a transcript) is the exception, not the shape.
-- Current thinking, not settled: guards trend toward a rules engine with a
-  few deep special cases.
 - 2026-11-05, current thinking: the aim is a rules engine with no hand-built
-  guards, one that guards a wide range of general use cases for many kinds of
-  users. A few deep special cases are "ok (maybe)" but not the plan; they are
-  an exit. The test, in the maintainer's words: "if we add this new guard in
-  the engine, will it pollute the data access layer, or the engine, or the
-  rules/config, in such a way that it's a step function increase in
-  difficulty to maintain? Yes, then consider a special case outside the rules
-  engine. No, figure it out using the established pattern". This replaces
-  "a few deep special cases" above as the plan; it stays as the exit.
+  guards; a few deep special cases are "ok (maybe)", an exit.
+  The test: "if we add this new guard in the engine, will it pollute the data
+  access layer, or the engine, or the rules/config, in such a way that it's a
+  step function increase in difficulty to maintain? Yes, then consider a
+  special case outside the rules engine. No, figure it out using the
+  established pattern".
 - 2026-10-30: guard-sudo and deny-always enter by #198's stage 2, no `ready`
   issue; [#314](https://github.com/mark-brannan/languette/pull/314) ships its config.
 
