@@ -25,7 +25,8 @@ import re
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Need, context
+from languette.verdict import Need, Refuse, context
+from languette.work_losses import add_options
 
 NAME = "prose-budget-commit"
 OPT_IN = "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT"   # off unless set to true: the warning is for repos whose CI runs prose-budget
@@ -33,7 +34,7 @@ OPTION = "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"
 DEFAULT = "prose-budget"
 ENGINE_TIMEOUT = 50                 # under Claude Code's 60 s hook timeout; past it the engine counts as crashed
 GIT_TIMEOUT = 10
-_ADD_QUIET = re.compile(r"-[nv]+\Z|--(?:dry-run|verbose)\Z")
+_ADD_QUIET = frozenset(("dry-run", "verbose"))   # change nothing about what gets staged
 _VALUED = frozenset("-m --message -F --file -C --reuse-message -c --reedit-message --fixup --squash --author "
                     "--date --template".split())
 CI = "CI fails on this; fix before the push."
@@ -88,25 +89,21 @@ class _Commits:
             self.paths.append(p)
 
     def _collect_add(self, lo, hi):
-        w = self.s.w
-        for i in range(lo, hi + 1):
-            if w[i] == "--":
-                continue
-            if w[i].startswith("-"):
-                if re.fullmatch(r"--(?:a|al|all)", w[i]) or (re.fullmatch(r"-[A-Za-z]+", w[i]) and "A" in w[i]):
-                    self.allflag = self.allnew = True
-                elif re.fullmatch(r"--(?:u|up|upd|upda|updat|update)", w[i]) or \
-                        (re.fullmatch(r"-[A-Za-z]+", w[i]) and "u" in w[i]):
-                    self.allflag = True
-                elif _ADD_QUIET.match(w[i]):
-                    pass                       # -n/-v change nothing about what gets staged
-                else:
-                    self.allflag = self.allnew = True   # -f, -p, -i, or a flag this does not know: widen
-                continue
-            if self._isbad(i):
+        try:
+            opts, at = add_options(self.s.w[lo:hi + 1])
+        except Refuse:
+            opts, at = ["force"], []     # a flag this does not know: widen
+        if "all" in opts:
+            self.allflag = self.allnew = True
+        elif "update" in opts:
+            self.allflag = True
+        elif any(o not in _ADD_QUIET for o in opts):
+            self.allflag = self.allnew = True   # -f, -p, -i, or any other flag: widen
+        for i in at:
+            if self._isbad(lo + i):
                 self.bad = True
-                continue
-            self._add_path(w[i], True)
+            else:
+                self._add_path(self.s.w[lo + i], True)
 
     def _commit_tail(self, lo, hi):
         w = self.s.w

@@ -10,15 +10,15 @@ import sys
 from pathlib import Path
 
 import pytest
-from hamcrest import assert_that, contains_string, empty, equal_to, has_length, is_, is_not
+from hamcrest import assert_that, contains_string, empty, equal_to, is_, is_not
 
 import readme_table
 from harness import hooks_json_commands, hooks_json_prompt_command
 from languette import engine, run, scan
 from languette import issue_writes, opened_prs, posts
 from languette.guards import guard_signed_comments
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 # Spelled out, not read from run.GUARDS, so a guard dropped from run.GUARDS fails the comparisons below.
 GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
           "guard-private-terms", "prose-budget-commit", "guard-worktrees",

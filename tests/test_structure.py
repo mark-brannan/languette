@@ -20,8 +20,8 @@ from collections import Counter
 from pathlib import Path
 
 from hamcrest import assert_that, empty, equal_to
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {f.stem: importlib.import_module(f"languette.guards.{f.stem}")
           for f in sorted((ROOT / "languette" / "guards").glob("*.py")) if f.stem != "__init__"}
 # The walks that left languette/guards/ with their guards (what a call applies, what a post carries,

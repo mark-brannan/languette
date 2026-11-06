@@ -15,15 +15,14 @@ switches through one f-string prefix."""
 import ast
 import json
 import re
-from pathlib import Path
 
 import pytest
 from gherkin.parser import Parser
 from gherkin.pickles.compiler import Compiler
 
 from languette import run
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 PREFIX = "CLAUDE_PLUGIN_OPTION_"
 OPTIONS = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())["userConfig"]
 SWITCHES = sorted(k for k, v in OPTIONS.items() if v["type"] == "boolean")

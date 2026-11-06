@@ -880,6 +880,17 @@ def reaches(doc):
     return None if home is None and words is None else {"home": home, "reaches": words}
 
 
+def in_own_place(doc, top):
+    """`top` (a real path, not $HOME) is under this session's scratchpad, or is a linked
+    worktree the session recorded as its own: the test own_place applies, for a guard that
+    relaxes only where this session works."""
+    home = (doc.env or {}).get("HOME") or ""
+    sess = _Session(doc.payload, doc.env or {}, "", home)
+    if (yield from sess.in_pad(top)):
+        return True
+    return bool((yield Need("path", "isfile", os.path.join(top, ".git"))) and (yield from sess.recorded(top)))
+
+
 def own_places(doc, guard, found):
     """The `own-places` handler: each control the test found on, checkout-home first. The
     first refusal denies; else the dotfile managers' calls are asked about; else the notes,

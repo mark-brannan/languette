@@ -14,8 +14,8 @@ from hamcrest import assert_that, equal_to
 from pytest_bdd import given, parsers, then, when
 
 from harness import IN_PROCESS, ROOT, fixture_text, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
-from matchers import Verdict, asks, denies, is_silent, warns_about
-from languette import run, scan, terms, verdict, world
+from matchers import asks, denies, is_silent, warns_about
+from languette import run, scan, terms, verdict
 
 # --- Given ---------------------------------------------------------------
 
@@ -237,11 +237,35 @@ def _linked_worktree(ctx, path, repo):
         subprocess.run(["git", "-C", r, *GIT_IDENT, "commit", "-q", "--allow-empty", "-m", "init"], check=True)
     Path(d).parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "-C", r, "worktree", "add", "-q", "-b", Path(d).name, d], check=True)
+    if ctx.guard == "guard-git-work-loss":
+        # That guard relaxes only in a worktree this session entered: it is the session's own
+        # unless a scenario says "the session did not enter" it.
+        _session_record(ctx).open("a").write(f"{os.path.realpath(d)}\t{os.stat(Path(d) / '.git').st_ino}\n")
+
+
+def _session_record(ctx):
+    sid = re.sub(r"[^A-Za-z0-9_-]", "_", ctx.session)
+    return Path(ctx.doordir()) / f"languette-guard-worktrees.{sid}"
+
+
+@given(parsers.parse('the session did not enter "{path}"'))
+def _not_entered(ctx, path):
+    rec = _session_record(ctx)
+    top = os.path.realpath(ctx.expand(path))
+    keep = [ln for ln in rec.read_text().splitlines() if not ln.startswith(top + "\t")]
+    rec.write_text("".join(ln + "\n" for ln in keep))
 
 
 @given(parsers.parse('the symlink "{path}" to "{target}"'))
 def _symlink(ctx, path, target):
-    Path(ctx.expand(path)).symlink_to(ctx.expand(target))
+    # $HOME is shared by every scenario in a worker, so an earlier one may have
+    # left a directory where this link goes: the link replaces it.
+    link = Path(ctx.expand(path))
+    if link.is_symlink():
+        link.unlink()
+    elif link.is_dir():
+        shutil.rmtree(link)
+    link.symlink_to(ctx.expand(target))
 
 
 @given("another plugin's door file is already present")
