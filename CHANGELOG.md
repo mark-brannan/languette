@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.17](https://github.com/mark-brannan/languette/compare/v0.0.16...v0.0.17) (2026-11-06)
+
+
+### Features
+
+* **ask-first:** resolve a listed script where the command runs it ([#363](https://github.com/mark-brannan/languette/issues/363)) ([f8597cf](https://github.com/mark-brannan/languette/commit/f8597cf35713438937abb2e3449026a78d9cce4e))
+
 ## [0.0.16](https://github.com/mark-brannan/languette/compare/v0.0.15...v0.0.16) (2026-11-06)
 
 
