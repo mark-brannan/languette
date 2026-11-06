@@ -1,5 +1,9 @@
-"""guard-review-threads: a review bot's thread is resolved only on a fix or a
-record. The spec is features/guard-review-threads.feature.
+"""guard-review-threads' walk and its handler (languette/rules/guard_review_threads.py is the
+rule set): a review bot's thread is resolved only on a fix or a record. The spec is
+features/guard-review-threads.feature. The `thread-resolves` test reads, from the call's
+words alone, each gh call that may reach the GraphQL endpoint; the `thread-replies`
+handler reads the query files those calls name and each thread from GitHub, and gives the
+verdict.
 
 A Bash call that resolves a review thread (`gh api graphql` whose query, in
 its fields, in a file a field or --input names, or in a heredoc fed to
@@ -26,8 +30,6 @@ from languette import scan as sw
 from languette.messages import say
 from languette.verdict import Need, ask, deny
 
-NAME = "guard-review-threads"
-OPT_IN = "CLAUDE_PLUGIN_OPTION_GUARD_REVIEW_THREADS"
 OPTION = "CLAUDE_PLUGIN_OPTION_REVIEW_THREAD_LOGINS"
 RESOLVE = re.compile(r"(?<![A-Za-z0-9_])resolveReviewThread(?![A-Za-z0-9_])")
 THREAD = re.compile(r"PRRT_[A-Za-z0-9_-]+")
@@ -163,11 +165,11 @@ def _read(p):
         return None
 
 
-def _resolves(doc, command, cwd, home=""):
-    """(thread ids, why): the PRRT_ ids each resolving gh call in `command`
+def _resolves(calls):
+    """(thread ids, why): the PRRT_ ids each resolving gh call of `calls` (_calls's records)
     names, in order, and why one of them cannot be read, or None."""
     ids = []
-    for rec in _calls(doc, command, cwd, home):
+    for rec in calls:
         if rec["why"]:
             return ids, rec["why"]
         text, query = rec["text"], rec["query"]
@@ -206,7 +208,7 @@ def _bot(c):
     return refs.bot(a.get("login"), a.get("__typename")) or _login(c) in BOTS
 
 
-def _judge(tid, viewer, comments, also=()):
+def _judge(guard, tid, viewer, comments, also=()):
     """deny for one thread, or None. The viewer's comments are replies, even
     when the viewer is itself a bot; so is a comment from a login in the
     review_thread_logins option, unless it opens the thread. The thread's
@@ -219,9 +221,9 @@ def _judge(tid, viewer, comments, also=()):
         return None
     mine = [c for c in comments[bots[-1] + 1:] if _login(c) in me]
     if not mine:
-        return deny(say("rt_no_reply", guard=NAME, tid=tid, viewer=viewer, do=DO))
+        return deny(say("rt_no_reply", guard=guard, tid=tid, viewer=viewer, do=DO))
     if not any(SHA.search(str(c.get("body") or "")) or LINK.search(str(c.get("body") or "")) for c in mine):
-        return deny(say("rt_no_link", guard=NAME, tid=tid, do=DO))
+        return deny(say("rt_no_link", guard=guard, tid=tid, do=DO))
     return None
 
 
@@ -244,20 +246,32 @@ def _thread(cwd, tid):
     return viewer, [c for c in comments if isinstance(c, dict)]
 
 
-def check(doc):
+def resolves(doc):
+    """The `thread-resolves` test: {"calls": _calls's records, "cwd": the payload's cwd when
+    absolute, else ""} for a Bash command holding a gh call that may reach the GraphQL
+    endpoint and is not a plain read, or None."""
     cmd = doc.command
     if not isinstance(cmd, str):
         return None
     cwd = doc.payload.get("cwd")
     cwd = cwd if isinstance(cwd, str) and cwd.startswith("/") else ""
-    ids, why = yield from _resolves(doc, cmd, cwd, (doc.env or {}).get("HOME") or "")
+    calls = _calls(doc, cmd, cwd, (doc.env or {}).get("HOME") or "")
+    return {"calls": calls, "cwd": cwd} if calls else None
+
+
+def replies(doc, guard, found):
+    """The `thread-replies` handler: the thread ids the calls the `thread-resolves` test found
+    name, each read from GitHub and judged; a call it cannot read denies, GitHub that cannot
+    answer asks."""
+    cwd = found["cwd"]
+    ids, why = yield from _resolves(found["calls"])
     if why:
-        return deny(say("rt_unknown_thread", guard=NAME, why=why, do=DO))
+        return deny(say("rt_unknown_thread", guard=guard, why=why, do=DO))
     for tid in ids:
         got = yield from _thread(cwd, tid)
         if isinstance(got, str):
-            return ask(say("rt_unreadable", guard=NAME, tid=tid, got=got))
-        v = _judge(tid, *got, sw.listed((doc.env or {}).get(OPTION)))
+            return ask(say("rt_unreadable", guard=guard, tid=tid, got=got))
+        v = _judge(guard, tid, *got, sw.listed((doc.env or {}).get(OPTION)))
         if v:
             return v
     return None
