@@ -647,3 +647,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261106t125452z
 - guard-review-threads, guard-signed-comments and prose-budget-commit each move as one rule: splitting would let rule order decide between verdicts the code orders. Undo: split a guard's rule per switch ([#366](https://github.com/mark-brannan/languette/pull/366))
+
+### 20261106t125511z
+- The moved walks' tests are thread-resolves, comment-posts and prose-commits; their handlers thread-replies, signatures and prose-budget. Undo: rename in primitives.py and the rule sets ([#366](https://github.com/mark-brannan/languette/pull/366))
