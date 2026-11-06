@@ -20,7 +20,10 @@ was meant to cover.
 A match entry is a command word (`cmd`, by basename) followed by `args` as
 a run of its non-option words (so an option's value, `npm --prefix web run
 x`, cannot hide it), and/or any later word that is `script` or ends in
-`/script`. npm, pnpm, yarn and bun stand in for each other (`yarn
+`/script`, or is the file <project>/`script` where the word runs: the
+payload's cwd, moved by an earlier cd in the command. A cd the scanner cannot
+follow (a variable, `cd -`, popd) leaves that unknown, and then any word
+naming the script's file is it. npm, pnpm, yarn and bun stand in for each other (`yarn
 e2e` is `npm run e2e`, `run-script` is `run`), and npx, bunx,
 `pnpm exec|dlx` and `yarn exec|dlx` launch `cmd`. Wrappers, chains, `sh -c "..."` and `echo ... |
 sh` are seen through by the scanner; prose (grep, git commit -m, cat, echo
@@ -40,11 +43,13 @@ AskUserQuestion is denied unseen, the deny says no one can approve it instead
 of sending the agent to ask.
 """
 
+import os
+
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
 from languette.secrets import quote
-from languette.verdict import NO_QUESTION, Refuse, approve, deny
+from languette.verdict import NO_QUESTION, Need, Refuse, approve, deny
 
 CONFIG = ".languette/ask-first.json"
 
@@ -57,6 +62,14 @@ def _config(payload, env):
     if path is None and not usable:
         raise Refuse(say("af_cwd_not_dir", cwd=repr(payload.get("cwd") or "(none)")))
     return path
+
+
+def _start(payload):
+    """The directory the command starts in, as the list's path was found (realpath), or None."""
+    cwd = payload.get("cwd")
+    if not (isinstance(cwd, str) and cwd.startswith("/") and (yield Need("path", "isdir", cwd))):
+        return None
+    return (yield Need("path", "realpath", cwd))
 
 
 def _own(c, where):
@@ -93,9 +106,14 @@ def approval(doc, guard, found):
         commands = yield from _load(path)
     except Refuse as e:
         return deny(say("ask_first_invalid", path=path, err=e))
+    at = None
+    root = os.path.dirname(os.path.dirname(path))
+    if root.startswith("/") and any("script" in e for c in commands for e in c["match"]):
+        start = yield from _start(payload)
+        at = (start, root)
     runs, looped = {}, []
     for c in commands:
-        m = [sw.match_rule(doc, e)[:2] for e in c["match"]]
+        m = [sw.match_rule(doc, e, at=at)[:2] for e in c["match"]]
         # Entries may describe the same run two ways (npm run x, tsx x.ts); count the widest.
         n = max(k for k, _ in m)
         if n:
