@@ -680,3 +680,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t095558z
 - The split modules are flat beside scan.py, not a scan/ package, so the purity walk that follows imports by file is unchanged Undo: move them into a scan/ package and teach the purity walk packages ([#372](https://github.com/mark-brannan/languette/pull/372))
+
+### 20261110t095603z
+- Split module names: quoting, lexicon, ladder, lexer, cd_tracking, forges, git_calls, texts, stops, command_rules Undo: rename ([#372](https://github.com/mark-brannan/languette/pull/372))
