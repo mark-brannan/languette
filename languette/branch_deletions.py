@@ -35,6 +35,7 @@ from languette.verdict import Need, ask, deny
 
 _REPO = re.compile(r"(?:^|/)repos/[^/]+/[^/]+/")
 _SHORT_O = re.compile(r"-[^o=-]*o\Z")   # -o, or a cluster ending in it (-fo): the value is the next word
+_SHORT_D = re.compile(r"-[^o=-]*d")     # -d, or a cluster holding it (-qd, -do): what follows an o is its value
 TIMEOUT = 20
 LIST = "  gh pr list --state open --json number,baseRefName,headRefName"
 # Each forge's client, a row (docs/design/forges.md): how it lists open PRs on a branch,
@@ -74,18 +75,20 @@ def _git_push(s, a, b, nested, out):
         repo = "?"
     if any(s.k[i] == "w" and (s.w[i] == "-C" or s.w[i].startswith("--git-dir")) for i in range(g + 1, p)):
         repo = "?"
-    words, skip, valued = [], False, sw.PROGRAMS["git push"]["valued"]
+    words, skip, delete, valued = [], False, False, sw.PROGRAMS["git push"]["valued"]
     for i in range(p + 1, b + 1):
         if s.k[i] != "w":
             continue
         w = s.w[i]
         if skip:                               # the value of -o, --repo, ...: not the remote, not a ref
             skip = False
-        elif _SHORT_O.match(w) or (len(w) >= 3 and "=" not in w and any(v.startswith(w) for v in valued)):
+            continue
+        if _SHORT_D.match(w) or (len(w) > 3 and "--delete".startswith(w)):
+            delete = True                      # --d alone is ambiguous with --dry-run, and git refuses it
+        if _SHORT_O.match(w) or (len(w) >= 3 and "=" not in w and any(v.startswith(w) for v in valued)):
             skip = True                        # git takes any unambiguous prefix of a long option
         else:
             words.append(w)
-    delete = any(w in ("--delete", "-d") for w in words)
     seen_remote = False
     for w in words:
         if w.startswith(":"):                  # a deletion with or without --delete, never the remote
