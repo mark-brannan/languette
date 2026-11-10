@@ -31,6 +31,7 @@ from pathlib import Path
 
 import pytest
 
+from harness import stand_in
 from languette import run, scan
 
 PINS = Path(__file__).resolve().parent / "io_counts.json"
@@ -99,8 +100,8 @@ def pipeline(engine, request, monkeypatch):
         assert len(state["ladder"]) <= 1, f"the parser ladder ran {len(state['ladder'])} times in one call"
         return out
 
-    monkeypatch.setattr(scan, "Scan", Counted)
-    monkeypatch.setattr(scan, "parse", parse)
+    stand_in(monkeypatch, "Scan", Counted)
+    stand_in(monkeypatch, "parse", parse)
     monkeypatch.setattr(run, "_finding", finding)
     monkeypatch.setattr(run, "respond", respond)
     yield
