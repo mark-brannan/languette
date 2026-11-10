@@ -47,6 +47,9 @@ Feature: guard-git-stacked-base
       | git push origin :refs/heads/claude/base-branch           | a colon refspec, qualified    |
       | git push origin --delete refs/heads/claude/base-branch   | refs/heads/ prefix stripped   |
       | git push --delete origin claude/base-branch              | --delete before the remote    |
+      | git push --del origin claude/base-branch                 | a prefix git takes            |
+      | git push -qd origin claude/base-branch                   | -d in a cluster               |
+      | git push -do ci.skip origin claude/base-branch           | -d in a cluster ending in -o  |
       | git push origin --delete claude/spare claude/base-branch | one of several refs is a base |
       | yadm push origin --delete claude/base-branch             | yadm is git                   |
       | vcsh dots push origin --delete claude/base-branch        | vcsh is git                   |

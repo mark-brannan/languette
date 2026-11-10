@@ -165,14 +165,11 @@ def _read(path, ctx):
 def _text(got):
     """A planned read's answer: the file's text, or the Refuse the world's
     exception comes to."""
-    if isinstance(got, UnicodeDecodeError):
-        return Refuse(say("unreadable_file", err=got))
-    if isinstance(got, OSError):
-        return Refuse(say("unreadable_file", err=got.strerror or got))
-    if isinstance(got, ValueError):            # not a regular file, or past MAX_READ
-        return Refuse(say("passed", text=got))
     if isinstance(got, Exception):
-        raise got
+        refusal = paths.read_refusal(got)
+        if refusal is None:
+            raise got
+        return refusal
     return got
 
 

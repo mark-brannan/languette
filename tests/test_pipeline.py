@@ -7,6 +7,7 @@ import os
 
 import pytest
 
+from harness import stand_in
 from languette import scan
 from languette.document import Document
 from pipeline_checks import PIN_KINDS, PINS
@@ -29,7 +30,7 @@ def test_a_document_is_read_only():
 def test_each_text_is_scanned_once_whoever_asks(monkeypatch):
     made = []
     real = scan.Scan
-    monkeypatch.setattr(scan, "Scan", lambda text: made.append(text) or real(text))
+    stand_in(monkeypatch, "Scan", lambda text: made.append(text) or real(text))
     d = doc('sh -c "rm -rf x" | tee y')
     for _ in range(3):
         for t, _nested in d.texts():
@@ -55,7 +56,7 @@ def test_a_refusal_is_kept(monkeypatch, command):
     d = doc(command)
     e = d.refusal
     assert isinstance(e, scan.Unparseable)
-    monkeypatch.setattr(scan, "parse", lambda *a, **kw: pytest.fail("the ladder ran again"))
+    stand_in(monkeypatch, "parse", lambda *a, **kw: pytest.fail("the ladder ran again"))
     assert d.refusal is e
 
 
@@ -65,7 +66,7 @@ def test_a_crash_is_kept_and_raised_on_every_read(monkeypatch):
     def boom(text, words=False):
         runs.append(text)
         raise RuntimeError("boom")
-    monkeypatch.setattr(scan, "parse", boom)
+    stand_in(monkeypatch, "parse", boom)
     d = doc("echo hi")
     for _ in range(2):
         with pytest.raises(RuntimeError, match="boom"):
