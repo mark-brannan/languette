@@ -6,7 +6,7 @@ Issues and pull requests are welcome. A vulnerability goes through
 ## A pull request
 
 Run the suite before you push; the README's
-[Working on it](README.md#working-on-it) has the other commands.
+[Working on it](README.md#working-on-it) has the rest.
 
 ```
 python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements-dev.txt
@@ -23,12 +23,12 @@ A guard never comes straight from a miss. The issue gives:
 - its root cause
 - the hazard: why it could ruin your day; a wasted hour is not one
 - the concept: a setting of an existing guard, or a new one
-- the name: a row of [the approved names](docs/approved-guard-names.md), or one proposed for it
+- the name: a row of [the approved names](docs/approved-guard-names.md), or one proposed there
 
 A miss is often a workflow gap, and a guard at most a backstop for it.
 
-Prototype it outside this repository. A pull request here, even a draft,
-waits for the maintainer's `ready` label on the issue.
+Prototype it elsewhere. A pull request here, even a draft, waits for the
+maintainer's `ready` label on the issue.
 
 ## Building a guard
 
@@ -41,7 +41,7 @@ first.
 
 - has no feature file
 - keeps a constant the shared layer or another guard holds
-- reads a call field from the payload, not from Document
+- reads a call field from the payload, not Document
 - says a sentence outside `languette/messages.py`
 - touches the disk, the network, the clock or a program; it asks the runner, with a Need
 
