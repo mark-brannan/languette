@@ -44,14 +44,15 @@ terminal, a human or a typed command.
 | 10 | `CLAUDE_PLUGIN_OPTION_NAME=false claude ...` | Bash `command` | silent | Sets the option for a nested `claude` only, not this session's guards |
 | 11 | Files under `.languette/` (`ask-first.json`, `secrets.json`) and the terms files | Edit/Write or Bash | silent | Same shape as 6 and 7. `ask-first.json` lists the runs that ask; removing an entry loosens |
 
-No row had already gone: every row above is silent on today's `main`, as it was at the
-review's `a23b406` and the plan's `7cb6452`.
+No row had already gone: every row above is silent on `main` at 3fbb3cd, as it was when
+#371 landed (`7cb6452`).
 
 ## Findings
 
 1. **No payload field tells the user from the agent.** A hook fires only on the model's
    own tool calls; a command the user types at their own shell never reaches it. So
-   every payload it sees is the agent's, and "who is asking" has no answer in the call.
+   every payload it sees is the agent's (the `!` prompt prefix is the one open case,
+   under Not measured), and "who is asking" has no answer in the call.
    `agent_id` and `agent_type` tell a subagent from the main session, which is a
    different question. `permission_mode` carries the user's mode, not the author of the
    call. The doctor's `y/N` prompt (`doctor.py`, `fix`) rests on `sys.stdin.isatty()`;
