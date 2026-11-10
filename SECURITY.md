@@ -9,7 +9,9 @@ languette.
 ## What counts as a vulnerability
 
 - A secret written to the decision record.
-- Text from a command, a file or a web page reaching the agent as languette's instruction.
+- Text from a command, a file or a web page reaching the agent as an
+  instruction from languette. Languette's own configuration is the exception,
+  below.
 - Languette running any part of a command it is only meant to read.
 
 ## What does not count
@@ -19,8 +21,12 @@ languette.
 - A guard that allows a command the README says it denies.
 - A guard that fails open: an error, a missing tool or a malformed input lets
   a command through.
-- A `why` or other languette config text reaching the agent on a deny or ask: the design, see [#383](https://github.com/mark-brannan/languette/issues/383).
-- An agent loosening its own guards through `languette config` or settings: known, see [#384](https://github.com/mark-brannan/languette/issues/384).
+- Text from languette's own configuration, such as a rule's `why`, reaching
+  the agent when a guard denies or asks. Languette is designed to do that;
+  [#383](https://github.com/mark-brannan/languette/issues/383) discusses it.
+- An agent loosening its own guards through `languette config` or the settings
+  file. That is a known gap;
+  [#384](https://github.com/mark-brannan/languette/issues/384) discusses it.
 
 [Open an issue](https://github.com/mark-brannan/languette/issues) for any of
 these. If you think one puts people at more risk than running without
