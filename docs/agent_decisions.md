@@ -665,3 +665,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t094319z
 - Clean-machine proof runs weekly and on dispatch, not per push, on both OS legs; undo: delete the workflow (no PR, branch claude/clean-machine)
+
+### 20261110t094322z
+- By-hand wrapper section renamed 'If you cannot run the installer' and moved under Install as a subsection; undo: revert the README hunk (no PR, branch claude/clean-machine)
