@@ -1,5 +1,5 @@
 """The `languette` command: `languette install`, `languette uninstall`,
-`languette doctor` or `languette scan`; from a clone, `python3 -m languette ...`; from a plugin install, `python3 -I
+`languette config`, `languette doctor` or `languette scan`; from a clone, `python3 -m languette ...`; from a plugin install, `python3 -I
 "$PLUGIN_ROOT/languette/__main__.py" ...`. `scan` is experimental: its
 output may change in any release while "languette_scan" is a v0 version."""
 
@@ -88,6 +88,15 @@ def main(argv=None):
                                      "Exits 1 on any ✗.")
     uni.add_argument("host", nargs="?", default="claude", type=_host, metavar="HOST",
                      help="the coding agent to unwire: claude (the default, and the only one today)")
+    cfg = sub.add_parser("config", help="list languette's options, or set or unset them; exits 1 on any ✗",
+                         description="With no arguments, list every option, its value and where it is set. "
+                                     "Otherwise set each NAME=VALUE and put each --unset NAME back to its default, "
+                                     "through the claude command; this writes nothing itself. Every value is "
+                                     "judged as its guard would read it first, and one it would refuse writes "
+                                     "nothing. Exits 1 on any ✗.")
+    cfg.add_argument("pairs", nargs="*", metavar="NAME=VALUE", help="an option to set, by its underscore name")
+    cfg.add_argument("--unset", action="append", default=[], metavar="NAME",
+                     help="put the option back to its default; repeatable")
     doc = sub.add_parser("doctor", help="say whether languette protects Claude Code here; exits 1 on any ✗",
                          description="Say whether languette protects Claude Code on this machine, from the current "
                                      "directory. Exits 1 on any ✗.", add_help=False)
@@ -105,6 +114,9 @@ def main(argv=None):
     one.add_argument("--restore-redacted-terms", action="store_true",
                      help="instead, repair the default entries in the redacted terms file: show the diff, write "
                           "it on a yes; your own lines and a commented-out default are left alone")
+    one.add_argument("--fix", action="store_true",
+                     help="instead, put each option its guard refuses back to its default, through languette "
+                          "config, showing the diff; the checks offer it at a terminal")
     sc = sub.add_parser("scan", help="(experimental) read a shell command on stdin and print its segments as JSON",
                         description="Read a shell command on stdin, as the Bash tool would run it, and print one "
                                     "JSON document of the segments the guards would judge, nested texts included. "
@@ -129,6 +141,9 @@ def main(argv=None):
     if args.command == "uninstall":
         from languette import uninstall
         return uninstall.main(args.host)
+    if args.command == "config":
+        from languette import config
+        return config.main(args.pairs, args.unset)
     from languette import doctor
     return doctor.main(args)
 

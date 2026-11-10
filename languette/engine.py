@@ -184,6 +184,13 @@ def _denial(rule, cmd, file):
                why=(rule.get("why") or "the rule file lists it").rstrip("."))
 
 
+def repo_rules(path, rules):
+    """The rules of the repo's file at path, beside the set's own loaded `rules`, whose ids it may
+    not take; Refuse naming the fault when it does not load."""
+    return (yield from paths.read_rules(path, "rules", ("action", "why"), _repo, many=True,
+                                        taken={r["id"] for r in rules}, match_keys=sw.ENGINE_MATCH_KEYS))
+
+
 class Guard:
     """The guard a rule set module's RULE_SET is. Its judging code is this
     module's, so __file__ names it, and check(doc) takes the call alone, as a
@@ -251,8 +258,7 @@ class Guard:
         if path is None:
             return None if usable else say("rules_cannot_look", cwd=doc.payload.get("cwd") or "(none)")
         try:
-            found = yield from paths.read_rules(path, "rules", ("action", "why"), _repo, many=True,
-                                                taken={r["id"] for r in rules}, match_keys=sw.ENGINE_MATCH_KEYS)
+            found = yield from repo_rules(path, rules)
         except Refuse as e:
             return say("rules_bad", file=path, err=e)
         for rule in found:

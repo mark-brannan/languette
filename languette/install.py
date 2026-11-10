@@ -39,10 +39,10 @@ def _first_line(r):
     return f"exit {r.returncode}, no output"
 
 
-def _claude(claude, *args):
+def _claude(claude, *args, stdin=None):
     """(CompletedProcess or None, what went wrong when it did not run)."""
     try:
-        return subprocess.run([claude, *args], capture_output=True, text=True, timeout=STEP_TIMEOUT), None
+        return subprocess.run([claude, *args], input=stdin, capture_output=True, text=True, timeout=STEP_TIMEOUT), None
     except subprocess.TimeoutExpired:
         return None, f"`claude {' '.join(args)}` ran past {STEP_TIMEOUT} s"
     except OSError as e:

@@ -10,8 +10,9 @@ Feature: doctor
   something it needs failed is a ! row saying so, never skipped silently,
   except fail-closed: no hook to probe means no protection, so it is ✗.
   Rows run in this order: version, shell parser, parse check, fail-closed,
-  Claude Code (its guards beneath it), gh, the other forge clients, redacted
-  terms, blocked terms. A row's detail lines are indented beneath it.
+  Claude Code (its guards beneath it), gh, the other forge clients, configs,
+  redacted terms, blocked terms; a configs row that denies every command comes
+  first. A row's detail lines are indented beneath it.
 
   Background:
     Given a fake HOME
@@ -340,6 +341,57 @@ Feature: doctor
     When the doctor runs
     Then the "redacted terms" row is ✗ "redacted_terms_file is ~/no-such.tsv, which does not exist: every public post is denied until it does"
     And the doctor exits 1
+
+  # Every other config, through its guard's own loader: the plugin's options and
+  # every file under .languette/.
+  Scenario: options and repo files that load make a ✓ configs row
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{}`
+    And "~/project/.languette/secrets.json" holds `{"patterns": []}`
+    When the doctor runs
+    Then the "configs" row is ✓ "every option and 1 file under .languette/ load as their guards read them"
+    And beneath it "~/project/.languette/secrets.json" is ✓
+    And the "gh" row comes before the "configs" row
+
+  Scenario: a repo file that does not load is reported first, as it denies every command
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{}`
+    And "~/project/.languette/deny-always.json" holds `{"rules": 3}`
+    When the doctor runs
+    Then the "configs" row is ✗ "every Bash command is denied until ~/project/.languette/deny-always.json loads"
+    And it prints "✗ ~/project/.languette/deny-always.json: the top level must be"
+    And the "configs" row comes before the "version" row
+    And the doctor exits 1
+
+  Scenario: a repo file whose guard is off, or that no guard reads, is a warning
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{"ask_first": false}`
+    And "~/project/.languette/ask-first.json" holds `[]`
+    And "~/project/.languette/notes.json" holds `{}`
+    When the doctor runs
+    Then the "configs" row is ! "every option and 2 files under .languette/ load as their guards read them"
+    And beneath it "~/project/.languette/notes.json: no guard reads it" is !
+    And the doctor exits 0
+
+  Scenario: an option its guard refuses fails the row, and the fix is offered as a diff
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{"signed_comments_signature": "("}`
+    When the doctor runs
+    Then the "configs" row is ✗ "1 option its guard refuses"
+    And beneath it "signed_comments_signature: is not a regular expression (missing ), unterminated subpattern at position 0)" is ✗
+    And it prints "-signed_comments_signature=("
+    And it prints "+signed_comments_signature="
+    And the last line is "! to write it: languette doctor --fix"
+    And the stored options are `{"signed_comments_signature": "("}`
+    And the doctor exits 1
+
+  Scenario: --fix writes the default through the host, showing the diff
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{"signed_comments_signature": "(", "guard_sudo": true}`
+    When the doctor runs with `--fix`
+    Then it prints ✓ "signed_comments_signature: ( → (empty) (its default)"
+    And the stored options are `{"signed_comments_signature": "", "guard_sudo": true}`
+    And the doctor exits 0
 
   # Mending configuration: a default entry is a copied line tagged default:<name>@<version>
   # in its comment column; the user's own lines are never touched.

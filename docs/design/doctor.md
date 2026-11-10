@@ -18,12 +18,12 @@ helps write a config that works.
 ## What it does
 
 1. **Checks protection and its dependencies:** a ✓, ! or ✗ row per check, details beneath; any ✗ exits non-zero.
-2. **Diagnoses every config** through the guard's own loader. (planned)
-3. **Offers the fix** as a diff, applied only on a yes. (planned)
+2. **Diagnoses every config** through the guard's own loader.
+3. **Offers the fix** as a diff, applied only on a yes.
 4. **Assists with configuration,** not only repair. (planned)
 
 The checks run in order, and a ✗ never stops a later one: version, shell parser, parse-check and fail-closed
-probes, the install with its guards beneath it, the forge clients, the terms
+probes, the install with its guards beneath it, the forge clients, the configs, the terms
 files. `shfmt`, the preferred parser, has top billing; without it the doctor
 names the rung that reads commands instead. `gh` is optional; without it guards ask the user. Every other forge client installed gets a
 row, a warning when signed in: the agent can act through it unseen. The configs are the plugin's options and every file
