@@ -205,6 +205,38 @@ Feature: guard-private-terms
       | gh pr comment o/r#1 -b Wanderlust                                        |
       | gh api graphql -f query='mutation { addComment(input:{body:"Wanderlust"}) { clientMutationId } }' |
 
+  # A query the command's words do not show cannot be shown to be a read.
+  @also_guard-signed-comments
+  Scenario: a graphql call whose query is in a file or a heredoc is judged, its target unknown
+    Given CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS is "you/notes"
+    And a project directory
+    And the file "q.graphql" holds:
+      """
+      mutation { addComment(input:{subjectId:"I_1", body:"seen aboard Wanderlust"}) { clientMutationId } }
+      """
+    And the file "q.json" holds:
+      """
+      {"query": "mutation($b: String!) { addComment(input:{body:$b}) { clientMutationId } }", "variables": {"b": "seen aboard Wanderlust"}}
+      """
+    When the agent runs `gh api graphql -F query=@{PROJ}/q.graphql`
+    Then the guard denies, naming "Wanderlust"
+    When the agent runs `gh api graphql --input {PROJ}/q.json`
+    Then the guard denies, naming "Wanderlust"
+    When the agent runs:
+      """
+      gh api graphql --input - <<'EOF'
+      {"query": "mutation($b: String!) { addComment(input:{body:$b}) { clientMutationId } }", "variables": {"b": "seen aboard Wanderlust"}}
+      EOF
+      """
+    Then the guard denies, naming "Wanderlust"
+    When the agent runs:
+      """
+      gh api graphql --input - <<'EOF'
+      {"query": "{ viewer { login } }"}
+      EOF
+      """
+    Then the guard is silent
+
   # glab's own docs: https://docs.gitlab.com/cli/mr/create/, /cli/mr/update/ and
   # /cli/issue/update/ (-t, --title, -d, --description, --description-file, -l,
   # --label), /cli/mr/note/create/ and /cli/issue/note/ (-m, --message; alias
@@ -1036,6 +1068,14 @@ Feature: guard-private-terms
         gh pr comment 3 -R o/r --body "$body"
         """
       Then the guard denies
+      When the agent runs:
+        """
+        b=$(cat <<EOF
+        public text
+        EOF
+        ); b="$(cat notes.md)"; gh pr comment 3 -R o/r --body "$b"
+        """
+      Then the guard denies, naming "run time"
 
     Scenario Outline: single quotes make $ and a backtick ordinary characters, double quotes do not
       When the agent runs `<command>`
@@ -1353,6 +1393,20 @@ Feature: guard-private-terms
         gh pr comment 5 -R o/r --body-file {PROJ}/mut.md
         """
       Then the guard denies, naming "mut.md"
+
+    # The file on disk is what it held before the command ran, not what it will post.
+    @also_guard-signed-comments
+    Scenario: a file the command writes by anything but one heredoc is not read as it stood before
+      When the agent runs `printf 'seen aboard Wanderlust' > {PROJ}/clean.md && gh issue comment 3 -R o/r -F {PROJ}/clean.md`
+      Then the guard denies, naming "clean.md cannot be read"
+      When the agent runs:
+        """
+        cat > {PROJ}/body.md <<'EOF'
+        all public here
+        EOF
+        gh issue comment 3 -R o/r -F {PROJ}/body.md
+        """
+      Then the guard is silent
 
     Scenario: . and .. in the path a heredoc writes and posts collapse
       Given the working directory is "{PROJ}/proj"

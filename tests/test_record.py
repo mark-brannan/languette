@@ -247,6 +247,7 @@ def test_a_guard_name_nothing_has_is_a_deny(tmp_path):
 
 
 def test_the_record_reads_the_runs_one_parse(tmp_path, monkeypatch):
+    from harness import stand_in
     from languette import scan
     calls = []
     real = scan.parse
@@ -255,7 +256,7 @@ def test_the_record_reads_the_runs_one_parse(tmp_path, monkeypatch):
         if not words:
             calls.append(text)
         return real(text, words)
-    monkeypatch.setattr(scan, "parse", counting)
+    stand_in(monkeypatch, "parse", counting)
     run.respond(_payload("ls -la"), _env(tmp_path), None)
     [rec] = _records(tmp_path)
     assert rec["rung"] and calls == ["ls -la"]

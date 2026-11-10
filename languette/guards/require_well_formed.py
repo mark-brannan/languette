@@ -1,7 +1,7 @@
 """require-well-formed: a Bash command the parser refuses is denied, whole, before
 anything in it runs.
 
-The parser is languette/scan.py's ladder, read top down: shfmt, `bash -n`,
+The parser is languette/ladder.py, read top down: shfmt, `bash -n`,
 then the awk lexer, which refuses only a quote that never closes. The deny
 names the rung that refused and what it found, with the position when the
 rung gives one or a pip parser adds it, since an agent that is told only

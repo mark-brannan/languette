@@ -209,8 +209,8 @@ def test_a_command_rules_cmd_picks_the_program_it_matches():
 
 
 # The parser ladder's pip parsers (docs/decisions.md, "Runtime dependencies"):
-# optional, and imported only by scan.py, which reads on without them.
-LADDER = {"languette/scan.py": {"tree_sitter", "tree_sitter_bash", "bashlex"}}
+# optional, and imported only by ladder.py, which reads on without them.
+LADDER = {"languette/ladder.py": {"tree_sitter", "tree_sitter_bash", "bashlex"}}
 
 
 def test_languette_imports_only_the_standard_library():
