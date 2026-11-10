@@ -48,7 +48,7 @@ class Need:
         ruleset-cache slug, branch        -> (mtime, text), or None
         clock                             -> seconds since the epoch
         worktree      op, *args           -> guard-worktrees' per-session record: arrive rec, top
-                                             -> (usable, adopt); recorded rec, top -> bool;
+                                             -> (usable, adopt); kept rec -> bool; recorded rec, top -> bool;
                                              scratchpad sid -> dir, or None
         approvals     {label: runs}       -> {label: [AskUserQuestion ids]}: the user's yeses to
                                              each label this call may spend, its own first; read only
@@ -102,6 +102,8 @@ def spend(kind, *args, lost=None):
 
     A spend that can no longer be made (a parallel call took it first) makes the
     call a deny, for the reason `lost`; the runner words a lost approvals spend."""
+    if not lost and kind != "approvals":       # a deny with no reason; the guard's crash is one
+        raise ValueError(f"spend({kind!r}) needs lost=, its deny reason")
     return {SPEND: [[kind, *args]], **({LOST: lost} if lost else {})}
 
 

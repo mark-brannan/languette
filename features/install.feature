@@ -13,7 +13,7 @@ Feature: install
   Scenario: without claude on PATH it fails and asks nothing
     Given claude is not on PATH
     When install runs
-    Then the install "Claude Code" row is ✗ "the claude command is not on PATH; install Claude Code, or see Installing by hand in the README"
+    Then the install "Claude Code" row is ✗ "the claude command is not on PATH; install Claude Code, or see the README section If you cannot run the installer"
     And install exits 1
     And the fake HOME is as it was before install
 

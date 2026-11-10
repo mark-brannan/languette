@@ -91,8 +91,8 @@ def claude_rows(cwd):
     """[(mark, label, text)]: each step run, stopping at the first ✗."""
     claude = shutil.which("claude")
     if not claude:
-        return [(FAIL, "Claude Code", "the claude command is not on PATH; install Claude Code, or see "
-                                      "Installing by hand in the README")]
+        return [(FAIL, "Claude Code", "the claude command is not on PATH; install Claude Code, or see the README section "
+                                      "If you cannot run the installer")]
     try:
         inst = doctor.in_effect(doctor.installs(doctor.settings_files(cwd)), cwd)
     except doctor.Unreadable as e:

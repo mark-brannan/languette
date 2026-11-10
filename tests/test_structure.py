@@ -20,8 +20,8 @@ from collections import Counter
 from pathlib import Path
 
 from hamcrest import assert_that, empty, equal_to
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 GUARDS = {f.stem: importlib.import_module(f"languette.guards.{f.stem}")
           for f in sorted((ROOT / "languette" / "guards").glob("*.py")) if f.stem != "__init__"}
 # The walks that left languette/guards/ with their guards (what a call applies, what a post carries,
@@ -34,7 +34,10 @@ WALKS = {m: importlib.import_module(f"languette.{m}")
          for m in ("labels", "posts", "hook_skips", "branch_deletions", "infra_runs", "listed_runs",
                    "pushes", "untrusted_reads", "issue_writes", "opened_prs", "work_losses",
                    "worktree_reaches", "thread_resolves", "comment_posts", "prose_commits")}
-SHARED = {m: importlib.import_module(f"languette.{m}") for m in ("scan", "paths", "verdict", "document", "secrets", "refs")}
+# scan and the modules it re-exports from (languette/scan.py).
+SHARED = {m: importlib.import_module(f"languette.{m}")
+          for m in ("scan", "quoting", "lexicon", "ladder", "lexer", "cd_tracking", "forges", "git_calls", "texts",
+                    "stops", "command_rules", "paths", "verdict", "document", "secrets", "refs")}
 
 # The fields of the call Document reads once; a guard reads them from the Document.
 DOCUMENT_FIELDS = {"tool_name", "tool_input", "hook_event_name", "permission_mode"}

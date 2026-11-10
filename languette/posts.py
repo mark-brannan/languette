@@ -56,12 +56,14 @@ path's project; :id is the cwd's, a numeric id unknown.
 
 The target repo is --repo/-R, GH_REPO=, a positional URL or owner/repo#n, the
 gh api path, or MCP owner/repo; failing those, the cwd's remote (the only one, else the one gh resolves), unless
-the command runs a `cd`. A graphql mutation's repo is unknown. Unknown is
+the command runs a `cd`. A graphql mutation's repo is unknown, and so is that of
+a graphql call whose query is not written out in the command's words. Unknown is
 judged; only when every target is in private_repos does the text go unjudged.
 
 Only the hard block fails closed on text it cannot see. With a blocked terms
 file loaded: a body built at run time that no heredoc feeds, stdin with no
-heredoc, a file it cannot read, or a flag whose shape says it carries text but
+heredoc, a file it cannot read or that the command writes other than from one
+heredoc, a $VAR assigned again, or a flag whose shape says it carries text but
 is not one it knows -> deny, with the fix in the reason.
 """
 
@@ -111,7 +113,8 @@ class _Meta:
     """The command's records, in command order, as (kind, value):
     R repo (- = the cwd's, ? = unknown) | T posted text | HDTXT heredoc text |
     F / FX file (FX: in nested text) | CDTO dir | CDPUSH / CDPOP | A NAME=VALUE |
-    HFED path a heredoc writes | STDIN | OPAQUE (what, value) | HEREDOC | CD | UNSEEN flag."""
+    HFED path one heredoc alone writes | STDIN | OPAQUE (what, value) | HEREDOC | CD |
+    UNSEEN flag. wrote: the paths the command writes any other way."""
 
     def __init__(self, doc, command):
         self.out = []
@@ -122,6 +125,10 @@ class _Meta:
         for p in sw.writes(buf, True):
             if counts.get(p) == 1:
                 self.add("HFED", p)
+                del counts[p]
+        # Not a record: sw.writes reads a > inside quotes too, so a redaction's put would add one.
+        self.wrote = list(counts)
+        self.flat = doc.stripped(buf)
         if doc.heredocs():
             self.add("HEREDOC")
         for body in doc.heredoc_bodies():
@@ -153,10 +160,19 @@ class _Meta:
             self.add("FX" if self.nested else "F", _flat(p))
 
     def fed(self, v):
-        """A $VAR whose assignment in this command carries a heredoc."""
+        """A $VAR this command assigns once, from a heredoc, before its first use: a second
+        assignment could replace the text the guard read."""
         name = re.sub(r"^\$\{?", "", v, count=1)
         name = re.sub(r"[^A-Za-z0-9_].*", "", name, count=1, flags=re.S)
-        return name != "" and re.search(r"(?:^|[;&|\s])" + name + r"""=["']?\$\([^)]*<<""", self.orig) is not None
+        if name == "":
+            return False
+        t = self.flat
+        # A shell assignment, not a gh field (-f NAME=...) of the same name.
+        sets = [a for a in re.finditer(r"(?:^|[\s;&|(])" + name + "=", t)
+                if not re.search(r"(?:-[fF]|--field|--raw-field)\s*\Z", t[:a.start() + 1])]
+        use = re.search(r"\$\{?" + name + r"\b", t)
+        return (len(sets) == 1 and use is not None and sets[0].end() <= use.start()
+                and re.match(r"""["']?\$\([^)]*\bHEREDOC\b""", t[sets[0].end():]) is not None)
 
     def val(self, v, live, what=None):
         """A posted value: text, or OPAQUE (what it is, the value) when built at run
@@ -374,8 +390,14 @@ class _Meta:
             got = unquote(m.group(1))
             self.add("R", "-" if got == ":id" else "?" if got.isdigit() or got.startswith(":") else _flat(got))
         elif p == "graphql":
-            if any(_GRAPHQL.search(sw.word(self.s, i)) for i in range(g, hi + 1)):
-                self.add("R", "?")          # the target is a node id in the query, never the cwd's origin
+            # The target is a node id in the query, never the cwd's origin. A query not
+            # written out in the command's words (--input, @file, built at run time) is
+            # not shown to be a read, so it is judged.
+            q = next((a for a in api.args if a.flag != "--input" and a.key == "query"), None)
+            shown = (q is not None and not q.value.startswith("@") and not (q.live and re.search(r"[$`]", q.value))
+                     and not any(a.flag == "--input" for a in api.args))
+            if not shown or any(_GRAPHQL.search(sw.word(self.s, i)) for i in range(g, hi + 1)):
+                self.add("R", "?")
 
 
 def _is_private(repo, env):
@@ -459,7 +481,8 @@ def check(doc):
         cmd = ti.get("command")
         if not isinstance(cmd, str) or not cmd:
             return None
-        meta = _Meta(doc, cmd).out
+        m = _Meta(doc, cmd)
+        meta, wrote = m.out, m.wrote
         # The tokeniser can lose a segment behind an odd construct; the raw string is
         # the backstop, so a gh write it names is scanned with the repo unknown.
         if not any(k == "R" for k, _ in meta) and _BACKSTOP.search(cmd):
@@ -469,7 +492,7 @@ def check(doc):
         text_cmd = "".join(v + "\n" for k, v in meta if k in ("T", "HDTXT"))
     elif _MCP_TOOL.match(tool):
         owner, repo = ti.get("owner"), ti.get("repo")
-        meta = [("R", f"{owner}/{repo}" if owner not in (None, "") and repo not in (None, "") else "-")]
+        meta, wrote = [("R", f"{owner}/{repo}" if owner not in (None, "") and repo not in (None, "") else "-")], []
         text_cmd = "\n".join(_strings(ti)) + "\n"
     else:
         return None
@@ -539,13 +562,17 @@ def check(doc):
         if f is None:
             bad = a
             continue
+        # A file this command writes from one heredoc holds that heredoc's text, already
+        # scanned; one it writes any other way is not yet what the post will send.
+        if any(rp.resolve(h) == f for h in hfed):
+            continue
+        if any(rp.resolve(w) == f for w in wrote):
+            bad = f
+            continue
         try:
-            body = yield Need("read", f)
+            body = yield Need("read", f, paths.MAX_READ)
         except Exception:  # noqa: BLE001
-            # A file this command writes from a heredoc need not exist yet: its text
-            # is already in the scanned command.
-            if not any(rp.resolve(h) == f for h in hfed):
-                bad = f
+            bad = f
             continue
         text_file += body + "\n"
         files.append(f)

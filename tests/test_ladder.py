@@ -1,17 +1,17 @@
-"""The parser ladder in languette/scan.py: which rung reads, and what a
+"""The parser ladder in languette/ladder.py: which rung reads, and what a
 refusal, a crash or an old shfmt does. The scenarios in features/ already run
 on both rungs (conftest.py); these are the edges between them."""
 
 import json
 import os
 import re
-from pathlib import Path
 
 import pytest
 
-from languette import run, scan
+from harness import stand_in
+from languette import ladder, run, scan
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 REAL = scan.shfmt()
 needs_shfmt = pytest.mark.skipif(not REAL and not os.environ.get("CI"), reason="no shfmt new enough on PATH")
 
@@ -19,8 +19,8 @@ needs_shfmt = pytest.mark.skipif(not REAL and not os.environ.get("CI"), reason="
 @pytest.fixture(autouse=True)
 def fresh():
     def clear():                               # a test may have patched one out
-        for f in (scan.shfmt, scan._shfmt_tree, scan._bash_n, scan._ts_parser, scan._tree_sitter, scan._bashlex_mod,
-                  scan._bashlex):
+        for f in (scan.shfmt, ladder._shfmt_tree, ladder._bash_n, ladder._ts_parser, ladder._tree_sitter, ladder._bashlex_mod,
+                  ladder._bashlex):
             getattr(f, "cache_clear", lambda: None)()
     clear()
     yield
@@ -67,7 +67,7 @@ def test_with_require_well_formed_off_the_other_guards_read_an_unparseable_comma
 def test_a_parser_crash_is_a_deny(monkeypatch, guard, option):
     def boom(text, words=False):
         raise RuntimeError("boom")
-    monkeypatch.setattr(scan, "parse", boom)
+    stand_in(monkeypatch, "parse", boom)
     env = {"HOME": os.environ["HOME"], **({"CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED": option} if option else {})}
     out = run.respond(payload("echo hi"), env, only=guard)
     v = json.loads(out)["hookSpecificOutput"]
@@ -115,7 +115,7 @@ def test_a_crashing_shfmt_drops_to_awk_and_denies_nothing(tmp_path, monkeypatch,
                                          ("kill -9 $$", "shfmt was killed by signal 9")])
 @pytest.mark.parametrize("probe", [False, True])
 def test_a_shfmt_run_that_fails_denies_and_never_passes_down(tmp_path, monkeypatch, stall, why, probe):
-    monkeypatch.setattr(scan, "SHFMT_TIMEOUT", 0.2)
+    stand_in(monkeypatch, "SHFMT_TIMEOUT", 0.2)
     body = f"{stall}\n" if probe else f'[ "$1" = --version ] && echo v3.12.0 && exit 0\n{stall}\n'
     fake_shfmt(tmp_path, monkeypatch, body)
     v = verdict("ls", guard="require-well-formed")
@@ -129,7 +129,7 @@ def test_a_shfmt_run_that_fails_denies_and_never_passes_down(tmp_path, monkeypat
 def test_a_shfmt_that_stalls_once_still_denies_the_whole_run(tmp_path, monkeypatch):
     """run.py reads require-well-formed's verdict once: a second parse that
     finishes in time must not undo the deny the first one earned."""
-    monkeypatch.setattr(scan, "SHFMT_TIMEOUT", 0.2)
+    stand_in(monkeypatch, "SHFMT_TIMEOUT", 0.2)
     fake_shfmt(tmp_path, monkeypatch, '[ "$1" = --version ] && echo v3.12.0 && exit 0\n'
                f'[ -e {tmp_path}/stalled ] || {{ touch {tmp_path}/stalled; exec sleep 5; }}\n'
                'echo \'{"Type": "File", "Stmts": []}\'\n')
@@ -138,8 +138,8 @@ def test_a_shfmt_that_stalls_once_still_denies_the_whole_run(tmp_path, monkeypat
 
 
 def test_a_bash_n_past_its_timeout_denies(tmp_path, monkeypatch):
-    monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
-    monkeypatch.setattr(scan, "BASH_TIMEOUT", 0.2)
+    stand_in(monkeypatch, "RUNGS", ("bash -n", "awk"))
+    stand_in(monkeypatch, "BASH_TIMEOUT", 0.2)
     f = tmp_path / "bash"
     f.write_text("#!/bin/sh\nexec sleep 5\n")
     f.chmod(0o755)
@@ -150,17 +150,17 @@ def test_a_bash_n_past_its_timeout_denies(tmp_path, monkeypatch):
 
 
 def test_without_shfmt_bash_n_refuses_and_its_tree_is_not_mapped(monkeypatch):
-    monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
+    stand_in(monkeypatch, "RUNGS", ("bash -n", "awk"))
     v = verdict('echo "unclosed', guard="require-well-formed")
     assert v["permissionDecision"] == "deny" and "(bash -n: " in v["permissionDecisionReason"]
     assert scan.parse("rm -rf x") == ("bash -n", True)
     calls = []
-    monkeypatch.setattr(scan, "_bash_n", lambda text: calls.append(text))
+    monkeypatch.setattr(ladder, "_bash_n", lambda text: calls.append(text))
     assert scan.Scan("rm -rf x").rung == "awk" and not calls    # Scan never asks a rung it cannot map
 
 
 def test_with_no_bash_the_awk_rung_reads(monkeypatch, tmp_path):
-    monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
+    stand_in(monkeypatch, "RUNGS", ("bash -n", "awk"))
     monkeypatch.setenv("PATH", str(tmp_path))
     assert scan.parse("rm -rf x") == ("awk", None)
     with pytest.raises(scan.Unparseable) as e:
@@ -173,7 +173,7 @@ def test_with_no_bash_the_awk_rung_reads(monkeypatch, tmp_path):
                                      "echo $'it\\'s'", "echo \\$'a' b",
                                      "echo $$'a\\'", "echo $$$'a\\'b'"])
 def test_the_awk_rung_refuses_no_closed_quote(monkeypatch, command):
-    monkeypatch.setattr(scan, "RUNGS", ("awk",))
+    stand_in(monkeypatch, "RUNGS", ("awk",))
     assert scan.parse(command) == ("awk", None)
 
 
@@ -187,15 +187,15 @@ class Node:
 
 def fake_ts(monkeypatch, root):
     tree = type("Tree", (), {"root_node": root})()
-    monkeypatch.setattr(scan, "_ts_parser", lambda: type("P", (), {"parse": lambda self, b: tree})())
+    monkeypatch.setattr(ladder, "_ts_parser", lambda: type("P", (), {"parse": lambda self, b: tree})())
 
 
 def refuse(monkeypatch, why="line 1: unexpected EOF"):
     """bash -n, faked to refuse, so the column is the only thing under test."""
     def bash_n(text):
         raise scan.Unparseable(why)
-    monkeypatch.setattr(scan, "_bash_n", bash_n)
-    monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
+    monkeypatch.setattr(ladder, "_bash_n", bash_n)
+    stand_in(monkeypatch, "RUNGS", ("bash -n", "awk"))
 
 
 @pytest.mark.parametrize("root, at", [
@@ -213,7 +213,7 @@ def test_tree_sitter_adds_the_column_to_a_refusal_below_shfmt(monkeypatch, root,
 
 def test_tree_sitter_never_decides(monkeypatch):
     fake_ts(monkeypatch, Node(children=[Node("ERROR", at=(0, 0), text=b"x")]))
-    monkeypatch.setattr(scan, "RUNGS", ("awk",))
+    stand_in(monkeypatch, "RUNGS", ("awk",))
     assert scan.parse("echo ok") == ("awk", None)            # an ERROR node, and the text still reads
 
 
@@ -223,8 +223,8 @@ def test_tree_sitter_never_decides(monkeypatch):
     type("P", (), {"parse": lambda self, b: type("T", (), {"root_node": Node()})()})(),  # a clean tree
 ])
 def test_with_no_column_the_refusal_stands_as_its_rung_wrote_it(monkeypatch, parser):
-    monkeypatch.setattr(scan, "_ts_parser", lambda: parser)
-    monkeypatch.setattr(scan, "_bashlex_mod", lambda: None)
+    monkeypatch.setattr(ladder, "_ts_parser", lambda: parser)
+    monkeypatch.setattr(ladder, "_bashlex_mod", lambda: None)
     refuse(monkeypatch)
     with pytest.raises(scan.Unparseable) as e:
         scan.check("x")
@@ -235,8 +235,8 @@ def test_a_failed_run_gets_no_column(monkeypatch):
     fake_ts(monkeypatch, Node(children=[Node("ERROR", at=(0, 4), text=b" 'x")]))
     def bash_n(text):
         raise scan.RunFailed("bash took over 0.2 s; a busy machine can cause this, so retry")
-    monkeypatch.setattr(scan, "_bash_n", bash_n)
-    monkeypatch.setattr(scan, "RUNGS", ("bash -n", "awk"))
+    monkeypatch.setattr(ladder, "_bash_n", bash_n)
+    stand_in(monkeypatch, "RUNGS", ("bash -n", "awk"))
     with pytest.raises(scan.RunFailed) as e:
         scan.check("x")
     assert str(e.value) == "bash took over 0.2 s; a busy machine can cause this, so retry"
@@ -252,7 +252,7 @@ def fake_bashlex(monkeypatch, raises):
     def parse(text):
         if raises:
             raise raises(ParsingError, text)
-    monkeypatch.setattr(scan, "_bashlex_mod", lambda: type("M", (), {"parse": staticmethod(parse)}))
+    monkeypatch.setattr(ladder, "_bashlex_mod", lambda: type("M", (), {"parse": staticmethod(parse)}))
 
 
 @pytest.mark.parametrize("raises, at", [
@@ -261,7 +261,7 @@ def fake_bashlex(monkeypatch, raises):
     (lambda E, s: E("past the end", s, 99), "2:7"),
 ])
 def test_bashlex_adds_the_column_when_tree_sitter_gives_none(monkeypatch, raises, at):
-    monkeypatch.setattr(scan, "_ts_parser", lambda: None)
+    monkeypatch.setattr(ladder, "_ts_parser", lambda: None)
     fake_bashlex(monkeypatch, raises)
     refuse(monkeypatch)
     with pytest.raises(scan.Unparseable) as e:
@@ -280,7 +280,7 @@ def test_tree_sitter_answers_before_bashlex(monkeypatch):
 
 def test_bashlex_never_decides(monkeypatch):
     fake_bashlex(monkeypatch, lambda E, s: E("unexpected token '-f'", s, 3))
-    monkeypatch.setattr(scan, "RUNGS", ("awk",))
+    stand_in(monkeypatch, "RUNGS", ("awk",))
     assert scan.parse("[[ -f x ]] && echo y") == ("awk", None)
 
 
@@ -291,7 +291,7 @@ def test_bashlex_never_decides(monkeypatch):
     lambda E, s: E("unexpected EOF", s, None),               # a position that is not one
 ])
 def test_with_no_bashlex_column_the_refusal_stands(monkeypatch, raises):
-    monkeypatch.setattr(scan, "_ts_parser", lambda: None)
+    monkeypatch.setattr(ladder, "_ts_parser", lambda: None)
     fake_bashlex(monkeypatch, raises)
     refuse(monkeypatch)
     with pytest.raises(scan.Unparseable) as e:
@@ -300,8 +300,8 @@ def test_with_no_bashlex_column_the_refusal_stands(monkeypatch, raises):
 
 
 def test_with_no_bashlex_package_the_refusal_stands(monkeypatch):
-    monkeypatch.setattr(scan, "_ts_parser", lambda: None)
-    monkeypatch.setattr(scan, "_bashlex_mod", lambda: None)
+    monkeypatch.setattr(ladder, "_ts_parser", lambda: None)
+    monkeypatch.setattr(ladder, "_bashlex_mod", lambda: None)
     refuse(monkeypatch)
     with pytest.raises(scan.Unparseable) as e:
         scan.check("x")
@@ -342,7 +342,7 @@ def test_shfmt_reads_every_feature_command_into_the_awk_rungs_tokens_and_operato
             refused.append(c)
             continue
         s = scan.Scan(c)
-        monkeypatch.setattr(scan, "RUNGS", ("awk",))
+        stand_in(monkeypatch, "RUNGS", ("awk",))
         a = scan.Scan(c)
         monkeypatch.undo()
         if s.rung != "shfmt" or (s.tokens(), s.live, s.op) != (a.tokens(), a.live, a.op):
@@ -390,7 +390,7 @@ def test_weight(text, w):
 
 
 def test_the_limits_deny_before_any_rung_runs(monkeypatch):
-    monkeypatch.setattr(scan, "RUNGS", ())     # a rung that ran would raise RuntimeError
+    stand_in(monkeypatch, "RUNGS", ())     # a rung that ran would raise RuntimeError
     with pytest.raises(scan.TooBig) as e:
         scan.check("echo " + "$(" * 141 + "x" + ")" * 141)
     assert e.value.rung == "limit" and "over the limit of 10,000" in str(e.value)

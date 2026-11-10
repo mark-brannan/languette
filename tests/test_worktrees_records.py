@@ -13,8 +13,8 @@ import sys
 from pathlib import Path
 
 import pytest
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 HOOK = [sys.executable, "-I", str(ROOT / "languette" / "run.py"), "--guard", "guard-worktrees"]
 GIT = ["git", "-c", "user.email=t@e", "-c", "user.name=t"]
 

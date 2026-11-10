@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.18](https://github.com/mark-brannan/languette/compare/v0.0.17...v0.0.18) (2026-11-10)
+
+
+### Bug Fixes
+
+* **guard-git-stacked-base:** read --delete by prefix and -d inside a cluster ([#373](https://github.com/mark-brannan/languette/issues/373)) ([28c9be6](https://github.com/mark-brannan/languette/commit/28c9be6605b42285ba82d72d3ab9cd35a25f78c4))
+* **guard-private-terms:** judge a body the command reassigns, rewrites or sends as a graphql input ([#377](https://github.com/mark-brannan/languette/issues/377)) ([e70d0ed](https://github.com/mark-brannan/languette/commit/e70d0ede3af2ea7b2ccdd3d603b574e9531b0592))
+* **guard-worktrees:** find checkout and switch as git's subcommand, not as any word ([#374](https://github.com/mark-brannan/languette/issues/374)) ([9897cd7](https://github.com/mark-brannan/languette/commit/9897cd7b6fca3e39fa248f4eba8bf09c568d09f3))
+* **run:** fail closed on a guard crash in a state event, and on any unreadable payload ([#376](https://github.com/mark-brannan/languette/issues/376)) ([6c41517](https://github.com/mark-brannan/languette/commit/6c415179a8bb7350722ff4ac6897396ccde97a20))
+
+
+### Documentation
+
+* **readme:** a quality pass on the sections below the introduction ([#381](https://github.com/mark-brannan/languette/issues/381)) ([68a1504](https://github.com/mark-brannan/languette/commit/68a15041720bc8f7a8f5db1aa2b572732d071737))
+
 ## [0.0.17](https://github.com/mark-brannan/languette/compare/v0.0.16...v0.0.17) (2026-11-06)
 
 

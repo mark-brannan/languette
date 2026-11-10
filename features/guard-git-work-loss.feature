@@ -690,8 +690,9 @@ Feature: guard-git-work-loss
       | git --attr-source HEAD push --force origin x | the same, another rule        |
       | git --config-env=a=B reset --hard            | attached, which already held  |
 
-  # Two relaxations hold only where an agent works: a linked worktree, or the
-  # session's scratchpad. $HOME and a repo's main checkout are where the user
+  # Two relaxations hold only where an agent works: the session's scratchpad, or
+  # a linked worktree that is its own (one guard-worktrees recorded for the
+  # session, or any linked worktree when guard-worktrees keeps no record). $HOME and a repo's main checkout are where the user
   # works, and there both stay denied. Each is asked of git in the directory the
   # session runs in, so a cd or -C in the command leaves the deny standing.
   Rule: where an agent works, `git add -A <paths>` stages by path
@@ -797,6 +798,18 @@ Feature: guard-git-work-loss
       And the working directory is "{TMP}/home"
       When the agent runs `git add -A src/x.py`
       Then the guard denies
+
+    Scenario: -A with paths is denied in a linked worktree guard-worktrees did not record for the session
+      Given guard-worktrees keeps a record for the session
+      And the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `git add -A src/x.py`
+      Then the guard denies
+
+    Scenario: -A with paths passes in a linked worktree guard-worktrees recorded for the session
+      Given guard-worktrees recorded "{TMP}/repo/.claude/worktrees/feat" for the session
+      And the working directory is "{TMP}/repo/.claude/worktrees/feat"
+      When the agent runs `git add -A src/x.py`
+      Then the guard is silent
 
     Scenario: -A with paths passes in a repo in the session's scratchpad
       Given the session is "aaaaaaaa-1111-4222-8333-444444444444"

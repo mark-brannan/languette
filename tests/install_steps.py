@@ -6,7 +6,6 @@ conftest.py imports these, so pytest-bdd finds them."""
 import json
 import os
 import shlex
-from pathlib import Path
 
 import pytest
 from hamcrest import assert_that, contains_string, equal_to, has_item, not_
@@ -14,8 +13,8 @@ from pytest_bdd import given, parsers, then, when
 
 from harness import FakeHome
 from languette.install import PLUGIN, REPO, SOURCE
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 
 
 class Install(FakeHome):

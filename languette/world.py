@@ -60,14 +60,18 @@ class World:
 
     # --- facts -----------------------------------------------------------
 
-    def _git(self, prog, cwd, *argv):
+    def _stdout(self, argv, cwd, timeout):
+        """The stripped stdout of `argv` when it exits 0 with some, else None."""
         try:
-            r = subprocess.run([prog, *argv], cwd=cwd, env=self.env, capture_output=True, text=True,
-                               timeout=GIT_TIMEOUT, stdin=subprocess.DEVNULL)
+            r = subprocess.run(argv, cwd=cwd, env=self.env, capture_output=True, text=True,
+                               timeout=timeout, stdin=subprocess.DEVNULL)
         except (OSError, subprocess.SubprocessError):
             return None
         out = r.stdout.strip()
         return out if r.returncode == 0 and out else None
+
+    def _git(self, prog, cwd, *argv):
+        return self._stdout([prog, *argv], cwd, GIT_TIMEOUT)
 
     def _forge_api(self, forge, host, path):
         """(HTTP status, parsed body) for the API `path` on `forge` (a scan.FORGES
@@ -88,13 +92,7 @@ class World:
         return (int(said), body) if isinstance(said, str) and said.isdigit() else (None, None)
 
     def _pr_list(self, cwd, *argv):
-        try:
-            r = subprocess.run(list(argv), cwd=cwd, env=self.env, capture_output=True, text=True,
-                               timeout=PR_LIST_TIMEOUT, stdin=subprocess.DEVNULL)
-        except (OSError, subprocess.SubprocessError):
-            return None
-        out = r.stdout.strip()
-        return out if r.returncode == 0 and out else None
+        return self._stdout(list(argv), cwd, PR_LIST_TIMEOUT)
 
     def _hostname(self):
         return socket.gethostname()
@@ -142,8 +140,13 @@ class World:
         dec = lambda b: b.decode("utf-8", "surrogateescape")
         return r.returncode, dec(r.stdout), dec(r.stderr)
 
+    def _session_file(self, prefix, session):
+        """The state file `prefix` + the session id under $TMPDIR; any character outside
+        [A-Za-z0-9_-] in the id becomes _, so no id reaches the file name as a path or a newline."""
+        return os.path.join(self.env.get("TMPDIR") or "/tmp", prefix + re.sub(r"[^A-Za-z0-9_-]", "_", session))
+
     def _door_file(self, session):
-        return os.path.join(self.env.get("TMPDIR") or "/tmp", DOOR + session)
+        return self._session_file(DOOR, session)
 
     def _door_spend(self, session):
         door = self._door_file(session)
@@ -239,7 +242,7 @@ class World:
     # cwd alone.
 
     def _worktree(self, op, *args):
-        if op not in ("arrive", "recorded", "scratchpad"):
+        if op not in ("arrive", "kept", "recorded", "scratchpad"):
             raise ValueError(f"no worktree fact {op!r}")
         return getattr(self, "_wt_" + op)(*args)
 
@@ -309,6 +312,10 @@ class World:
         except OSError:
             pass
         return True, adopt
+
+    def _wt_kept(self, rec):
+        """The record exists and is this user's: guard-worktrees has seen this session."""
+        return self._wt_mine(rec)
 
     def _wt_recorded(self, rec, top):
         if not self._wt_mine(rec):
@@ -421,8 +428,7 @@ class World:
             return True
 
     def _send_file(self, session):
-        base = self.env.get("TMPDIR") or "/tmp"
-        return os.path.join(base, SEND_STATE + re.sub(r"[^A-Za-z0-9_-]", "_", session))
+        return self._session_file(SEND_STATE, session)
 
     def _send_state(self, session):
         """guard-cross-session-send's state for `session`: {"subagents": [the

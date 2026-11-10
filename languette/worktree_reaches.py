@@ -308,10 +308,9 @@ def _home_events(doc):
                 if sw.cmd_index(s, a, b, _FS_CHANGE, nested) is not None:
                     out.append(("FS",))
                 continue
-            sidx = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and s.w[i] in ("checkout", "switch")), None)
-            if sidx is None:
-                sub = sw.git_subcommand(s, g, b)
-                if sub <= b and s.w[sub] == "mv":
+            sidx = sw.git_subcommand(s, g, b)
+            if sidx > b or s.k[sidx] != "w" or sw.git_verb(s.w[g], s.w[sidx]) not in ("checkout", "switch"):
+                if sidx <= b and s.w[sidx] == "mv":
                     out.append(("FS",))
                 continue
             # checkout -- <path> is a file restore; a bare trailing -- is not.
@@ -323,7 +322,9 @@ def _home_events(doc):
                 out.append(("DENY", name + " <repo>" * row.repo))
                 continue
             targets = []
-            for i in range(a, b + 1):
+            # The words before git (assignments, a wrapper's -C) and git's own options; past the
+            # subcommand, -C is switch's "create branch", not a directory.
+            for i in [*range(a, g), *sw.git_options(s, g, sidx)]:
                 if s.k[i] != "w":
                     continue
                 w = s.w[i]
@@ -878,6 +879,22 @@ def reaches(doc):
     if env.get(FOREIGN) != "false":
         words = _foreign_words(doc) if doc.tool == "Bash" and _command(doc) else []
     return None if home is None and words is None else {"home": home, "reaches": words}
+
+
+def in_own_place(doc, top, linked):
+    """`top` (a real path, not $HOME) is under this session's scratchpad, or is a linked
+    worktree (`linked`, git's own answer) that is the session's own: one it recorded, or
+    any, when no record is kept for the session (guard-worktrees' foreign control off, or
+    not yet run). For a guard that relaxes only where this session works."""
+    home = (doc.env or {}).get("HOME") or ""
+    sess = _Session(doc.payload, doc.env or {}, "", home)
+    if (yield from sess.in_pad(top)):
+        return True
+    if not linked:
+        return False
+    if not (sess.rec and (yield Need("worktree", "kept", sess.rec))):
+        return True
+    return (yield from sess.recorded(top))
 
 
 def own_places(doc, guard, found):

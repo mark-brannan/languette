@@ -11,15 +11,24 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from languette import run, verdict  # noqa: E402
+from languette import run, scan, verdict  # noqa: E402
 from hamcrest import assert_that, equal_to, has_length
 from matchers import Verdict
 
 ENGINES = ("python", "shfmt", "hook")
 IN_PROCESS = {"python": ("awk",), "shfmt": ("shfmt",)}   # engine -> scan.RUNGS
+
+
+def stand_in(monkeypatch, name, value):
+    """Stand `value` in for scan's `name` in every languette module that holds it by that name:
+    scan re-exports what its parts define, so a name has more than one home."""
+    real = getattr(scan, name)
+    for key, mod in list(sys.modules.items()):
+        if (key == "languette" or key.startswith("languette.")) and mod is not None and vars(mod).get(name) is real:
+            monkeypatch.setattr(mod, name, value)
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "LANGUETTE_PERM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
          "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH", "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND",

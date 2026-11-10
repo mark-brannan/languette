@@ -19,10 +19,10 @@ from pytest_bdd import given, parsers, then, when
 from harness import FakeHome, fixture_text
 from languette import terms
 from languette.doctor import FORGES
+from paths import ROOT
 
 DEFAULTS = terms.defaults(Path(terms.DEFAULTS).read_text())
 
-ROOT = Path(__file__).resolve().parent.parent
 PLUGIN_ID = "languette@languette"
 
 
@@ -231,7 +231,7 @@ def _options(doctor, options):
 
 @given("the user's settings.json has a by-hand guard-recursive-delete hook")
 def _by_hand(doctor):
-    # The README's "Installing by hand" entry, pointed at this repo.
+    # The README's "If you cannot run the installer" entry, pointed at this repo.
     deny = json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
                                               "permissionDecisionReason": "languette/run.py is missing or crashed"}})
     command = (f'h="{ROOT}/languette/run.py"; {{ [ -f "$h" ] && python3 -I "$h" --guard guard-recursive-delete; }} '
