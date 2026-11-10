@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from languette import scan  # noqa: E402
 

@@ -11,8 +11,8 @@ import re
 from pathlib import Path
 
 from hamcrest import assert_that, empty
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 DIRS = ("languette", "hooks", "features", "tests", "docs", "README.md")
 # The maintainer's identifiers, and the words of the workflow languette was born in.
 DENY = re.compile(r"mark-brannan|markbrannan|solace|claude_prompts_scratch"

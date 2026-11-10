@@ -880,6 +880,22 @@ def reaches(doc):
     return None if home is None and words is None else {"home": home, "reaches": words}
 
 
+def in_own_place(doc, top, linked):
+    """`top` (a real path, not $HOME) is under this session's scratchpad, or is a linked
+    worktree (`linked`, git's own answer) that is the session's own: one it recorded, or
+    any, when no record is kept for the session (guard-worktrees' foreign control off, or
+    not yet run). For a guard that relaxes only where this session works."""
+    home = (doc.env or {}).get("HOME") or ""
+    sess = _Session(doc.payload, doc.env or {}, "", home)
+    if (yield from sess.in_pad(top)):
+        return True
+    if not linked:
+        return False
+    if not (sess.rec and (yield Need("worktree", "kept", sess.rec))):
+        return True
+    return (yield from sess.recorded(top))
+
+
 def own_places(doc, guard, found):
     """The `own-places` handler: each control the test found on, checkout-home first. The
     first refusal denies; else the dotfile managers' calls are asked about; else the notes,

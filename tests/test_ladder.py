@@ -5,13 +5,12 @@ on both rungs (conftest.py); these are the edges between them."""
 import json
 import os
 import re
-from pathlib import Path
 
 import pytest
 
 from languette import run, scan
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 REAL = scan.shfmt()
 needs_shfmt = pytest.mark.skipif(not REAL and not os.environ.get("CI"), reason="no shfmt new enough on PATH")
 
