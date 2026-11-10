@@ -674,3 +674,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t095540z
 - --unset writes the manifest default, since Claude Code keeps no unset Undo: drop --unset until the host offers one ([#371](https://github.com/mark-brannan/languette/pull/371))
+
+### 20261110t095550z
+- scan.py splits into ten modules, not eight: lexicon (command vocabulary) and texts stand alone, heredoc helpers join quoting, seg_cmd/word/word_live join Scan, so imports run one way Undo: merge modules ([#372](https://github.com/mark-brannan/languette/pull/372))
