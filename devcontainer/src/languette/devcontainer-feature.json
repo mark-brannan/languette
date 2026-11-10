@@ -1,6 +1,6 @@
 {
   "id": "languette",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "name": "languette",
   "description": "Fail-closed guards against risky actions by coding agents, wired into Claude Code when the container is created.",
   "documentationURL": "https://github.com/mark-brannan/languette#devcontainer-codespace-and-ci",

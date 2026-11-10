@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.19](https://github.com/mark-brannan/languette/compare/v0.0.18...v0.0.19) (2026-11-10)
+
+
+### Features
+
+* languette config, and the doctor judges every config ([#371](https://github.com/mark-brannan/languette/issues/371)) ([7cb6452](https://github.com/mark-brannan/languette/commit/7cb6452756237fab28ed7f588bd336294a8cadd2))
+
+
+### Documentation
+
+* **readme:** say how languette and a sandbox differ ([#386](https://github.com/mark-brannan/languette/issues/386)) ([aba2521](https://github.com/mark-brannan/languette/commit/aba2521ab8e9b21c10f4b34ebde358c52dad5e8a))
+* security policy, contributing guide, classifiers, one plugin description ([#369](https://github.com/mark-brannan/languette/issues/369)) ([ca5cb2e](https://github.com/mark-brannan/languette/commit/ca5cb2e4cf582985ed5c6c90fa584d0f861c9bf8))
+* tighten the security policy and the contributing guide ([#382](https://github.com/mark-brannan/languette/issues/382)) ([3fbb3cd](https://github.com/mark-brannan/languette/commit/3fbb3cd9e66b7a194cb4426a06caaadba7c078de))
+
 ## [0.0.18](https://github.com/mark-brannan/languette/compare/v0.0.17...v0.0.18) (2026-11-10)
 
 
