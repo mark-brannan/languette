@@ -710,3 +710,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t231454z
 - SECURITY.md: languette running part of a command it only reads is listed as a vulnerability Undo: delete the line ([#391](https://github.com/mark-brannan/languette/pull/391))
+
+### 20261110t231508z
+- SECURITY.md: opens with what languette guards against and a link to Not a sandbox Undo: delete the opening ([#391](https://github.com/mark-brannan/languette/pull/391))
