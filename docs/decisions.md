@@ -4,6 +4,17 @@ Decisions that settle languette's public interface. The README says what the
 interface is; this file says what was decided and why, one line each. Every
 line is the maintainer's (@mark-brannan) unless it says otherwise.
 
+## Rules engine: 2026-11-05
+
+- Current thinking: the aim is a rules engine with no hand-built guards; a
+  few deep special cases are "ok (maybe)", an exit.
+  The test: "if we add this new guard in the engine, will it pollute the data
+  access layer, or the engine, or the rules/config, in such a way that it's a
+  step function increase in difficulty to maintain? Yes, then consider a
+  special case outside the rules engine. No, figure it out using the
+  established pattern".
+  Sharpens the "few deep special cases" line under New guards.
+
 ## Uninstall and the user's options: 2026-11-05
 
 - `languette uninstall` writes nothing to the user's `settings.json`. It runs
