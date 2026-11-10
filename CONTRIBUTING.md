@@ -23,7 +23,7 @@ A guard never comes straight from a miss. The issue gives:
 - its root cause
 - the hazard: why it could ruin your day; a wasted hour is not one
 - the concept: a setting of an existing guard, or a new one
-- the name, from [the approved names](docs/approved-guard-names.md) where one fits
+- the name: a row of [the approved names](docs/approved-guard-names.md), or one proposed for it
 
 A miss is often a workflow gap, and a guard at most a backstop for it.
 
