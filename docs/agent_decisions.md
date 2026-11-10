@@ -689,3 +689,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t095624z
 - the fix the doctor offers for an option its guard refuses is that option's default Undo: drop doctor.fix and --fix ([#371](https://github.com/mark-brannan/languette/pull/371))
+
+### 20261110t095634z
+- terms-file options keep their own rows, not repeated under configs Undo: drop the skip in doctor.refused_options ([#371](https://github.com/mark-brannan/languette/pull/371))
