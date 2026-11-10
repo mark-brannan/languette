@@ -197,8 +197,8 @@ A command over 64 KB, or nested too deeply to parse quickly, is denied unread.
 
 ## Not a sandbox
 
-Languette checks each command before it runs. It can't see what a script
-or program does once it starts.
+Languette checks commands before they run. It can't see what a script does
+once it starts.
 
 A [sandbox](https://code.claude.com/docs/en/sandboxing) limits what any
 program can reach. It doesn't judge commands, so one that deletes your
