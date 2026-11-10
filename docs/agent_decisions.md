@@ -695,3 +695,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t103051z
 - guard-worktrees: words before git still supply -C, so env -C /x git checkout main is judged from /x guard-worktrees: yadm and vcsh look for checkout or switch anywhere after their command word, so yadm commit -m checkout still denies, as on main Undo: revert the PR's yadm/vcsh fallback once scan reads their own options ([#374](https://github.com/mark-brannan/languette/pull/374))
+
+### 20261110t171610z
+- README section 'Not a sandbox' sits after 'The promise' It links Claude Code's sandboxing docs, not the blog post that prompted it Its last row calls #384 open, not planned The doctor idea is filed apart as #385, unscoped Undo: edit README.md on the PR branch ([#386](https://github.com/mark-brannan/languette/pull/386))
