@@ -662,3 +662,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t094304z
 - Vulnerability disclosure policy as written on the card: private report, 7-day acknowledgement, 30-day fix or plan, public at fix release or 90 days, latest release only (no PR, branch main)
+
+### 20261110t094319z
+- Clean-machine proof runs weekly and on dispatch, not per push, on both OS legs; undo: delete the workflow (no PR, branch claude/clean-machine)
