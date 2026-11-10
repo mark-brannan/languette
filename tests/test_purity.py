@@ -88,10 +88,10 @@ KNOWN = {
     # A Need that writes as it reads, under a rename.
     "worktree_reaches.py": ["Need worktree arrive"],
     # The parser ladder's shfmt rung (docs/decisions.md, "Runtime dependencies").
-    "scan.py": ["import shutil", "import subprocess", "subprocess.run", "subprocess.TimeoutExpired", "shutil.which"],
+    "ladder.py": ["import shutil", "import subprocess", "subprocess.run", "subprocess.TimeoutExpired", "shutil.which"],
 }
 # The design's one named exception to a pure step: parse runs programs.
-LADDER = "scan.py"
+LADDER = "ladder.py"
 
 
 def _imports(tree):

@@ -7,12 +7,10 @@ Feature: guard-protected-paths
   Scenarios tagged @planned are verdicts no guard gives yet: they are
   expected to fail, so they never fail CI, and a row that starts passing
   shows as XPASS. The verdicts there are proposals, not decisions. Every
-  scenario here is planned while the guard is a stub.
+  scenario here but the allow rows is planned while the guard is a stub.
 
-  # An allow row, written ahead: until the guard is registered the runner
-  # denies every call to it (no guard is named so), so it is @planned too.
-  # Drop the tag when the guard is registered.
-  @planned
+  # Allow rows, written ahead: they already pass with no guard registered,
+  # so they are not @planned.
   Scenario Outline: a path no one listed is the agent's to write
     When the agent runs `<command>`
     Then the guard is silent
@@ -38,7 +36,6 @@ Feature: guard-protected-paths
       | sed -i 's/a/b/' deploy.yml       | denies  | an in-place edit             |
       | rm secrets/token                 | denies  | a delete is a write          |
 
-  @planned
   Scenario Outline: reading a listed path is allowed
     When the agent runs `<command>`
     Then the guard is silent

@@ -34,12 +34,13 @@ Feature: guard-worktrees
   <file>`) stay allowed; `-b` and `-B` count as a branch switch; `checkout .`
   is denied too, since it is no pathspec-restore the guard can single out.
 
-  `checkout` or `switch` is looked for anywhere after the git, yadm or vcsh
-  command word, and `-C`, `--git-dir` and `--work-tree` anywhere in the segment, so
-  an unparsed leading option can never push the subcommand out of reach. The
-  cost is a false deny on a bare word "checkout" passed as a value to another
-  flag, never a false allow; likewise a quoted path value the shell would not
-  expand is read as if unquoted, which only ever adds denials. The command
+  `checkout` or `switch` counts as git's subcommand, past git's global options
+  and the repository name vcsh takes; `-C`, `--git-dir` and `--work-tree` are
+  read from those options and from the words before the git (an inline
+  `GIT_DIR=`, a wrapper's `-C`). So `git commit -m checkout` is no switch, and
+  in `git switch -C <branch>` the `-C` creates a branch, naming no directory.
+  A quoted path value the shell would not expand is read as if unquoted,
+  which only ever adds denials. The command
   can move git before it runs (a `cd` or `pushd`, an exported `GIT_DIR`,
   chained `-C`s, which are cumulative as git applies them); each is followed,
   and a `--git-dir` counts when it is $HOME's repo or any repo whose work tree
@@ -159,6 +160,7 @@ Feature: guard-worktrees
         | echo hi && yadm checkout some-branch             |
         | git switch some-branch                           |
         | git switch -c new-branch                         |
+        | git switch -C new-branch                         |
         | git switch some-branch --                        |
         | git checkout some-branch --                      |
         | yadm checkout some-branch --                     |
@@ -386,6 +388,7 @@ Feature: guard-worktrees
         | /tmp                          | cd {TMP}/.claude/worktrees/fake-task && git checkout some-branch |
         | /tmp                          | cd {PROJ} && git checkout some-branch                |
         | {PROJ}                        | git -C {TMP}/.claude/worktrees/fake-task checkout -b probe |
+        | {PROJ}                        | git switch -C feature                                |
 
     # -C already says where the command runs, so a session that happens to sit
     # in $HOME is not judged for a checkout in an unrelated repo.
@@ -410,6 +413,8 @@ Feature: guard-worktrees
         | vcsh dots status                         |
         | echo 'yadm checkout some-branch'         |
         | git status                               |
+        | git commit -m checkout                   |
+        | git log --grep switch                    |
 
   Rule: chezmoi's forced apply, destroy and purge ask
 

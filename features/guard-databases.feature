@@ -8,12 +8,10 @@ Feature: guard-databases
   Scenarios tagged @planned are verdicts no guard gives yet: they are
   expected to fail, so they never fail CI, and a row that starts passing
   shows as XPASS. The verdicts there are proposals, not decisions. Every
-  scenario here is planned while the guard is a stub.
+  scenario here but the allow rows is planned while the guard is a stub.
 
-  # An allow row, written ahead: until the guard is registered the runner
-  # denies every call to it (no guard is named so), so it is @planned too.
-  # Drop the tag when the guard is registered.
-  @planned
+  # Allow rows, written ahead: they already pass with no guard registered,
+  # so they are not @planned.
   Scenario Outline: reading or inserting stored data is allowed
     When the agent runs `<command>`
     Then the guard is silent

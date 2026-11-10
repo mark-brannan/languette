@@ -34,7 +34,10 @@ WALKS = {m: importlib.import_module(f"languette.{m}")
          for m in ("labels", "posts", "hook_skips", "branch_deletions", "infra_runs", "listed_runs",
                    "pushes", "untrusted_reads", "issue_writes", "opened_prs", "work_losses",
                    "worktree_reaches", "thread_resolves", "comment_posts", "prose_commits")}
-SHARED = {m: importlib.import_module(f"languette.{m}") for m in ("scan", "paths", "verdict", "document", "secrets", "refs")}
+# scan and the modules it re-exports from (languette/scan.py).
+SHARED = {m: importlib.import_module(f"languette.{m}")
+          for m in ("scan", "quoting", "lexicon", "ladder", "lexer", "cd_tracking", "forges", "git_calls", "texts",
+                    "stops", "command_rules", "paths", "verdict", "document", "secrets", "refs")}
 
 # The fields of the call Document reads once; a guard reads them from the Document.
 DOCUMENT_FIELDS = {"tool_name", "tool_input", "hook_event_name", "permission_mode"}

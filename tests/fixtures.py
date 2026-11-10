@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from harness import Ctx, IN_PROCESS
+from harness import Ctx, IN_PROCESS, stand_in
 from languette import run, scan, world
 
 @pytest.fixture(autouse=True)
@@ -23,7 +23,7 @@ def rungs(engine, monkeypatch):
         if os.environ.get("CI"):
             pytest.fail(f"CI runs the shfmt engine: no shfmt >= {scan.SHFMT_MIN} on PATH")
         pytest.skip(f"no shfmt >= {scan.SHFMT_MIN} on PATH")
-    monkeypatch.setattr(scan, "RUNGS", IN_PROCESS[engine])
+    stand_in(monkeypatch, "RUNGS", IN_PROCESS[engine])
 
 
 

@@ -276,12 +276,8 @@ def _fetch(p):
     """The text of the file `p`, as the runner reads it, or the Refuse it comes to."""
     try:
         return (yield Need("read", p, paths.MAX_READ))
-    except UnicodeDecodeError as e:
-        return Refuse(say("unreadable_file", err=e))
-    except OSError as e:
-        return Refuse(say("unreadable_file", err=e.strerror or e))
-    except ValueError as e:                    # not a regular file, or past MAX_READ
-        return Refuse(say("passed", text=e))
+    except (OSError, ValueError) as e:
+        return paths.read_refusal(e)
 
 
 def _abs(p, cwd, cd, env):
