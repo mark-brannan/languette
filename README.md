@@ -195,6 +195,17 @@ Bash runs a broken command in part, the lines before the error or prose in
 backticks as a command; the deny stops all of it, so the agent looks again.
 A command over 64 KB, or nested too deeply to parse quickly, is denied unread.
 
+## Not a sandbox
+
+Languette checks commands before they run. It can't see what a script does
+once it starts.
+
+A [sandbox](https://code.claude.com/docs/en/sandboxing) limits what any
+program can reach. It doesn't judge commands, so one that deletes your
+project still runs.
+
+Use both.
+
 ## Ask first
 
 A repo lists its expensive commands in `.languette/ask-first.json`:
@@ -261,7 +272,7 @@ or at install, by its name with underscores:
 claude plugin install languette@languette --config guard_recursive_delete=false
 ```
 
-Changing an option later, outside the installer, is `languette config` (planned; [design](docs/design/config.md)).
+Changing an option later, outside the installer, is `languette config`: alone it lists every option, `languette config guard_recursive_delete=false` sets one, `--unset` restores its default ([design](docs/design/config.md)).
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.

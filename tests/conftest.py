@@ -32,6 +32,7 @@ import pytest
 
 import harness
 import pipeline_checks
+from config_steps import *  # noqa: F401,F403  (features/config.feature)
 from doctor_steps import *  # noqa: F401,F403  (features/doctor.feature)
 from install_steps import *  # noqa: F401,F403  (features/install.feature)
 from fixtures import *  # noqa: F401,F403  (engine, rungs, writes_in_acts, ctx)
