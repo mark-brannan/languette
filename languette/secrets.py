@@ -345,7 +345,7 @@ def _nested_repeat(pattern):
 _SHIPPED = frozenset(r.id for r in secret_rules.RULES)
 
 
-def _load(path):
+def load(path):
     """The project's rules, or Refuse naming what is wrong with the file."""
     cfg = yield from paths.read_json(path)
     if not isinstance(cfg, dict) or not isinstance(cfg.get("patterns"), list):
@@ -383,4 +383,4 @@ def project_rules(payload, env):
     the list is malformed. guard-secrets judges with them and so does the
     decision record, which masks what the guard would deny."""
     path, _ = yield from paths.project_config(payload, env, CONFIG)
-    return (yield from _load(path)) if path else ()
+    return (yield from load(path)) if path else ()

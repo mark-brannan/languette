@@ -49,7 +49,7 @@ def test_shown_echoes_at_most_a_quarter_of_the_value():
 
 
 def test_a_project_regex_over_512_characters_is_refused():
-    load = secrets._load("/p/.languette/secrets.json")
+    load = secrets.load("/p/.languette/secrets.json")
     next(load)
     with pytest.raises(Refuse, match="longer than 512"):
         load.send(json.dumps({"patterns": [{"id": "long", "regex": "a" * 513}]}))
@@ -57,7 +57,7 @@ def test_a_project_regex_over_512_characters_is_refused():
 
 @pytest.mark.parametrize("regex", ["(a+)+$", "(a*)*b", "(\\w+\\s?)+$", "(?:x|(a+))+", "((ab)*)+"])
 def test_a_project_regex_nesting_unbounded_repeats_is_refused(regex):
-    load = secrets._load("/p/.languette/secrets.json")
+    load = secrets.load("/p/.languette/secrets.json")
     next(load)
     with pytest.raises(Refuse, match="nests one unbounded repeat"):
         load.send(json.dumps({"patterns": [{"id": "slow", "regex": regex}]}))
@@ -66,7 +66,7 @@ def test_a_project_regex_nesting_unbounded_repeats_is_refused(regex):
 @pytest.mark.parametrize("regex", ["acme_[a-z0-9]{24}", "(a+)b+", "(?:ab)+c", "(a{1,3})+", "^-----BEGIN .* KEY-----$",
                                    "(?=.*\\d)[A-Za-z0-9]{32,}", "(a|b)*c"])
 def test_a_project_regex_with_one_level_of_repeat_is_kept(regex):
-    load = secrets._load("/p/.languette/secrets.json")
+    load = secrets.load("/p/.languette/secrets.json")
     next(load)
     try:
         load.send(json.dumps({"patterns": [{"id": "ok", "regex": regex}]}))

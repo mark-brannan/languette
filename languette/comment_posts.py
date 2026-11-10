@@ -264,6 +264,13 @@ def posted(doc):
     return {"posts": posts, "read": r}
 
 
+def signature_patterns(pattern, hexid=None):
+    """(the signature for this session, for any session) from the signed_comments_signature
+    setting, {session} filled: the second matches a line that names another session.
+    Raises re.error for a pattern that does not compile."""
+    return re.compile(pattern.replace("{session}", hexid or _ANY_HEX)), re.compile(pattern.replace("{session}", _ANY_HEX))
+
+
 def signatures(doc, guard, found):
     """The `signatures` handler: the posts the `comment-posts` test found, each body read
     where it is written and judged against the opening and signature settings, and gh's
@@ -276,9 +283,7 @@ def signatures(doc, guard, found):
     sig = loose = None
     if pattern:
         try:
-            # One for this session, one for any: a line only the second matches names another session.
-            sig = re.compile(pattern.replace("{session}", hexid or _ANY_HEX))
-            loose = re.compile(pattern.replace("{session}", _ANY_HEX))
+            sig, loose = signature_patterns(pattern, hexid)
         except re.error as e:
             return deny(say("signature_not_regex", guard=guard, pattern=pattern, err=e))
     want = ([f"start the first line with `{first}`"] if first else []) + (

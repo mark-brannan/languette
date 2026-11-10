@@ -80,7 +80,8 @@ def _own(c, where):
         raise sw.BadRules(f"{where}.cheaper must be a string")
 
 
-def _load(path):
+def load(path):
+    """The repo's listed commands, or Refuse naming what is wrong with the file."""
     commands = yield from paths.read_rules(
         path, "commands", ("cost", "approve_label", "cheaper"), _own, many=True, nonempty=True)
     labels = {}
@@ -103,7 +104,7 @@ def approval(doc, guard, found):
     if not path:
         return None
     try:
-        commands = yield from _load(path)
+        commands = yield from load(path)
     except Refuse as e:
         return deny(say("ask_first_invalid", path=path, err=e))
     at = None

@@ -6,6 +6,7 @@ imports these, so pytest-bdd finds them."""
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -60,10 +61,14 @@ class Doctor(FakeHome):
             s = self.settings()
             s.setdefault("enabledPlugins", {})[PLUGIN_ID] = False
             self.write_settings(s)
-        self.stub("claude", f'[ "$*" = "plugin list --json" ] || exit 2\n'
+        # `plugin configure` answers as the host does, from settings.json and this repo's manifest.
+        configure = " ".join(shlex.quote(str(a)) for a in (sys.executable, ROOT / "tests/claude_configure.py",
+                                                            self.cfg / "settings.json", ROOT / ".claude-plugin/plugin.json"))
+        self.stub("claude", f'case "$*" in "plugin configure "*) exec {configure} "$@";; esac\n'
+                            f'[ "$*" = "plugin list --json" ] || exit 2\n'
                             f'{"exec cat " + str(listed) if self.claude_ok else "exit 1"}')
 
-    def run(self, cwd, *extra, stdin=None):
+    def run(self, cwd, *extra, stdin=None, command="doctor"):
         self.write_installs()
         for path, text in self.overrides.items():
             Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -72,7 +77,7 @@ class Doctor(FakeHome):
             args, lists, _ = FORGES[name]
             out = ("echo a-host" if lists else "") if signed else "echo 'No logins.' >&2" if lists else "exit 1"
             self.stub(name, f'[ "$*" = "{" ".join(args)}" ] || exit 2\n{out}')
-        self.invoke(["doctor", *extra], cwd, os.environ["PATH"], stdin)
+        self.invoke([command, *extra], cwd, os.environ["PATH"], stdin)
         self.last = None                       # the row the last row step asserted, for "beneath it"
 
     def details(self, label):
