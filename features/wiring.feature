@@ -573,6 +573,7 @@ Feature: wiring
       | setup                                                                       |
       | the plugin's script for "guard-cross-session-send" fails after reading its payload |
       | the real run.py, whose guard-cross-session-send state handler raises        |
+      | the real run.py, whose guard-cross-session-send rule set does not load      |
 
   Scenario: a guard-cross-session-send state hook that fails inside run.py writes no file when the option is false
     Given the hook is the hooks.json PostToolUse command for "guard-cross-session-send"

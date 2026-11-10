@@ -213,7 +213,8 @@ def _read(stdin_text):
 
 
 def _answer(payload, env, only):
-    """(respond's stdout, whether a guard crashed) for `payload`, _read's result."""
+    """(respond's stdout, whether guard-cross-session-send crashed or objected) for
+    `payload`, _read's result. Its state handlers never object, so a finding is a failure."""
     out, judged = _respond(payload, env, only)
     world, payload, findings, acts, doc = judged
     for a in acts:
@@ -223,7 +224,7 @@ def _answer(payload, env, only):
             world.keep(record.build(payload, env, only, findings, _verdict(out), doc, extra=_project_rules(world, payload, env)))
         except Exception:  # noqa: BLE001 -- a record never changes the verdict
             pass
-    return out, any(crashed for _, _, crashed in findings)
+    return out, any(crashed or r is not None for name, r, crashed in findings if name == guard_cross_session_send.NAME)
 
 
 def _project_rules(world, payload, env):
@@ -316,7 +317,7 @@ def _spend(world, event, findings, fields):
         try:
             if world.spend(kind, *args):
                 continue
-            why = lost
+            why = lost or say("spend_failed", guards=name, err="no deny reason given")
         except Exception as e:  # noqa: BLE001 -- a spend that cannot be made fails closed
             why = say("spend_failed", guards=name, err=e)
         return deny(why)
@@ -356,12 +357,12 @@ def main(argv):
     event = payload.get("hook_event_name") if isinstance(payload, dict) else None
     if event in STATE_EVENTS:
         # These events carry no decision: whatever the guards say is kept off stdout,
-        # and a guard that crashed is a failure though their verdict is silence.
+        # and guard-cross-session-send crashing or objecting is a failure though the verdict is silence.
         try:
-            out, crashed = _answer(payload, os.environ, only)
+            out, failed = _answer(payload, os.environ, only)
         except Exception:  # noqa: BLE001
-            out, crashed = "", True
-        if out or crashed:
+            out, failed = "", True
+        if out or failed:
             _state_failed(payload, os.environ)
         return 0
     sys.stdout.write(_answer(payload, os.environ, only)[0])
