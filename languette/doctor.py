@@ -818,5 +818,4 @@ def main(args=None):
     problems = sum(mark == FAIL for mark, _, _, _ in rows)
     code = 1 if problems else 0
     print(f"{problems} problem{'' if problems == 1 else 's'}; exit {code}")
-    fix(cwd, False)
-    return code
+    return max(code, fix(cwd, False))
