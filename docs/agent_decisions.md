@@ -656,3 +656,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261106t125532z
 - prose-budget-commit's rule says action deny while its handler only warns, as tree-state's asks and own-places gives context. Undo: give the engine a warn action ([#366](https://github.com/mark-brannan/languette/pull/366))
+
+### 20261110t092520z
+- No scenario runs guard-worktrees' own route before guard-git-work-loss; the no-record rows pin the default install Undo: add a cross-guard scenario ([#364](https://github.com/mark-brannan/languette/pull/364#discussion_r4523153053)) ([#364](https://github.com/mark-brannan/languette/pull/364))
