@@ -19,7 +19,7 @@ helps write a config that works.
 
 1. **Checks protection and its dependencies:** a ✓, ! or ✗ row per check, details beneath; any ✗ exits non-zero.
 2. **Diagnoses every config** through the guard's own loader.
-3. **Offers the fix** as a diff, applied only on a yes.
+3. **Offers the fix** as a diff, applied only on a yes. (planned for the files under `.languette/`)
 4. **Assists with configuration,** not only repair. (planned)
 
 The checks run in order, and a ✗ never stops a later one: version, shell parser, parse-check and fail-closed
