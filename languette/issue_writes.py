@@ -185,8 +185,7 @@ def _writes(doc):
 
 def _session(payload):
     sid = payload.get("session_id")
-    sid = sid if isinstance(sid, str) and sid else "none"
-    return re.sub(r"[^A-Za-z0-9_\n-]", "_", sid)
+    return sid if isinstance(sid, str) and sid else "none"
 
 
 def _never_ran(transcript, call):
