@@ -31,9 +31,9 @@ from collections import namedtuple
 from languette import reshape
 from languette.verdict import Need
 
-# kind -> (the option, the default file, the second column's name)
-KINDS = {"redacted": ("redacted_terms_file", "redacted-terms.tsv", "put"),
-         "blocked": ("blocked_terms_file", "blocked-terms.tsv", "message")}
+# kind -> (the option, the default file, the second column's name, the option's environment variable)
+KINDS = {"redacted": ("redacted_terms_file", "redacted-terms.tsv", "put", "CLAUDE_PLUGIN_OPTION_REDACTED_TERMS_FILE"),
+         "blocked": ("blocked_terms_file", "blocked-terms.tsv", "message", "CLAUDE_PLUGIN_OPTION_BLOCKED_TERMS_FILE")}
 DEFAULT_PUT = "<redacted>"
 DEFAULTS = os.path.join(os.path.dirname(__file__), "rules", "redacted-terms.tsv")
 MAX_READ = 1 << 20                                  # bytes of a terms file the guard reads
@@ -75,9 +75,9 @@ def where(kind, env):
     """(path, set): where the kind's file is read from and whether the user's option named it.
     A leading `~` or `$HOME` in the option is expanded; with the option unset or empty it is
     $XDG_CONFIG_HOME/languette/<file>, ~/.config by default. "" when there is no home to look in."""
-    option, name, _ = KINDS[kind]
+    _, name, _, option_var = KINDS[kind]
     home = env.get("HOME") or ""
-    value = env.get(option_env(option)) or ""
+    value = env.get(option_var) or ""
     if value:
         m = re.match(r"(?:~|\$HOME|\$\{HOME\})(?=/|\Z)", value)
         return (home + value[m.end():] if m else value), True

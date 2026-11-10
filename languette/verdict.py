@@ -102,6 +102,8 @@ def spend(kind, *args, lost=None):
 
     A spend that can no longer be made (a parallel call took it first) makes the
     call a deny, for the reason `lost`; the runner words a lost approvals spend."""
+    if not lost and kind != "approvals":       # a deny with no reason; the guard's crash is one
+        raise ValueError(f"spend({kind!r}) needs lost=, its deny reason")
     return {SPEND: [[kind, *args]], **({LOST: lost} if lost else {})}
 
 

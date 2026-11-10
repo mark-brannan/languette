@@ -328,6 +328,17 @@ def project_config(payload, env, name):
     return None, bool(usable)
 
 
+def read_refusal(exc):
+    """The Refuse a failed read's exception comes to, or None for any other exception."""
+    if isinstance(exc, UnicodeDecodeError):
+        return Refuse(say("unreadable_file", err=exc))
+    if isinstance(exc, OSError):
+        return Refuse(say("unreadable_file", err=exc.strerror or exc))
+    if isinstance(exc, ValueError):            # not a regular file, or past MAX_READ
+        return Refuse(say("passed", text=exc))
+    return None
+
+
 def read_json(path):
     """The file at path, parsed as JSON, or Refuse naming why it cannot be."""
     try:
