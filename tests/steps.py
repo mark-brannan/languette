@@ -15,7 +15,7 @@ from pytest_bdd import given, parsers, then, when
 
 from harness import IN_PROCESS, ROOT, fixture_text, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
 from matchers import asks, denies, is_silent, warns_about
-from languette import run, scan, terms, verdict
+from languette import run, scan, terms, verdict, world, worktree_reaches
 
 # --- Given ---------------------------------------------------------------
 
@@ -237,24 +237,23 @@ def _linked_worktree(ctx, path, repo):
         subprocess.run(["git", "-C", r, *GIT_IDENT, "commit", "-q", "--allow-empty", "-m", "init"], check=True)
     Path(d).parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "-C", r, "worktree", "add", "-q", "-b", Path(d).name, d], check=True)
-    if ctx.guard == "guard-git-work-loss":
-        # That guard relaxes only in a worktree this session entered: it is the session's own
-        # unless a scenario says "the session did not enter" it.
-        with _session_record(ctx).open("a") as f:
-            f.write(f"{os.path.realpath(d)}\t{os.stat(Path(d) / '.git').st_ino}\n")
 
 
-def _session_record(ctx):
-    sid = re.sub(r"[^A-Za-z0-9_-]", "_", ctx.session)
-    return Path(ctx.doordir()) / f"languette-guard-worktrees.{sid}"
+def _record(ctx):
+    # guard-worktrees' own name and writer, so the record's format is not copied here.
+    rec = worktree_reaches._Session({"session_id": ctx.session}, {"TMPDIR": ctx.doordir()}, "", "").rec
+    Path(rec).touch()
+    return rec
 
 
-@given(parsers.parse('the session did not enter "{path}"'))
-def _not_entered(ctx, path):
-    rec = _session_record(ctx)
-    top = os.path.realpath(ctx.expand(path))
-    keep = [ln for ln in rec.read_text().splitlines() if not ln.startswith(top + "\t")]
-    rec.write_text("".join(ln + "\n" for ln in keep))
+@given("guard-worktrees keeps a record for the session")
+def _keeps_record(ctx):
+    _record(ctx)
+
+
+@given(parsers.parse('guard-worktrees recorded "{path}" for the session'))
+def _recorded(ctx, path):
+    world.World({}, {})._wt_keep(_record(ctx), os.path.realpath(ctx.expand(path)))
 
 
 @given(parsers.parse('the symlink "{path}" to "{target}"'))

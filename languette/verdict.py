@@ -48,7 +48,7 @@ class Need:
         ruleset-cache slug, branch        -> (mtime, text), or None
         clock                             -> seconds since the epoch
         worktree      op, *args           -> guard-worktrees' per-session record: arrive rec, top
-                                             -> (usable, adopt); recorded rec, top -> bool;
+                                             -> (usable, adopt); kept rec -> bool; recorded rec, top -> bool;
                                              scratchpad sid -> dir, or None
         approvals     {label: runs}       -> {label: [AskUserQuestion ids]}: the user's yeses to
                                              each label this call may spend, its own first; read only

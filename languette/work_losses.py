@@ -20,8 +20,9 @@ and the default branches turn on, from git in the payload's cwd, and gives the v
                     overwriting the repo's copy; -D and -R alone only touch links
 
 Where an agent works: the payload's cwd is in this session's scratchpad or in a
-linked worktree the session recorded as its own (guard-worktrees' record), and its
-toplevel is not $HOME. $HOME and a repo's main checkout are where the user
+linked worktree (git's own --git-dir differs from --git-common-dir) that is the
+session's own: one guard-worktrees recorded, or any, when it keeps no record for
+the session. Its toplevel is not $HOME. $HOME and a repo's main checkout are where the user
 works, so neither relaxation holds there.
 
 Each rule has its own switch, CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_<RULE>,
@@ -324,21 +325,23 @@ def _own_command(s, a, b, g):
 
 def _where_agents_work(doc, cwd):
     """True when cwd's toplevel is this session's own: inside its scratchpad, or a linked
-    worktree it recorded, and is not $HOME's: then the toplevel, else "". Another session's
+    worktree that is its own (in_own_place), and is not $HOME's: then the toplevel, else "". Another session's
     worktree, a repo's main checkout outside the scratchpad, and $HOME, are the user's. Any failure to ask is "", as is a toplevel of /."""
     home = (doc.env or {}).get("HOME") or ""
     if not home.startswith("/"):
         return ""
     try:
         rc, out, _ = yield Need("run", cwd, STATUS_TIMEOUT, "git", "rev-parse", "--path-format=absolute",
-                                "--show-toplevel")
-        top = out.strip()
-        if rc != 0 or not top:
+                                "--show-toplevel", "--git-dir", "--git-common-dir")
+        lines = out.splitlines()
+        if rc != 0 or len(lines) != 3:
             return ""
+        top, gdir, common = lines
         top = yield Need("path", "realpath", top)
         if top in ("", "/") or top == (yield Need("path", "realpath", home)):
             return ""
-        return top if (yield from in_own_place(doc, top)) else ""
+        linked = (yield Need("path", "realpath", gdir)) != (yield Need("path", "realpath", common))
+        return top if (yield from in_own_place(doc, top, linked)) else ""
     except Exception:  # noqa: BLE001
         return ""
 
