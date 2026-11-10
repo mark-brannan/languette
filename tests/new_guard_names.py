@@ -15,9 +15,8 @@ import ast
 import re
 import subprocess
 import sys
-from pathlib import Path
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 GUARDS = "languette/guards"
 RULES = "languette/rules"
 HEADING = re.compile(r"^#+ approved guard names[ \t]*$", re.M | re.I)

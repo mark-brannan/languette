@@ -18,10 +18,10 @@ from pytest_bdd import given, parsers, then, when
 from harness import FakeHome, fixture_text
 from languette import terms
 from languette.doctor import FORGES
+from paths import ROOT
 
 DEFAULTS = terms.defaults(Path(terms.DEFAULTS).read_text())
 
-ROOT = Path(__file__).resolve().parent.parent
 PLUGIN_ID = "languette@languette"
 
 
