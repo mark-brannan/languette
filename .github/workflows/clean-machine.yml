@@ -46,10 +46,10 @@ jobs:
           if [ "$RUNNER_OS" = macOS ]; then
             brew install mark-brannan/tap/languette
           else
-            sudo apt-get update -q
+            sudo apt-get update -q  # runner setup, not part of the block
             sudo apt-get install -y -q python3 pipx shfmt gh
             pipx ensurepath
             pipx install languette
-            export PATH="$HOME/.local/bin:$PATH"
+            export PATH="$HOME/.local/bin:$PATH"  # stands in for the new shell
           fi
           languette install && languette doctor

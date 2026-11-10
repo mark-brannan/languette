@@ -64,7 +64,13 @@ languette install && languette doctor
 
 ```
 sudo apt install python3 pipx shfmt gh
+pipx ensurepath
 pipx install languette
+```
+
+Open a new shell so `~/.local/bin` is on your PATH, then:
+
+```
 languette install && languette doctor
 ```
 
