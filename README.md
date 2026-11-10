@@ -261,7 +261,7 @@ or at install, by its name with underscores:
 claude plugin install languette@languette --config guard_recursive_delete=false
 ```
 
-Changing an option later, outside the installer, is `languette config` (planned; [design](docs/design/config.md)).
+Changing an option later, outside the installer, is `languette config`: alone it lists every option, `languette config guard_recursive_delete=false` sets one, `--unset` restores its default ([design](docs/design/config.md)).
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.

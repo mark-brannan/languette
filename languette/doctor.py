@@ -3,7 +3,7 @@ machine, one row per check, each ✓, ! or ✗. Exits 1 on any ✗, so CI can ru
 
 The doctor reads settings and runs programs, so it sits outside the pure
 steps of the guard pipeline (docs/design/guard-pipeline.md): no guard imports
-it. It writes nothing. Two probes each send one command to an installed hook as
+it. Its checks write nothing. Two probes each send one command to an installed hook as
 a JSON payload, the way Claude Code would: a command that does not parse, to
 require-well-formed, and a recursive delete of a fake path, to
 guard-recursive-delete. Nothing here ever runs either command.
@@ -14,7 +14,10 @@ Anything it cannot read, or reads in a shape it does not know, is a ! row,
 never a traceback. A ✗ never stops a later check; the exit is decided after the
 last row. For guard-private-terms it also writes: --init-redacted-terms and
 --init-blocked-terms a missing file, --restore-redacted-terms the defaults into
-one on a yes; --redact prints what a post would become. Standard library only.
+one on a yes; --redact prints what a post would become. Every other config, each option and
+each file under .languette/, is judged by its guard's own loader (languette/loaders.py); an
+option it refuses is offered back at its default as a diff, written through `languette config`
+on a yes. Standard library only.
 """
 
 import json
@@ -449,7 +452,13 @@ def check(cwd):
         state = {True: "signed in", False: "installed, not signed in", None: "installed, not answering"}[signed]
         quiet = signed is True if name == "gh" else signed is False
         rows.append((OK, name, state, []) if quiet else (WARN, name, f"{state}; {note}", []))
-    return rows + terms_rows(options)
+    try:
+        configs = configs_row(options, cwd)
+    except BaseException as e:  # noqa: BLE001 -- run.py exits when a guard will not import
+        configs = (WARN, "configs", f"the guards did not load ({type(e).__name__}: {e})", [])
+    # A config that denies every command is the first thing to mend.
+    return ([configs] if configs[2].startswith(DENIES_ALL) else []) + rows + \
+        ([] if configs[2].startswith(DENIES_ALL) else [configs]) + terms_rows(options)
 
 
 def render(rows):
@@ -461,6 +470,93 @@ def render(rows):
     for mark, label, text, lines in rows:
         yield f"{mark} {label:<13} {text}"
         yield from details(lines, 1)
+
+
+# --- every other config, through its guard's own loader ---------------------
+
+DENIES_ALL = "every Bash command is denied"
+
+
+def refused_options(options):
+    """name -> why its guard refuses the value, for each installed option but the terms files,
+    which have rows of their own."""
+    from languette import loaders
+    env = _env(options)
+    own = {terms.option_name(k) for k in terms.KINDS}
+    found = {k: loaders.option(k, _env_value(v), env) for k, v in options.items()
+             if isinstance(k, str) and k not in own and v is not None}
+    return {k: why for k, why in found.items() if why}
+
+
+def configs_row(options, cwd):
+    """(mark, "configs", text, lines): each installed option and each file under .languette/ judged
+    by its guard's own loader. A file that does not load is a ✗ while its guard is on, since every
+    Bash command is denied until it does; off, a !. A file no guard reads is a !."""
+    from languette import loaders
+    from languette.engine import one_line   # a repo's file supplies the loader's message
+    lines, deny_all, refused = [], [], refused_options(options)
+    for name, why in refused.items():
+        lines.append(line(FAIL, f"{name}: {why}", line("", "to put it back to its default: languette doctor --fix")))
+    try:
+        files = loaders.repo_files(cwd, _env(options))
+    except Exception as e:  # noqa: BLE001 -- what the doctor cannot read is a ! row
+        return WARN, "configs", f".languette/ could not be read ({type(e).__name__}: {one_line(str(e))})", lines
+    for path, opt, why in files:
+        where = _tilde(path)
+        if opt is None:
+            lines.append(line(WARN, f"{where}: no guard reads it"))
+        elif why is None:
+            lines.append(line(OK, where))
+        elif is_on("=", options.get(opt)):
+            deny_all.append(where)
+            lines.append(line(FAIL, f"{where}: {one_line(why)}"))
+        else:
+            lines.append(line(WARN, f"{where}: {one_line(why)}; {opt} is off, so nothing reads it"))
+    if deny_all:
+        return FAIL, "configs", f"{DENIES_ALL} until {', '.join(deny_all)} loads", lines
+    if refused:
+        return FAIL, "configs", f"{len(refused)} option{'' if len(refused) == 1 else 's'} its guard refuses", lines
+    n = len(files)
+    text = f"every option and {n} file{'' if n == 1 else 's'} under .languette/ load as their guards read them" \
+        if n else "every option loads as its guard reads it; no .languette/ files"
+    return worst([m for m, _, _ in lines]), "configs", text, lines
+
+
+def fix(cwd, yes):
+    """Offer each option its guard refuses back at its default, as a diff, and write it through
+    `languette config` on a yes: `yes` (--fix), else y at a terminal. Exits 1 when the write fails."""
+    from languette import config
+    options = installed_options(cwd)
+    old = {k: _env_value(options[k]) for k in refused_options(options)}
+    if not old:
+        if yes:
+            print(f"{OK} no option its guard refuses; nothing to write")
+        return 0
+    try:
+        schema = config.options(config.plugin(cwd))[0]
+    except config.Refused as e:
+        print(f"{FAIL} {e.args[0]}: {e.args[1]}; nothing written")
+        return 1
+    new = {k: config.default(schema[k]) for k in old if k in schema}
+    if not new:
+        print(f"{FAIL} {', '.join(old)}: not in the installed plugin's options; nothing written")
+        return 1
+    where = _tilde(_config_dir() / "settings.json")
+    print(f"--- {where}\n+++ {where}")
+    for k, v in new.items():
+        print(f"-{k}={old[k]}\n+{k}={v}")
+    if not yes:
+        if not sys.stdin.isatty():
+            print(f"{WARN} to write it: languette doctor --fix")
+            return 0
+        try:
+            answer = input("Write it? [y/N] ")
+        except EOFError:
+            answer = ""
+        if answer.strip().lower() not in ("y", "yes"):
+            print(f"{WARN} left as it was")
+            return 0
+    return config.main(unset=list(new))
 
 
 # --- guard-private-terms' files, through the guard's own loader --------------
@@ -695,7 +791,8 @@ def installed_options(cwd):
 
 def main(args=None):
     """`args`: the parsed doctor options (redact, init_redacted_terms, init_blocked_terms,
-    restore_redacted_terms); none runs the checks."""
+    restore_redacted_terms, fix); none runs the checks, then offers the fix for any option its
+    guard refuses."""
     try:
         sys.stdout.reconfigure(errors="replace")
     except (AttributeError, ValueError):
@@ -714,10 +811,12 @@ def main(args=None):
             return init("blocked", installed_options(cwd))
         if args.restore_redacted_terms:
             return restore(installed_options(cwd))
+        if args.fix:
+            return fix(cwd, True)
     rows = check(cwd)
     for text in render(rows):
         print(text)
     problems = sum(mark == FAIL for mark, _, _, _ in rows)
     code = 1 if problems else 0
     print(f"{problems} problem{'' if problems == 1 else 's'}; exit {code}")
-    return code
+    return max(code, fix(cwd, False))

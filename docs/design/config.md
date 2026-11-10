@@ -13,7 +13,7 @@ environment variable, and the one command that reads them all is the doctor.
 Installing and configuring are separate acts: install
 puts languette on the host, and config changes it afterwards, any day.
 
-## languette config (planned)
+## languette config
 
 ```
 languette config                              every option, its value, where it is set
