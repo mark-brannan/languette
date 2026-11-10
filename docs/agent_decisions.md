@@ -707,3 +707,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t231441z
 - SECURITY.md: a guard miss and a fail-open are an issue by default, private if the reporter thinks it is worse Undo: restore the ambiguous section from a5048d0 ([#391](https://github.com/mark-brannan/languette/pull/391))
+
+### 20261110t231454z
+- SECURITY.md: languette running part of a command it only reads is listed as a vulnerability Undo: delete the line ([#391](https://github.com/mark-brannan/languette/pull/391))
