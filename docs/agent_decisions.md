@@ -683,3 +683,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t095603z
 - Split module names: quoting, lexicon, ladder, lexer, cd_tracking, forges, git_calls, texts, stops, command_rules Undo: rename ([#372](https://github.com/mark-brannan/languette/pull/372))
+
+### 20261110t095608z
+- Tests stand in for a re-exported scan name through tests/harness.py stand_in, which sets every languette module holding it, rather than changing importers Undo: revert stand_in; point document, record and secrets at the owning modules ([#372](https://github.com/mark-brannan/languette/pull/372))
