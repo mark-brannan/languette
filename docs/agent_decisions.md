@@ -701,3 +701,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t215750z
 - The sandbox section says 'commands', the README's opening word, where the reviewer suggested 'calls' Undo: swap one word in README.md ([#386](https://github.com/mark-brannan/languette/pull/386#discussion_r4528114873)) ([#386](https://github.com/mark-brannan/languette/pull/386))
+
+### 20261110t215801z
+- The four-row table and the 'sandbox first' advice are cut from the sandbox section, on the ask for high-level ideas only Undo: restore the table from e73aad8 ([#386](https://github.com/mark-brannan/languette/pull/386))
