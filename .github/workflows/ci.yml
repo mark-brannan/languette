@@ -82,11 +82,17 @@ jobs:
       - run: pip install -r requirements-dev.txt
       # smoke_steps.py builds its own PATHs and venvs: the smoke job runs it.
       # pytest-xdist on min(4, cores) workers: pyproject's -n auto, capped in tests/conftest.py.
+      # Branch coverage with subprocess patching costs about a third of a leg's
+      # test time (measured 120 s with, 83 s without, on 4 workers), so only the
+      # leg that uploads the report runs it.
       # --cov reads pyproject's [tool.coverage.run]; the report feeds the coverage job.
       # Absolute, so hook child processes (cwd elsewhere) write where the combine reads.
-      - run: python -m pytest -q --cov --cov-report=xml
+      - if: matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
+        run: python -m pytest -q --cov --cov-report=xml
         env:
           COVERAGE_FILE: ${{ github.workspace }}/.coverage
+      - if: matrix.os != 'ubuntu-latest' || matrix.python != '3.13'
+        run: python -m pytest -q
       # On main too: main's report at a PR's merge base is what the total's delta is measured against.
       # One leg uploads, so the artifact name never collides.
       - if: (github.event_name == 'pull_request' || github.event_name == 'push') && matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
@@ -130,6 +136,8 @@ jobs:
 
   shellcheck:
     runs-on: ubuntu-latest
+    # Measured per push: 5 s to 8 s.
+    timeout-minutes: 1
     steps:
       - uses: actions/checkout@v7
         with:
@@ -148,7 +156,10 @@ jobs:
 
   # A guard a pull request adds must take a name from the approved guard names
   # table under docs/, as the base has it. Guards already there are not checked.
+  # A push to main has no base to compare, so the job is skipped there and
+  # ci-gate reads the skip as green off a pull request.
   new-guard-names:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -156,7 +167,6 @@ jobs:
         with:
           persist-credentials: false
       - name: New guards take an approved name
-        if: github.event_name == 'pull_request'
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -195,3 +205,4 @@ jobs:
     uses: mark-brannan/.github/.github/workflows/ci-gate.yml@main
     with:
       results: ${{ toJSON(needs) }}
+      allow-skipped: ${{ github.event_name != 'pull_request' }}
