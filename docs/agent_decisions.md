@@ -668,3 +668,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t094322z
 - By-hand wrapper section renamed 'If you cannot run the installer' and moved under Install as a subsection; undo: revert the README hunk (no PR, branch claude/clean-machine)
+
+### 20261110t095533z
+- languette config and the doctor stay two commands (D2) Undo: fold config into a doctor flag ([#371](https://github.com/mark-brannan/languette/pull/371))
