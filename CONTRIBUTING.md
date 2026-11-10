@@ -10,7 +10,7 @@ The issue gives:
 
 - the incident,
 - its root cause,
-- the hazard: why it could ruin a day, as the README's lede puts it (a
+- the hazard: why it could ruin your day, as the README puts it (a
   waste of an hour is not one),
 - the concept: a setting of an existing guard, or a new one,
 - the name, under the naming decision in [docs/decisions.md](docs/decisions.md).
