@@ -1,0 +1,55 @@
+name: Clean machine
+
+# The README's install blocks, run as written on a fresh runner: the macOS
+# block on macos-latest, the Linux block on ubuntu-latest. Claude Code is
+# installed first, the way a reader has it before the block. Then
+# `languette install && languette doctor`; the doctor exits non-zero on any ✗
+# and sends the fail-closed canary (a recursive delete of a fake path) through
+# the installed hook, so a green run is a canary denied.
+#
+# It installs the released package, so it proves the last release, not the
+# branch. Not a gate. Cost: ubuntu about 2 minutes, macOS about 5 minutes,
+# once a week; one concurrent-job slot each, from the account's pool (GitHub
+# Free: 20 concurrent jobs, 5 of them macOS). Never per push.
+
+on:
+  schedule:
+    - cron: "43 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  block:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 10 || 6 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS block
+            os: macos-latest
+          - name: Linux block
+            os: ubuntu-latest
+    steps:
+      - name: Install Claude Code
+        run: |
+          set -euo pipefail
+          npm install --global @anthropic-ai/claude-code
+          claude --version
+      - name: The README's block
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = macOS ]; then
+            brew install mark-brannan/tap/languette
+          else
+            sudo apt-get update -q
+            sudo apt-get install -y -q python3 pipx shfmt gh
+            pipx ensurepath
+            pipx install languette
+            export PATH="$HOME/.local/bin:$PATH"
+          fi
+          languette install && languette doctor

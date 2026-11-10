@@ -87,7 +87,19 @@ A registry and a CI Action are planned
 [cloud sessions](https://code.claude.com/docs/en/cloud-environments) build no
 dev container.
 
-Without the plugin system or the installer, see [Installing by hand](#installing-by-hand).
+### If you cannot run the installer
+
+Clone the repo and add one entry per guard in `hooks/hooks.json` to
+`settings.json`, shaped like the one below. Replace `${CLAUDE_PLUGIN_ROOT}`
+with the path to your clone, since it is unset outside the plugin, and keep
+the wrapper. The wrapper is what makes a missing or
+crashing guard a deny: without it, a missing script is a non-blocking error
+to Claude Code, and every command goes through. One entry:
+
+```json
+{"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command",
+  "command": "h=\"$HOME/languette/languette/run.py\"; { [ -f \"$h\" ] && python3 -I \"$h\" --guard guard-recursive-delete; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-recursive-delete) is missing or crashed, or python3 is not on PATH. This is a gate and fails closed.\"}}'"}]}]}}
+```
 
 ### Removing it
 
@@ -406,20 +418,6 @@ Scenario: a target the guard cannot resolve is denied on sight
   Given the working directory is "$HOME/project"
   When the agent runs `rm -rf "$DIR"`
   Then the guard denies, naming "variable or command substitution"
-```
-
-## Installing by hand
-
-Clone the repo and add one entry per guard in `hooks/hooks.json` to
-`settings.json`, shaped like the one below. Replace `${CLAUDE_PLUGIN_ROOT}`
-with the path to your clone, since it is unset outside the plugin, and keep
-the wrapper. The wrapper is what makes a missing or
-crashing guard a deny: without it, a missing script is a non-blocking error
-to Claude Code, and every command goes through. One entry:
-
-```json
-{"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command",
-  "command": "h=\"$HOME/languette/languette/run.py\"; { [ -f \"$h\" ] && python3 -I \"$h\" --guard guard-recursive-delete; } || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"languette/run.py (guard-recursive-delete) is missing or crashed, or python3 is not on PATH. This is a gate and fails closed.\"}}'"}]}]}}
 ```
 
 ## Working on it
