@@ -99,7 +99,8 @@ Clone the repo and add one entry per guard to `settings.json`, shaped like
 the one below. Replace `$HOME/languette` with the path to your clone, and
 keep the wrapper. The wrapper is what makes a missing or
 crashing guard a deny: without it, a missing script is a non-blocking error
-to Claude Code, and every command goes through. One entry:
+to Claude Code, and every command goes through. One entry, for Bash calls;
+`hooks/hooks.json` lists the other tools and events the plugin wires:
 
 ```json
 {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command",
