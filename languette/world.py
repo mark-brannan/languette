@@ -239,7 +239,7 @@ class World:
     # cwd alone.
 
     def _worktree(self, op, *args):
-        if op not in ("arrive", "recorded", "scratchpad"):
+        if op not in ("arrive", "kept", "recorded", "scratchpad"):
             raise ValueError(f"no worktree fact {op!r}")
         return getattr(self, "_wt_" + op)(*args)
 
@@ -309,6 +309,10 @@ class World:
         except OSError:
             pass
         return True, adopt
+
+    def _wt_kept(self, rec):
+        """The record exists and is this user's: guard-worktrees has seen this session."""
+        return self._wt_mine(rec)
 
     def _wt_recorded(self, rec, top):
         if not self._wt_mine(rec):
