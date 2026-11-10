@@ -4,13 +4,13 @@ and the code and its blanks must exist. Read as source, never run."""
 import ast
 import importlib
 import string
-from pathlib import Path
 
 from hamcrest import assert_that, empty, equal_to
 
 from languette.messages import MESSAGES
+from paths import ROOT as _ROOT
 
-ROOT = Path(__file__).resolve().parent.parent / "languette"
+ROOT = _ROOT / "languette"
 
 
 def _calls():

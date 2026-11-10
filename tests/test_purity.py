@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 from hamcrest import assert_that, empty, equal_to, is_not
 
-ROOT = Path(__file__).resolve().parent.parent
+from paths import ROOT
 
 
 def _pure():

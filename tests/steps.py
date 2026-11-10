@@ -14,8 +14,8 @@ from hamcrest import assert_that, equal_to
 from pytest_bdd import given, parsers, then, when
 
 from harness import IN_PROCESS, ROOT, fixture_text, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
-from matchers import Verdict, asks, denies, is_silent, warns_about
-from languette import run, scan, terms, verdict, world
+from matchers import asks, denies, is_silent, warns_about
+from languette import run, scan, terms, verdict, world, worktree_reaches
 
 # --- Given ---------------------------------------------------------------
 
@@ -239,9 +239,33 @@ def _linked_worktree(ctx, path, repo):
     subprocess.run(["git", "-C", r, "worktree", "add", "-q", "-b", Path(d).name, d], check=True)
 
 
+def _record(ctx):
+    # guard-worktrees' own name and writer, so the record's format is not copied here.
+    rec = worktree_reaches._Session({"session_id": ctx.session}, {"TMPDIR": ctx.doordir()}, "", "").rec
+    Path(rec).touch()
+    return rec
+
+
+@given("guard-worktrees keeps a record for the session")
+def _keeps_record(ctx):
+    _record(ctx)
+
+
+@given(parsers.parse('guard-worktrees recorded "{path}" for the session'))
+def _recorded(ctx, path):
+    world.World({}, {})._wt_keep(_record(ctx), os.path.realpath(ctx.expand(path)))
+
+
 @given(parsers.parse('the symlink "{path}" to "{target}"'))
 def _symlink(ctx, path, target):
-    Path(ctx.expand(path)).symlink_to(ctx.expand(target))
+    # $HOME is shared by every scenario in a worker, so an earlier one may have
+    # left a directory where this link goes: the link replaces it.
+    link = Path(ctx.expand(path))
+    if link.is_symlink() or link.is_file():
+        link.unlink()
+    elif link.is_dir():
+        shutil.rmtree(link)
+    link.symlink_to(ctx.expand(target))
 
 
 @given("another plugin's door file is already present")

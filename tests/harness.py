@@ -11,8 +11,8 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from languette import run, scan, verdict  # noqa: E402
 from hamcrest import assert_that, equal_to, has_length

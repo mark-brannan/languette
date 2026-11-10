@@ -19,9 +19,10 @@ and the default branches turn on, from git in the payload's cwd, and gives the v
   stow --adopt      asks: it moves each conflicting file from the target into the package,
                     overwriting the repo's copy; -D and -R alone only touch links
 
-Where an agent works: the payload's cwd is in a linked worktree (git's own
---git-dir differs from --git-common-dir) or the session's scratchpad, and its
-toplevel is not $HOME. $HOME and a repo's main checkout are where the user
+Where an agent works: the payload's cwd is in this session's scratchpad or in a
+linked worktree (git's own --git-dir differs from --git-common-dir) that is the
+session's own: one guard-worktrees recorded, or any, when it keeps no record for
+the session. Its toplevel is not $HOME. $HOME and a repo's main checkout are where the user
 works, so neither relaxation holds there.
 
 Each rule has its own switch, CLAUDE_PLUGIN_OPTION_GUARD_GIT_WORK_LOSS_<RULE>,
@@ -44,6 +45,7 @@ from languette import scan as sw
 from languette.messages import say
 from languette.refs import FALLBACK, default_branches
 from languette.verdict import Need, Refuse, ask, deny
+from languette.worktree_reaches import in_own_place
 
 
 class Ask(Refuse):
@@ -150,17 +152,17 @@ def _add_long(t):
     return full, negated, (val if eq else None)
 
 
-def _add_options(a):
+def add_options(a):
     """Split git add's words into the options set (canonical names, a negated one as no-<name>)
-    and the pathspecs, from git's own option table. A value option eats the next word when its
-    value is not glued on; `--` and `--end-of-options` end the options."""
+    and the pathspecs' indexes into a, from git's own option table. A value option eats the
+    next word when its value is not glued on; `--` and `--end-of-options` end the options."""
     opts, specs = [], []
     i, n = 0, len(a)
     while i < n:
         t = a[i]
         i += 1
         if t in ("--", "--end-of-options"):
-            specs.extend(a[i:])
+            specs.extend(range(i, n))
             break
         if t in ("-h", "--help"):     # git prints usage or the manual and stages nothing
             opts.append("help")
@@ -184,12 +186,13 @@ def _add_options(a):
                         i += 1
                     break
         else:
-            specs.append(t)
+            specs.append(i - 1)
     return opts, specs
 
 
 def _add(a):
-    opts, names = _add_options(a)
+    opts, at = add_options(a)
+    names = [a[i] for i in at]
     if "help" in opts:
         return
     for t in names:
@@ -321,9 +324,9 @@ def _own_command(s, a, b, g):
 
 
 def _where_agents_work(doc, cwd):
-    """True when cwd's toplevel is a linked worktree or inside the session's scratchpad,
-    and is not $HOME's: then the toplevel, else "". A repo's main checkout outside the
-    scratchpad, and $HOME, are the user's. Any failure to ask is "", as is a toplevel of /."""
+    """True when cwd's toplevel is this session's own: inside its scratchpad, or a linked
+    worktree that is its own (in_own_place), and is not $HOME's: then the toplevel, else "". Another session's
+    worktree, a repo's main checkout outside the scratchpad, and $HOME, are the user's. Any failure to ask is "", as is a toplevel of /."""
     home = (doc.env or {}).get("HOME") or ""
     if not home.startswith("/"):
         return ""
@@ -337,16 +340,10 @@ def _where_agents_work(doc, cwd):
         top = yield Need("path", "realpath", top)
         if top in ("", "/") or top == (yield Need("path", "realpath", home)):
             return ""
-        if (yield Need("path", "realpath", gdir)) != (yield Need("path", "realpath", common)):
-            return top
-        sid = doc.payload.get("session_id")
-        scratch = (yield Need("worktree", "scratchpad", sid)) if isinstance(sid, str) and sid else None
-        if not scratch:
-            return ""
-        scratch = yield Need("path", "realpath", scratch)
+        linked = (yield Need("path", "realpath", gdir)) != (yield Need("path", "realpath", common))
+        return top if (yield from in_own_place(doc, top, linked)) else ""
     except Exception:  # noqa: BLE001
         return ""
-    return top if top == scratch or top.startswith(scratch.rstrip("/") + "/") else ""
 
 
 def _upstream_target(args):
