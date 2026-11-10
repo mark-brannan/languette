@@ -95,12 +95,12 @@ dev container.
 
 ### If you cannot run the installer
 
-Clone the repo and add one entry per guard in `hooks/hooks.json` to
-`settings.json`, shaped like the one below. Replace `${CLAUDE_PLUGIN_ROOT}`
-with the path to your clone, since it is unset outside the plugin, and keep
-the wrapper. The wrapper is what makes a missing or
+Clone the repo and add one entry per guard to `settings.json`, shaped like
+the one below. Replace `$HOME/languette` with the path to your clone, and
+keep the wrapper. The wrapper is what makes a missing or
 crashing guard a deny: without it, a missing script is a non-blocking error
-to Claude Code, and every command goes through. One entry:
+to Claude Code, and every command goes through. One entry, for Bash calls;
+`hooks/hooks.json` lists the other tools and events the plugin wires:
 
 ```json
 {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command",
@@ -130,51 +130,35 @@ $ echo 'rm -rf build && sh -c "git push --force"' | python3 -m languette scan | 
 
 ## The guards
 
-Each guard checks for one kind of hazard:
+Each guard checks for one kind of hazard; [Configuration](#configuration)
+turns one off:
 
-- [`ask-first`](#ask-first): a command the repo lists as costly, until you
-  approve that one run
+- [`ask-first`](#ask-first): a command the repo lists as costly, until you approve that one run
 - [`deny-always`](#deny-always): a command the repo forbids, every time
 - [`guard-sudo`](features/guard-sudo.feature): opt-in; `sudo`, `su`, `doas`, `pkexec`, `run0`, `sudoedit`, `dzdo`
-- [`require-well-formed`](features/require-well-formed.feature): a Bash command that
-  doesn't parse; the other guards skip it
+- [`require-well-formed`](features/require-well-formed.feature): a Bash command that doesn't parse; the other guards skip it
 - [`guard-disks`](features/guard-disks.feature): `dd`, `mkfs`, `wipefs`, `shred` onto disks
-- [`guard-github-issues`](features/guard-github-issues.feature): a second GitHub or GitLab issue create,
-  transfer or delete in one human turn, or any inside a loop
+- [`guard-github-issues`](features/guard-github-issues.feature): a second issue create, transfer or delete in one human turn, or any in a loop
 - [`guard-host-availability`](features/guard-host-availability.feature): shutdown, reboot, fork bomb, `systemctl stop sshd`
-- [`guard-infra`](features/guard-infra.feature): `terraform destroy`, `kubectl delete` and
-  other infrastructure destroys, until you approve that one run
-- [`guard-permissions`](features/guard-permissions.feature): recursive `chmod`,
-  `chown`, `chgrp` or `chmod 777` outside agent-owned or
-  `LANGUETTE_PERM_ALLOW` directories
-- [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`, `sh <(curl ..)`,
-  `eval "$(wget ..)"`
-- [`guard-private-terms`](#settings-for-guard-private-terms): a blocked term
-  posted to a public repo; home paths, this machine's name, private
-  addresses and your terms redacted first
-- [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or
-  `find -delete` outside a generated or agent-owned directory
+- [`guard-infra`](features/guard-infra.feature): `terraform destroy`, `kubectl delete` and other destroys, until you approve that one run
+- [`guard-permissions`](features/guard-permissions.feature): `chmod 777`, recursive `chmod`, `chown`, `chgrp` outside agent-owned or `LANGUETTE_PERM_ALLOW` paths
+- [`guard-pipe-to-shell`](features/guard-pipe-to-shell.feature): `curl u | sh`, `sh <(curl ..)`, `eval "$(wget ..)"`
+- [`guard-private-terms`](#settings-for-guard-private-terms): a blocked term posted to a public repo; your redacted terms replaced first
+- [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or `find -delete` outside a generated or agent-owned directory
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
 - [`guard-secrets`](features/guard-secrets.feature): a pasted credential
-- [`guard-worktrees`](features/guard-worktrees.feature): opt-in; a branch switch in a `$HOME`
-  that is a worktree, a dotfile manager's forced apply or teardown (an ask), or a reach into
-  another session's worktree
-- [`guard-bypass-hooks`](features/guard-bypass-hooks.feature): `--no-verify` on commit, push,
-  merge, pull, rebase or am, and `git -c core.hooksPath=`, until you approve that one run
-- [`guard-bypass-labels`](features/guard-bypass-labels.feature): a session
-  applying a label the `bypass_labels` setting names (none by default)
-- [`guard-bypass-ruleset`](features/guard-bypass-ruleset.feature): a push direct to
-  main where pull requests are normally required (agents could potentially bypass using your credentials)
-- [`guard-cross-session-send`](features/guard-cross-session-send.feature): prevents
-  sending messages to another session with the option to ask first or deny outright
-- [`guard-git-stacked-base`](features/guard-git-stacked-base.feature): deleting a
-  remote branch an open PR is based on (GitHub silently closes the PR)
+- [`guard-worktrees`](features/guard-worktrees.feature): opt-in; a branch switch when `$HOME` is a worktree, or a reach into another session's worktree
+- [`guard-bypass-hooks`](features/guard-bypass-hooks.feature): `--no-verify` and `git -c core.hooksPath=`, until you approve that one run
+- [`guard-bypass-labels`](features/guard-bypass-labels.feature): a session applying a label the `bypass_labels` setting names (none by default)
+- [`guard-bypass-ruleset`](features/guard-bypass-ruleset.feature): a push direct to main, past a pull-request rule your credentials can bypass
+- [`guard-cross-session-send`](features/guard-cross-session-send.feature): a message to another session: an ask; in bypass mode, a deny after a network read
+- [`guard-git-stacked-base`](features/guard-git-stacked-base.feature): deleting a remote branch an open PR is based on (GitHub silently closes the PR)
 - [`guard-duplicate-prs`](features/guard-duplicate-prs.feature): a second open PR on one issue
-- [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `commit -a`,
-  `stash pop`, force-push, `reset --hard`, `stow --adopt` and other moves that throw work away
-- [`guard-protected-services`](features/guard-protected-services.feature): `systemctl stop postgresql`, for the services you list
-- [`prose-budget-commit`](features/prose-budget-commit.feature): opt-in; a `git commit` whose
-  staged prose runs over the repo's word budgets
+- [`guard-git-work-loss`](features/guard-git-work-loss.feature): `add -A`, `stash pop`, force-push, `reset --hard` and other moves that throw work away
+- [`guard-protected-services`](features/guard-protected-services.feature): `systemctl stop postgresql`, for the services the `protected_services` setting names
+- [`guard-review-threads`](features/guard-review-threads.feature): opt-in; resolving a bot's review thread with no reply naming a commit or a link
+- [`guard-signed-comments`](features/guard-signed-comments.feature): opt-in; a comment not from a bot's account, or without the signature you set
+- [`prose-budget-commit`](features/prose-budget-commit.feature): opt-in; a `git commit` whose staged prose runs over the repo's word budgets
 - `guard-databases` (planned)
 - `guard-protected-paths` (planned)
 
@@ -243,9 +227,9 @@ seen.
 The guard reads the nearest `.languette/ask-first.json` at or above the
 command's working directory, stopping at the repo root, else the one in
 `$CLAUDE_PROJECT_DIR`. With no file, it stays silent. A file that doesn't
-parse, that has a key a command does not (only `id`, `match`, `cost`,
-`approve_label` and `cheaper` are read), or that gives two commands the same
-`id` or `approve_label`, denies every command until it is fixed, because the guard can no longer tell what the repo
+parse, that has a key besides `id`, `match`, `cost`, `approve_label` and
+`cheaper`, or that gives two commands the same `id` or `approve_label`,
+denies every command until it is fixed, because the guard can no longer tell what the repo
 meant. Spent approvals are kept beside the session transcript, in
 `<transcript>.languette-ask`.
 
@@ -269,7 +253,7 @@ Matches, lookup and a broken file work as for ask-first; `{"cmd":
 
 Every guard is on by default except `guard-worktrees`,
 `guard-review-threads`, `guard-signed-comments`, `guard-sudo` and
-`prose-budget-commit`, which are opt-in; `guard-signed-comments` is experimental, and checks a signature only for the settings you give it: `signed_comments_opening` and `signed_comments_signature` are empty by default, and empty checks nothing. On, it also denies any comment not posted from a bot's account (a GitHub App's, its login ending in `[bot]`), and any through a GitHub MCP tool, whose account it cannot read: a session that posts under a person's own gh login is denied until it posts through a GitHub App. Turn one off (or those on) with
+`prose-budget-commit`, which are opt-in. Turn one off (or those on) with
 `/plugin configure languette@languette`,
 or at install, by its name with underscores:
 
@@ -281,9 +265,9 @@ Changing an option later, outside the installer, is `languette config` (planned;
 
 A guard is skipped only when its setting is exactly `false`. Unset, empty or
 anything else runs it, so a misconfiguration cannot open the gate.
-`guard_worktrees`, `guard_review_threads` and `guard_signed_comments` are the reverse: each runs only
-when its setting is exactly `true`, so a misconfiguration leaves it off. The
-first's two controls, `guard_worktrees_checkout_home` and
+An opt-in guard is the reverse: it runs only when its setting is exactly
+`true`, so a misconfiguration leaves it off. The two controls of
+`guard-worktrees`, `guard_worktrees_checkout_home` and
 `guard_worktrees_foreign`, are each on unless set to `false`.
 
 ### One setting per `guard-git-work-loss` rule
@@ -305,76 +289,57 @@ Built in: the generated directories `node_modules`, `dist`, `coverage` and
 `.pio`, and the agent's own places: `/tmp`, the host's temporary directory
 (`$CLAUDE_CODE_TMPDIR`, else `$TMPDIR`) and the host's worktree directory,
 `<project>/.claude/worktrees`, for the project the host names
-(`$CLAUDE_PROJECT_DIR`) and the one a worktree session stands in. To allow more, set `LANGUETTE_RM_ALLOW` to a
-colon-separated list. It adds to the built-in lists and never replaces them;
-unset or empty changes nothing.
+(`$CLAUDE_PROJECT_DIR`) and the one a worktree session stands in.
+
+To allow more, set `LANGUETTE_RM_ALLOW` to a colon-separated list. It adds to
+the built-in lists and never replaces them; unset or empty changes nothing.
 
 ```
 export LANGUETTE_RM_ALLOW=build:.next:/srv/agent-area
 ```
 
-- A bare name (`build`) is treated like `dist`: a directory with that name,
-  anywhere below the top level of `$HOME` or `/`.
-- An absolute path (`/srv/agent-area`) is treated like the scratchpad: a
-  place the agent owns.
-- Entries use letters, digits and `. _ @ + -` only. A path may not contain a
-  `.` or `..` segment, and may not be `/` or `$HOME`.
-- If the value doesn't parse (an empty entry, a glob, a space, a relative
-  path with a slash), every Bash call carries a warning, and only a recursive
-  `rm` or `find -delete` is denied. A typo can't stop unrelated work, and it
-  can't open the gate either.
+- A bare name (`build`) is treated like `dist`: a directory with that name, below the top level of `$HOME` or `/`.
+- An absolute path (`/srv/agent-area`) is treated like the scratchpad: a place the agent owns.
+- Entries use letters, digits and `. _ @ + -` only. A path has no `.` or `..` segment, and is never `/` or `$HOME`.
+
+If the value doesn't parse, every Bash call carries a warning, and only a
+recursive `rm` or `find -delete` is denied. A typo can't stop unrelated work,
+and it can't open the gate either.
 
 ### Settings for `guard-private-terms`
 
-| Setting | Holds | Example |
-|---|---|---|
-| `blocked_terms_file` | terms that deny the whole post: the term, a tab, a message for the agent | `~/.config/languette/blocked-terms.tsv` |
-| `redacted_terms_file` | terms replaced before the post leaves: the term, a tab, the replacement | `~/.config/languette/redacted-terms.tsv` |
-| `private_repos` | repos whose posts are never scanned, comma-separated | `you/notes,you/scratch` |
+| Setting | Holds |
+|---|---|
+| `blocked_terms_file` | terms that deny the whole post: the term, a tab, a message for the agent |
+| `redacted_terms_file` | terms replaced before the post leaves: the term, a tab, the replacement |
+| `private_repos` | repos whose posts are never scanned, comma-separated: `you/notes,you/scratch` |
 
 One tab-separated format, `#` comments, case-insensitive, `re:` for a regular
-expression; unset, both read from `~/.config/languette/`. A path set but not
+expression; unset, the files are `blocked-terms.tsv` and `redacted-terms.tsv`
+in `~/.config/languette/`. A path set but not
 loading denies public posts until fixed; `languette doctor` says which line.
 Only the file's entries count; `languette doctor --init-redacted-terms` writes the
 [default entries](languette/rules/redacted-terms.tsv) into it; [`features/fixtures/private-terms/`](features/fixtures/private-terms/)
 shows a comment beside what leaves.
 
+### Other settings
+
 `bypass_labels` lists the labels `guard-bypass-labels` keeps for humans,
-comma-separated; empty, the default, guards no label. A label that waives a CI
-gate is the user's to apply unless this setting names it, for example
-`churn-ok,mixed-loops-ok`.
+comma-separated, for example `churn-ok,mixed-loops-ok`; empty, the default,
+guards no label.
 
 `review_thread_logins` lists the logins, besides the gh login, whose reply
 lets `guard-review-threads` pass a thread's resolve, comma-separated, for
-example `you,your-app`; empty, the default, counts the gh login alone. A listed login that also posts review findings has its follow-up findings in its own thread read as replies.
+example `you,your-app`; empty, the default, counts the gh login alone.
+
+`guard-signed-comments` is experimental. On, it denies any comment not posted
+from a bot's account (a GitHub App's, its login ending in `[bot]`), and any
+through a GitHub MCP tool, whose account it cannot read. It checks a signature
+only for the settings you give it: `signed_comments_opening` and
+`signed_comments_signature` are empty by default, and empty checks nothing.
 
 `record_decisions`, off by default, keeps every verdict, with its command and
 secrets masked, in `$XDG_STATE_HOME/languette/decisions.jsonl`, readable only by you.
-
-<details>
-<summary>How Claude Code passes plugin settings to a hook (measured)</summary>
-
-Claude Code hands each key to the hook as `CLAUDE_PLUGIN_OPTION_<KEY>`.
-Measured on Claude Code 2.1.258, with a throwaway plugin loaded by
-`--plugin-dir` and options supplied through `pluginConfigs`:
-
-| Setting | Env in the hook |
-|---|---|
-| key `flag_off`, boolean `false` | `CLAUDE_PLUGIN_OPTION_FLAG_OFF=false` |
-| key `flag_on`, boolean `true` | `CLAUDE_PLUGIN_OPTION_FLAG_ON=true` |
-| key `camelKey`, boolean `false` | `CLAUDE_PLUGIN_OPTION_CAMELKEY=false` |
-| `multiple` string `["a b","c,d"]` | `CLAUDE_PLUGIN_OPTION_LIST_VALS=a b,c,d` |
-| `multiple` string `[]` | `CLAUDE_PLUGIN_OPTION_LIST_VALS=` |
-| key unset, though the manifest gives a `default` | variable absent |
-
-The name is the key upper-cased, underscores kept and camelCase not split.
-Booleans arrive as the words `true` and `false`. A list is joined with a bare
-comma and no escaping, so an item holding a comma can't be recovered. A
-string `"false"` looks the same as a boolean `false`. A `default` did not
-reach the environment under `--plugin-dir`; the installed-plugin path was not
-measured, which is why the guards treat unset as on.
-
-</details>
 
 ## Privacy and support
 
@@ -394,7 +359,7 @@ for beyond the command, it declares:
 
 | Guard | Reads |
 |---|---|
-| `guard-git-work-loss` | git, in the payload's cwd: whether the tree is clean, and whether it is a linked worktree or in the scratchpad, and guard-worktrees' per-session record when there is one |
+| `guard-git-work-loss` | git: whether the tree is clean, a linked worktree or in the scratchpad; guard-worktrees' record |
 | `require-well-formed` | a shell parser; nothing runs the command |
 | `guard-recursive-delete` | the filesystem, and `LANGUETTE_RM_ALLOW` |
 | `ask-first` | the repo's list, the session transcript, the approvals spent |
@@ -407,14 +372,14 @@ for beyond the command, it declares:
 | `guard-bypass-ruleset` | git, for where a push lands, and GitHub's rules for the default branch, through `gh`, cached an hour |
 | `guard-github-issues` | the payload's `session_id`, the transcript, and a door file in `$TMPDIR` |
 | `guard-private-terms` | the terms file, the files a post reads, and the checkout's `git remote` |
-| `guard-signed-comments` | the files a comment's body is read from, the `signed_comments_opening` and `signed_comments_signature` settings, and the gh login, from GitHub through `gh` |
+| `guard-signed-comments` | the files a comment's body is read from, its two settings, and the gh login, from GitHub through `gh` |
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
-| `guard-worktrees` | `$HOME` and what `git rev-parse --show-toplevel` resolves to; git, for where each path lands, and a record per session in `$TMPDIR` |
-| `prose-budget-commit` | the staged diff and, for a commit that reaches past the index, the named working-tree files, through `prose-budget` |
+| `guard-worktrees` | `$HOME`; git, for the repo's top level and where each path lands; a record per session in `$TMPDIR` |
+| `prose-budget-commit` | the staged diff, and the working-tree files a commit names, through `prose-budget` |
 
-A guard that cannot decide denies and says what it saw. A guard that crashes
-is a deny naming the guard; the runner holds that rule, so no guard has to.
+A guard that crashes is a deny naming the guard; the runner holds that rule,
+so no guard has to.
 
 The contract is written as "[gherkin](https://en.wikipedia.org/wiki/Cucumber_(software)#Gherkin_language)" scenarios, in the words a person uses to state the
 rule. They're still completely deterministic tests, just easy for non-technical folks to read.
