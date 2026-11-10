@@ -452,7 +452,10 @@ def check(cwd):
         state = {True: "signed in", False: "installed, not signed in", None: "installed, not answering"}[signed]
         quiet = signed is True if name == "gh" else signed is False
         rows.append((OK, name, state, []) if quiet else (WARN, name, f"{state}; {note}", []))
-    configs = configs_row(options, cwd)
+    try:
+        configs = configs_row(options, cwd)
+    except BaseException as e:  # noqa: BLE001 -- run.py exits when a guard will not import
+        configs = (WARN, "configs", f"the guards did not load ({type(e).__name__}: {e})", [])
     # A config that denies every command is the first thing to mend.
     return ([configs] if configs[2].startswith(DENIES_ALL) else []) + rows + \
         ([] if configs[2].startswith(DENIES_ALL) else [configs]) + terms_rows(options)
@@ -534,6 +537,9 @@ def fix(cwd, yes):
         print(f"{FAIL} {e.args[0]}: {e.args[1]}; nothing written")
         return 1
     new = {k: config.default(schema[k]) for k in old if k in schema}
+    if not new:
+        print(f"{FAIL} {', '.join(old)}: not in the installed plugin's options; nothing written")
+        return 1
     where = _tilde(_config_dir() / "settings.json")
     print(f"--- {where}\n+++ {where}")
     for k, v in new.items():

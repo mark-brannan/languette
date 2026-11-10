@@ -28,13 +28,10 @@ def drive(gen, env):
     return run_drive(gen, World(env, {}), [])
 
 
-def _tilde(path, home):
-    return "~" + path[len(home):] if home and (path == home or path.startswith(home.rstrip("/") + "/")) else path
-
-
 def option(name, value, env):
     """Why the guard that reads option `name` would refuse `value` (a string, as the hook is
     given it), or None. `env` is the guard's environment the value is judged in."""
+    from languette import doctor  # imported here, as doctor imports this module in its functions
     if not value:
         return None
     env = {**env, terms.option_env(name): value}
@@ -42,7 +39,7 @@ def option(name, value, env):
         if terms.option_name(kind) == name:
             penv = drive(terms.environment(env), env)
             _, path, _, err = drive(terms.load(kind, env, penv), env)
-            where = _tilde(path, env.get("HOME") or "")
+            where = doctor._tilde(path)
             if isinstance(err, terms.BadTerms):
                 return f"{where} {err}"
             return f"{where} {terms.why_not(err)}" if err else None
