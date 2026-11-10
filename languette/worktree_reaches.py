@@ -308,10 +308,9 @@ def _home_events(doc):
                 if sw.cmd_index(s, a, b, _FS_CHANGE, nested) is not None:
                     out.append(("FS",))
                 continue
-            sidx = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and s.w[i] in ("checkout", "switch")), None)
-            if sidx is None:
-                sub = sw.git_subcommand(s, g, b)
-                if sub <= b and s.w[sub] == "mv":
+            sidx = sw.git_subcommand(s, g, b)
+            if sidx > b or s.k[sidx] != "w" or sw.git_verb(s.w[g], s.w[sidx]) not in ("checkout", "switch"):
+                if sidx <= b and s.w[sidx] == "mv":
                     out.append(("FS",))
                 continue
             # checkout -- <path> is a file restore; a bare trailing -- is not.
@@ -323,7 +322,9 @@ def _home_events(doc):
                 out.append(("DENY", name + " <repo>" * row.repo))
                 continue
             targets = []
-            for i in range(a, b + 1):
+            # The words before git (assignments, a wrapper's -C) and git's own options; past the
+            # subcommand, -C is switch's "create branch", not a directory.
+            for i in [*range(a, g), *sw.git_options(s, g, sidx)]:
                 if s.k[i] != "w":
                     continue
                 w = s.w[i]
