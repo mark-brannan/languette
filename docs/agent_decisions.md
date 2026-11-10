@@ -659,3 +659,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t092520z
 - No scenario runs guard-worktrees' own route before guard-git-work-loss; the no-record rows pin the default install Undo: add a cross-guard scenario ([#364](https://github.com/mark-brannan/languette/pull/364#discussion_r4523153053)) ([#364](https://github.com/mark-brannan/languette/pull/364))
+
+### 20261110t094304z
+- Vulnerability disclosure policy as written on the card: private report, 7-day acknowledgement, 30-day fix or plan, public at fix release or 90 days, latest release only (no PR, branch main)
