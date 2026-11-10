@@ -493,13 +493,14 @@ def configs_row(options, cwd):
     by its guard's own loader. A file that does not load is a ✗ while its guard is on, since every
     Bash command is denied until it does; off, a !. A file no guard reads is a !."""
     from languette import loaders
+    from languette.engine import one_line   # a repo's file supplies the loader's message
     lines, deny_all, refused = [], [], refused_options(options)
     for name, why in refused.items():
         lines.append(line(FAIL, f"{name}: {why}", line("", "to put it back to its default: languette doctor --fix")))
     try:
         files = loaders.repo_files(cwd, _env(options))
     except Exception as e:  # noqa: BLE001 -- what the doctor cannot read is a ! row
-        return WARN, "configs", f".languette/ could not be read ({type(e).__name__}: {e})", lines
+        return WARN, "configs", f".languette/ could not be read ({type(e).__name__}: {one_line(str(e))})", lines
     for path, opt, why in files:
         where = _tilde(path)
         if opt is None:
@@ -508,9 +509,9 @@ def configs_row(options, cwd):
             lines.append(line(OK, where))
         elif is_on("=", options.get(opt)):
             deny_all.append(where)
-            lines.append(line(FAIL, f"{where}: {why}"))
+            lines.append(line(FAIL, f"{where}: {one_line(why)}"))
         else:
-            lines.append(line(WARN, f"{where}: {why}; {opt} is off, so nothing reads it"))
+            lines.append(line(WARN, f"{where}: {one_line(why)}; {opt} is off, so nothing reads it"))
     if deny_all:
         return FAIL, "configs", f"{DENIES_ALL} until {', '.join(deny_all)} loads", lines
     if refused:
