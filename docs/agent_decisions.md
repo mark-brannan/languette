@@ -692,3 +692,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t095634z
 - terms-file options keep their own rows, not repeated under configs Undo: drop the skip in doctor.refused_options ([#371](https://github.com/mark-brannan/languette/pull/371))
+
+### 20261110t103051z
+- guard-worktrees: words before git still supply -C, so env -C /x git checkout main is judged from /x guard-worktrees: yadm and vcsh look for checkout or switch anywhere after their command word, so yadm commit -m checkout still denies, as on main Undo: revert the PR's yadm/vcsh fallback once scan reads their own options ([#374](https://github.com/mark-brannan/languette/pull/374))
