@@ -146,7 +146,7 @@ turns one off:
 - [`guard-recursive-delete`](#allowing-more-for-guard-recursive-delete): a recursive `rm` or `find -delete` outside a generated or agent-owned directory
 - [`guard-scheduled-jobs`](features/guard-scheduled-jobs.feature): `crontab -r`
 - [`guard-secrets`](features/guard-secrets.feature): a pasted credential
-- [`guard-worktrees`](features/guard-worktrees.feature): opt-in; a branch switch in a `$HOME` worktree, or a reach into another session's worktree
+- [`guard-worktrees`](features/guard-worktrees.feature): opt-in; a branch switch when `$HOME` is a worktree, or a reach into another session's worktree
 - [`guard-bypass-hooks`](features/guard-bypass-hooks.feature): `--no-verify` and `git -c core.hooksPath=`, until you approve that one run
 - [`guard-bypass-labels`](features/guard-bypass-labels.feature): a session applying a label the `bypass_labels` setting names (none by default)
 - [`guard-bypass-ruleset`](features/guard-bypass-ruleset.feature): a push direct to main, past a pull-request rule your credentials can bypass
