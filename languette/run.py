@@ -200,7 +200,22 @@ def respond(stdin_text, env, only=None):
     JSON line. `env` is what the guards read in place of os.environ. The
     guards' Acts are done after the verdict, and with record_decisions on, the
     call is recorded (record.py)."""
-    out, judged = _respond(stdin_text, env, only)
+    return _answer(_read(stdin_text), env, only)[0]
+
+
+def _read(stdin_text):
+    """The payload object, or the exception that kept it from reading."""
+    try:
+        payload = json.loads(stdin_text)
+    except Exception as e:  # noqa: BLE001 -- a gate fails closed on anything, RecursionError too
+        return e
+    return payload if isinstance(payload, dict) else ValueError("payload is not an object")
+
+
+def _answer(payload, env, only):
+    """(respond's stdout, whether guard-cross-session-send crashed or objected) for
+    `payload`, _read's result. Its state handlers never object, so a finding is a failure."""
+    out, judged = _respond(payload, env, only)
     world, payload, findings, acts, doc = judged
     for a in acts:
         world.act(a)
@@ -209,7 +224,7 @@ def respond(stdin_text, env, only=None):
             world.keep(record.build(payload, env, only, findings, _verdict(out), doc, extra=_project_rules(world, payload, env)))
         except Exception:  # noqa: BLE001 -- a record never changes the verdict
             pass
-    return out
+    return out, any(crashed or r is not None for name, r, crashed in findings if name == guard_cross_session_send.NAME)
 
 
 def _project_rules(world, payload, env):
@@ -231,14 +246,11 @@ def _verdict(out):
     return hso.get("permissionDecision") or "context"
 
 
-def _respond(stdin_text, env, only):
-    """(stdout, (world, payload, [(guard, result, crashed)], [Act], Document))."""
-    try:
-        payload = json.loads(stdin_text)
-        if not isinstance(payload, dict):
-            raise ValueError("payload is not an object")
-    except Exception as e:  # noqa: BLE001 -- a gate fails closed on anything
-        return _out("PreToolUse", deny(say("payload_unreadable", err=e))), (World(env, {}), {}, [], [], Document({}, env))
+def _respond(payload, env, only):
+    """(stdout, (world, payload, [(guard, result, crashed)], [Act], Document)) for
+    _read's result."""
+    if isinstance(payload, Exception):
+        return _out("PreToolUse", deny(say("payload_unreadable", err=payload))), (World(env, {}), {}, [], [], Document({}, env))
     # The shell guards never read the event; a payload without one is judged
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
@@ -305,7 +317,7 @@ def _spend(world, event, findings, fields):
         try:
             if world.spend(kind, *args):
                 continue
-            why = lost
+            why = lost or say("spend_failed", guards=name, err="no deny reason given")
         except Exception as e:  # noqa: BLE001 -- a spend that cannot be made fails closed
             why = say("spend_failed", guards=name, err=e)
         return deny(why)
@@ -341,21 +353,19 @@ def main(argv):
         stdin_text = sys.stdin.buffer.read()
     except OSError:
         stdin_text = b""                       # judged as an unreadable payload
-    try:
-        payload = json.loads(stdin_text)
-    except ValueError:
-        payload = None
+    payload = _read(stdin_text)
     event = payload.get("hook_event_name") if isinstance(payload, dict) else None
     if event in STATE_EVENTS:
-        # These events carry no decision: whatever the guards say is kept off stdout.
+        # These events carry no decision: whatever the guards say is kept off stdout,
+        # and guard-cross-session-send crashing or objecting is a failure though the verdict is silence.
         try:
-            out = respond(stdin_text, os.environ, only)
+            out, failed = _answer(payload, os.environ, only)
         except Exception:  # noqa: BLE001
-            out = "crashed"
-        if out:
+            out, failed = "", True
+        if out or failed:
             _state_failed(payload, os.environ)
         return 0
-    sys.stdout.write(respond(stdin_text, os.environ, only))
+    sys.stdout.write(_answer(payload, os.environ, only)[0])
     return 0
 
 
