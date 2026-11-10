@@ -1,6 +1,6 @@
 {
   "name": "languette",
-  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for the commands that could ruin a day, such as recursive rm, a disk wipe, a shutdown or a credential pasted into a command.",
+  "description": "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for the commands that could ruin a day, such as recursive rm, git work loss, a disk wipe, a shutdown or a credential pasted into a command. Records decisions only if you turn on record_decisions, to a local file.",
   "author": {
     "name": "Mark Brannan"
   },
