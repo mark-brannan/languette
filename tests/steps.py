@@ -486,6 +486,17 @@ def _fails_mid_run(ctx, guard):
     ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
 
 
+@given('the real run.py, whose guard-cross-session-send state handler raises')
+def _state_handler_raises(ctx):
+    """The guard itself raises: run.py catches it as a crashed finding, and a state
+    event's verdict is silence either way, so only the crash says it failed."""
+    root = Path(ctx.mkdtemp())
+    shutil.copytree(ROOT / "languette", root / "languette", ignore=shutil.ignore_patterns("__pycache__"))
+    with open(root / "languette/untrusted_reads.py", "a") as f:
+        f.write("\n\ndef keep(doc, guard, found):\n    raise RuntimeError('boom')\n    yield\n")
+    ctx.env["CLAUDE_PLUGIN_ROOT"] = str(root)
+
+
 
 # --- When ----------------------------------------------------------------
 

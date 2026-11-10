@@ -200,7 +200,21 @@ def respond(stdin_text, env, only=None):
     JSON line. `env` is what the guards read in place of os.environ. The
     guards' Acts are done after the verdict, and with record_decisions on, the
     call is recorded (record.py)."""
-    out, judged = _respond(stdin_text, env, only)
+    return _answer(_read(stdin_text), env, only)[0]
+
+
+def _read(stdin_text):
+    """The payload object, or the exception that kept it from reading."""
+    try:
+        payload = json.loads(stdin_text)
+    except Exception as e:  # noqa: BLE001 -- a gate fails closed on anything, RecursionError too
+        return e
+    return payload if isinstance(payload, dict) else ValueError("payload is not an object")
+
+
+def _answer(payload, env, only):
+    """(respond's stdout, whether a guard crashed) for `payload`, _read's result."""
+    out, judged = _respond(payload, env, only)
     world, payload, findings, acts, doc = judged
     for a in acts:
         world.act(a)
@@ -209,7 +223,7 @@ def respond(stdin_text, env, only=None):
             world.keep(record.build(payload, env, only, findings, _verdict(out), doc, extra=_project_rules(world, payload, env)))
         except Exception:  # noqa: BLE001 -- a record never changes the verdict
             pass
-    return out
+    return out, any(crashed for _, _, crashed in findings)
 
 
 def _project_rules(world, payload, env):
@@ -231,14 +245,11 @@ def _verdict(out):
     return hso.get("permissionDecision") or "context"
 
 
-def _respond(stdin_text, env, only):
-    """(stdout, (world, payload, [(guard, result, crashed)], [Act], Document))."""
-    try:
-        payload = json.loads(stdin_text)
-        if not isinstance(payload, dict):
-            raise ValueError("payload is not an object")
-    except Exception as e:  # noqa: BLE001 -- a gate fails closed on anything
-        return _out("PreToolUse", deny(say("payload_unreadable", err=e))), (World(env, {}), {}, [], [], Document({}, env))
+def _respond(payload, env, only):
+    """(stdout, (world, payload, [(guard, result, crashed)], [Act], Document)) for
+    _read's result."""
+    if isinstance(payload, Exception):
+        return _out("PreToolUse", deny(say("payload_unreadable", err=payload))), (World(env, {}), {}, [], [], Document({}, env))
     # The shell guards never read the event; a payload without one is judged
     # as PreToolUse, the only event they are wired to.
     event = payload.get("hook_event_name") or "PreToolUse"
@@ -341,21 +352,19 @@ def main(argv):
         stdin_text = sys.stdin.buffer.read()
     except OSError:
         stdin_text = b""                       # judged as an unreadable payload
-    try:
-        payload = json.loads(stdin_text)
-    except ValueError:
-        payload = None
+    payload = _read(stdin_text)
     event = payload.get("hook_event_name") if isinstance(payload, dict) else None
     if event in STATE_EVENTS:
-        # These events carry no decision: whatever the guards say is kept off stdout.
+        # These events carry no decision: whatever the guards say is kept off stdout,
+        # and a guard that crashed is a failure though their verdict is silence.
         try:
-            out = respond(stdin_text, os.environ, only)
+            out, crashed = _answer(payload, os.environ, only)
         except Exception:  # noqa: BLE001
-            out = "crashed"
-        if out:
+            out, crashed = "", True
+        if out or crashed:
             _state_failed(payload, os.environ)
         return 0
-    sys.stdout.write(respond(stdin_text, os.environ, only))
+    sys.stdout.write(_answer(payload, os.environ, only)[0])
     return 0
 
 
