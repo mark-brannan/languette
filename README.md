@@ -197,14 +197,14 @@ A command over 64 KB, or nested too deeply to parse quickly, is denied unread.
 
 ## Not a sandbox
 
-Languette is an accident guard, not a sandbox: it judges the commands it is shown, and confines nothing. A sandbox confines, and judges nothing: `rm -rf src` in your project passes. Run both; unattended or on untrusted text, sandbox first.
+Languette checks each command before it runs. It can't see what a script
+or program does once it starts.
 
-| What a guard cannot see | The layer that can |
-|---|---|
-| What a script, `python3 -c` or any other program does once it runs | A [sandbox](https://code.claude.com/docs/en/sandboxing): it confines the process, whatever runs |
-| A secret file the agent opens with its Read tool, then repeats | Permission deny rules; better, no secrets on the disk it works on |
-| Data leaving by `curl`, a package install or an allowed host | A short list of allowed domains; a container with its own egress rules |
-| A session rewriting the hooks and settings that guard it | A sandbox denies shell writes to them; the rest is open ([#384](https://github.com/mark-brannan/languette/issues/384)) |
+A [sandbox](https://code.claude.com/docs/en/sandboxing) limits what any
+program can reach. It doesn't judge commands, so one that deletes your
+project still runs.
+
+Use both.
 
 ## Ask first
 
