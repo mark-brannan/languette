@@ -5,9 +5,21 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "languette"
 version = "0.0.18"
-description = "Fail-closed guards against risky actions by coding agents, an installer that wires them into Claude Code, and a doctor that says whether they are on."
+description = "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for the commands that could ruin a day, such as recursive rm, git work loss, a disk wipe, a shutdown or a credential pasted into a command. The wheel also ships an installer that wires the guards into Claude Code and a doctor that says whether they are on."
 readme = "README.md"
 requires-python = ">=3.11"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: POSIX",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security",
+  "Topic :: Software Development",
+]
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE", "LICENSE-CC-BY-SA"]
 authors = [{ name = "Mark Brannan" }]
