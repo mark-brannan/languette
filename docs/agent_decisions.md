@@ -671,3 +671,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t095533z
 - languette config and the doctor stay two commands (D2) Undo: fold config into a doctor flag ([#371](https://github.com/mark-brannan/languette/pull/371))
+
+### 20261110t095540z
+- --unset writes the manifest default, since Claude Code keeps no unset Undo: drop --unset until the host offers one ([#371](https://github.com/mark-brannan/languette/pull/371))
