@@ -698,3 +698,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261110t171610z
 - README section 'Not a sandbox' sits after 'The promise' It links Claude Code's sandboxing docs, not the blog post that prompted it Its last row calls #384 open, not planned The doctor idea is filed apart as #385, unscoped Undo: edit README.md on the PR branch ([#386](https://github.com/mark-brannan/languette/pull/386))
+
+### 20261110t215750z
+- The sandbox section says 'commands', the README's opening word, where the reviewer suggested 'calls' Undo: swap one word in README.md ([#386](https://github.com/mark-brannan/languette/pull/386#discussion_r4528114873)) ([#386](https://github.com/mark-brannan/languette/pull/386))
