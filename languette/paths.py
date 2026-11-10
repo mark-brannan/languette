@@ -342,7 +342,7 @@ def read_refusal(exc):
 def read_json(path):
     """The file at path, parsed as JSON, or Refuse naming why it cannot be."""
     try:
-        return json.loads((yield Need("read", path, MAX_READ)))
+        return json.loads((yield Need("read", path)))
     except ValueError as e:
         raise Refuse(f"not JSON ({e})")
     except RecursionError:
