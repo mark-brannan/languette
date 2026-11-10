@@ -5,7 +5,7 @@ does not (`systemMessage`), beside `permissionDecisionReason`? Checked
 against Claude Code's hooks docs (https://code.claude.com/docs/en/hooks,
 read through a condensed fetch) and one live deny on Claude Code 2.1.319.
 
-## Answer: yes
+## Answer: yes in the event stream; the interactive screen is unchecked
 
 The live deny: a throwaway hook printed
 `{"systemMessage":"HUMAN-ONLY-MARKER-7731","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"AGENT-REASON-MARKER-4420"}}`
@@ -38,7 +38,7 @@ All of that is the agent's text. Nothing is sent to the human beside it.
 
 ## The four directions
 
-Each shows the human's screen, the agent's text, and what the repo rule
+Each shows the human's screen (D's only when paired with B), the agent's text, and what the repo rule
 loses. The human lines are mockups of the notice, not captured TUI output.
 
 ### A. Accept the residual risk, write the reasoning into the decisions file
@@ -95,8 +95,8 @@ Rule file: `"why": {"use": "make deploy"}` in place of free prose.
  agent, switch on
    as today
 ```
-Human: with the switch off, B's `systemMessage` carries the repo's words
-(an option; not required by D).
+Human: D alone adds no human-facing text. Paired with B, the switch-off
+case shows B's `systemMessage` with the repo's words.
 
 | | |
 |---|---|
