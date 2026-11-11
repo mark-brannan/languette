@@ -550,11 +550,8 @@ def _texts(doc):
     JSON text holds: `["git add -A"]` scans as one word `[git`, which is no git call."""
     texts = list(doc.texts())
     if doc.command is None and doc.tool == "Bash":
-        try:
-            held = json.loads(doc.text)
-        except ValueError:
-            held = None
-        texts += [t for s in _strings(held) for t in doc.texts(text=s)]
+        # Document built its text with json.dumps, and losses() returned before here on none.
+        texts += [t for s in _strings(json.loads(doc.text)) for t in doc.texts(text=s)]
     return texts
 
 
