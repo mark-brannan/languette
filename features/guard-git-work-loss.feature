@@ -914,8 +914,5 @@ Feature: guard-git-work-loss
       Then the guard is silent
 
   Scenario: a command that is not a string is judged as the JSON text it prints as
-    When the payload is:
-      """
-      {"tool_name": "Bash", "tool_input": {"command": ["git add -A"]}}
-      """
+    When the agent calls tool "Bash" with input `{"command": ["git add -A"]}`
     Then the guard denies

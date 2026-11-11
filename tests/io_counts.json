@@ -280,6 +280,7 @@
  "tests/test_features.py::test_a_command_that_is_not_a_checkout_is_allowed[git status]": {"git": 1},
  "tests/test_features.py::test_a_command_that_is_not_a_checkout_is_allowed[vcsh dots status]": {"git": 1},
  "tests/test_features.py::test_a_command_that_is_not_a_checkout_is_allowed[yadm status]": {"git": 1},
+ "tests/test_features.py::test_a_command_that_is_not_a_string_is_judged_as_the_json_text_it_prints_as": {"git": 1},
  "tests/test_features.py::test_a_command_that_only_looks_plans_or_previews_is_silent[aws --profile delete-me s3 ls-an option's value]": {"git": 1},
  "tests/test_features.py::test_a_command_that_only_looks_plans_or_previews_is_silent[aws ec2 delete-security-group --group-id sg-1 --dry-run-dry run]": {"git": 1},
  "tests/test_features.py::test_a_command_that_only_looks_plans_or_previews_is_silent[aws ec2 describe-instances-a read]": {"git": 1},
