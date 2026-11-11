@@ -392,7 +392,23 @@ def test_every_shipped_rule_file_loads_and_is_packaged(rule_file):
     guard = next(g for _, _, gs in run.GUARDS for g in gs if g.NAME == rule_file.stem)
     assert_that(Path(guard.RULE_FILE), equal_to(rule_file))
     _gathered(guard.file_rules({r["id"] for r in engine.load(guard.RULE_SET)}))
-    assert_that((ROOT / "pyproject.toml").read_text(), contains_string('languette = ["rules/*.json", "rules/*.tsv"]'))
+    assert_that(_packaged(rule_file), is_(True))
+
+
+def _packaged(path):
+    """`path`, a file under languette/, is in the wheel's package data."""
+    import fnmatch
+    import tomllib
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["setuptools"]["package-data"]["languette"]
+    rel = path.relative_to(ROOT / "languette").as_posix()
+    return any(fnmatch.fnmatch(rel, g) for g in data)
+
+
+def test_the_doctor_times_terms_over_a_file_the_wheel_ships():
+    """docs/design/doctor.md promises the timing of each accepted re: line, so the sample
+    it is timed over goes wherever the package does, not only into a checkout."""
+    from languette import doctor
+    assert_that(doctor.SAMPLE.is_file() and _packaged(doctor.SAMPLE), is_(True))
 
 
 def test_the_devcontainer_feature_installs_this_release():

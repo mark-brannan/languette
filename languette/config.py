@@ -14,9 +14,8 @@ import os
 import shutil
 import sys
 
-from languette import doctor, install, loaders
-
-OK, FAIL = doctor.OK, doctor.FAIL
+from languette import host, loaders
+from languette.host import FAIL, OK
 
 
 class Refused(Exception):
@@ -28,21 +27,21 @@ def _claude(*args, stdin=None):
     claude = shutil.which("claude")
     if not claude:
         return None, "the claude command is not on PATH"
-    r, why = install._claude(claude, *args, stdin=stdin)
+    r, why = host.call(claude, *args, stdin=stdin)
     if why or r.returncode != 0:
-        return None, why or install._first_line(r)
+        return None, why or host.first_line(r)
     return r.stdout, None
 
 
 def plugin(cwd):
     """The id of the languette install in effect for cwd; Refused when there is none."""
     try:
-        inst = doctor.in_effect(doctor.installs(doctor.settings_files(cwd)), cwd)
-    except doctor.Unreadable as e:
+        inst = host.in_effect(host.installs(host.settings_files(cwd)), cwd)
+    except host.Unreadable as e:
         raise Refused("Claude Code", f"{e}, so whether languette is installed is unknown")
     if not inst:
         raise Refused("Claude Code", "languette is not installed for this directory; run languette install")
-    return inst.get("id") or install.PLUGIN
+    return inst.get("id") or host.PLUGIN
 
 
 def options(pid):
@@ -55,12 +54,12 @@ def options(pid):
             raise TypeError
     except (ValueError, KeyError, TypeError):
         raise Refused("Claude Code", why or "`claude plugin configure --json` printed no options it could read")
-    return schema, {k: v if isinstance(v, str) else doctor._env_value(v) for k, v in inputs.items()}, configured
+    return schema, {k: v if isinstance(v, str) else host.env_value(v) for k, v in inputs.items()}, configured
 
 
 def default(spec):
     """An option's default as the host stores it: a string, "" when the manifest gives none."""
-    return doctor._env_value(spec["default"]) if spec.get("default") is not None else ""
+    return host.env_value(spec["default"]) if spec.get("default") is not None else ""
 
 
 def judged(name, value, schema, env):
@@ -79,7 +78,7 @@ def judged(name, value, schema, env):
 
 def _list(pid):
     schema, inputs, configured = options(pid)
-    where = doctor._tilde(doctor._config_dir() / "settings.json")
+    where = host.tilde(host.user_settings())
     shown = {name: inputs.get(name, default(spec)) or "(empty)" for name, spec in schema.items()}
     width, vwidth = max(map(len, shown), default=0), max(map(len, shown.values()), default=0)
     for name, value in shown.items():
@@ -99,7 +98,7 @@ def _set(pid, pairs, unset):
         if name not in schema:
             raise Refused(name, "languette has no such option; languette config lists them")
         values[name] = default(schema[name])
-    env = doctor._env(doctor.installed_options(os.getcwd()))
+    env = host.guard_env(host.installed_options(os.getcwd()))
     for name, value in values.items():
         judged(name, value, schema, env)
     said, why = _claude("plugin", "configure", pid, "--values-stdin", stdin=json.dumps(values))

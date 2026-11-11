@@ -24,7 +24,6 @@ Feature: install
     And claude was asked only:
       """
       plugin list --json
-      plugin list --json
       """
     And install exits 0
 
@@ -48,7 +47,6 @@ Feature: install
       plugin marketplace list --json
       plugin marketplace add {SOURCE}
       plugin install languette@languette
-      plugin list --json
       """
     And install exits 0
 
@@ -85,7 +83,6 @@ Feature: install
       plugin list --json
       plugin marketplace list --json
       plugin install languette@languette
-      plugin list --json
       """
     And install exits 0
 
