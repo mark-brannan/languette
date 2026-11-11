@@ -96,7 +96,7 @@ class Ctx:
                         r"🤖 \S+ · (?:low|medium|high|xhigh|max|-) · {session}"}
         self.proj = self.tmp = self.stub_log = self.bare = self.cache = None
         self.project_env = True
-        self.stubs = False
+        self.stubs = ()                        # names of the tests/stubs first on PATH, and only those
         self.hook = None                       # a hooks.json command, for wiring
         self.wired = None                      # the guard a wiring row is about: the one command runs them all
         self.arg = None                        # the hook event, as Claude Code names it, for the guard to read
@@ -124,6 +124,13 @@ class Ctx:
             if found:
                 os.symlink(found, os.path.join(d, tool))
         return os.pathsep.join([str(ROOT / "tests/gh-only"), d, os.defpath])
+
+    def stub_dir(self, *names):
+        """A directory linking only the stubs named, to put first on PATH."""
+        d = self.mkdtemp()
+        for name in names:
+            os.symlink(ROOT / "tests/stubs" / name, os.path.join(d, name))
+        return d
 
     def doordir(self):
         # Lazy and once per scenario: the guard-github-issues state lives at
@@ -200,7 +207,7 @@ class Ctx:
             env = {"HOME": os.environ["HOME"], "USER": Path(os.environ["HOME"]).name, "TMPDIR": self.doordir(), **on,
                    "PATH": self.system_path(), **self.scenario_env()}
             if self.bare or self.stubs:
-                env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
+                env["PATH"] = self.bare or self.stub_dir(*self.stubs) + os.pathsep + os.environ["PATH"]
             if self.stub_log:
                 env["LANGUETTE_STUB_LOG"] = self.stub_log
             if self.arg:
@@ -229,7 +236,7 @@ class Ctx:
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
         path = env["PATH"]
         if self.stubs:
-            path = str(ROOT / "tests/stubs") + os.pathsep + path
+            path = self.stub_dir(*self.stubs) + os.pathsep + path
         if self.stub_log:
             env["LANGUETTE_STUB_LOG"] = self.stub_log
         env["PATH"] = self.bare or path
@@ -270,19 +277,35 @@ def _respond_all(stdin, env, seen, docs):
 
 
 
-def hooks_json_commands():
-    """guard name -> the PreToolUse command in hooks/hooks.json that judges it: the one
-    command, which names no guard and runs every guard wired for the call."""
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [command] = [h["command"] for e in hj["hooks"]["PreToolUse"] for h in e["hooks"]]
-    return {g.NAME: command for ev, _, gs in run.GUARDS for g in gs if ev == "PreToolUse"}
+def drive(check, *answers):
+    """Run a guard's generator to its end, answering each Need it yields from `answers`
+    in order (None once they run out); returns (the Needs and Acts yielded, its result)."""
+    yielded = []
+    try:
+        step = next(check)
+        while True:
+            yielded.append(step)
+            step = check.send(answers[len(yielded) - 1] if len(yielded) <= len(answers) else None)
+    except StopIteration as stop:
+        return yielded, stop.value
+
+
+def hooks_json():
+    """hooks/hooks.json's `hooks`: event -> its entries. The one reader of the file."""
+    return json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]
 
 
 def hooks_json_event_command(event):
     """The one command hooks/hooks.json runs for `event`."""
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [command] = [h["command"] for e in hj["hooks"][event] for h in e["hooks"]]
+    [command] = [h["command"] for e in hooks_json()[event] for h in e["hooks"]]
     return command
+
+
+def hooks_json_commands():
+    """guard name -> the PreToolUse command in hooks/hooks.json that judges it: the one
+    command, which names no guard and runs every guard wired for the call."""
+    command = hooks_json_event_command("PreToolUse")
+    return {g.NAME: command for ev, _, gs in run.GUARDS for g in gs if ev == "PreToolUse"}
 
 
 def hooks_json_prompt_command():
