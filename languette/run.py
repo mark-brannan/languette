@@ -48,11 +48,10 @@ def _out(event, fields):
     return json.dumps({"hookSpecificOutput": {"hookEventName": event, **fields}}, separators=(",", ":")) + "\n"
 
 
-from languette.messages import say  # noqa: E402 -- the sentence for a guard that will not import
-
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
+    from languette.messages import say
     from languette.guards import require_well_formed
     from languette import comment_posts, engine, issue_writes, opened_prs, posts, record, secrets
     from languette.rules import (ask_first as _ask_first, deny_always as _deny_always,
@@ -104,9 +103,11 @@ try:
     guard_review_threads, guard_signed_comments = engine.Guard(_guard_review_threads), engine.Guard(_guard_signed_comments)
     prose_budget_commit = engine.Guard(_prose_budget_commit)
 except Exception as e:  # noqa: BLE001
-    sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
-                                         "permissionDecisionReason": say("guard_load_failed", kind=type(e).__name__,
-                                                                                         err=e)}))
+    try:
+        _why = say("guard_load_failed", kind=type(e).__name__, err=e)
+    except NameError:                          # messages itself would not import: the floor sentence, no `say`
+        _why = ("languette could not load (%s). This is a gate and fails closed: reinstall languette." % type(e).__name__)
+    sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny", "permissionDecisionReason": _why}))
     sys.exit(0)
 
 # (hook event, tool name pattern or None for an event with no tool, guards in
