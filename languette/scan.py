@@ -2,8 +2,8 @@
 turns the Bash tool's command string into words a guard judges, and every
 ambiguity resolves toward MORE words reaching the guard, never fewer.
 
-Its parts are modules of their own, each name a caller reads here under one
-(a name only its part reads stays there):
+Its parts are modules of their own, and the names callers read through
+scan are re-exported here under each:
 languette.quoting (quotes, heredocs), languette.lexicon (the commands known
 by name), languette.ladder (the parser ladder), languette.lexer (the Scan),
 languette.cd_tracking, languette.forges, languette.git_calls,
