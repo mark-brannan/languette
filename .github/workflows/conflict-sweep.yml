@@ -1,0 +1,38 @@
+name: Conflict sweep
+
+# Hands pull requests that conflict with main to the shared fixer; the design
+# and its costs are in the called workflow's header. `dequeued` is the label
+# Mergify adds when it drops a pull request from its queue.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Hand a conflicting head to the fixer even if it was handed over before
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    if: github.event_name != 'pull_request' || github.event.label.name == 'dequeued'
+    # What the called workflow's jobs ask for; a caller must grant at least that.
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      statuses: write
+      id-token: write
+    uses: mark-brannan/.github/.github/workflows/conflict-sweep.yml@main
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      AGENT_BOT_APP_ID: ${{ secrets.AGENT_BOT_APP_ID }}
+      AGENT_BOT_PRIVATE_KEY: ${{ secrets.AGENT_BOT_PRIVATE_KEY }}
+    with:
+      force: ${{ inputs.force == true }}
