@@ -9,6 +9,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from languette import record, run, world
+from languette.document import Document
 from languette.world import World
 
 RM = "rm -rf ~/secret-project && git push"
@@ -144,10 +145,18 @@ def test_a_command_every_guard_let_through_is_recorded(tmp_path):
     assert {f["decision"] for f in rec["findings"]} == {"none"}
 
 
+def _programs(command):
+    return record.programs(Document(json.loads(_payload(command)), {}))
+
+
 def test_shell_keywords_are_not_programs():
-    assert record.programs('for f in *.py; do python3 "$f"; done') == ["python3"]
-    assert record.programs("if ! grep -q x f; then rm x; fi") == ["grep", "rm"]
-    assert record.programs("case $x in a) rm y;; esac") == ["rm"]
+    assert _programs('for f in *.py; do python3 "$f"; done') == ["python3"]
+    assert _programs("if ! grep -q x f; then rm x; fi") == ["grep", "rm"]
+    assert _programs("case $x in a) rm y;; esac") == ["rm"]
+
+
+def test_a_heredoc_body_is_not_programs():
+    assert _programs("cat <<EOF > f\nrm -rf x\nfoo bar\nEOF\nls") == ["cat", "ls"]
 
 
 def test_raw_keeps_the_command_and_the_reason(tmp_path):
