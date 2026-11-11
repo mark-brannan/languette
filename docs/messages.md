@@ -127,6 +127,7 @@ gi_batch: {guard}: {n} issue creates, transfers or deletes in one call. One per 
 gi_loop: {guard}: an issue create, transfer or delete inside a loop. One per human turn, never a batch.
 gi_transcript: {guard}: cannot read the session transcript to look for the user's yes, or record it as spent ({err}). {why} {ask}
 gi_door: {guard}: {why} {ask}
+gi_query_unread: the graphql query is not written out in the command (an --input or @file, or a value built at run time), so this call counts as an issue write
 ```
 
 ## guard

@@ -25,7 +25,10 @@ Feature: guard-github-issues
 
   Counts as an identifier write: `gh issue create|new|transfer|delete`; a
   `gh api` POST to repos/o/r/issues; a graphql createIssue, transferIssue or
-  deleteIssue; the MCP create_issue, transfer_issue, delete_issue, and
+  deleteIssue, on github.com's endpoint or an Enterprise server's; a graphql
+  call whose query the command does not write out (an --input or @file, or a
+  value built at run time, with no heredoc of its own feeding it), whatever
+  its mutation; the MCP create_issue, transfer_issue, delete_issue, and
   issue_write with method create. The command is read through the shell
   scanner, so `sh -c`, `eval` and `xargs` bodies are seen; a script file is
   not. The door is named apart from any other plugin's copy because the
@@ -106,6 +109,36 @@ Feature: guard-github-issues
       EOF
       """
     Then the guard denies
+
+  Scenario: an Enterprise server's graphql endpoint reads as graphql
+    When the agent runs `gh api https://ghe.example.com/api/graphql -f query='mutation { createIssue(input:{}) { issue { id } } }'`
+    Then the guard denies
+
+  # The query could be any mutation, createIssue among them: one write, as guard-private-terms reads it.
+  Scenario Outline: a graphql query the command does not write out counts as a write, door shut
+    When the agent runs `<command>`
+    Then the guard denies, naming "not written out"
+
+    @also_guard-bypass-labels @also_guard-review-threads @also_guard-signed-comments
+    Examples:
+      | command                                 |
+      | gh api graphql --input q.json           |
+
+    @also_guard-bypass-labels @also_guard-review-threads
+    Examples:
+      | command                                 |
+      | gh api graphql -F query=@q.graphql      |
+
+    @also_guard-review-threads
+    Examples:
+      | command                                 |
+      | gh api graphql -f query="$Q"            |
+
+  @also_guard-review-threads
+  Scenario: a graphql query the command does not write out takes the turn's door
+    When the human speaks, opening the door
+    And the agent runs `gh api graphql -f query="$Q"`
+    Then the guard is silent
 
   Scenario Outline: a -R/--repo flag before the subcommand is still seen
     When the agent runs `<command>`
