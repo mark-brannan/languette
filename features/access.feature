@@ -57,7 +57,7 @@ Feature: access
       | chmod u+s ~/project/bin/tool              | denies  | setuid                        |
       | chmod 4755 ~/project/bin/tool             | denies  |                               |
       | chmod g+s ~/project/shared                | denies  | setgid                        |
-      | sudo chown root ~/project/bin/tool        | denies  |                               |
+      | chown root ~/project/bin/tool             | denies  |                               |
       | setfacl -m o::rwx ~/project/data          | denies  | everyone may write            |
       | setfacl -R -m u:guest:rwx ~/project       | denies  |                               |
       | net user guest /delete                    | asks    | a Windows account             |

@@ -107,6 +107,7 @@ class Ctx:
         self._doordir = None
         self.calls = 0                         # tool_use_id in the payload: one per call, as Claude Code gives
         self.stdin = self.verdict = self.scanned = None
+        self.crashed = set()                   # in-process: the guards whose check raised on the last call
         self._dirs = []
         self.cleanups = []
 
@@ -196,7 +197,7 @@ class Ctx:
         return env
 
     def run(self, stdin):
-        self.stdin = stdin
+        self.stdin, self.crashed = stdin, set()
         if self.engine in IN_PROCESS:
             # A hook command only shapes a subprocess; in-process it would do nothing.
             assert not self.hook, "test setup: a hook command needs the hook engine (@hook)"
@@ -221,6 +222,7 @@ class Ctx:
                 self.verdict = Verdict(_respond_all(stdin, env, seen, docs))
             finally:
                 os.chdir(here)
+            self.crashed = {g for g, _, crashed in seen if crashed}
             if self.guard and seen:
                 others = {g: r for g, r, _ in seen if r and g != self.guard}
                 self.fired |= others.keys()

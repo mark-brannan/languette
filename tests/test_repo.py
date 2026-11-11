@@ -268,6 +268,29 @@ def test_a_rule_set_names_under_on_every_state_event_run_wires_its_guard_to():
         assert_that((g.NAME, events), equal_to((g.NAME, set(g.RULE_SET.get("on", {})))))
 
 
+def test_the_state_hooks_run_one_command_on_the_tools_run_keeps_state_for():
+    # Each state event's entry is written out by hand in hooks.json; one that drifts from the
+    # others fails open on that event alone, and a matcher narrower than run's misses a read.
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]
+    commands = [(ev, h["command"]) for ev in engine.STATE_EVENTS for e in hj[ev] for h in e["hooks"]]
+    assert_that(sorted({ev for ev, _ in commands}), equal_to(sorted(engine.STATE_EVENTS)))
+    assert_that(len({c for _, c in commands}), equal_to(1))
+    tools = {t for ev in ("PostToolUse", "PostToolUseFailure") for e in hj[ev] for t in e["matcher"].split("|")}
+    tools |= {"Read", "Edit", "Glob", "SendMessage", "WebFetchX", "mcp__github__create_issue"}
+    for ev in ("PostToolUse", "PostToolUseFailure"):
+        [matcher] = [e["matcher"] for e in hj[ev]]
+        for tool in sorted(tools):
+            assert_that((ev, tool, bool(re.fullmatch(matcher, tool))),
+                        equal_to((ev, tool, bool(run._SEND_STATE_TOOLS.match(tool)))))
+
+
+def test_the_readme_lists_every_guard_run_wires():
+    section = (ROOT / "README.md").read_text().split("\n## The guards\n", 1)[1].split("\n## ", 1)[0]
+    bullets = re.findall(r"^- \[?`([\w-]+)`(.*)$", section, re.M)
+    wired = {name for name, rest in bullets if "(planned)" not in rest}
+    assert_that(sorted(wired), equal_to(sorted({g.NAME for _, _, gs in run.GUARDS for g in gs})))
+
+
 def _prompt_hooks(*hooks):
     return json.dumps({"hooks": {"UserPromptSubmit": [{"hooks": list(hooks)}]}})
 

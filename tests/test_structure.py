@@ -24,20 +24,35 @@ from paths import ROOT
 
 GUARDS = {f.stem: importlib.import_module(f"languette.guards.{f.stem}")
           for f in sorted((ROOT / "languette" / "guards").glob("*.py")) if f.stem != "__init__"}
-# The walks that left languette/guards/ with their guards (what a call applies, what a post carries,
-# the hooks a git call skips, the remote branches it deletes, the infrastructure it destroys, the runs
-# a repo lists, where a push lands, what a session read and sends, the issues a call writes, the PRs
-# it opens, the work a git call throws away, where a session's git work lands, the review threads it
-# resolves, the comments it posts, the commits it makes): read by the same checks, since moving a file is
-# not removing a copy.
-WALKS = {m: importlib.import_module(f"languette.{m}")
-         for m in ("labels", "posts", "hook_skips", "branch_deletions", "infra_runs", "listed_runs",
-                   "pushes", "untrusted_reads", "issue_writes", "opened_prs", "work_losses",
-                   "worktree_reaches", "thread_resolves", "comment_posts", "prose_commits")}
-# scan and the modules it re-exports from (languette/scan.py).
-SHARED = {m: importlib.import_module(f"languette.{m}")
-          for m in ("scan", "quoting", "lexicon", "ladder", "lexer", "cd_tracking", "forges", "git_calls", "texts",
-                    "stops", "command_rules", "paths", "verdict", "document", "secrets", "refs")}
+
+
+def _imports(path):
+    """The top-level languette modules a source file imports, by name."""
+    out = set()
+    for n in ast.walk(ast.parse(Path(path).read_text())):
+        if isinstance(n, ast.ImportFrom) and n.level == 1 and n.module:
+            out.add(n.module.split(".")[0])
+        elif isinstance(n, ast.ImportFrom) and (n.module == "languette" or n.level == 1):
+            out |= {a.name for a in n.names}
+        elif isinstance(n, ast.ImportFrom) and (n.module or "").startswith("languette."):
+            out.add(n.module.split(".")[1])
+    return {m for m in out if (ROOT / "languette" / f"{m}.py").is_file()}
+
+
+def _modules(names):
+    return {m: importlib.import_module(f"languette.{m}") for m in sorted(names)}
+
+
+# The shared layer: Document for the call, scan for the words, paths for path words, verdict for
+# the answer, and the readers two guards' walks share (secrets, refs); with every module scan
+# re-exports from, read from scan.py itself, so a part split out of scan is read too.
+SHARED = _modules({"document", "scan", "paths", "verdict", "secrets", "refs"}
+                  | _imports(ROOT / "languette" / "scan.py"))
+# The walks that left languette/guards/ with their guards: every module primitives imports, since
+# a rule set reaches a walk only through primitives' TESTS and HANDLERS, but the shared layer and
+# messages. Read by the same checks, since moving a file is not removing a copy, and found from
+# primitives' imports, so a new walk is read the day it is wired.
+WALKS = _modules(_imports(ROOT / "languette" / "primitives.py") - set(SHARED) - {"messages"})
 
 # The fields of the call Document reads once; a guard reads them from the Document.
 DOCUMENT_FIELDS = {"tool_name", "tool_input", "hook_event_name", "permission_mode"}
@@ -48,7 +63,7 @@ ANSWERS = {"Refuse", "deny", "ask", "context"}
 # must fall inside one of these.
 KNOWN_TWICE = set()
 # Reads of a DOCUMENT_FIELDS key from the payload, at most, per guard.
-KNOWN_PAYLOAD_READS = {"labels": 2, "posts": 2}
+KNOWN_PAYLOAD_READS = {"posts": 1}
 # Answers whose text is anything but a messages.say call, at most, per guard.
 KNOWN_INLINE_TEXT = {}
 

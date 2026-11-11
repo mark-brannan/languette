@@ -867,20 +867,31 @@ def _from_the_wired_guard(ctx):
         f"want {ctx.wired}'s own verdict ({alone.decision}: {alone.reason}), got {whole.decision}: {whole.reason}"
 
 
+def _not_crashed(ctx):
+    """A guard that raises is a deny too (run._finding), so a deny row passes on a crash
+    unless the harness reads the crashed flag. In-process only: a hook row sees stdout."""
+    crashed = ctx.crashed if ctx.guard is None else ctx.crashed & {ctx.guard}
+    assert not crashed, f"{sorted(crashed)} crashed, and the crash is the deny: {ctx.verdict.reason}"
+
+
 @then("the guard denies")
 def _denies(ctx):
     assert_that(ctx.verdict, denies())
+    _not_crashed(ctx)
     _from_the_wired_guard(ctx)
 
 
 @then(parsers.re(r'the guard denies, naming "(?P<text>.*)"'))
 def _denies_naming(ctx, text):
     assert_that(ctx.verdict, denies(naming=ctx.expand(text).replace('\\"', '"')))
+    if "guard crashed" not in text:
+        _not_crashed(ctx)
 
 
 @then(parsers.re(r'the guard denies, not naming "(?P<text>.*)"'))
 def _denies_not_naming(ctx, text):
     assert_that(ctx.verdict, denies())
+    _not_crashed(ctx)
     assert ctx.expand(text) not in ctx.verdict.reason, f"the reason names {text!r}: {ctx.verdict.reason}"
 
 
