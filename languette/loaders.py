@@ -8,7 +8,7 @@ no guard imports it. Standard library only.
 import os
 import re
 
-from languette import comment_posts, engine, listed_runs, paths, secrets, terms
+from languette import comment_posts, engine, host, listed_runs, paths, secrets, terms
 from languette.rules import deny_always
 
 # A repo's file under .languette/ -> (the option that switches its guard, its loader: path -> generator).
@@ -31,7 +31,6 @@ def drive(gen, env):
 def option(name, value, env):
     """Why the guard that reads option `name` would refuse `value` (a string, as the hook is
     given it), or None. `env` is the guard's environment the value is judged in."""
-    from languette import doctor  # imported here, as doctor imports this module in its functions
     if not value:
         return None
     env = {**env, terms.option_env(name): value}
@@ -39,7 +38,7 @@ def option(name, value, env):
         if terms.option_name(kind) == name:
             penv = drive(terms.environment(env), env)
             _, path, _, err = drive(terms.load(kind, env, penv), env)
-            where = doctor._tilde(path)
+            where = host.tilde(path)
             if isinstance(err, terms.BadTerms):
                 return f"{where} {err}"
             return f"{where} {terms.why_not(err)}" if err else None

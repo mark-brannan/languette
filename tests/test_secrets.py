@@ -9,6 +9,7 @@ import string
 
 import pytest
 
+from harness import drive
 from languette import scan as sw
 from languette import secrets
 from languette.verdict import Refuse
@@ -49,29 +50,19 @@ def test_shown_echoes_at_most_a_quarter_of_the_value():
 
 
 def test_a_project_regex_over_512_characters_is_refused():
-    load = secrets.load("/p/.languette/secrets.json")
-    next(load)
     with pytest.raises(Refuse, match="longer than 512"):
-        load.send(json.dumps({"patterns": [{"id": "long", "regex": "a" * 513}]}))
+        drive(secrets.load("/p/.languette/secrets.json"), json.dumps({"patterns": [{"id": "long", "regex": "a" * 513}]}))
 
 
 @pytest.mark.parametrize("regex", ["(a+)+$", "(a*)*b", "(\\w+\\s?)+$", "(?:x|(a+))+", "((ab)*)+", "(a{1,3})+",
                                    "(.*){12}Z", "\\w+\\d+x"])
 def test_a_project_regex_the_terms_screen_refuses_is_refused(regex):
-    load = secrets.load("/p/.languette/secrets.json")
-    next(load)
     with pytest.raises(Refuse, match="a pattern languette will not run"):
-        load.send(json.dumps({"patterns": [{"id": "slow", "regex": regex}]}))
+        drive(secrets.load("/p/.languette/secrets.json"), json.dumps({"patterns": [{"id": "slow", "regex": regex}]}))
 
 
 @pytest.mark.parametrize("regex", ["acme_[a-z0-9]{24}", "(a+)b+", "(?:ab)+c", "^-----BEGIN .* KEY-----$",
                                    "(?=.*\\d)[A-Za-z0-9]{32,}", "(a|b)*c"])
 def test_a_project_regex_with_one_level_of_repeat_is_kept(regex):
-    load = secrets.load("/p/.languette/secrets.json")
-    next(load)
-    try:
-        load.send(json.dumps({"patterns": [{"id": "ok", "regex": regex}]}))
-    except StopIteration as stop:
-        assert [r.id for r in stop.value] == ["ok"]
-    else:
-        raise AssertionError("_load did not return")
+    _, loaded = drive(secrets.load("/p/.languette/secrets.json"), json.dumps({"patterns": [{"id": "ok", "regex": regex}]}))
+    assert [r.id for r in loaded] == ["ok"]
