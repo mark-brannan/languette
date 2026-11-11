@@ -36,6 +36,7 @@ Feature: scanner
       | x=`git push -f origin foo`        | ["w:x=", ";", "w:git", "w:push", "w:-f", "w:origin", "w:foo", ";"]          | backticks are separators                                                         |
       | git push origin --delete "$b"     | ["w:git", "w:push", "w:origin", "w:--delete", "w:$b"]                       | a variable ref stays an unresolvable word                                        |
       | echo $'\ud800'                    | ["w:echo", "w:\\\\ud800"]                                                   | a lone surrogate stays as written, so no later encode can raise                  |
+      | echo $$'\' ; rm -rf x             | ["w:echo", "w:$$\\\\", ";", "w:rm", "w:-rf", "w:x"]                            | $$ is the PID, so the ' after it opens a plain quote, not an ANSI-C one          |
 
   Scenario: a line continuation is nothing
     When the scanner reads:

@@ -5,7 +5,7 @@ fields, and the forge and repo a git remote's URL names (docs/design/forges.md).
 import re
 from collections import namedtuple
 
-from .quoting import UNRESOLVED
+from .quoting import UNREADABLE
 from .lexer import word
 
 
@@ -29,6 +29,8 @@ GH_API_FIELDS = ("-f", "-F", "--field", "--raw-field")
 
 # `gh api` flags whose value no guard reads.
 GH_API_VALUED = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
+# Every `gh api` flag that takes the next word as its value.
+GH_API_VALUE = frozenset(GH_REPO_FLAGS + GH_METHOD_FLAGS + GH_API_FIELDS + ("--input",)) | GH_API_VALUED
 
 # `glab api` reads its words as `gh api` does, but for these: --form sends a
 # field too, and these flags' values no guard reads. It takes no -R.
@@ -201,7 +203,7 @@ def gh_api(s, lo, hi, cli="gh"):
 def gl_project(p):
     """The project a glab api path names, read: "-" for :id (the cwd's), "?" for a numeric
     id or a word the shell would still expand (no path to look up), else group/project."""
-    return "-" if p == ":id" else "?" if p.isdigit() or UNRESOLVED.search(p) else p
+    return "-" if p == ":id" else "?" if p.isdigit() or UNREADABLE.search(p) else p
 
 
 def gh_api_path(path):

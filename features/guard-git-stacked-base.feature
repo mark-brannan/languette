@@ -121,6 +121,7 @@ Feature: guard-git-stacked-base
       | gh_fail | command                                                 | verdict | note                                                  |
       | unset   | git push origin --delete "$b"                           | asks    | a variable branch cannot be looked up: ask, not allow |
       | unset   | git push origin --delete claude/old-*                   | asks    | a glob cannot be looked up                            |
+      | unset   | git push origin --delete claude/{spare,lonely}          | asks    | a brace names several branches                        |
       | "1"     | git push origin --delete claude/base-branch             | asks    | gh cannot answer                                      |
       | unset   | git push origin --delete claude/base-branch pr merge -d | denies  | pr, merge and -d after a real delete do not excuse it |
 

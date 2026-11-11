@@ -106,8 +106,8 @@ def bash_read(doc):
     for text, nested in doc.texts():
         s = doc.scan(text)
         for i, w in enumerate(s.w):
-            if s.k[i] == "w" and os.path.basename(w) in _FETCHERS:
-                return f"`{os.path.basename(w)}`"
+            if s.k[i] == "w" and sw.basename(w) in _FETCHERS:
+                return f"`{sw.basename(w)}`"
         for a, b in s.segments():
             if a <= b and sw.cmd_index(s, a, b, _FETCH, True) is not None:
                 return "`fetch`"
@@ -117,7 +117,7 @@ def bash_read(doc):
             cli = sw.client(s.w[g])
             if _gh_reads(s, g + 1, b, cli):
                 words = [sw.word(s, i) for i in range(g + 1, b + 1)]
-                return f"`{cli} " + " ".join(sw.operands(words, sw.PROGRAMS["gh api"]["valued"])[:2]) + "`"
+                return f"`{cli} " + " ".join(sw.operands(words, sw.GH_API_VALUE)[:2]) + "`"
     return None
 
 

@@ -107,6 +107,13 @@ Feature: guard-protected-services
       | pkill mysqld     | *sql    | a glob's literal part is in the name   |
       | pkill re         | redis   | a regex that matches part of the name  |
 
+  # A pattern is screened as a terms file's re: is (languette/reshape.py) before it runs:
+  # one that could backtrack without bound is never tried, and the deny says why.
+  Scenario: a process pattern that could backtrack without bound is denied, not run
+    Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "postgresql@14-main"
+    When the agent runs `pkill -f '(.*){12}Z'`
+    Then the guard denies, naming "a pattern languette will not run: a quantifier inside a quantified group"
+
   Scenario Outline: without a match, a stop is the agent's
     Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "<setting>"
     When the agent runs `<command>`

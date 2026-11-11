@@ -154,4 +154,4 @@ Feature: guard-secrets
       {"patterns": [{"id": "slow", "regex": "(a+)+$"}]}
       """
     When the agent runs `echo hello`
-    Then the guard denies, naming "nests one unbounded repeat"
+    Then the guard denies, naming "a quantifier inside a quantified group"

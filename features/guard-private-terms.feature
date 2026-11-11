@@ -574,6 +574,7 @@ Feature: guard-private-terms
       | redacted | redacted_terms_file | re:(a+)+$         | a quantifier inside a quantified group |
       | redacted | redacted_terms_file | re:(a)\\1          | a backreference           |
       | blocked  | blocked_terms_file  | re:(\\d+)*x        | a quantifier inside a quantified group |
+      | blocked  | blocked_terms_file  | re:(.*){12}Z      | a quantifier inside a quantified group |
       | redacted | redacted_terms_file | re:.*.*.*.*;      | two unbounded repeats in a row over the same characters |
       | blocked  | blocked_terms_file  | re:\\w+\\d+x        | two unbounded repeats in a row over the same characters |
       | redacted | redacted_terms_file | re:(?:a\|aa)+x    | overlapping alternatives inside a repeat |

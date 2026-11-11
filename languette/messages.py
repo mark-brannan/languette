@@ -317,6 +317,7 @@ MESSAGES = {
         "`:(){{ :|:& }};:` is blocked: that is the fork-bomb shape, a function that pipes itself into "
         "itself in the background, and it freezes the machine. {way_user}"
     ),
+    "protected_pattern_refused": "{pattern} (a pattern languette will not run: {why})",
     "protected_stop": (
         "`{verb}` is blocked: it stops a protected service, one the user's machine "
         "depends on (the protected_services setting). {way_user}"
@@ -712,7 +713,7 @@ MESSAGES = {
     "sec_id_shipped": "{where}.id '{id}' is a shipped rule's id",
     "sec_regex_long": "{where}.regex is longer than {max} characters",
     "sec_regex_bad": "{where}.regex does not compile ({err})",
-    "sec_regex_nested": "{where}.regex nests one unbounded repeat inside another, which can backtrack for minutes",
+    "sec_regex_refused": "{where}.regex is a pattern languette will not run: {why}",
     "sec_entropy": "{where}.entropy must be a number >= 0",
     "perm_blocked": "`{target}` is blocked: {why}. {way_out}",
     "wl_add_unknown": (

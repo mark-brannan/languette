@@ -319,7 +319,7 @@ def _own_command(s, a, b, g):
     c = sw.seg_cmd(s, a, b)
     if c == g:
         return True
-    return (c is not None and s.w[c].rsplit("/", 1)[-1] == "env"
+    return (c is not None and sw.basename(s.w[c]) == "env"
             and all(s.k[i] == "w" and sw._ASSIGN.match(s.w[i]) for i in range(c + 1, g)))
 
 
