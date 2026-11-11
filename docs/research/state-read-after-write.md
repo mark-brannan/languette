@@ -76,8 +76,15 @@ bare `ls` takes 80 ms at least and 86 ms at the median (n=20);
 
 The credit rule: yeses for the label, minus later calls for the label before
 this one, in transcript order, whose result does not show they never ran. A
-call with no result yet counts as spent, so lag over-denies and never
-over-allows, as long as the earlier call's `tool_use` line is there.
+call with no result yet counts as spent, so a missing result over-denies.
+A missing `tool_use` line is the other direction: the replay finds no spend
+and over-allows, and nothing in the transcript shows a line is missing. The
+gap that matters, from the earlier call's `tool_use` being queued to this
+call's PreToolUse reading, was not measured; the 80 ms hook run against the
+100 ms timer is a plausibility argument, not a bound. So "remove the read"
+for the spent ledger is not shown safe. A replay that must fail closed needs
+a cross-check: keep the write-only ledger, or deny when the transcript's last
+entry is older than the previous hook's start.
 
 ## Row by row
 
