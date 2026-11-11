@@ -598,7 +598,7 @@ def write_new(path, text):
     beside it, linked into place (atomic, and refusing a file another session wrote first), and
     removed whatever happens. Raises FileExistsError when a file is there first, OSError when
     it cannot be written."""
-    d = os.path.dirname(path)
+    d = os.path.dirname(path) or "."
     os.makedirs(d, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=d, prefix=os.path.basename(path) + ".", suffix=".tmp")
     try:

@@ -100,7 +100,7 @@ try:
         ("PostToolUseFailure", issue_writes.TOOLS, ("guard-github-issues",)),
     )
     # Every guard by name, loaded once: the wiring above is the one list of them.
-    GUARD = {n: _load(n) for _, _, ns in _WIRING for n in ns}
+    GUARD = {n: _load(n) for n in dict.fromkeys(n for _, _, ns in _WIRING for n in ns)}
     GUARDS = tuple((ev, rx, tuple(GUARD[n] for n in ns)) for ev, rx, ns in _WIRING)
     require_well_formed, guard_cross_session_send = GUARD["require-well-formed"], GUARD["guard-cross-session-send"]
 except Exception as e:  # noqa: BLE001
