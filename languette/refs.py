@@ -38,6 +38,16 @@ def viewer(cwd):
     return (login, typename) if isinstance(login, str) and login else "GitHub named no viewer"
 
 
+def git_asker(cwd, prog="git", lead=()):
+    """`ask(*git_args)`, the generator a guard hands in to ask git a question in `cwd`: it
+    returns git's stripped stdout, or None when git fails, says nothing or times out. `prog`
+    and `lead` are the program and leading arguments that run plain git for a wrapper
+    (git_calls.wrapper_git). One Need and one timeout, the world's, for every such question."""
+    def ask(*argv):
+        return (yield Need("git", prog, cwd, *lead, *argv))
+    return ask
+
+
 def remote_heads(ask, remote=None):
     """The branches the remote HEAD refs name, in the order git lists them; none where no HEAD ref is a symref.
 
@@ -72,8 +82,7 @@ def remote_url(cwd):
     picks; with none of those, unknown. The branch's tracking remote is no part of it: `gh`
     ignores it, so a guard that trusted it could skip a scan of a post `gh` sends elsewhere.
     Read in `cwd`."""
-    def ask(*argv):
-        return (yield Need("git", "git", cwd, *argv))
+    ask = git_asker(cwd)
     names = ((yield from ask("remote")) or "").split()
     marked = []
     for line in ((yield from ask("config", "--get-regexp", r"^remote\..*\.gh-resolved$")) or "").splitlines():

@@ -28,8 +28,7 @@ import re
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Need, Refuse, context
-from languette.work_losses import add_options
+from languette.verdict import Need, context
 
 OPTION = "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"
 DEFAULT = "prose-budget"
@@ -76,9 +75,6 @@ class _Commits:
                 if a <= b:
                     self._segment(a, b, nested)
 
-    def _w(self, i):
-        return self.s.w[i] if i < len(self.s.w) else ""
-
     def _isbad(self, i):
         return self.s.k[i] == "q" or self.s.live[i]
 
@@ -91,8 +87,8 @@ class _Commits:
 
     def _collect_add(self, lo, hi):
         try:
-            opts, at = add_options(self.s.w[lo:hi + 1])
-        except Refuse:
+            opts, at = sw.add_options(self.s.w[lo:hi + 1])
+        except sw.UnreadOption:
             opts, at = ["force"], []     # a flag this does not know: widen
         if "all" in opts:
             self.allflag = self.allnew = True
@@ -154,19 +150,19 @@ class _Commits:
         g = sw.cmd_index(s, lo, hi, sw.GIT, nested)
         if g is None:
             return
-        self.bin = s.w[g]
-        self.repo, i = sw.git_call(s, g, hi)
+        call = sw.GitCall(s, lo, g, hi)
+        self.bin, self.repo, i = s.w[g], call.repo, call.sub
         d = ""
-        for j in sw.git_options(s, g, i):
-            if s.w[j] == "-C":
-                d = _join(d, self._w(j + 1))
-        if i <= hi and s.w[i] in ("add", "stage"):
+        for kind, v, _ in call.places:
+            if kind == "C":
+                d = _join(d, v or "")
+        if call.verb in ("add", "stage"):
             self.addseen, self.addctx = True, (self.cd, d)
             self._collect_add(i + 1, hi)
-        elif i <= hi and s.w[i] == "commit":
+        elif call.verb == "commit":
             self._commit_tail(i + 1, hi)
             self._seen(d)
-        elif i <= hi and s.w[i] == "merge" and "--continue" in s.w[i + 1:hi + 1]:
+        elif call.verb == "merge" and "--continue" in s.w[i + 1:hi + 1]:
             self._seen(d)
 
     def _seen(self, d):

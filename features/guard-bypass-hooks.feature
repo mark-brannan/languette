@@ -142,6 +142,7 @@ Feature: guard-bypass-hooks
       | git commit --message=--no-verify                    | attached message                    |
       | git commit --amend --no-edit                        | --no-edit is not --no-verify        |
       | git commit -s -m x                                  | other short flags                   |
+      | git merge --no-veri feature                         | --no-verify or --no-verify-signatures: git refuses it |
       | git log --no-verify                                 | not commit or push                  |
       | git status -n                                       | not commit or push                  |
       | echo git push --no-verify                           | echo with no shell                  |

@@ -85,7 +85,7 @@ from collections import namedtuple
 
 from languette import scan as sw
 from languette.messages import say
-from languette.refs import remote_heads
+from languette.refs import git_asker, remote_heads
 from languette.verdict import Act, Need, Refuse, ask, context, deny
 
 # Each control's own switch, off only when exactly "false".
@@ -227,7 +227,7 @@ def _home_ask(s, a, b, nested):
 
 
 def _git(cwd, *argv):
-    return (yield Need("git", "git", cwd, *argv))
+    return (yield from git_asker(cwd)(*argv))
 
 
 def _canon(p):
@@ -301,52 +301,30 @@ def _home_events(doc):
                     out.append(("ASK", hit))
                     continue
                 for i in range(a, b + 1):
-                    if s.k[i] == "w" and s.w[i].startswith("GIT_DIR="):
-                        out.append(("ENV", "GITDIR", s.w[i][8:]))
-                    if s.k[i] == "w" and s.w[i].startswith("GIT_WORK_TREE="):
-                        out.append(("ENV", "WORKTREE", s.w[i][14:]))
+                    env = sw.git_env(s.w[i]) if s.k[i] == "w" else None
+                    if env:
+                        out.append(("ENV", *env))
                 if sw.cmd_index(s, a, b, _FS_CHANGE, nested) is not None:
                     out.append(("FS",))
                 continue
-            sidx = sw.git_subcommand(s, g, b)
-            if sidx > b or s.k[sidx] != "w" or sw.git_verb(s.w[g], s.w[sidx]) not in ("checkout", "switch"):
-                if sidx <= b and s.w[sidx] == "mv":
+            call = sw.GitCall(s, a, g, b)
+            sidx = call.sub
+            if call.verb not in ("checkout", "switch") or s.k[sidx] != "w":
+                if call.verb == "mv":
                     out.append(("FS",))
                 continue
             # checkout -- <path> is a file restore; a bare trailing -- is not.
             if s.w[sidx] == "checkout" and any(s.k[i] == "w" and s.w[i] == "--" and s.k[i + 1] == "w"
                                                for i in range(sidx + 1, b)):
                 continue
-            name, row = sw.git_wrapper(s.w[g])
-            if row.home:
-                out.append(("DENY", name + " <repo>" * row.repo))
+            if call.row.home:
+                out.append(("DENY", call.prog + " <repo>" * call.row.repo))
                 continue
-            targets = []
-            # The words before git (assignments, a wrapper's -C) and git's own options; past the
-            # subcommand, -C is switch's "create branch", not a directory.
-            for i in [*range(a, g), *sw.git_options(s, g, sidx)]:
-                if s.k[i] != "w":
-                    continue
-                w = s.w[i]
-                nxt = s.w[i + 1] if i + 1 <= b and s.k[i + 1] == "w" else None
-                if w == "-C":
-                    if nxt is not None:
-                        targets.append(("C", nxt))
-                elif w == "--git-dir":
-                    if nxt is not None:
-                        targets.append(("GITDIR", nxt))
-                elif w.startswith("--git-dir="):
-                    targets.append(("GITDIR", w.split("=", 1)[1]))
-                elif w == "--work-tree":
-                    if nxt is not None:
-                        targets.append(("WORKTREE", nxt))
-                elif w.startswith("--work-tree="):
-                    targets.append(("WORKTREE", w.split("=", 1)[1]))
-                elif w.startswith("GIT_DIR="):
-                    targets.append(("GITDIR", w[8:]))
-                elif w.startswith("GIT_WORK_TREE="):
-                    targets.append(("WORKTREE", w[14:]))
-            out.append(("G", targets))
+            # The words before git (assignments, a wrapper's -C) and git's own options, in the
+            # order they stand; past the subcommand, -C is switch's "create branch", not a directory.
+            places = [(i + 1, "C", s.w[i + 1]) for i in range(a, g) if s.w[i] == "-C" and s.k[i] == "w"]
+            places += [(j, kind, v) for kind, v, j in call.places if v is not None]
+            out.append(("G", [(kind, v) for j, kind, v in sorted(places) if j <= b and s.k[j] == "w"]))
     return out
 
 
@@ -420,12 +398,9 @@ def _generic(prog, cwd, guard):
     the working directory's), where the repository names none, or a name the shell would read as
     more than a word."""
     base = "<base>"
-
-    def ask(*argv):
-        return (yield from _git(cwd, *argv))
     if cwd:
         try:
-            heads = yield from remote_heads(ask)
+            heads = yield from remote_heads(git_asker(cwd))
         except Exception:  # noqa: BLE001
             heads = ()
         if heads and re.fullmatch(r"[A-Za-z0-9._][A-Za-z0-9._/-]*", heads[0]):
@@ -585,10 +560,11 @@ def _worktree_add(s, a, b):
     g = sw.cmd_index(s, a, b, sw.GIT, False)
     if g is None or sw.git_wrapper(s.w[g])[1].home:
         return None
-    sub = sw.git_subcommand(s, g, b)
-    if sub + 1 > b or s.w[sub] != "worktree" or s.w[sub + 1] != "add":
+    call = sw.GitCall(s, a, g, b)
+    sub = call.sub
+    if sub + 1 > b or call.verb != "worktree" or s.w[sub + 1] != "add":
         return None
-    cs = [s.w[i + 1] for i in sw.git_options(s, g, sub) if s.w[i] == "-C"]
+    cs = [v for kind, v, _ in call.places if kind == "C" and v is not None]
     pos, i, opts = [], sub + 2, True
     while i <= b:
         if s.k[i] != "w":

@@ -50,12 +50,6 @@ SHORT_N = frozenset(("commit", "am"))
 FLAG = "--no-verify"
 
 
-def _is_flag(w):
-    """git takes any unambiguous prefix of a long option; shorter than
-    --no-veri is ambiguous with --no-verbose, and git refuses it anyway."""
-    return len(w) >= 9 and FLAG.startswith(w)
-
-
 def _skips(sub, args):
     """Does `git <sub> <args>` skip the hooks?"""
     short, long_ = VALUE[sub]
@@ -65,7 +59,7 @@ def _skips(sub, args):
         i += 1
         if w == "--":
             break
-        if _is_flag(w):
+        if sw.long_option(w, FLAG, sub):
             return True
         if w in long_:
             i += 1
@@ -86,15 +80,10 @@ def _runs(doc):
         g = sw.cmd_index(s, a, b, sw.GIT, nested)
         if g is None:
             continue
-        i, hooks_path = sw.git_subcommand(s, g, b), False
-        for j in sw.git_options(s, g, i):
-            w = s.w[j]
-            v = w[len("--config-env="):] if w.startswith("--config-env=") else (
-                s.w[j + 1] if w in ("-c", "--config-env") and j < b and s.k[j + 1] == "w" else "")
-            hooks_path = hooks_path or v.split("=", 1)[0].lower() == "core.hookspath"
-        if hooks_path:
+        call = sw.GitCall(s, a, g, b)
+        if any(c and c.split("=", 1)[0] == "core.hookspath" for c in call.configs):
             n += 1
-        elif i <= b and s.k[i] == "w" and sw.git_verb(s.w[g], s.w[i]) in VALUE and _skips(sw.git_verb(s.w[g], s.w[i]), s.w[i + 1:b + 1]):
+        elif call.verb in VALUE and s.k[call.sub] == "w" and _skips(call.verb, s.w[call.sub + 1:b + 1]):
             n += 1
     return n, loop
 

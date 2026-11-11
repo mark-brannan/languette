@@ -67,25 +67,23 @@ def _git_push(s, a, b, nested, out):
     g = sw.cmd_index(s, a, b, sw.GIT, nested)
     if g is None:
         return
-    p = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and s.w[i] == "push"), None)
-    if p is None:
+    call = sw.GitCall(s, a, g, b)
+    if call.verb != "push" or s.k[call.sub] != "w":
         return
-    repo = "-"
-    if any(s.k[i] == "w" and s.w[i].startswith("GIT_DIR=") for i in range(a, g)):
-        repo = "?"
-    if any(s.k[i] == "w" and (s.w[i] == "-C" or s.w[i].startswith("--git-dir")) for i in range(g + 1, p)):
-        repo = "?"
-    words, skip, delete, valued = [], False, False, sw.PROGRAMS["git push"]["valued"]
-    for i in range(p + 1, b + 1):
+    # Another repository's remote: -C, --git-dir or GIT_DIR=; a work tree moves no remote.
+    repo = "?" if any(kind != "WORKTREE" for kind, _, _ in call.places) else "-"
+    words, skip, delete = [], False, False
+    valued = [v for v in sw.PROGRAMS["git push"]["valued"] if v.startswith("--")]
+    for i in call.args:
         if s.k[i] != "w":
             continue
         w = s.w[i]
         if skip:                               # the value of -o, --repo, ...: not the remote, not a ref
             skip = False
             continue
-        if _SHORT_D.match(w) or (len(w) > 3 and "--delete".startswith(w)):
+        if _SHORT_D.match(w) or sw.long_option(w, "--delete", "push"):
             delete = True                      # --d alone is ambiguous with --dry-run, and git refuses it
-        if _SHORT_O.match(w) or (len(w) >= 3 and "=" not in w and any(v.startswith(w) for v in valued)):
+        if _SHORT_O.match(w) or ("=" not in w and any(sw.long_option(w, v, "push") for v in valued)):
             skip = True                        # git takes any unambiguous prefix of a long option
         else:
             words.append(w)
