@@ -35,8 +35,9 @@ languette = "languette.__main__:main"
 packages = ["languette", "languette.guards", "languette.rules"]
 
 [tool.setuptools.package-data]
-# Each guard's shipped rule file (docs/design/guard-rules.md).
-languette = ["rules/*.json", "rules/*.tsv"]
+# Each guard's shipped rule file (docs/design/guard-rules.md), and the post the doctor
+# times guard-private-terms' regular expressions over.
+languette = ["rules/*.json", "rules/*.tsv", "rules/timing-sample.md"]
 
 # `pytest --cov` reads this. `patch = subprocess` measures the hooks.json
 # commands the hook scenarios run as child processes, not only in-process code.

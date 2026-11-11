@@ -24,16 +24,17 @@ import json
 import os
 import re
 import shutil
+import string
 import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from languette import scan, terms
-from languette.paths import config_dir
+from languette import host, messages, scan, terms
+from languette.host import Unreadable, installed_options
 
-OK, WARN, FAIL = "✓", "!", "✗"
+OK, WARN, FAIL = host.OK, host.WARN, host.FAIL
 # A probe is (row label, guard, command): the command goes to the guard's hook as a payload.
 PARSE = ("parse check", "require-well-formed", 'echo "unclosed')
 CANARY = ("fail-closed", "guard-recursive-delete", "rm -rf /fake/languette-doctor")
@@ -50,53 +51,22 @@ FORGES = {
     "fj": (("auth", "list"), True, "not yet guarded (see issue #288)"),
 }
 BY_HAND = re.compile(r"languette/run\.py")
-SHA = re.compile(r"[0-9a-f]{7,40}")
+
+
+def _said(code):
+    """A paragraph that starts as message `code` does, up to its last blank, each blank before
+    it any text on one line."""
+    parts = [(text, name) for text, name, _, _ in string.Formatter().parse(messages.MESSAGES[code])]
+    while parts and parts[-1][1] is None:
+        parts.pop()                            # the text after the last blank is not read
+    return "^" + "".join(re.escape(text) + ("[^\n]*?" if i < len(parts) - 1 else "")
+                         for i, (text, _) in enumerate(parts))
+
+
 # A deny that came from the wrapper, the loader or a crash, not the guard: run.py is
 # missing, a guard failed to import or raised, or the payload was refused. Fail-closed, but nothing judged.
-FALLBACK = re.compile(r"This is a gate and fails closed|^languette: (a guard failed to load|unreadable hook payload)"
-                      r"|^[\w-]+: guard crashed \(")
-
-
-class Unreadable(Exception):
-    """A file the doctor needs is missing, not JSON, or not in a shape it knows."""
-
-
-def _home():
-    return Path(os.environ.get("HOME") or Path.home())
-
-
-def _config_dir():
-    return Path(config_dir({**os.environ, "HOME": str(_home())}))
-
-
-def _tilde(path):
-    home, p = str(_home()), str(path)
-    return "~" + p[len(home):] if p == home or p.startswith(home.rstrip("/") + "/") else p
-
-
-def _json(path, missing=None):
-    """The JSON in `path`, `missing` when there is no file, or Unreadable."""
-    try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        if missing is not None:
-            return missing
-        raise Unreadable(f"{_tilde(path)} is missing") from None
-    except (OSError, UnicodeDecodeError) as e:
-        raise Unreadable(f"{_tilde(path)} is unreadable ({getattr(e, 'strerror', None) or e})") from None
-    except ValueError:
-        raise Unreadable(f"{_tilde(path)} is not JSON") from None
-
-
-def _dig(value, keys, where):
-    """value[k0][k1]... where each level is an object; {} past a missing key."""
-    for k in keys:
-        if not isinstance(value, dict):
-            raise Unreadable(f"{where} has a shape the doctor does not know")
-        value = value.get(k, {})
-    if not isinstance(value, dict):
-        raise Unreadable(f"{where} has a shape the doctor does not know")
-    return value
+FALLBACK = re.compile("|".join([re.escape(messages.FAILS_CLOSED),
+                                *map(_said, ("guard_load_failed", "payload_unreadable", "guard_crashed"))]))
 
 
 def _commands(settings):
@@ -110,57 +80,6 @@ def _commands(settings):
 
 
 # --- gather: every read, every program run ---------------------------------
-
-def _ours(pid):
-    return isinstance(pid, str) and pid.split("@")[0] == "languette"
-
-
-def installs(settings_files):
-    """languette's installs, each {id, version, scope, enabled, installPath[, projectPath]}:
-    `claude plugin list --json`, else ~/.claude/plugins/installed_plugins.json."""
-    claude = shutil.which("claude")
-    if claude:
-        try:
-            r = subprocess.run([claude, "plugin", "list", "--json"], capture_output=True, text=True, timeout=30)
-            listed = json.loads(r.stdout) if r.returncode == 0 else None
-        except (OSError, subprocess.SubprocessError, ValueError):
-            listed = None
-        if isinstance(listed, list) and all(isinstance(x, dict) for x in listed):
-            return [x for x in listed if _ours(x.get("id"))]
-    path = _config_dir() / "plugins/installed_plugins.json"
-    plugins = _dig(_json(path, missing={}), ["plugins"], _tilde(path))
-    out = []
-    for pid, entries in plugins.items():
-        if not _ours(pid):
-            continue
-        if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
-            raise Unreadable(f"{_tilde(path)} has a shape the doctor does not know")
-        # The file has no enabled flag: an install counts as enabled unless a
-        # settings file sets enabledPlugins[id] to false.
-        off = any(isinstance(s, dict) and isinstance(s.get("enabledPlugins"), dict)
-                  and s["enabledPlugins"].get(pid) is False for s in settings_files.values())
-        out += [{**e, "id": pid, "enabled": not off} for e in entries]
-    return out
-
-
-def settings_files(cwd):
-    """path -> parsed JSON (or the Unreadable) for the user's settings.json and every
-    .claude/settings{,.local}.json from cwd up to, not including, $HOME."""
-    home = _home()
-    paths = [_config_dir() / "settings.json"]
-    d = Path(cwd)
-    for d in (d, *d.parents):
-        if d == home:
-            break
-        paths += [d / ".claude/settings.json", d / ".claude/settings.local.json"]
-    out = {}
-    for p in paths:
-        try:
-            out[p] = _json(p, missing={})
-        except Unreadable as e:
-            out[p] = e
-    return out
-
 
 def shfmt_version(path):
     try:
@@ -225,42 +144,6 @@ def probe(command, env, cwd, limit, sent):
 
 # --- rows ------------------------------------------------------------------
 
-def in_effect(found, cwd):
-    """The install in effect for cwd: the most specific project or local install
-    whose projectPath holds cwd, local before project, else the user's."""
-    def holds(p):
-        return isinstance(p, str) and p and (cwd == p or cwd.startswith(p.rstrip("/") + "/"))
-    scoped = [i for i in found if i.get("scope") in ("project", "local") and holds(i.get("projectPath"))]
-    if scoped:
-        return max(scoped, key=lambda i: (len(i["projectPath"]), i.get("scope") == "local"))
-    rest = [i for i in found if i.get("scope") not in ("project", "local")]
-    return rest[0] if rest else None
-
-
-def _version(inst):
-    v = str(inst.get("version") or "?")
-    return v[:7] if SHA.fullmatch(v) else v
-
-
-def _env_value(v):
-    return "true" if v is True else "false" if v is False else v if isinstance(v, str) else json.dumps(v)
-
-
-def _options(files, user_path, inst):
-    """The installed plugin's options from the user's settings file; Unreadable when it will not say."""
-    user = files[user_path]
-    if isinstance(user, Unreadable):
-        raise user
-    return _dig(user, ["pluginConfigs", inst.get("id") or "languette@languette", "options"],
-                f"pluginConfigs in {_tilde(user_path)}")
-
-
-def _option_env(options):
-    """Each option as the environment variable Claude Code gives the plugin's hooks."""
-    return {terms.option_env(k): _env_value(v) for k, v in options.items()
-            if isinstance(k, str) and re.fullmatch(r"\w+", k) and v is not None}
-
-
 def gates(hooks):
     """Option name -> its gate, `=` (on unless false) or `!=` (on only if true), as run.py
     reads them, and the first hook of each probed guard, from a hooks.json object. A
@@ -286,7 +169,7 @@ def gates(hooks):
 def is_on(gate, value):
     if value is None:
         return gate == "="
-    v = _env_value(value)
+    v = host.env_value(value)
     return v != "false" if gate == "=" else v == "true"
 
 
@@ -299,7 +182,7 @@ def by_hand(files):
 def _titles(root):
     """Option name -> its one-line title from the install's plugin.json; {} when it will not say."""
     try:
-        conf = _json(Path(root) / ".claude-plugin/plugin.json").get("userConfig")
+        conf = host.read_json(Path(root) / ".claude-plugin/plugin.json").get("userConfig")
     except (Unreadable, AttributeError):
         return {}
     return {k: v["title"] for k, v in conf.items() if isinstance(v, dict) and isinstance(v.get("title"), str)} \
@@ -319,11 +202,11 @@ def check(cwd):
     """[(mark, label, text, [detail lines])] for this machine, from cwd, in the order printed:
     version, shell parser, the probes, Claude Code with its guards beneath, the forge clients,
     the terms files. A ✗ never stops a later check."""
-    files = settings_files(cwd)
-    user_path = _config_dir() / "settings.json"
+    files = host.settings_files(cwd)
+    user_path = host.user_settings()
     hand = {p: hs for p, hs in by_hand(files).items() if hs}
     try:
-        inst = in_effect(installs(files), cwd)
+        inst = host.in_effect(host.installs(files), cwd)
         problem = None
     except Unreadable as e:
         inst, problem = None, str(e)
@@ -334,16 +217,16 @@ def check(cwd):
     # A probe's environment is an allowlist, not the doctor's own.
     base_env = {k: os.environ[k] for k in ("PATH", "HOME", "TMPDIR") if k in os.environ}
     if inst:
-        where = f"plugin {_version(inst)}, {inst.get('scope', '?')} scope"
+        where = f"plugin {host.version(inst)}, {inst.get('scope', '?')} scope"
         root = str(inst.get("installPath") or "")
         if hand:
-            names = ", ".join(_tilde(p) for p in hand)
+            names = ", ".join(host.tilde(p) for p in hand)
             claude = (FAIL, "Claude Code", f"{where}, and by-hand run.py hooks in {names}: every guard "
                                            "runs twice; remove the by-hand entries", [])
         elif inst.get("enabled") is False:
             claude = (FAIL, "Claude Code", f"{where}, is disabled: claude plugin enable {inst.get('id')}", [])
         try:
-            options = _options(files, user_path, inst)
+            options = host.plugin_options(files, inst)
         except Unreadable as e:
             options, opt_problem = {}, str(e)
         else:
@@ -351,7 +234,7 @@ def check(cwd):
         try:
             if not root:
                 raise Unreadable("the install names no installPath")
-            found, probed = gates(_json(Path(root) / "hooks/hooks.json"))
+            found, probed = gates(host.read_json(Path(root) / "hooks/hooks.json"))
         except Unreadable as e:
             found, hooks_problem = {}, str(e)
         else:
@@ -364,7 +247,7 @@ def check(cwd):
                 on = [k for k, g in found.items() if is_on(g, options.get(k))]
                 # Disabled: a default-on guard turned off, or an opt-in set to a value that leaves it off.
                 off = sorted(k for k, g in found.items() if k not in on and (
-                    g == "=" or options.get(k) is not None and _env_value(options[k]) != "false"))
+                    g == "=" or options.get(k) is not None and host.env_value(options[k]) != "false"))
                 titles = _titles(root)
                 claude = (OK, "Claude Code", where, [
                     line(OK, f"guards enabled: {len(on)}"),
@@ -376,9 +259,9 @@ def check(cwd):
                 not_run[guard] = "the plugin is disabled, so its hooks do not run; the probe did not run"
             elif not is_on(found.get(key, "="), options.get(key)):
                 not_run[guard] = f"{guard} is off, so `{sent}` would go through; the probe did not run"
-        env = {**base_env, "CLAUDE_PLUGIN_ROOT": root, **_option_env(options)}
+        env = {**base_env, "CLAUDE_PLUGIN_ROOT": root, **host.option_env(options)}
     elif hand:
-        names = ", ".join(_tilde(p) for p in hand)
+        names = ", ".join(host.tilde(p) for p in hand)
         count = len({m for hs in hand.values() for h in hs for m in re.findall(r"--guard ([\w-]+)", h["command"])})
         claude = (OK, "Claude Code", f"by hand, {count} guard{'' if count == 1 else 's'} in {names}", [])
         # Only the user's own file supplies a command to run: a project's settings
@@ -400,7 +283,7 @@ def check(cwd):
     rows = []
     if inst:
         v = str(inst.get("version") or "")
-        rows.append((WARN, "version", f"plugin at commit {v[:7]}, from main; not a release" if SHA.fullmatch(v) else
+        rows.append((WARN, "version", f"plugin at commit {v[:7]}, from main; not a release" if host.SHA.fullmatch(v) else
                      f"plugin at {v or 'an unknown version'}; not checked against the latest release", []))
     elif hand:
         rows.append((WARN, "version", "installed by hand; not checked", []))
@@ -481,9 +364,9 @@ def refused_options(options):
     """name -> why its guard refuses the value, for each installed option but the terms files,
     which have rows of their own."""
     from languette import loaders
-    env = _env(options)
+    env = host.guard_env(options)
     own = {terms.option_name(k) for k in terms.KINDS}
-    found = {k: loaders.option(k, _env_value(v), env) for k, v in options.items()
+    found = {k: loaders.option(k, host.env_value(v), env) for k, v in options.items()
              if isinstance(k, str) and k not in own and v is not None}
     return {k: why for k, why in found.items() if why}
 
@@ -498,11 +381,11 @@ def configs_row(options, cwd):
     for name, why in refused.items():
         lines.append(line(FAIL, f"{name}: {why}", line("", "to put it back to its default: languette doctor --fix")))
     try:
-        files = loaders.repo_files(cwd, _env(options))
+        files = loaders.repo_files(cwd, host.guard_env(options))
     except Exception as e:  # noqa: BLE001 -- what the doctor cannot read is a ! row
         return WARN, "configs", f".languette/ could not be read ({type(e).__name__}: {one_line(str(e))})", lines
     for path, opt, why in files:
-        where = _tilde(path)
+        where = host.tilde(path)
         if opt is None:
             lines.append(line(WARN, f"{where}: no guard reads it"))
         elif why is None:
@@ -527,7 +410,7 @@ def fix(cwd, yes):
     `languette config` on a yes: `yes` (--fix), else y at a terminal. Exits 1 when the write fails."""
     from languette import config
     options = installed_options(cwd)
-    old = {k: _env_value(options[k]) for k in refused_options(options)}
+    old = {k: host.env_value(options[k]) for k in refused_options(options)}
     if not old:
         if yes:
             print(f"{OK} no option its guard refuses; nothing to write")
@@ -541,7 +424,7 @@ def fix(cwd, yes):
     if not new:
         print(f"{FAIL} {', '.join(old)}: not in the installed plugin's options; nothing written")
         return 1
-    where = _tilde(_config_dir() / "settings.json")
+    where = host.tilde(host.user_settings())
     print(f"--- {where}\n+++ {where}")
     for k, v in new.items():
         print(f"-{k}={old[k]}\n+{k}={v}")
@@ -549,11 +432,7 @@ def fix(cwd, yes):
         if not sys.stdin.isatty():
             print(f"{WARN} to write it: languette doctor --fix")
             return 0
-        try:
-            answer = input("Write it? [y/N] ")
-        except EOFError:
-            answer = ""
-        if answer.strip().lower() not in ("y", "yes"):
+        if not host.confirm("Write it?"):
             print(f"{WARN} left as it was")
             return 0
     return config.main(unset=list(new))
@@ -562,14 +441,9 @@ def fix(cwd, yes):
 # --- guard-private-terms' files, through the guard's own loader --------------
 
 # What each accepted re: is timed over; shown, never the verdict.
-SAMPLE = Path(__file__).resolve().parent.parent / "features/fixtures/private-terms/bad-comment.md"
+SAMPLE = Path(__file__).resolve().parent / "rules/timing-sample.md"
 FIRST = 32                                 # characters of a refused line shown beneath its reason
 LABELS = {"redacted": "redacted terms", "blocked": "blocked terms"}
-
-
-def _env(options):
-    """The guard's environment, as the installed plugin's options give it."""
-    return {**os.environ, "HOME": str(_home()), **_option_env(options)}
 
 
 def _terms(options):
@@ -577,7 +451,7 @@ def _terms(options):
     file read as the guard reads it, and the environment its $NAMEs are filled from."""
     from languette.run import drive          # run.py exits when a guard will not import
     from languette.world import World
-    env = _env(options)
+    env = host.guard_env(options)
     world = World(env, {})
     penv = drive(terms.environment(env), world, [])
     return penv, {kind: drive(terms.read(kind, env), world, []) for kind in terms.KINDS}
@@ -596,7 +470,7 @@ def _file_lines(kind, text, path, penv):
     bad = [(n, raw, item) for n, raw, item in found if isinstance(item, terms.BadTerms)]
     good = [item for _, _, item in found if isinstance(item, terms.Term)]
     count = f"{len(found)} entr{'y' if len(found) == 1 else 'ies'}"
-    out = [line(WARN if not found else OK, f"{_tilde(path)} ({count})")]
+    out = [line(WARN if not found else OK, f"{host.tilde(path)} ({count})")]
     for n, raw, err in bad:
         first = raw if len(raw) <= FIRST else raw[:FIRST - 1] + "…"
         out.append(line(FAIL, f"line {n}: {err.why}", line("", first)))
@@ -625,7 +499,7 @@ def terms_rows(options):
     rows = []
     for kind, label in LABELS.items():
         text, path, named, err = read[kind]
-        option, where = terms.option_name(kind), _tilde(path)
+        option, where = terms.option_name(kind), host.tilde(path)
         if err:
             why = "is a directory" if isinstance(err, ValueError) and os.path.isdir(path) else terms.why_not(err)
             until = "does" if why == "does not exist" else "is fixed"
@@ -654,7 +528,7 @@ def _loaded(kind, text, path, penv):
     found = list(terms.entries(text, kind, penv))
     bad = [item for _, _, item in found if isinstance(item, terms.BadTerms)]
     for err in bad:
-        print(f"{FAIL} {_tilde(path)} {err}")
+        print(f"{FAIL} {host.tilde(path)} {err}")
     return None if bad else [item for _, _, item in found]
 
 
@@ -670,7 +544,7 @@ def redact(file, options):
     loaded = {}
     for kind, (body, path, _, err) in read.items():
         if err:
-            print(f"{FAIL} {_tilde(path)} {terms.why_not(err)}")
+            print(f"{FAIL} {host.tilde(path)} {terms.why_not(err)}")
             return 1
         loaded[kind] = [] if body is None else _loaded(kind, body, path, penv)
         if loaded[kind] is None:
@@ -692,7 +566,7 @@ def write_initial(kind, env):
     path, _ = terms.where(kind, env)
     if not path or os.path.lexists(path):
         return None
-    where = _tilde(path)
+    where = host.tilde(path)
     if kind == "redacted":
         groups = _defaults()
         body, what = terms.initial(groups), f"{len(groups)} defaults"
@@ -716,12 +590,11 @@ def write_initial(kind, env):
     return OK, f"wrote {where} ({what})"
 
 
-def default_terms_rows(cwd):
-    """[(mark, label, text)]: the default redacted terms file written where the installed plugin's
-    options say the guard reads it, as --init-redacted-terms does; a file already there is left
+def default_terms_rows(options):
+    """[(mark, label, text)]: the default redacted terms file written where the plugin's
+    `options` say the guard reads it, as --init-redacted-terms does; a file already there is left
     alone and says nothing."""
-    options = installed_options(cwd)
-    env = _env(options)
+    env = host.guard_env(options)
     if not terms.where("redacted", env)[0]:
         return []
     done = write_initial("redacted", env)
@@ -730,12 +603,12 @@ def default_terms_rows(cwd):
 
 def init(kind, options):
     """Write the kind's file, never over one that exists."""
-    env = _env(options)
+    env = host.guard_env(options)
     done = write_initial(kind, env)
     if done is None:
         path, _ = terms.where(kind, env)
         repair = "; to repair it: languette doctor --restore-redacted-terms" if kind == "redacted" else ""
-        done = FAIL, f"{_tilde(path)} exists{repair}"
+        done = FAIL, f"{host.tilde(path)} exists{repair}"
     print(f"{done[0]} {done[1]}")
     return 1 if done[0] == FAIL else 0
 
@@ -743,8 +616,8 @@ def init(kind, options):
 def restore(options):
     """Repair the defaults in the redacted terms file: show the diff, write it on a yes."""
     import difflib
-    path, _ = terms.where("redacted", _env(options))
-    where = _tilde(path)
+    path, _ = terms.where("redacted", host.guard_env(options))
+    where = host.tilde(path)
     try:
         text = Path(path).read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -760,11 +633,7 @@ def restore(options):
         print(f"{OK} {where} holds every default as it is now; nothing to write")
         return 0
     sys.stdout.writelines(difflib.unified_diff(text.splitlines(True), new.splitlines(True), where, where))
-    try:
-        answer = input("Write it? [y/N] ")
-    except EOFError:
-        answer = ""
-    if answer.strip().lower() not in ("y", "yes"):
+    if not host.confirm("Write it?"):
         print(f"{WARN} {where} left as it was")
         return 0
     # Whole or untouched: a cut-off write would leave the only file that redacts half gone.
@@ -777,16 +646,6 @@ def restore(options):
         return 1
     print(f"{OK} wrote {where}")
     return 0
-
-
-def installed_options(cwd):
-    """The options of the plugin in effect for cwd, {} where there is none or its settings will not say."""
-    files = settings_files(cwd)
-    try:
-        inst = in_effect(installs(files), cwd)
-        return _options(files, _config_dir() / "settings.json", inst) if inst else {}
-    except Unreadable:
-        return {}
 
 
 def main(args=None):

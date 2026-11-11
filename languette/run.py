@@ -48,6 +48,8 @@ def _out(event, fields):
     return json.dumps({"hookSpecificOutput": {"hookEventName": event, **fields}}, separators=(",", ":")) + "\n"
 
 
+from languette.messages import say  # noqa: E402 -- the sentence for a guard that will not import
+
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
@@ -76,7 +78,6 @@ try:
                                  guard_sudo as _guard_sudo, guard_worktrees as _guard_worktrees,
                                  prose_budget_commit as _prose_budget_commit)
     from languette.document import Document
-    from languette.messages import say
     from languette.verdict import LOST, SPEND, Act, deny, verdict
     from languette.world import ACTS, World
     # The guards that are a rule set alone (languette/engine.py).
@@ -104,7 +105,8 @@ try:
     prose_budget_commit = engine.Guard(_prose_budget_commit)
 except Exception as e:  # noqa: BLE001
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny",
-                                         "permissionDecisionReason": f"languette: a guard failed to load ({type(e).__name__}: {e})"}))
+                                         "permissionDecisionReason": say("guard_load_failed", kind=type(e).__name__,
+                                                                                         err=e)}))
     sys.exit(0)
 
 # (hook event, tool name pattern or None for an event with no tool, guards in

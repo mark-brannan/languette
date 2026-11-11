@@ -132,6 +132,7 @@ gi_door: {guard}: {why} {ask}
 ## guard
 
 ```
+guard_load_failed: languette: a guard failed to load ({kind}: {err})
 guard_crashed: {guard}: guard crashed ({kind}: {err}), cannot inspect the command
 ```
 
