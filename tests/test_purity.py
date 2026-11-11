@@ -200,11 +200,15 @@ def test_every_known_escape_is_still_there():
 
 
 def test_install_writes_nothing_itself():
-    """`languette install` only finds `claude`, runs it and reads the cwd; only
-    Claude Code writes. Any other way out, a file opened or a path written, fails here."""
+    """`languette install` only finds `claude`, runs it through the host layer and reads the
+    cwd; only Claude Code writes. The host layer only reads files, runs programs and asks.
+    Any other way out, a file opened or a path written, fails here."""
     found = {w for _, w in escapes((ROOT / "languette" / "install.py").read_text())}
-    assert_that(sorted(found), equal_to(["import shutil", "import subprocess", "os.getcwd", "shutil.which",
-                                         "subprocess.TimeoutExpired", "subprocess.run"]))
+    assert_that(sorted(found), equal_to(["import shutil", "os.getcwd", "shutil.which"]))
+    found = {w for _, w in escapes((ROOT / "languette" / "host.py").read_text())}
+    assert_that(sorted(found), equal_to([".read_text()", "import shutil", "import subprocess", "input", "pathlib.Path",
+                                         "pathlib.Path.home", "shutil.which", "subprocess.SubprocessError",
+                                         "subprocess.TimeoutExpired", "subprocess.run", "sys.stdin.isatty"]))
 
 
 @pytest.mark.parametrize("source", [

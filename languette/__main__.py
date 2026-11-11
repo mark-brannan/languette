@@ -49,8 +49,8 @@ def _regex(text):
 
 
 def _host(text):
-    from languette import install
-    if text not in install.HOSTS:
+    from languette import host
+    if text not in host.HOSTS:
         raise argparse.ArgumentTypeError(f"{text!r} is not a host languette installs into yet: only claude today; "
                                          "other hosts are planned (#5)")
     return text
