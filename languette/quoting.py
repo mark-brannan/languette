@@ -9,7 +9,6 @@ import re
 _DPART = r"""'[^'\n]*'|"[^"\n]*"|\\."""
 _OPENER = re.compile(r"(?<!<)<<-?[ \t]*(?:[A-Za-z_]|" + _DPART + r")(?:[A-Za-z0-9_]|" + _DPART + r")*")
 _ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
-_WS = re.compile(r"[ \t\n]")
 # A word's run-time part that names one variable: $NAME or ${NAME}, the name in group 1 or 2.
 VAR_REF = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
 UNRESOLVED = re.compile(r"[$`*?\[]")           # a word the shell would still expand or glob

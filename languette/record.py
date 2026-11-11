@@ -62,10 +62,11 @@ KEYWORDS = frozenset("if then else elif fi while until do done !".split())
 HEADERS = frozenset("for select case esac".split())
 
 
-def programs(command):
-    """The program each top-level segment runs, as its basename: the first word
-    after assignments and shell keywords."""
-    s = scan.Scan(command)
+def programs(doc):
+    """The program each top-level segment of the Document's command runs, as its
+    basename: the first word after assignments and shell keywords. Heredoc
+    bodies are data, not segments."""
+    s = doc.scan(doc.stripped())
     out = []
     for a, b in s.segments():
         c = scan.seg_cmd(s, a, b) if a <= b else None
@@ -77,19 +78,17 @@ def programs(command):
     return out
 
 
-def build(payload, env, only, findings, verdict, doc, clock=time.time, extra=()):
-    """The record of one hook call. findings: [(guard name, its result, crashed)].
-    doc: the run's Document, whose one parse gives the rung.
+def build(doc, only, findings, verdict, clock=time.time, extra=()):
+    """The record of one hook call, read from the run's Document, whose one
+    parse gives the rung. findings: [(guard name, its result, crashed)].
     extra: the project's secret rules, gathered by the caller (run.py); None
     when they could not be, and then no command text or reason is written."""
-    raw = env.get(RAW) == "true"
-    ti = payload.get("tool_input")
-    command = ti.get("command") if payload.get("tool_name") == "Bash" and isinstance(ti, dict) else None
+    raw = doc.env.get(RAW) == "true"
+    ti, command = doc.tool_input, doc.command
     rec = {"v": VERSION, "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(clock())),
-           "session": payload.get("session_id"), "call": payload.get("tool_use_id"),
-           "event": payload.get("hook_event_name") or "PreToolUse", "tool": payload.get("tool_name"),
-           "run": only}
-    if isinstance(command, str):
+           "session": doc.payload.get("session_id"), "call": doc.payload.get("tool_use_id"),
+           "event": doc.event, "tool": doc.tool, "run": only}
+    if command is not None:
         try:
             rec["rung"], refusal = doc.reading()
         except Exception:  # noqa: BLE001 -- a record never fails the call
@@ -101,7 +100,7 @@ def build(payload, env, only, findings, verdict, doc, clock=time.time, extra=())
             rec["command"] = {"raw": command}
         else:
             try:
-                progs = [] if refused else programs(command)
+                progs = [] if refused else programs(doc)
             except Exception:  # noqa: BLE001
                 progs = None
             try:

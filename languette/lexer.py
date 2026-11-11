@@ -9,9 +9,32 @@ segment is led by a shell, so `echo ... | sh` is executed text).
 import re
 
 from . import ladder                           # ladder.parse, so a stand-in for it reaches this call too
-from .quoting import ansi_c, _ASSIGN, _sub_end, _WS
+from .quoting import ansi_c, _ASSIGN, _sub_end
 from .lexicon import SHELL, _FIND_EXECS, _FIND_WRAPPERS
-from .ladder import RunFailed, TooBig, Unparseable, _off, _words
+from .ladder import RunFailed, TooBig, Unparseable
+
+
+_WS = re.compile(r"[ \t\n]")
+
+
+def _off(node, key="Pos"):
+    return node[key]["Offset"]
+
+
+def _words(node, out):
+    """Every Word under node, not descending into one: shfmt's typed JSON
+    writes no Type on a Word, since its field is never an interface. A
+    heredoc body is left to the awk lexer, as the awk rung reads it."""
+    if isinstance(node, dict):
+        if "Parts" in node and node.get("Type", "Word") == "Word":
+            out.append(node)
+            return
+        for key, v in node.items():
+            if key != "Hdoc":
+                _words(v, out)
+    elif isinstance(node, list):
+        for v in node:
+            _words(v, out)
 
 
 class Scan:
