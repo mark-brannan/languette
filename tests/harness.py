@@ -207,7 +207,7 @@ class Ctx:
             env = {"HOME": os.environ["HOME"], "USER": Path(os.environ["HOME"]).name, "TMPDIR": self.doordir(), **on,
                    "PATH": self.system_path(), **self.scenario_env()}
             if self.bare or self.stubs:
-                env["PATH"] = self.bare or self.stub_dir(*self.stubs) + os.pathsep + os.environ["PATH"]
+                env["PATH"] = self.bare or self.stub_dir(*self.stubs) + os.pathsep + real_path()
             if self.stub_log:
                 env["LANGUETTE_STUB_LOG"] = self.stub_log
             if self.arg:
@@ -234,7 +234,7 @@ class Ctx:
                 self.verdict = Verdict(run._out(event, fields) if fields else "")
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
-        path = env["PATH"]
+        path = real_path()
         if self.stubs:
             path = self.stub_dir(*self.stubs) + os.pathsep + path
         if self.stub_log:
@@ -275,6 +275,13 @@ def _respond_all(stdin, env, seen, docs):
     finally:
         run._respond = real
 
+
+
+def real_path():
+    """The machine's PATH without a directory holding a real prose-budget, so no verdict or
+    pinned count depends on whether this machine has the engine installed."""
+    return os.pathsep.join(d for d in os.environ["PATH"].split(os.pathsep)
+                           if not os.access(os.path.join(d, "prose-budget"), os.X_OK))
 
 
 def drive(check, *answers):

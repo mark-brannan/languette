@@ -13,7 +13,7 @@ from pathlib import Path
 from hamcrest import assert_that, equal_to
 from pytest_bdd import given, parsers, then, when
 
-from harness import IN_PROCESS, ROOT, fixture_text, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
+from harness import IN_PROCESS, ROOT, real_path, fixture_text, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
 from matchers import asks, denies, is_silent, warns_about
 from languette import run, scan, terms, verdict, world, worktree_reaches
 
@@ -299,7 +299,7 @@ def _stubs(ctx):
 def _getent_stub(ctx):
     # The guard reads ~user through getent; the stub answers for one user whose
     # home is the scenario's $HOME, so no verdict depends on this machine's users.
-    ctx.env["PATH"] = ctx.stub_dir("getent") + os.pathsep + os.environ["PATH"]
+    ctx.env["PATH"] = ctx.stub_dir("getent") + os.pathsep + real_path()
 
 
 @given('the stub "gh" is first on PATH, for a Python guard')
@@ -307,7 +307,7 @@ def _gh_stub_python(ctx):
     # The Python engine's guards get only the scenario's env, so PATH and the
     # stub log travel there rather than through the shell engine's subprocess.
     ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
-    ctx.env["PATH"] = ctx.stub_dir("gh", "glab") + os.pathsep + os.environ["PATH"]
+    ctx.env["PATH"] = ctx.stub_dir("gh", "glab") + os.pathsep + real_path()
     ctx.env["LANGUETTE_STUB_LOG"] = ctx.stub_log
 
 
