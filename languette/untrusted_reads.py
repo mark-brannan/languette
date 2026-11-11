@@ -90,13 +90,7 @@ def _gh_reads(s, lo, hi, cli="gh"):
             return True
         return verb not in writes if sub in groups else verb in views[sub]
     if sub == "api":
-        api = sw.gh_api(s, i + 1, hi, cli)
-        if api.method in ("POST", "PUT", "PATCH", "DELETE"):
-            return False
-        graphql = api.path == "graphql"
-        if api.method == "" and api.sends and not graphql:
-            return False                       # gh api sends fields as a POST
-        return not (graphql and any("mutation" in w for w in rest))
+        return sw.gh_api(s, i + 1, hi, cli).writes is not True   # a query not written out may read
     return False
 
 

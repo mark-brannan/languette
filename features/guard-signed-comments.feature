@@ -265,7 +265,7 @@ Feature: guard-signed-comments
         | echo Done \| gh pr comment 1 -F -                              |
         | gh api repos/o/r/issues/1/comments -f body="$(cat reply.md)"   |
 
-      @also_guard-review-threads
+      @also_guard-review-threads @also_guard-github-issues
       Examples:
         | command                                                        |
         | gh api graphql -f query="$q" -f body=Done                      |
@@ -323,8 +323,12 @@ Feature: guard-signed-comments
       @also_guard-review-threads
       Examples:
         | command                                                                                                         |
-        | gh api graphql -f query="$q"                                                                                    |
         | gh api graphql -f query='mutation { resolveReviewThread(input:{threadId:"T"}) { thread { isResolved } } }'      |
+
+      @also_guard-review-threads @also_guard-github-issues
+      Examples:
+        | command                                                                                                         |
+        | gh api graphql -f query="$q"                                                                                    |
 
   Rule: the opening and the signature are settings, empty by default and then unchecked
 

@@ -557,6 +557,8 @@ MESSAGES = {
         "{why} {ask}"
     ),
     "gi_door": "{guard}: {why} {ask}",
+    "gi_query_unread": ("the graphql query is not written out in the command (an --input or @file, or a value built at "
+                        "run time), so this call counts as an issue write"),
     "infra_times": "; it runs the rule {n} times and has {have} unspent approvals",
     "infra_need": (
         "`{cmd}` {what} (`{rule}`){times}. Cost: {cost}. Instead, look first: {instead}."
