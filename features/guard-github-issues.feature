@@ -134,6 +134,37 @@ Feature: guard-github-issues
       | command                                 |
       | gh api graphql -f query="$Q"            |
 
+  # A heredoc of the call's own feeds every source, so the mutation is read: not an issue write.
+  Scenario: a non-issue mutation fed on stdin by the call's own heredoc is silent
+    When the agent runs:
+      """
+      gh api graphql --input - <<'EOF'
+      {"query":"mutation { addReaction(input:{subjectId:\"x\",content:THUMBS_UP}) { clientMutationId } }"}
+      EOF
+      """
+    Then the guard is silent
+
+  @also_guard-bypass-labels
+  Scenario: the same on -F query=@- is silent
+    When the agent runs:
+      """
+      gh api graphql -F query=@- <<'EOF'
+      mutation { addReaction(input:{subjectId:"x",content:THUMBS_UP}) { clientMutationId } }
+      EOF
+      """
+    Then the guard is silent
+
+  # A typed word HEREDOC is not scan's mark: the stdin comes from a pipe, so it is unread.
+  @also_guard-review-threads @also_guard-signed-comments
+  Scenario: a typed HEREDOC word does not pass for the call's own heredoc
+    When the agent runs:
+      """
+      cat q.json | gh api graphql --input - HEREDOC && cat <<EOF
+      x
+      EOF
+      """
+    Then the guard denies, naming "not written out"
+
   @also_guard-review-threads
   Scenario: a graphql query the command does not write out takes the turn's door
     When the human speaks, opening the door

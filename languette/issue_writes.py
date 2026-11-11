@@ -86,8 +86,10 @@ class _Writes:
 
     def __init__(self, doc):
         self.found, self.loop, self.unread = [], False, False
-        self.hd = "".join(b + "\n" for b in doc.heredoc_bodies())
-        for text, nested in doc.texts():
+        ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
+        buf = str(ti.get("command", "")).replace("HEREDOC", "HEREDOC_")   # a typed HEREDOC must not pass for scan's mark
+        self.hd = "".join(b + "\n" for b in doc.heredoc_bodies(buf))
+        for text, nested in doc.texts(text=buf):
             s = doc.scan(text)
             self.depth = 0
             for a, b in s.segments():

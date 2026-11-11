@@ -234,6 +234,9 @@ class GhApi(namedtuple("GhApi", "path operands method args flags skipped")):
         with no operationName) is False however much of it is built at run
         time. Any other endpoint: any method sent but GET and HEAD."""
         if self.graphql:
+            if not any(a.flag == "--input" or a.key == "query" or (a.live and re.search(r"[$`]", a.key))
+                       for a in self.args):
+                return False   # no query is sent (no field name built at run time either): nothing can run
             q = self._query_arg()
             if q is not None and GRAPHQL_READ.match(q.value) and not any(a.key == "operationName" for a in self.args):
                 return False

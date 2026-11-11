@@ -73,6 +73,8 @@ def _api(command):
     ('gh api graphql -f query="{repository(name:\\"$R\\"){id}}"', True, False),   # a read, filled at run time
     ('gh api graphql -f query="$Q"', True, None),
     ("gh api graphql --input q.json", True, None),
+    ("gh api graphql", True, False),                          # no query sent: nothing can run
+    ("gh api graphql -f variables='{}'", True, False),
     ("gh api graphql -F query=@q.graphql", True, None),
     ("gh api repos/o/r/issues", False, False),
     ("gh api repos/o/r/issues -f title=t", False, True),
