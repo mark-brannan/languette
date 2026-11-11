@@ -360,7 +360,7 @@ stays in local files. Decisions are recorded only if you turn on
 
 ### What languette writes
 
-Everything, with the guard that writes it. The first table is what a guard
+Every write, by guard. The first table is what a guard
 reads back to reach a verdict:
 
 | File | Guard | Default | Read back for |
