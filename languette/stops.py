@@ -232,7 +232,7 @@ def _may_match(pat, names, fold):
         for f in dict.fromkeys([p] + [f for f in re.split(r"[\s/]+", p) if f]):
             why = reshape.refusal(f)
             if why:
-                return say("protected_pattern_refused", pattern=f, why=why)
+                return say("protected_pattern_refused", pattern=f, why=why) if f == pat else True
             if any(re.search(f, n, flags) for n in names):
                 return True
         return False
