@@ -358,6 +358,28 @@ Guards that need GitHub's answer ask through your own `gh`. Session state
 stays in local files. Decisions are recorded only if you turn on
 `record_decisions`.
 
+### What languette writes
+
+Every write, by guard. The first table is what a guard
+reads back to reach a verdict:
+
+| File | Guard | Default | Read back for |
+|---|---|---|---|
+| `$TMPDIR/languette-guard-github-issues.<session>` (and `.held`) | `guard-github-issues` | on | one issue write per human turn |
+| `$TMPDIR/languette-guard-cross-session-send.<session>` | `guard-cross-session-send` | on | whether untrusted content has been read, and which subagents are its own |
+| `$TMPDIR/languette-guard-worktrees.<session>[.<agent>]` (and `.arrive`) | `guard-worktrees`; read by `guard-git-work-loss` | opt-in | which linked worktrees were entered |
+| `<transcript>.languette-ask` | `ask-first`, `guard-infra`, `guard-bypass-hooks`, `guard-github-issues` | on | which approvals are already spent |
+| `~/.cache/languette/rulesets/<repo>/<branch>` | `guard-bypass-ruleset` | on | skipping the GitHub call for an hour after "needs a PR" |
+
+The second is what no verdict reads back:
+
+| File | Guard | Default | Why it is written |
+|---|---|---|---|
+| `~/.config/languette/redacted-terms.tsv` | `guard-private-terms` | on | your configuration; written at SessionStart only when missing |
+| `~/.local/state/languette/decisions.jsonl` | `record_decisions` | opt-in | for you to read |
+
+The plugin cleans up none of these: no hook runs at session end.
+
 Questions and bugs: [GitHub issues](https://github.com/mark-brannan/languette/issues).
 
 ## Strong guards

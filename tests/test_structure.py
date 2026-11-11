@@ -22,22 +22,39 @@ from pathlib import Path
 from hamcrest import assert_that, empty, equal_to
 from paths import ROOT
 
+from languette import world
+
 GUARDS = {f.stem: importlib.import_module(f"languette.guards.{f.stem}")
           for f in sorted((ROOT / "languette" / "guards").glob("*.py")) if f.stem != "__init__"}
-# The walks that left languette/guards/ with their guards (what a call applies, what a post carries,
-# the hooks a git call skips, the remote branches it deletes, the infrastructure it destroys, the runs
-# a repo lists, where a push lands, what a session read and sends, the issues a call writes, the PRs
-# it opens, the work a git call throws away, where a session's git work lands, the review threads it
-# resolves, the comments it posts, the commits it makes): read by the same checks, since moving a file is
-# not removing a copy.
-WALKS = {m: importlib.import_module(f"languette.{m}")
-         for m in ("labels", "posts", "hook_skips", "branch_deletions", "infra_runs", "listed_runs",
-                   "pushes", "untrusted_reads", "issue_writes", "opened_prs", "work_losses",
-                   "worktree_reaches", "thread_resolves", "comment_posts", "prose_commits")}
-# scan and the modules it re-exports from (languette/scan.py).
-SHARED = {m: importlib.import_module(f"languette.{m}")
-          for m in ("scan", "quoting", "lexicon", "ladder", "lexer", "cd_tracking", "forges", "git_calls", "texts",
-                    "stops", "command_rules", "paths", "verdict", "document", "secrets", "refs")}
+
+
+def _imports(path):
+    """The top-level languette modules a source file imports, by name."""
+    out = set()
+    for n in ast.walk(ast.parse(Path(path).read_text())):
+        if isinstance(n, ast.ImportFrom) and n.level == 1 and n.module:
+            out.add(n.module.split(".")[0])
+        elif isinstance(n, ast.ImportFrom) and (n.module == "languette" or n.level == 1):
+            out |= {a.name for a in n.names}
+        elif isinstance(n, ast.ImportFrom) and (n.module or "").startswith("languette."):
+            out.add(n.module.split(".")[1])
+    return {m for m in out if (ROOT / "languette" / f"{m}.py").is_file()}
+
+
+def _modules(names):
+    return {m: importlib.import_module(f"languette.{m}") for m in sorted(names)}
+
+
+# The shared layer: Document for the call, scan for the words, paths for path words, verdict for
+# the answer, and the readers two guards' walks share (secrets, refs); with every module scan
+# re-exports from, read from scan.py itself, so a part split out of scan is read too.
+SHARED = _modules({"document", "scan", "paths", "verdict", "secrets", "refs"}
+                  | _imports(ROOT / "languette" / "scan.py"))
+# The walks that left languette/guards/ with their guards: every module primitives imports, since
+# a rule set reaches a walk only through primitives' TESTS and HANDLERS, but the shared layer and
+# messages. Read by the same checks, since moving a file is not removing a copy, and found from
+# primitives' imports, so a new walk is read the day it is wired.
+WALKS = _modules(_imports(ROOT / "languette" / "primitives.py") - set(SHARED) - {"messages"})
 
 # The fields of the call Document reads once; a guard reads them from the Document.
 DOCUMENT_FIELDS = {"tool_name", "tool_input", "hook_event_name", "permission_mode"}
@@ -48,9 +65,22 @@ ANSWERS = {"Refuse", "deny", "ask", "context"}
 # must fall inside one of these.
 KNOWN_TWICE = set()
 # Reads of a DOCUMENT_FIELDS key from the payload, at most, per guard.
-KNOWN_PAYLOAD_READS = {"labels": 2, "posts": 2}
+KNOWN_PAYLOAD_READS = {"posts": 1}
 # Answers whose text is anything but a messages.say call, at most, per guard.
 KNOWN_INLINE_TEXT = {}
+# What a guard may ask of World that languette did not write: git, GitHub, the filesystem, the clock.
+FACT_KINDS = {"git", "forge-api", "pr-list", "which", "read", "path", "physical", "clock", "run", "hostname"}
+# The facts a verdict reads back from something languette wrote on an earlier call (read-after-write),
+# today's, as the README's "What languette writes" lists them. The list only shrinks: a new fact kind
+# is a read-after-write until it is shown to be one of FACT_KINDS.
+KNOWN_READ_AFTER_WRITE = {"door": "languette-guard-github-issues.<session>",
+                          "send-state": "languette-guard-cross-session-send.<session>",
+                          "worktree": "languette-guard-worktrees.<session>",
+                          "approvals": ".languette-ask",
+                          "ruleset-cache": "languette/rulesets/"}
+# The acts and spends World makes after a verdict, at most (run.py's _state_failed writes outside them).
+KNOWN_WRITES = {"door-open", "door-spend", "send-keep", "worktree-keep", "worktree-leave", "ruleset-keep",
+                "terms-init", "approvals", "door"}
 
 
 def _imported(tree):
@@ -159,3 +189,16 @@ def test_a_guard_says_its_text_through_messages():
             if t is not None and not _said(t):
                 found[g] += 1
     assert_that(_over(found, KNOWN_INLINE_TEXT), equal_to({}))
+
+
+def test_a_verdict_reads_back_only_what_is_known_to_be_written_first():
+    """The README's "What languette writes": a guard's new read of its own earlier write is a new
+    entry there and here, with its reason, never a quiet addition."""
+    found = set(world.KINDS) - FACT_KINDS
+    assert_that(sorted(found - set(KNOWN_READ_AFTER_WRITE)), empty())
+    assert_that(sorted((set(world.ACTS) | set(world.SPENDS)) - KNOWN_WRITES), empty())
+
+
+def test_the_readme_lists_each_file_a_verdict_reads_back():
+    readme = (ROOT / "README.md").read_text()
+    assert_that([f for f in KNOWN_READ_AFTER_WRITE.values() if f not in readme], empty())

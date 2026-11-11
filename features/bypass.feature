@@ -44,7 +44,7 @@ Feature: bypass
 
     Examples:
       | command                                                         | verdict | note |
-      | sudo ufw disable                                                | denies  |      |
+      | ufw disable                                                     | denies  |      |
       | netsh.exe advfirewall set allprofiles state off                 | denies  | Windows, reachable from WSL |
       | pwsh -c "Set-MpPreference -DisableRealtimeMonitoring $true"     | denies  |      |
       | manage-bde.exe -off C:                                          | denies  |      |

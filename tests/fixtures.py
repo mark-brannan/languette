@@ -3,6 +3,8 @@ the write gate and the scenario's Ctx."""
 
 import builtins
 import os
+import shutil
+import tempfile
 
 import pytest
 
@@ -82,8 +84,19 @@ def writes_in_acts(engine, monkeypatch):
 
 
 
+@pytest.fixture(autouse=True)
+def home(monkeypatch):
+    """One throwaway $HOME per scenario, with {HOME}/project, so no row sees what an earlier one
+    left. Not under /tmp: guard-recursive-delete allows all of /tmp, so every target would pass."""
+    path = os.path.realpath(tempfile.mkdtemp(prefix="languette-home-", dir="/var/tmp"))
+    os.mkdir(os.path.join(path, "project"))
+    monkeypatch.setenv("HOME", path)
+    yield path
+    shutil.rmtree(path, ignore_errors=True)
+
+
 @pytest.fixture
-def ctx(engine, request):
+def ctx(engine, request, home):
     c = Ctx(engine, request.node.nodeid)
     yield c
     c.cleanup()
