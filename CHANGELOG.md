@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.20](https://github.com/mark-brannan/languette/compare/v0.0.19...v0.0.20) (2026-11-11)
+
+
+### Documentation
+
+* research a human-only why for a repo rule's denial ([#388](https://github.com/mark-brannan/languette/issues/388)) ([eed4067](https://github.com/mark-brannan/languette/commit/eed40675f94446330da3d00c8a79fc995321848f))
+* **research:** the settings that govern the guards ([#389](https://github.com/mark-brannan/languette/issues/389)) ([275665b](https://github.com/mark-brannan/languette/commit/275665be3a56bcc0d3bad82e163c91ac147811b9))
+* **security:** one test for what counts as a vulnerability ([#391](https://github.com/mark-brannan/languette/issues/391)) ([66e17a0](https://github.com/mark-brannan/languette/commit/66e17a0f2339bbfeb1d6f6274333f08b53101c50))
+
 ## [0.0.19](https://github.com/mark-brannan/languette/compare/v0.0.18...v0.0.19) (2026-11-10)
 
 
