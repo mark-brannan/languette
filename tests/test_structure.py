@@ -22,6 +22,8 @@ from pathlib import Path
 from hamcrest import assert_that, empty, equal_to
 from paths import ROOT
 
+from languette import world
+
 GUARDS = {f.stem: importlib.import_module(f"languette.guards.{f.stem}")
           for f in sorted((ROOT / "languette" / "guards").glob("*.py")) if f.stem != "__init__"}
 # The walks that left languette/guards/ with their guards (what a call applies, what a post carries,
@@ -51,6 +53,19 @@ KNOWN_TWICE = set()
 KNOWN_PAYLOAD_READS = {"labels": 2, "posts": 2}
 # Answers whose text is anything but a messages.say call, at most, per guard.
 KNOWN_INLINE_TEXT = {}
+# What a guard may ask of World that languette did not write: git, GitHub, the filesystem, the clock.
+FACT_KINDS = {"git", "forge-api", "pr-list", "which", "read", "path", "physical", "clock", "run", "hostname"}
+# The facts a verdict reads back from something languette wrote on an earlier call (read-after-write),
+# today's, as the README's "What languette writes" lists them. The list only shrinks: a new fact kind
+# is a read-after-write until it is shown to be one of FACT_KINDS.
+KNOWN_READ_AFTER_WRITE = {"door": "languette-guard-github-issues.<session>",
+                          "send-state": "languette-guard-cross-session-send.<session>",
+                          "worktree": "languette-guard-worktrees.<session>",
+                          "approvals": ".languette-ask",
+                          "ruleset-cache": "languette/rulesets/"}
+# The writes a hook makes after its verdict, at most; a new one is listed in the README first.
+KNOWN_WRITES = {"door-open", "door-spend", "send-keep", "worktree-keep", "worktree-leave", "ruleset-keep",
+                "terms-init", "approvals", "door"}
 
 
 def _imported(tree):
@@ -159,3 +174,16 @@ def test_a_guard_says_its_text_through_messages():
             if t is not None and not _said(t):
                 found[g] += 1
     assert_that(_over(found, KNOWN_INLINE_TEXT), equal_to({}))
+
+
+def test_a_verdict_reads_back_only_what_is_known_to_be_written_first():
+    """The README's "What languette writes": a guard's new read of its own earlier write is a new
+    entry there and here, with its reason, never a quiet addition."""
+    found = set(world.KINDS) - FACT_KINDS
+    assert_that(sorted(found - set(KNOWN_READ_AFTER_WRITE)), empty())
+    assert_that(sorted((set(world.ACTS) | set(world.SPENDS)) - KNOWN_WRITES), empty())
+
+
+def test_the_readme_lists_each_file_a_verdict_reads_back():
+    readme = (ROOT / "README.md").read_text()
+    assert_that([f for f in KNOWN_READ_AFTER_WRITE.values() if f not in readme], empty())
