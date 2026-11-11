@@ -13,7 +13,7 @@ import pytest
 from hamcrest import assert_that, contains_string, empty, equal_to, is_, is_not
 
 import readme_table
-from harness import hooks_json_commands, hooks_json_prompt_command
+from harness import hooks_json, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
 from languette import engine, run, scan
 from languette import comment_posts, issue_writes, opened_prs, posts
 from paths import ROOT
@@ -132,7 +132,7 @@ def test_the_shape_check_rejects(wrong):
 
 def _pre_matcher():
     """The matcher of the one PreToolUse entry in hooks/hooks.json."""
-    [e] = json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]["PreToolUse"]
+    [e] = hooks_json()["PreToolUse"]
     return e["matcher"]
 
 
@@ -145,7 +145,7 @@ def _reaches(guard, tool):
 def test_hooks_json_wires_exactly_the_guards():
     # One entry and one command per event, each running run.py with no --guard, for
     # every event run.py wires a guard on: a guard is reachable only through it.
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]
+    hj = hooks_json()
     assert_that(sorted(hj), equal_to(sorted({ev for ev, _, _ in run.GUARDS})))
     for event, entries in hj.items():
         [command] = [h["command"] for e in entries for h in e["hooks"]]
@@ -158,8 +158,7 @@ def test_hooks_json_wires_exactly_the_guards():
 def test_the_all_off_gate_names_every_guard_option():
     # Without python3 the PreToolUse command can read no option but these, and every
     # guard off is silence: a guard missing here fails closed even when all are off.
-    [command] = [h["command"] for e in json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]["PreToolUse"]
-                 for h in e["hooks"]]
+    command = hooks_json_event_command("PreToolUse")
     gate = command[:command.index("; } || { ")]
     found = re.findall(r'\[ "\$\{CLAUDE_PLUGIN_OPTION_(\w+)-\}" (= false|!= true) \]', gate)
     assert_that(gate, equal_to("{ " + " && ".join(f'[ "${{CLAUDE_PLUGIN_OPTION_{o}-}}" {t} ]' for o, t in found)))
@@ -267,6 +266,29 @@ def test_a_rule_set_names_under_on_every_state_event_run_wires_its_guard_to():
     for g in {g for _, _, gs in run.GUARDS for g in gs if isinstance(g, engine.Guard)}:
         events = {ev for ev, _, gs in run.GUARDS for x in gs if x is g and ev in engine.STATE_EVENTS}
         assert_that((g.NAME, events), equal_to((g.NAME, set(g.RULE_SET.get("on", {})))))
+
+
+def test_the_state_hooks_run_one_command_on_the_tools_run_keeps_state_for():
+    # Each state event's entry is written out by hand in hooks.json; one that drifts from the
+    # others fails open on that event alone, and a matcher narrower than run's misses a read.
+    hj = json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]
+    commands = [(ev, h["command"]) for ev in engine.STATE_EVENTS for e in hj[ev] for h in e["hooks"]]
+    assert_that(sorted({ev for ev, _ in commands}), equal_to(sorted(engine.STATE_EVENTS)))
+    assert_that(len({c for _, c in commands}), equal_to(1))
+    tools = {t for ev in ("PostToolUse", "PostToolUseFailure") for e in hj[ev] for t in e["matcher"].split("|")}
+    tools |= {"Read", "Edit", "Glob", "SendMessage", "WebFetchX", "mcp__github__create_issue"}
+    for ev in ("PostToolUse", "PostToolUseFailure"):
+        [matcher] = [e["matcher"] for e in hj[ev]]
+        for tool in sorted(tools):
+            assert_that((ev, tool, bool(re.fullmatch(matcher, tool))),
+                        equal_to((ev, tool, bool(run._SEND_STATE_TOOLS.match(tool)))))
+
+
+def test_the_readme_lists_every_guard_run_wires():
+    section = (ROOT / "README.md").read_text().split("\n## The guards\n", 1)[1].split("\n## ", 1)[0]
+    bullets = re.findall(r"^- \[?`([\w-]+)`(.*)$", section, re.M)
+    wired = {name for name, rest in bullets if "(planned)" not in rest}
+    assert_that(sorted(wired), equal_to(sorted({g.NAME for _, _, gs in run.GUARDS for g in gs})))
 
 
 def _prompt_hooks(*hooks):

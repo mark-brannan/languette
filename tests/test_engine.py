@@ -8,6 +8,7 @@ import types
 import pytest
 from hamcrest import assert_that, contains_string, equal_to
 
+from harness import drive
 from languette import engine, primitives, scan
 from languette.rules import guard_protected_services
 from languette.document import Document
@@ -77,13 +78,8 @@ def test_a_rule_set_that_does_not_load_denies_every_command():
     module = types.SimpleNamespace(RULE_SET=_with_rule(action="ask"), __name__="languette.rules.guard_x")
     guard = engine.Guard(module)
     doc = Document({"tool_name": "Bash", "tool_input": {"command": "ls"}, "cwd": "/"}, {})
-    verdict = guard.check(doc)
-    while True:                                # a bad set is judged before any Need is yielded
-        try:
-            next(verdict)
-        except StopIteration as stop:
-            verdict = stop.value
-            break
+    needs, verdict = drive(guard.check(doc))   # a bad set is judged before any Need is yielded
+    assert_that(needs, equal_to([]))
     assert_that(verdict["permissionDecision"], equal_to("deny"))
     assert_that(verdict["permissionDecisionReason"], contains_string("languette/rules/guard_x.py is invalid"))
     assert_that(verdict["permissionDecisionReason"], contains_string('rules[0].action must be "deny"'))
@@ -100,10 +96,9 @@ def test_a_handler_is_given_what_the_match_found_and_its_verdict_stands(monkeypa
     rule_set = {**GOOD, "rules": [{"id": "r", "match": [{"cmd": "foo"}], "action": "deny", "handler": "h"}]}
     guard = engine.Guard(types.SimpleNamespace(RULE_SET=rule_set, __name__="languette.rules.guard_x"))
     check = guard.check(Document({"tool_name": "Bash", "tool_input": {"command": "foo bar"}, "cwd": "/"}, {}))
-    assert_that(next(check), equal_to(Need("clock")))
-    with pytest.raises(StopIteration) as stop:
-        check.send(5)
-    assert_that(stop.value.value, equal_to(deny("at 5")))
+    needs, result = drive(check, 5)
+    assert_that(needs, equal_to([Need("clock")]))
+    assert_that(result, equal_to(deny("at 5")))
     assert_that(seen, equal_to([("guard-x", {"cmd": "foo", "verb": None})]))
 
 
@@ -119,14 +114,9 @@ def test_an_event_on_names_goes_to_its_handler_and_the_rules_judge_the_rest(monk
                                                __name__="languette.rules.guard_x"))
     call = {"tool_name": "Bash", "tool_input": {"command": "foo"}, "cwd": "/"}
     check = guard.check(Document({**call, "hook_event_name": "PostToolUse"}, {}))
-    assert_that(next(check), equal_to(Act("door-open", "s")))
-    with pytest.raises(StopIteration) as stop:
-        check.send(None)
-    assert_that(stop.value.value, equal_to(None))
+    assert_that(drive(check), equal_to(([Act("door-open", "s")], None)))
     assert_that(seen, equal_to([("PostToolUse", "guard-x", {})]))
-    with pytest.raises(StopIteration) as stop:            # the rules judge PreToolUse: foo is denied
-        next(guard.check(Document(call, {})))
-    assert_that(stop.value.value["permissionDecision"], equal_to("deny"))
+    assert_that(drive(guard.check(Document(call, {})))[1]["permissionDecision"], equal_to("deny"))   # the rules judge PreToolUse: foo is denied
 
 
 def test_a_rule_files_reason_reaches_the_agent_as_one_labelled_capped_line():
