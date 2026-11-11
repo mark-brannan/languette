@@ -63,3 +63,12 @@ def test_the_listing_page_is_the_catalog():
     from languette.messages import listing
     page = ROOT.parent / "docs" / "messages.md"
     assert_that(page.read_text(), equal_to(listing()), "regenerate: python -m languette.messages > docs/messages.md")
+
+
+def test_the_fail_closed_phrase_is_said_where_no_message_can_be():
+    """The doctor reads a deny holding messages.FAILS_CLOSED as no guard's judgement, so the
+    hooks.json wrapper and run.py's Python floor, which say theirs without the catalog, say it."""
+    from languette.messages import FAILS_CLOSED
+    hooks = (ROOT.parent / "hooks" / "hooks.json").read_text()
+    floor = (ROOT / "run.py").read_text().split("sys.version_info < (3, 11)", 1)[1].split("sys.exit", 1)[0]
+    assert_that([hooks.count(FAILS_CLOSED) > 0, FAILS_CLOSED in floor], equal_to([True, True]))

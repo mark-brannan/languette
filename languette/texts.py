@@ -8,13 +8,20 @@ import re
 
 from . import lexer                            # lexer.Scan, so a stand-in for it reaches these calls too
 from .quoting import strip_heredocs, _ASSIGN, _heredocs
-from .lexicon import EXEC, GIT, LOOP, PROSE, SHELL, WRAP, _WRAP_VALUED
+from .lexicon import EXEC, GIT, LOOP, PROSE, SHELL, WRAP
 from .ladder import TooMany
 from .git_calls import git_wrapper
 from .lexer import seg_cmd
 
 
 NESTED_CAP = 64
+# A wrapper's options that take a separate value, so the value is not the command (`sudo -u postgres pkill`).
+_WRAP_VALUED = {"sudo": frozenset("-u -g -h -p -C -D -R -T -U -r -t --user --group --host --prompt --close-from "
+                                  "--chdir --chroot --command-timeout --other-user --role --type".split()),
+                "env": frozenset("-u -C -P --unset --chdir --default-signal".split()),  # -S's value is the command
+                "doas": frozenset("-u -C".split()),
+                "timeout": frozenset("-s -k --signal --kill-after".split()),
+                "nice": frozenset("-n --adjustment".split())}
 
 
 def _unq(t):

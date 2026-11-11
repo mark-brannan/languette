@@ -17,32 +17,30 @@ import os
 import shutil
 import sys
 
-from languette import doctor, install
-
-OK, WARN, FAIL = doctor.OK, doctor.WARN, doctor.FAIL
-PLUGIN, MARKETPLACE = install.PLUGIN, install.MARKETPLACE
+from languette import host
+from languette.host import FAIL, MARKETPLACE, OK, PLUGIN, REPO, WARN
 
 
 def plan(claude, cwd):
     """(steps, left, problem): what install wrote, as [(label, text, claude args)] in the order removed;
     rows for the languette installs and marketplace it did not write; a ✗ row when that is unknown."""
     try:
-        found = doctor.installs(doctor.settings_files(cwd))
-    except doctor.Unreadable as e:
+        found = host.installs(host.settings_files(cwd))
+    except host.Unreadable as e:
         return [], [], (FAIL, "Claude Code", f"{e}, so what install wrote is unknown; nothing removed")
-    source, why = install._listed(claude)
+    source, why = host.marketplace(claude)
     if why:
         return [], [], (FAIL, "Claude Code", f"{why}, so what install wrote is unknown; nothing removed")
-    ours = source is not None and install._ours(source)
+    ours = source is not None and host.ours_source(source)
     mine = ours or source is None     # no marketplace listed: the plugin is still the one install wrote
     steps, left, fed = [], [], 0
     for inst in found:
-        where = f"plugin {doctor._version(inst)}, {inst.get('scope', '?')} scope"
+        where = f"plugin {host.version(inst)}, {inst.get('scope', '?')} scope"
         if inst.get("id") == PLUGIN and inst.get("scope") == "user" and mine:
             steps.append(("Claude Code", f"{PLUGIN}, {where}",
                           ("plugin", "uninstall", PLUGIN, "--scope", "user")))
         else:
-            at = f" for {doctor._tilde(inst['projectPath'])}" if isinstance(inst.get("projectPath"), str) else ""
+            at = f" for {host.tilde(inst['projectPath'])}" if isinstance(inst.get("projectPath"), str) else ""
             left.append((WARN, "Claude Code", f"{inst.get('id', '?')}, {where}{at}, left: install did not write it"))
             fed += inst.get("id") == PLUGIN
     if ours and fed:
@@ -52,19 +50,13 @@ def plan(claude, cwd):
         steps.append(("marketplace", f"{MARKETPLACE}, added from {source}",
                       ("plugin", "marketplace", "remove", MARKETPLACE, "--scope", "user")))
     elif source is not None:
-        left.append((WARN, "marketplace", f"{MARKETPLACE} is added from {source}, not {install.REPO}; left: "
+        left.append((WARN, "marketplace", f"{MARKETPLACE} is added from {source}, not {REPO}; left: "
                                           "install did not write it"))
     return steps, left, None
 
 
 def _ask():
-    try:
-        answer = input("Remove them? [y/N] ")
-    except EOFError:
-        answer = ""
-    if not sys.stdin.isatty():
-        print()                          # no echoed Enter ends the question's line
-    return answer.strip().lower() in ("y", "yes")
+    return host.confirm("Remove them?")
 
 
 def claude_rows(cwd, ask=_ask):
@@ -88,14 +80,14 @@ def claude_rows(cwd, ask=_ask):
         return left + [(WARN, "uninstall", "nothing removed")]
     rows = list(left)
     for label, text, args in steps:
-        r, why = install._claude(claude, *args)
+        r, why = host.call(claude, *args)
         if why or r.returncode != 0:
-            return rows + [(FAIL, label, why or install._first_line(r))]
+            return rows + [(FAIL, label, why or host.first_line(r))]
         rows.append((OK, label, f"{text.split(',')[0]} removed"))
     return rows
 
 
-def main(host="claude"):
+def main(agent="claude"):
     try:
         sys.stdout.reconfigure(errors="replace")
     except (AttributeError, ValueError):

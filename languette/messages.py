@@ -6,8 +6,13 @@ with one voice and reviewed as a diff. tests/test_messages.py holds the codes an
 their blanks to the call sites. Standard library only.
 """
 
+# The phrase a fail-closed deny carries, said too where no message can be: the hooks.json
+# wrapper and run.py's Python floor. The doctor reads a deny that holds it as no guard's judgement.
+FAILS_CLOSED = "This is a gate and fails closed"
+
 MESSAGES = {
     # A gate that cannot run its check denies rather than guess.
+    "guard_load_failed": "languette: a guard failed to load ({kind}: {err})",
     "payload_unreadable": "languette: unreadable hook payload ({err})",
     "no_cwd": (
         "languette: the hook payload has no working directory, or only a relative one, so no path in "

@@ -115,7 +115,7 @@ class Document:
         return self._heredocs(text)[0]
 
     def heredocs(self, text=None):
-        """[(body, live)] per heredoc in `text`, the command when None (scan.heredocs)."""
+        """[(body, live)] per heredoc in `text`, the command when None (quoting.heredocs)."""
         return [(body, not quoted and ("$" in body or "`" in body)) for body, quoted in self._heredocs(text)[1]]
 
     def heredoc_bodies(self, text=None):

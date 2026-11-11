@@ -10,7 +10,7 @@ from .lexicon import (EXEC, LAUNCH, LAUNCH_SUB, LOOP, PM, PROSE_PROCESS, RUN, WR
 from .lexer import UNREADABLE
 from .texts import cmd_index, segments
 from .cd_tracking import cd_present, cwds, _abspath
-from .stops import _stop_hit
+from .stops import stop_of, unit_test
 
 
 # Command rules: docs/design/guard-rules.md, "Command rules". A rule's match is
@@ -205,6 +205,20 @@ def _word_hit(doc, match, prose, launchers, at=None):
                 break
             g = next((i for i in range(g + 1, b + 1) if s.k[i] == "w" and rx.search(s.w[i])), None)
     return n, loop
+
+
+def _stop_hit(doc, match, prose):
+    """`<command> <stop>` for the first command in the text that `match` fits, or None."""
+    hit = unit_test(match["unit"])
+    if hit is None:
+        return None
+    for t, _ in doc.texts(prose):
+        s = doc.scan(t)
+        for a, b in s.segments():
+            got = a <= b and stop_of(s, a, b, match, hit, match.get("host_verbs", ()))
+            if got:
+                return " ".join(got)
+    return None
 
 
 def match_rule(doc, match, prose=PROSE_PROCESS, launchers=True, at=None):
