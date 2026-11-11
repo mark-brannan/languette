@@ -52,6 +52,7 @@ Feature: guard-bypass-hooks
       | yadm commit -n -m x                          | yadm is git                           |
       | vcsh dots commit -n -m x                     | vcsh is git                           |
       | vcsh run dots git commit --no-verify         | vcsh run, then git                    |
+      | git -c "core.hooksPath=/tmp/my hooks" commit -m x | a quoted value holding whitespace |
       | vcsh run dots git -c core.hooksPath=x commit | git options after vcsh run's git      |
       | vcsh dots -c core.hooksPath=x commit -m x    | git options after the repository      |
       | vcsh commit --no-verify                      | vcsh commit runs git commit in every repository |

@@ -2621,6 +2621,7 @@
  "tests/test_features.py::test_skipping_the_hooks_is_denied_however_it_is_spelled[git --git-dir=/x/.git push --no-verify-global option with an attached value]": {"git": 2},
  "tests/test_features.py::test_skipping_the_hooks_is_denied_however_it_is_spelled[git -C /tmp/r -c core.hooksPath=h commit -m x-after -C]": {"git": 2},
  "tests/test_features.py::test_skipping_the_hooks_is_denied_however_it_is_spelled[git -C /tmp/repo commit -n -m x-global option with a value]": {"git": 2},
+ "tests/test_features.py::test_skipping_the_hooks_is_denied_however_it_is_spelled[git -c \"core.hooksPath=/tmp/my hooks\" commit -m x-a quoted value holding whitespace]": {"git": 1},
  "tests/test_features.py::test_skipping_the_hooks_is_denied_however_it_is_spelled[git -c CORE.HOOKSPATH=x push-config keys ignore case]": {"git": 9},
  "tests/test_features.py::test_skipping_the_hooks_is_denied_however_it_is_spelled[git -c core.hooksPath status-a bare key sets it to true]": {"git": 1},
  "tests/test_features.py::test_skipping_the_hooks_is_denied_however_it_is_spelled[git -c core.hooksPath= push-hooks path emptied]": {"git": 9},

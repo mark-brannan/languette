@@ -7,6 +7,7 @@ abbreviation (long_option, over GIT_LONG) and git add's options (add_options).
 
 import re
 
+from .lexer import word
 from .lexicon import GIT_VALUE, GIT_WRAPPERS, _base
 from .messages import say
 from .verdict import Refuse
@@ -114,7 +115,7 @@ class GitCall:
         self.places = [(e[0], e[1], i) for i in range(a, g) if s.k[i] == "w" for e in [git_env(s.w[i])] if e]
         self.configs = []
         for i in self.opts:
-            x, nxt = s.w[i], (s.w[i + 1] if i + 1 <= b else None)
+            x, nxt = s.w[i], (word(s, i + 1) if i + 1 <= b else None)
             name, eq, val = x.partition("=")
             if name in _PLACES and (not eq or name != "-C"):   # only a long option takes `=value`
                 self.places.append((_PLACES[name], val, i) if eq else (_PLACES[name], nxt, i + 1))
