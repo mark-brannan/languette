@@ -117,6 +117,12 @@ def host_tmp_roots(env):
     return [d for d in dict.fromkeys(named) if d] + ["/tmp"]
 
 
+def session_file(env, prefix, *ids):
+    """A per-session state file under $TMPDIR: `prefix` and the ids joined by ".", any character
+    outside [A-Za-z0-9_-] in an id made _, so no id reaches the name as a path or a newline."""
+    return os.path.join(env.get("TMPDIR") or "/tmp", prefix + ".".join(re.sub(r"[^A-Za-z0-9_-]", "_", i) for i in ids))
+
+
 def config_dir(env):
     """The host's own configuration directory: CLAUDE_CONFIG_DIR when it is set
     and absolute, else $HOME/.claude."""

@@ -17,6 +17,7 @@ import shutil
 import socket
 import stat
 import subprocess
+import tempfile
 import time
 from urllib.parse import quote
 
@@ -37,7 +38,7 @@ KINDS = frozenset("git forge-api pr-list which read path physical clock ruleset-
                   "send-state hostname".split())
 ACTS = {"ruleset-keep": "_ruleset_keep", "send-keep": "_send_keep", "worktree-keep": "_wt_keep",
         "worktree-leave": "_wt_leave", "door-open": "_door_open", "door-spend": "_door_spend",
-        "terms-init": "_terms_init"}
+        "terms-init": "_terms_init", "send-fail": "_send_fail"}
 # What the runner spends after the verdict (languette.verdict.spend), kind -> method.
 SPENDS = {"approvals": "_claim", "door": "_door_take"}
 DOOR = "languette-guard-github-issues."   # + the session id, under $TMPDIR
@@ -46,6 +47,8 @@ SEND_SUBAGENTS_MAX = 500            # names and ids kept per session; the oldest
 # What a failed write, or a first write that is not a session start, leaves:
 # no subagents known, the door open.
 SEND_LOST = '{"subagents": [], "read": "an unknown tool (this session\'s state was lost)"}'
+# What a state hook that crashed or objected leaves, as hooks.json's sh fallback does.
+SEND_FAILED = '{"subagents": [], "read": "an unknown tool (a state hook failed)"}'
 
 
 class World:
@@ -141,9 +144,7 @@ class World:
         return r.returncode, dec(r.stdout), dec(r.stderr)
 
     def _session_file(self, prefix, session):
-        """The state file `prefix` + the session id under $TMPDIR; any character outside
-        [A-Za-z0-9_-] in the id becomes _, so no id reaches the file name as a path or a newline."""
-        return os.path.join(self.env.get("TMPDIR") or "/tmp", prefix + re.sub(r"[^A-Za-z0-9_-]", "_", session))
+        return paths.session_file(self.env, prefix, session)
 
     def _door_file(self, session):
         return self._session_file(DOOR, session)
@@ -489,17 +490,27 @@ class World:
                 pass
             raise
 
+    def _send_fail(self, session):
+        """Replace that state with SEND_FAILED, made afresh: a link planted at the path is
+        removed, never written through."""
+        path = self._send_file(session)
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(SEND_FAILED + "\n")
+
     # --- acts ------------------------------------------------------------
 
     def _terms_init(self):
-        """Write the default redacted terms file where the guard reads it, when none is there
-        (doctor.write_initial, as install does). The plugin's options are in this environment.
-        The path is looked for first: doctor is imported only on the session that writes."""
+        """Write the default redacted terms file where the guard reads it, when none is there,
+        as `languette doctor --init-redacted-terms` does. The plugin's options are in this environment."""
         path, _ = terms.where("redacted", self.env)
         if not path or os.path.lexists(path):
             return
-        from languette import doctor
-        doctor.write_initial("redacted", self.env)
+        write_new(path, terms.initial(terms.defaults(self._read(terms.DEFAULTS))))
 
     def act(self, a):
         """Do one Act. Silent on any failure: an act comes after the verdict and
@@ -580,6 +591,26 @@ class World:
         if self._seen is None:
             self._seen = scan(self._transcript())
         return self._seen
+
+
+def write_new(path, text):
+    """Write `text` to `path` whole and private (0600), never over a file there: a temp file
+    beside it, linked into place (atomic, and refusing a file another session wrote first), and
+    removed whatever happens. Raises FileExistsError when a file is there first, OSError when
+    it cannot be written."""
+    d = os.path.dirname(path) or "."
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=os.path.basename(path) + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            os.fchmod(f.fileno(), 0o600)
+            f.write(text)
+        os.link(tmp, path)
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
 
 
 def _own(f):

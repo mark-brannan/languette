@@ -16,7 +16,7 @@ import pytest
 from hamcrest import assert_that, contains_string, equal_to, has_item, is_not
 from pytest_bdd import given, parsers, then, when
 
-from harness import FakeHome, fixture_text
+from harness import FakeHome, fixture_text, hooks_json
 from languette import terms
 from languette.doctor import FORGES
 from paths import ROOT
@@ -185,7 +185,7 @@ def _other_probed(guard):
 
 def _real_hook_for(guard):
     """The plugin's one PreToolUse hook, narrowed to `guard` alone: a copy wired per guard."""
-    [h] = [h for e in json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]["PreToolUse"] for h in e["hooks"]]
+    [h] = [h for e in hooks_json()["PreToolUse"] for h in e["hooks"]]
     run_py = 'python3 -I "${CLAUDE_PLUGIN_ROOT}/languette/run.py"'
     assert h["command"].count(run_py) == 1
     return {**h, "command": h["command"].replace(run_py, f"{run_py} --guard {guard}")}

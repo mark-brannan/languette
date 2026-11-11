@@ -1,6 +1,6 @@
 """languette/run.py where a scenario cannot reach: the entry point run bare, as a
 hand-installed hook runs it with no hooks.json wrapper to turn a traceback into a
-deny, and a spend that would deny with no reason."""
+deny, a spend that would deny with no reason, and the terms file a session start writes."""
 
 import json
 import os
@@ -10,7 +10,9 @@ import sys
 import pytest
 from paths import ROOT
 
-from languette.verdict import spend
+from languette import terms
+from languette.verdict import Act, spend
+from languette.world import World
 
 HOOK = [sys.executable, "-I", str(ROOT / "languette" / "run.py")]
 
@@ -29,3 +31,10 @@ def test_a_spend_other_than_approvals_names_its_lost_reason():
         spend("door", "take", "s", "c")
     assert spend("door", "take", "s", "c", lost="why")["lost"] == "why"
     assert "lost" not in spend("approvals", {"x": 1})
+
+
+def test_the_terms_init_writes_a_private_file_and_leaves_no_temp_file(tmp_path):
+    path = tmp_path / "terms" / "redacted.tsv"
+    World({"HOME": str(tmp_path), terms.KINDS["redacted"][3]: str(path)}, {}).act(Act("terms-init"))
+    assert (os.listdir(path.parent), path.stat().st_mode & 0o777) == (["redacted.tsv"], 0o600)
+    assert path.read_text(encoding="utf-8").startswith(terms.header("redacted"))

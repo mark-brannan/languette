@@ -34,9 +34,11 @@ not the flag. git takes any unambiguous prefix of a long option, so --har is
 options with Getopt::Long, so --adopt is any prefix of it (--ado), the options
 bundle (-nvd dir), and --adopt may stand before, between or after the package names.
 A package under -D is only unlinked; --adopt asks when some package is stowed (the
-default) or restowed, and not on a dry run (-n, --simulate).
+default) or restowed, and not on a dry run (-n, --simulate). A command that is not a string
+is read as its JSON text, and each string the JSON holds is judged as a command of its own.
 """
 
+import json
 import os
 import re
 
@@ -535,6 +537,24 @@ def _git(s, a, b, nested, env):
     return None
 
 
+def _strings(v):
+    """Every string a decoded JSON value holds, in order."""
+    if isinstance(v, str):
+        return [v]
+    items = v if isinstance(v, list) else [*v, *v.values()] if isinstance(v, dict) else []
+    return [s for x in items for s in _strings(x)]
+
+
+def _texts(doc):
+    """doc.texts(), and for a Bash command that is not a string, the texts of each string its
+    JSON text holds: `["git add -A"]` scans as one word `[git`, which is no git call."""
+    texts = list(doc.texts())
+    if doc.command is None and doc.tool == "Bash":
+        # Document built its text with json.dumps, and losses() returned before here on none.
+        texts += [t for s in _strings(json.loads(doc.text)) for t in doc.texts(text=s)]
+    return texts
+
+
 def losses(doc):
     """The `work-losses` test: {"segments": [{"git": what _git found or None, "stow": the
     reason a `stow --adopt` asks or None}, ...]} for the segments that hold either, in the
@@ -543,7 +563,7 @@ def losses(doc):
         return None
     env = doc.env or {}
     found = []
-    for text, nested in doc.texts():
+    for text, nested in _texts(doc):
         s = doc.scan(text)
         for a, b in s.segments():
             if a <= b:

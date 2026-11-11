@@ -133,6 +133,7 @@ gi_query_unread: the graphql query is not written out in the command (an --input
 ## guard
 
 ```
+guard_load_failed: languette: a guard failed to load ({kind}: {err})
 guard_crashed: {guard}: guard crashed ({kind}: {err}), cannot inspect the command
 ```
 

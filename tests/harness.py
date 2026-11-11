@@ -1,6 +1,7 @@
 """The harness the step vocabulary and fixtures share: engines, the scrubbed
 environment, a scenario's Ctx, and the hooks.json lookups."""
 
+import atexit
 import json
 import os
 import random
@@ -96,7 +97,7 @@ class Ctx:
                         r"🤖 \S+ · (?:low|medium|high|xhigh|max|-) · {session}"}
         self.proj = self.tmp = self.stub_log = self.bare = self.cache = None
         self.project_env = True
-        self.stubs = False
+        self.stubs = ()                        # names of the tests/stubs first on PATH, and only those
         self.hook = None                       # a hooks.json command, for wiring
         self.wired = None                      # the guard a wiring row is about: the one command runs them all
         self.arg = None                        # the hook event, as Claude Code names it, for the guard to read
@@ -106,6 +107,7 @@ class Ctx:
         self._doordir = None
         self.calls = 0                         # tool_use_id in the payload: one per call, as Claude Code gives
         self.stdin = self.verdict = self.scanned = None
+        self.crashed = set()                   # in-process: the guards whose check raised on the last call
         self._dirs = []
         self.cleanups = []
 
@@ -124,6 +126,13 @@ class Ctx:
             if found:
                 os.symlink(found, os.path.join(d, tool))
         return os.pathsep.join([str(ROOT / "tests/gh-only"), d, os.defpath])
+
+    def stub_dir(self, *names):
+        """A directory linking only the stubs named, to put first on PATH."""
+        d = self.mkdtemp()
+        for name in names:
+            os.symlink(ROOT / "tests/stubs" / name, os.path.join(d, name))
+        return d
 
     def doordir(self):
         # Lazy and once per scenario: the guard-github-issues state lives at
@@ -188,7 +197,7 @@ class Ctx:
         return env
 
     def run(self, stdin):
-        self.stdin = stdin
+        self.stdin, self.crashed = stdin, set()
         if self.engine in IN_PROCESS:
             # A hook command only shapes a subprocess; in-process it would do nothing.
             assert not self.hook, "test setup: a hook command needs the hook engine (@hook)"
@@ -200,7 +209,7 @@ class Ctx:
             env = {"HOME": os.environ["HOME"], "USER": Path(os.environ["HOME"]).name, "TMPDIR": self.doordir(), **on,
                    "PATH": self.system_path(), **self.scenario_env()}
             if self.bare or self.stubs:
-                env["PATH"] = self.bare or str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
+                env["PATH"] = self.bare or self.stub_dir(*self.stubs) + os.pathsep + real_path()
             if self.stub_log:
                 env["LANGUETTE_STUB_LOG"] = self.stub_log
             if self.arg:
@@ -213,6 +222,7 @@ class Ctx:
                 self.verdict = Verdict(_respond_all(stdin, env, seen, docs))
             finally:
                 os.chdir(here)
+            self.crashed = {g for g, _, crashed in seen if crashed}
             if self.guard and seen:
                 others = {g: r for g, r, _ in seen if r and g != self.guard}
                 self.fired |= others.keys()
@@ -227,9 +237,9 @@ class Ctx:
                 self.verdict = Verdict(run._out(event, fields) if fields else "")
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}
-        path = env["PATH"]
+        path = real_path()
         if self.stubs:
-            path = str(ROOT / "tests/stubs") + os.pathsep + path
+            path = self.stub_dir(*self.stubs) + os.pathsep + path
         if self.stub_log:
             env["LANGUETTE_STUB_LOG"] = self.stub_log
         env["PATH"] = self.bare or path
@@ -270,19 +280,59 @@ def _respond_all(stdin, env, seen, docs):
 
 
 
-def hooks_json_commands():
-    """guard name -> the PreToolUse command in hooks/hooks.json that judges it: the one
-    command, which names no guard and runs every guard wired for the call."""
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [command] = [h["command"] for e in hj["hooks"]["PreToolUse"] for h in e["hooks"]]
-    return {g.NAME: command for ev, _, gs in run.GUARDS for g in gs if ev == "PreToolUse"}
+_SHADOWS = {}
+
+
+def _without_prose_budget(d):
+    """`d` itself when it holds no real prose-budget; else a directory linking every other program
+    in `d` (made once, removed at exit), so only that one program is hidden."""
+    if not os.access(os.path.join(d, "prose-budget"), os.X_OK):
+        return d
+    if d not in _SHADOWS:
+        shadow = tempfile.mkdtemp(prefix="languette-shadow-")
+        atexit.register(shutil.rmtree, shadow, ignore_errors=True)
+        for name in os.listdir(d):
+            if name != "prose-budget":
+                os.symlink(os.path.join(d, name), os.path.join(shadow, name))
+        _SHADOWS[d] = shadow
+    return _SHADOWS[d]
+
+
+def real_path():
+    """The machine's PATH with only a real prose-budget hidden (its directory's other programs stay),
+    so no verdict or pinned count depends on whether this machine has the engine installed."""
+    return os.pathsep.join(_without_prose_budget(d) for d in os.environ["PATH"].split(os.pathsep))
+
+
+def drive(check, *answers):
+    """Run a guard's generator to its end, answering each Need it yields from `answers`
+    in order (None once they run out); returns (the Needs and Acts yielded, its result)."""
+    yielded = []
+    try:
+        step = next(check)
+        while True:
+            yielded.append(step)
+            step = check.send(answers[len(yielded) - 1] if len(yielded) <= len(answers) else None)
+    except StopIteration as stop:
+        return yielded, stop.value
+
+
+def hooks_json():
+    """hooks/hooks.json's `hooks`: event -> its entries. The one reader of the file."""
+    return json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]
 
 
 def hooks_json_event_command(event):
     """The one command hooks/hooks.json runs for `event`."""
-    hj = json.loads((ROOT / "hooks/hooks.json").read_text())
-    [command] = [h["command"] for e in hj["hooks"][event] for h in e["hooks"]]
+    [command] = [h["command"] for e in hooks_json()[event] for h in e["hooks"]]
     return command
+
+
+def hooks_json_commands():
+    """guard name -> the PreToolUse command in hooks/hooks.json that judges it: the one
+    command, which names no guard and runs every guard wired for the call."""
+    command = hooks_json_event_command("PreToolUse")
+    return {g.NAME: command for ev, _, gs in run.GUARDS for g in gs if ev == "PreToolUse"}
 
 
 def hooks_json_prompt_command():
