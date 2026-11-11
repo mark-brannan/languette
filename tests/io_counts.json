@@ -1036,6 +1036,7 @@
  "tests/test_features.py::test_a_redacted_terms_file_that_is_missing_a_directory_or_not_in_shape_denies_a_public_post_naming_the_option[{TMP}/h/pt-bad.tsv-{TMP}/h/no-such.tsv]": {"git": 2, "run": 1},
  "tests/test_features.py::test_a_redacted_terms_file_that_is_missing_a_directory_or_not_in_shape_denies_a_public_post_naming_the_option[{TMP}/h/pt-bad.tsv-{TMP}/h/pt-bad.tsv]": {"git": 2, "run": 1},
  "tests/test_features.py::test_a_redacted_terms_file_that_is_missing_a_directory_or_not_in_shape_denies_a_public_post_naming_the_option[{TMP}/h/pt-bad.tsv-{TMP}/h]": {"git": 2, "run": 1},
+ "tests/test_features.py::test_a_refused_piece_of_a_pattern_is_a_hit_not_the_reason_the_deny_names": {"git": 1},
  "tests/test_features.py::test_a_relative_engine_command_still_resolves_after_the_hook_changes_directory": {"git": 3, "run": 1},
  "tests/test_features.py::test_a_relative_path_after_a_cd_that_may_land_in_dev_cannot_be_followed_so_it_is_denied[/usr/bin/cd /dev && cat x > sda-is silent-a cd program cannot move the shell]": {"git": 3},
  "tests/test_features.py::test_a_relative_path_after_a_cd_that_may_land_in_dev_cannot_be_followed_so_it_is_denied[abcd /dev && cat x > sda-is silent-a command whose name ends in cd is not cd]": {"git": 2},

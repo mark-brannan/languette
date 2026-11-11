@@ -114,6 +114,11 @@ Feature: guard-protected-services
     When the agent runs `pkill -f '(.*){12}Z'`
     Then the guard denies, naming "a pattern languette will not run: a quantifier inside a quantified group"
 
+  Scenario: a refused piece of a pattern is a hit, not the reason the deny names
+    Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "postgresql@14-main"
+    When the agent runs `pkill -f 'ssh -N .*'`
+    Then the guard denies, naming "`pkill ssh -N .*` is blocked: it stops a protected service"
+
   Scenario Outline: without a match, a stop is the agent's
     Given CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "<setting>"
     When the agent runs `<command>`
