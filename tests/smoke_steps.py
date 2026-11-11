@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
+from harness import hooks_json_event_command
 from paths import ROOT
 
 sys.path.insert(0, str(ROOT))
@@ -45,10 +46,7 @@ def known_gap(request):
 def hook_command():
     """The PreToolUse command, read from hooks.json, never copied: the one command that
     runs require-well-formed with every other guard wired for the call."""
-    hooks = json.loads((ROOT / "hooks" / "hooks.json").read_text())["hooks"]
-    found = [h["command"] for e in hooks["PreToolUse"] for h in e.get("hooks", ())]
-    assert len(found) == 1, f"expected one PreToolUse hook in hooks.json, found {len(found)}"
-    return found[0]
+    return hooks_json_event_command("PreToolUse")
 
 
 def python_for(var):

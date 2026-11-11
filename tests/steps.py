@@ -13,7 +13,7 @@ from pathlib import Path
 from hamcrest import assert_that, equal_to
 from pytest_bdd import given, parsers, then, when
 
-from harness import IN_PROCESS, ROOT, fixture_text, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
+from harness import IN_PROCESS, ROOT, real_path, fixture_text, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
 from matchers import asks, denies, is_silent, warns_about
 from languette import run, scan, terms, verdict, world, worktree_reaches
 
@@ -78,9 +78,8 @@ def _file(ctx, rel, docstring):
 
 @given(parsers.parse('the file "{rel}" is committed'))
 def _file_committed(ctx, rel):
-    subprocess.run(["git", "-C", str(ctx.proj), "add", "--", rel], check=True)
-    subprocess.run(["git", "-C", str(ctx.proj), "-c", "user.email=a@a", "-c", "user.name=a",
-                     "commit", "-q", "-m", "x", "--", rel], check=True)
+    _git(str(ctx.proj), "add", "--", rel)
+    _git(ctx.proj, "commit", "-q", "-m", "x", "--", rel)
 
 
 @given(parsers.re(r"the (?P<kind>blocked|redacted) terms file holds:"))
@@ -189,6 +188,11 @@ def _mkdir(ctx, path):
 GIT_IDENT = ["-c", "user.email=t@e", "-c", "user.name=t"]
 
 
+def _git(path, *args):
+    """`git -C path args` with an author, failing the step if git does."""
+    return subprocess.run(["git", "-C", str(path), *GIT_IDENT, *args], check=True)
+
+
 def _init_main(d):
     subprocess.run(["git", "init", "-q", "-b", "main", str(d)], check=True)
 
@@ -204,8 +208,8 @@ def _commit_file(ctx, path):
     f = Path(ctx.expand(path))
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text("committed\n")
-    subprocess.run(["git", "-C", str(f.parent), "add", f.name], check=True)
-    subprocess.run(["git", "-C", str(f.parent), *GIT_IDENT, "commit", "-q", "-m", "init"], check=True)
+    _git(str(f.parent), "add", f.name)
+    _git(str(f.parent), "commit", "-q", "-m", "init")
     return f
 
 
@@ -217,7 +221,7 @@ def _tracked_file(ctx, path):
 @given(parsers.re(r'the tracked file "(?P<path>[^"]+)" is edited and marked (?P<flag>assume-unchanged|skip-worktree)'))
 def _tracked_flagged(ctx, path, flag):
     f = _commit_file(ctx, path)
-    subprocess.run(["git", "-C", str(f.parent), "update-index", f"--{flag}", f.name], check=True)
+    _git(str(f.parent), "update-index", f"--{flag}", f.name)
     f.write_text("edit that git status does not show\n")
 
 
@@ -234,9 +238,9 @@ def _yadm_repo(ctx, path, wt):
 def _linked_worktree(ctx, path, repo):
     r, d = ctx.expand(repo), ctx.expand(path)
     if subprocess.run(["git", "-C", r, "rev-parse", "-q", "--verify", "HEAD"], capture_output=True).returncode:
-        subprocess.run(["git", "-C", r, *GIT_IDENT, "commit", "-q", "--allow-empty", "-m", "init"], check=True)
+        _git(r, "commit", "-q", "--allow-empty", "-m", "init")
     Path(d).parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["git", "-C", r, "worktree", "add", "-q", "-b", Path(d).name, d], check=True)
+    _git(r, "worktree", "add", "-q", "-b", Path(d).name, d)
 
 
 def _record(ctx):
@@ -258,13 +262,7 @@ def _recorded(ctx, path):
 
 @given(parsers.parse('the symlink "{path}" to "{target}"'))
 def _symlink(ctx, path, target):
-    # $HOME is shared by every scenario in a worker, so an earlier one may have
-    # left a directory where this link goes: the link replaces it.
     link = Path(ctx.expand(path))
-    if link.is_symlink() or link.is_file():
-        link.unlink()
-    elif link.is_dir():
-        shutil.rmtree(link)
     link.symlink_to(ctx.expand(target))
 
 
@@ -294,14 +292,14 @@ def _door_replaced(ctx, target, content):
 
 @given('the stubs "gh" and "timeout" are first on PATH')
 def _stubs(ctx):
-    ctx.stubs, ctx.stub_log = True, ctx.mkdtemp()
+    ctx.stubs, ctx.stub_log = ("gh", "glab", "timeout"), ctx.mkdtemp()
 
 
 @given('the stub "getent" is first on PATH')
 def _getent_stub(ctx):
     # The guard reads ~user through getent; the stub answers for one user whose
     # home is the scenario's $HOME, so no verdict depends on this machine's users.
-    ctx.env["PATH"] = str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
+    ctx.env["PATH"] = ctx.stub_dir("getent") + os.pathsep + real_path()
 
 
 @given('the stub "gh" is first on PATH, for a Python guard')
@@ -309,7 +307,7 @@ def _gh_stub_python(ctx):
     # The Python engine's guards get only the scenario's env, so PATH and the
     # stub log travel there rather than through the shell engine's subprocess.
     ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
-    ctx.env["PATH"] = str(ROOT / "tests/stubs") + os.pathsep + os.environ["PATH"]
+    ctx.env["PATH"] = ctx.stub_dir("gh", "glab") + os.pathsep + real_path()
     ctx.env["LANGUETTE_STUB_LOG"] = ctx.stub_log
 
 
@@ -332,60 +330,57 @@ def _review_thread(ctx, tid, datatable):
 @given(parsers.parse('a clone of "{url}" at "{path}" on branch "{branch}"'))
 def _clone(ctx, url, path, branch):
     d = ctx.expand(path)
-    git = ["git", "-C", d, *GIT_IDENT]
     _init_main(d)
-    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "init"], check=True)
-    subprocess.run([*git, "remote", "add", "origin", url], check=True)
+    _git(d, "commit", "-q", "--allow-empty", "-m", "init")
+    _git(d, "remote", "add", "origin", url)
     if branch != "main":
-        subprocess.run([*git, "checkout", "-q", "-b", branch], check=True)
+        _git(d, "checkout", "-q", "-b", branch)
     for b in {"main", branch}:
-        subprocess.run([*git, "update-ref", f"refs/remotes/origin/{b}", "HEAD"], check=True)
-        subprocess.run([*git, "config", f"branch.{b}.remote", "origin"], check=True)
-        subprocess.run([*git, "config", f"branch.{b}.merge", f"refs/heads/{b}"], check=True)
-    subprocess.run([*git, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"], check=True)
+        _git(d, "update-ref", f"refs/remotes/origin/{b}", "HEAD")
+        _git(d, "config", f"branch.{b}.remote", "origin")
+        _git(d, "config", f"branch.{b}.merge", f"refs/heads/{b}")
+    _git(d, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
 
 
 @given(parsers.parse('the remote HEAD of "{path}" points at "{branch}"'))
 def _remote_head(ctx, path, branch):
     d = ctx.expand(path)
-    subprocess.run(["git", "-C", d, "update-ref", f"refs/remotes/origin/{branch}", "HEAD"], check=True)
-    subprocess.run(["git", "-C", d, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{branch}"],
-                   check=True)
+    _git(d, "update-ref", f"refs/remotes/origin/{branch}", "HEAD")
+    _git(d, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{branch}")
 
 
 @given(parsers.parse('the remote HEAD of "{path}" is removed'))
 def _remote_head_removed(ctx, path):
-    subprocess.run(["git", "-C", ctx.expand(path), "symbolic-ref", "--delete", "refs/remotes/origin/HEAD"],
-                   check=True)
+    _git(ctx.expand(path), "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
 
 
 @given(parsers.parse('the remote of "{path}" is renamed to "{name}"'))
 def _remote_renamed(ctx, path, name):
-    subprocess.run(["git", "-C", ctx.expand(path), "remote", "rename", "origin", name], check=True)
+    _git(ctx.expand(path), "remote", "rename", "origin", name)
 
 
 @given(parsers.parse('the branch "{branch}" of "{path}" tracks "{upstream}"'))
 def _tracks(ctx, branch, path, upstream):
     d = ctx.expand(path)
     remote, _, name = upstream.partition("/")
-    subprocess.run(["git", "-C", d, "config", f"branch.{branch}.remote", remote], check=True)
-    subprocess.run(["git", "-C", d, "config", f"branch.{branch}.merge", f"refs/heads/{name}"], check=True)
+    _git(d, "config", f"branch.{branch}.remote", remote)
+    _git(d, "config", f"branch.{branch}.merge", f"refs/heads/{name}")
 
 
 @given(parsers.parse('"{path}" marks the remote "{name}" as gh\'s default'))
 def _gh_resolved(ctx, path, name):
     if name != "-":
-        subprocess.run(["git", "-C", ctx.expand(path), "config", f"remote.{name}.gh-resolved", "base"], check=True)
+        _git(ctx.expand(path), "config", f"remote.{name}.gh-resolved", "base")
 
 
 @given(parsers.parse('"{path}" has a remote "{name}" at "{url}"'))
 def _add_remote(ctx, path, name, url):
-    subprocess.run(["git", "-C", ctx.expand(path), "remote", "add", name, url], check=True)
+    _git(ctx.expand(path), "remote", "add", name, url)
 
 
 @given(parsers.parse('"{path}" has remote.{name}.gh-resolved "{value}"'))
 def _gh_resolved_value(ctx, path, name, value):
-    subprocess.run(["git", "-C", ctx.expand(path), "config", f"remote.{name}.gh-resolved", value], check=True)
+    _git(ctx.expand(path), "config", f"remote.{name}.gh-resolved", value)
 
 
 def _engine(ctx, command):
@@ -411,7 +406,7 @@ def _prose_budget_stub_relative(ctx):
 
 @given('the stub "prose-budget" is the engine, by bare name on PATH')
 def _prose_budget_stub_bare(ctx):
-    ctx.stubs, ctx.stub_log = True, ctx.stub_log or ctx.mkdtemp()
+    ctx.stubs, ctx.stub_log = ("prose-budget",), ctx.stub_log or ctx.mkdtemp()
     _engine(ctx, "prose-budget")
 
 
@@ -437,10 +432,14 @@ def _hooks_json_event(ctx, event, guard):
     ctx.hook = hooks_json_event_command(event)
 
 
+def _fire(ctx, event, **fields):
+    """Run `event` as Claude Code sends it: the session, the cwd and `fields` in the payload."""
+    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": event, "session_id": ctx.session, **fields})))
+
+
 @when(parsers.parse('Claude Code fires {event} for tool "{tool}"'))
 def _fires(ctx, event, tool):
-    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": event, "session_id": ctx.session, "tool_name": tool,
-                                  "tool_input": {}, "tool_response": "..."})))
+    _fire(ctx, event, tool_name=tool, tool_input={}, tool_response="...")
 
 
 @then("the cross-session state file is gone")
@@ -668,8 +667,7 @@ def _call_declined(ctx):
 @when("the human speaks, opening the door")
 def _open_door(ctx):
     ctx.arg = "prompt"
-    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
-                                    "prompt": "yes, file it"})))
+    _fire(ctx, "UserPromptSubmit", prompt="yes, file it")
     ctx.arg = None
 
 
@@ -678,8 +676,7 @@ def _open_door_via_hooks_json(ctx):
     # The UserPromptSubmit command exactly as hooks.json writes it, run the way
     # Claude Code runs it; the PreToolUse hook is restored for the next step.
     pretool, ctx.hook = ctx.hook, hooks_json_prompt_command()
-    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
-                                    "prompt": "yes, file it"})))
+    _fire(ctx, "UserPromptSubmit", prompt="yes, file it")
     ctx.hook = pretool
 
 
@@ -709,23 +706,21 @@ def _no_mode(ctx):
 
 @when("the human speaks")
 def _speaks(ctx):
-    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "UserPromptSubmit", "session_id": ctx.session,
-                                  "prompt": "go on"})))
+    _fire(ctx, "UserPromptSubmit", prompt="go on")
     assert ctx.verdict.stdout == "", f"UserPromptSubmit printed {ctx.verdict.stdout!r}"
 
 
 @given(parsers.parse('the session starts from "{source}"'))
 @when(parsers.parse('the session starts from "{source}"'))
 def _session_starts(ctx, source):
-    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "SessionStart", "session_id": ctx.session, "source": source})))
+    _fire(ctx, "SessionStart", source=source)
     assert ctx.verdict.stdout == "", f"SessionStart printed {ctx.verdict.stdout!r}"
 
 
 @when(parsers.parse('the agent spawns a subagent named "{name}", given id "{agent}"'))
 def _spawns(ctx, name, agent):
-    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "PostToolUse", "session_id": ctx.session, "tool_name": "Agent",
-                                  "tool_input": {"name": name, "prompt": "p", "description": "d"},
-                                  "tool_response": {"status": "async_launched", "agentId": agent}})))
+    _fire(ctx, "PostToolUse", tool_name="Agent", tool_input={"name": name, "prompt": "p", "description": "d"},
+          tool_response={"status": "async_launched", "agentId": agent})
     assert ctx.verdict.stdout == "", f"PostToolUse printed {ctx.verdict.stdout!r}"
 
 
@@ -740,16 +735,14 @@ def _team(ctx, name, base=None):
 
 @when(parsers.parse('subagent "{agent}" starts'))
 def _subagent_starts(ctx, agent):
-    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "SubagentStart", "session_id": ctx.session,
-                                  "agent_id": agent, "agent_type": "general-purpose"})))
+    _fire(ctx, "SubagentStart", agent_id=agent, agent_type="general-purpose")
     assert ctx.verdict.stdout == "", f"SubagentStart printed {ctx.verdict.stdout!r}"
 
 
 def _send(ctx, to, message, **extra):
     ctx.calls += 1
-    ctx.run(json.dumps(ctx.as_sent({"hook_event_name": "PreToolUse", "session_id": ctx.session, "tool_name": "SendMessage",
-                                  "tool_input": {"to": to, "message": message},
-                                  "tool_use_id": f"toolu_call{ctx.calls}", **extra})))
+    _fire(ctx, "PreToolUse", tool_name="SendMessage", tool_input={"to": to, "message": message},
+          tool_use_id=f"toolu_call{ctx.calls}", **extra)
 
 
 @when(parsers.re(r'the agent sends "(?P<to>[^"]*)" the message `(?P<message>.*)`', flags=re.S))
