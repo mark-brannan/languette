@@ -51,57 +51,58 @@ def _out(event, fields):
 # A guard that cannot even be imported is a deny too, not a traceback and a
 # non-zero exit that only the hooks.json wrapper would turn into one.
 try:
+    import importlib.util
     from languette.messages import say
-    from languette.guards import require_well_formed
     from languette import comment_posts, engine, issue_writes, opened_prs, posts, record, secrets
-    from languette.rules import (ask_first as _ask_first, deny_always as _deny_always,
-                                 guard_bypass_hooks as _guard_bypass_hooks,
-                                 guard_bypass_labels as _guard_bypass_labels,
-                                 guard_bypass_ruleset as _guard_bypass_ruleset,
-                                 guard_cross_session_send as _guard_cross_session_send,
-                                 guard_disks as _guard_disks,
-                                 guard_duplicate_prs as _guard_duplicate_prs,
-                                 guard_git_stacked_base as _guard_git_stacked_base,
-                                 guard_git_work_loss as _guard_git_work_loss,
-                                 guard_github_issues as _guard_github_issues,
-                                 guard_host_availability as _guard_host_availability,
-                                 guard_infra as _guard_infra,
-                                 guard_private_terms as _guard_private_terms,
-                                 guard_review_threads as _guard_review_threads,
-                                 guard_signed_comments as _guard_signed_comments,
-                                 guard_permissions as _guard_permissions,
-                                 guard_pipe_to_shell as _guard_pipe_to_shell,
-                                 guard_protected_services as _guard_protected_services,
-                                 guard_recursive_delete as _guard_recursive_delete,
-                                 guard_scheduled_jobs as _guard_scheduled_jobs, guard_secrets as _guard_secrets,
-                                 guard_sudo as _guard_sudo, guard_worktrees as _guard_worktrees,
-                                 prose_budget_commit as _prose_budget_commit)
     from languette.document import Document
     from languette.verdict import LOST, SPEND, Act, deny, verdict
     from languette.world import ACTS, World
-    # The guards that are a rule set alone (languette/engine.py).
-    deny_always, guard_sudo = engine.Guard(_deny_always), engine.Guard(_guard_sudo)
-    guard_bypass_labels = engine.Guard(_guard_bypass_labels)
-    guard_private_terms = engine.Guard(_guard_private_terms)
-    guard_disks = engine.Guard(_guard_disks)
-    guard_host_availability = engine.Guard(_guard_host_availability)
-    guard_permissions = engine.Guard(_guard_permissions)
-    guard_pipe_to_shell = engine.Guard(_guard_pipe_to_shell)
-    guard_protected_services = engine.Guard(_guard_protected_services)
-    guard_recursive_delete = engine.Guard(_guard_recursive_delete)
-    guard_scheduled_jobs = engine.Guard(_guard_scheduled_jobs)
-    guard_secrets = engine.Guard(_guard_secrets)
-    # Stateful: the rule set names a handler that gathers and judges its facts.
-    guard_bypass_hooks = engine.Guard(_guard_bypass_hooks)
-    guard_git_stacked_base = engine.Guard(_guard_git_stacked_base)
-    guard_git_work_loss = engine.Guard(_guard_git_work_loss)
-    ask_first, guard_infra = engine.Guard(_ask_first), engine.Guard(_guard_infra)
-    guard_bypass_ruleset = engine.Guard(_guard_bypass_ruleset)
-    guard_cross_session_send = engine.Guard(_guard_cross_session_send)
-    guard_github_issues, guard_duplicate_prs = engine.Guard(_guard_github_issues), engine.Guard(_guard_duplicate_prs)
-    guard_worktrees = engine.Guard(_guard_worktrees)
-    guard_review_threads, guard_signed_comments = engine.Guard(_guard_review_threads), engine.Guard(_guard_signed_comments)
-    prose_budget_commit = engine.Guard(_prose_budget_commit)
+
+    def _load(name):
+        """The guard `name`: a rule set in languette/rules/ (languette/engine.py), else a guard
+        module in languette/guards/."""
+        mod = name.replace("-", "_")
+        if importlib.util.find_spec("languette.rules." + mod) is not None:
+            g = engine.Guard(importlib.import_module("languette.rules." + mod))
+        else:
+            g = importlib.import_module("languette.guards." + mod)
+        if g.NAME != name:
+            raise ImportError(f"{name} loads a guard named {g.NAME}")
+        return g
+
+    # (hook event, tool name pattern or None for an event with no tool, guards in
+    # the order they judge). guard-cross-session-send judges SendMessage; on the
+    # other events it only keeps its per-session state, and never objects.
+    STATE_EVENTS = engine.STATE_EVENTS
+    _SEND_STATE_TOOLS = re.compile(r"(?:WebFetch|WebSearch|Bash|Agent|mcp__.+)\Z")
+    _WIRING = (
+        ("PreToolUse", re.compile(r"Bash\Z"), ("require-well-formed", "guard-git-work-loss", "guard-recursive-delete",
+                                               "ask-first", "deny-always", "guard-bypass-hooks", "guard-infra",
+                                               "guard-bypass-labels", "guard-bypass-ruleset", "guard-permissions",
+                                               "guard-pipe-to-shell", "guard-disks", "guard-host-availability",
+                                               "guard-protected-services", "guard-scheduled-jobs", "guard-sudo",
+                                               "guard-git-stacked-base", "guard-review-threads", "guard-secrets",
+                                               "prose-budget-commit")),
+        ("PreToolUse", re.compile(r"mcp__.+"), ("guard-bypass-labels",)),
+        ("PreToolUse", issue_writes.TOOLS, ("guard-github-issues",)),
+        ("PreToolUse", posts.TOOLS, ("guard-private-terms",)),
+        ("PreToolUse", opened_prs.TOOLS, ("guard-duplicate-prs",)),
+        ("PreToolUse", comment_posts.TOOLS, ("guard-signed-comments",)),
+        ("PreToolUse", re.compile(r"(?:Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree)\Z"), ("guard-worktrees",)),
+        ("PreToolUse", re.compile(r"SendMessage\Z"), ("guard-cross-session-send",)),
+        ("PostToolUse", _SEND_STATE_TOOLS, ("guard-cross-session-send",)),
+        ("PostToolUseFailure", _SEND_STATE_TOOLS, ("guard-cross-session-send",)),
+        ("SubagentStart", None, ("guard-cross-session-send",)),
+        ("SessionStart", None, ("guard-cross-session-send", "guard-private-terms")),
+        # guard-github-issues' door: a human turn opens it, a write that ran spends it.
+        ("UserPromptSubmit", None, ("guard-github-issues",)),
+        ("PostToolUse", issue_writes.TOOLS, ("guard-github-issues",)),
+        ("PostToolUseFailure", issue_writes.TOOLS, ("guard-github-issues",)),
+    )
+    # Every guard by name, loaded once: the wiring above is the one list of them.
+    GUARD = {n: _load(n) for _, _, ns in _WIRING for n in ns}
+    GUARDS = tuple((ev, rx, tuple(GUARD[n] for n in ns)) for ev, rx, ns in _WIRING)
+    require_well_formed, guard_cross_session_send = GUARD["require-well-formed"], GUARD["guard-cross-session-send"]
 except Exception as e:  # noqa: BLE001
     try:
         _why = say("guard_load_failed", kind=type(e).__name__, err=e)
@@ -109,35 +110,6 @@ except Exception as e:  # noqa: BLE001
         _why = ("languette could not load (%s). This is a gate and fails closed: reinstall languette." % type(e).__name__)
     sys.stdout.write(_out("PreToolUse", {"permissionDecision": "deny", "permissionDecisionReason": _why}))
     sys.exit(0)
-
-# (hook event, tool name pattern or None for an event with no tool, guards in
-# the order they judge). guard-cross-session-send judges SendMessage; on the
-# other events it only keeps its per-session state, and never objects.
-STATE_EVENTS = engine.STATE_EVENTS
-_SEND_STATE_TOOLS = re.compile(r"(?:WebFetch|WebSearch|Bash|Agent|mcp__.+)\Z")
-GUARDS = (
-    ("PreToolUse", re.compile(r"Bash\Z"), (require_well_formed, guard_git_work_loss, guard_recursive_delete, ask_first,
-                                           deny_always, guard_bypass_hooks, guard_infra, guard_bypass_labels,
-                                           guard_bypass_ruleset, guard_permissions, guard_pipe_to_shell,
-                                           guard_disks, guard_host_availability, guard_protected_services,
-                                           guard_scheduled_jobs, guard_sudo, guard_git_stacked_base,
-                                           guard_review_threads, guard_secrets, prose_budget_commit)),
-    ("PreToolUse", re.compile(r"mcp__.+"), (guard_bypass_labels,)),
-    ("PreToolUse", issue_writes.TOOLS, (guard_github_issues,)),
-    ("PreToolUse", posts.TOOLS, (guard_private_terms,)),
-    ("PreToolUse", opened_prs.TOOLS, (guard_duplicate_prs,)),
-    ("PreToolUse", comment_posts.TOOLS, (guard_signed_comments,)),
-    ("PreToolUse", re.compile(r"(?:Bash|Edit|Write|MultiEdit|NotebookEdit|EnterWorktree)\Z"), (guard_worktrees,)),
-    ("PreToolUse", re.compile(r"SendMessage\Z"), (guard_cross_session_send,)),
-    ("PostToolUse", _SEND_STATE_TOOLS, (guard_cross_session_send,)),
-    ("PostToolUseFailure", _SEND_STATE_TOOLS, (guard_cross_session_send,)),
-    ("SubagentStart", None, (guard_cross_session_send,)),
-    ("SessionStart", None, (guard_cross_session_send, guard_private_terms)),
-    # guard-github-issues' door: a human turn opens it, a write that ran spends it.
-    ("UserPromptSubmit", None, (guard_github_issues,)),
-    ("PostToolUse", issue_writes.TOOLS, (guard_github_issues,)),
-    ("PostToolUseFailure", issue_writes.TOOLS, (guard_github_issues,)),
-)
 
 
 def option(g):
@@ -335,19 +307,8 @@ def _state_failed(payload, env):
     if not _on(guard_cross_session_send, env):
         return
     sid = payload.get("session_id") if isinstance(payload, dict) else None
-    if not isinstance(sid, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", sid):
-        return
-    path = os.path.join(env.get("TMPDIR") or "/tmp", f"languette-guard-cross-session-send.{sid}")
-    try:
-        try:
-            os.unlink(path)
-        except FileNotFoundError:
-            pass
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "w") as f:
-            f.write(json.dumps({"subagents": [], "read": "an unknown tool (a state hook failed)"}) + "\n")
-    except OSError:
-        pass
+    if isinstance(sid, str) and sid:
+        World(env, payload).act(Act("send-fail", sid))
 
 
 def main(argv):

@@ -31,7 +31,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from languette import host, messages, scan, terms
+from languette import host, messages, scan, terms, world
 from languette.host import Unreadable, installed_options
 
 OK, WARN, FAIL = host.OK, host.WARN, host.FAIL
@@ -450,11 +450,10 @@ def _terms(options):
     """(penv, kind -> (text, path, whether an option named it, the exception or None)): each terms
     file read as the guard reads it, and the environment its $NAMEs are filled from."""
     from languette.run import drive          # run.py exits when a guard will not import
-    from languette.world import World
     env = host.guard_env(options)
-    world = World(env, {})
-    penv = drive(terms.environment(env), world, [])
-    return penv, {kind: drive(terms.read(kind, env), world, []) for kind in terms.KINDS}
+    w = world.World(env, {})
+    penv = drive(terms.environment(env), w, [])
+    return penv, {kind: drive(terms.read(kind, env), w, []) for kind in terms.KINDS}
 
 
 def _ms(rx, text):
@@ -573,20 +572,12 @@ def write_initial(kind, env):
     else:
         body = terms.header("blocked") + "\n# A term that denies a whole public post: find, a message for the agent, comment.\n"
         what = "no terms yet"
-    tmp = f"{path}.{os.getpid()}.tmp"
     try:
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
-        Path(tmp).write_text(body, encoding="utf-8")
-        os.link(tmp, path)  # atomic, and refuses a file another session wrote first
+        world.write_new(path, body)
     except FileExistsError:
         return None
     except OSError as e:
         return FAIL, f"{where} cannot be written ({e.strerror or e})"
-    finally:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
     return OK, f"wrote {where} ({what})"
 
 
