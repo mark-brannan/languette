@@ -1,18 +1,36 @@
 # Security policy
 
-## What does *not* count as a vulnerability?
+Languette guards against an agent's mistakes. It is
+[not a sandbox](README.md#not-a-sandbox).
 
-A command that no guard or rule covers today. That is merely a feature/functionality gap, not a
-vulnerability; [open an issue](https://github.com/mark-brannan/languette/issues) for it.
+A vulnerability is a bug that leaves you worse off than running without
+languette.
 
-## What counts as a vulnerability?
+## What counts as a vulnerability
+
 - A secret written to the decision record.
-- A prompt injection risk, setting aside the specified design that send preconfigured 'why' statements to the agent on a deny/ask. 
+- Text from a command, a file or a web page reaching the agent as an
+  instruction from languette. Languette's own configuration is the exception,
+  below.
+- Languette running any part of a command it is only meant to read.
 
-## What counts as ambiguous for vulnerability reporting?
-These might be either a bug/issue or vulnerability depending on the circumstances.  There's not a clear rule yet:
+## What does not count
+
+- A command that no guard or rule covers today. That is a gap in what
+  languette does.
 - A guard that allows a command the README says it denies.
-- A guard that fails open: an error, a missing tool or a malformed input lets a command through.
+- A guard that fails open: an error, a missing tool or a malformed input lets
+  a command through.
+- Text from languette's own configuration, such as a rule's `why`, reaching
+  the agent when a guard denies or asks. Languette is designed to do that;
+  [#383](https://github.com/mark-brannan/languette/issues/383) discusses it.
+- An agent loosening its own guards through `languette config` or the settings
+  file. That is a known gap;
+  [#384](https://github.com/mark-brannan/languette/issues/384) discusses it.
+
+[Open an issue](https://github.com/mark-brannan/languette/issues) for any of
+these. If you think one puts people at more risk than running without
+languette, report it privately instead.
 
 ## Reporting a vulnerability
 
