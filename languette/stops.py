@@ -295,17 +295,3 @@ def unit_test(cond):
         return any(c in u for c in "*?[") or any(
             fnmatch.fnmatchcase(f(n), f(p)) for n in unit_names(u) for p in pats)
     return hit
-
-
-def _stop_hit(doc, match, prose):
-    """`<command> <stop>` for the first command in the text that `match` fits, or None."""
-    hit = unit_test(match["unit"])
-    if hit is None:
-        return None
-    for t, _ in doc.texts(prose):
-        s = doc.scan(t)
-        for a, b in s.segments():
-            got = a <= b and stop_of(s, a, b, match, hit, match.get("host_verbs", ()))
-            if got:
-                return " ".join(got)
-    return None

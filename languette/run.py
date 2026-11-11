@@ -224,7 +224,7 @@ def _answer(payload, env, only):
         world.act(a)
     if record.wanted(env):
         try:
-            world.keep(record.build(payload, env, only, findings, _verdict(out), doc, extra=_project_rules(world, payload, env)))
+            world.keep(record.build(doc, only, findings, _verdict(out), extra=_project_rules(world, payload, env)))
         except Exception:  # noqa: BLE001 -- a record never changes the verdict
             pass
     return out, any(crashed or r is not None for name, r, crashed in findings if name == guard_cross_session_send.NAME)
