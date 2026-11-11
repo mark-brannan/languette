@@ -256,12 +256,9 @@ class _Meta:
         g = sw.cmd_index(s, lo, hi, sw.CLIENTS, nested)
         if g is None or g + 1 > hi:
             return
-        repo = posrepo = ""
+        posrepo = ""
         cli = sw.client(s.w[g])
-        env = "GITLAB_REPO=" if cli == "glab" else "GH_REPO="
-        for i in range(lo, g):
-            if s.k[i] == "w" and s.w[i].startswith(env):
-                repo = s.w[i][len(env):]
+        repo = sw.gh_env_repo(s, lo, g, cli) or ""
         sub = s.w[g + 1]
         if sub == "api":
             self.api(g, hi, cli)
@@ -379,24 +376,21 @@ class _Meta:
                 self.add("UNSEEN", _flat(t))
         p = api.path
         if re.match(r"repos/[^/]+/[^/]+/(?:issues|pulls)(?:/|\Z)", p):
-            if api.method in ("GET", "HEAD") or (api.method == "" and not api.sends):
+            if not api.writes:
                 return
             parts = p.split("/")
             self.add("R", parts[1] + "/" + parts[2])
         elif m := _GLAB_PATH.match(p):
-            if api.method in ("GET", "HEAD") or (api.method == "" and not api.sends):
+            if not api.writes:
                 return
             # :id is the cwd's project; a number names a project the guard cannot map to a path.
             got = unquote(m.group(1))
             self.add("R", "-" if got == ":id" else "?" if got.isdigit() or got.startswith(":") else _flat(got))
-        elif p == "graphql":
+        elif api.graphql:
             # The target is a node id in the query, never the cwd's origin. A query not
             # written out in the command's words (--input, @file, built at run time) is
             # not shown to be a read, so it is judged.
-            q = next((a for a in api.args if a.flag != "--input" and a.key == "query"), None)
-            shown = (q is not None and not q.value.startswith("@") and not (q.live and re.search(r"[$`]", q.value))
-                     and not any(a.flag == "--input" for a in api.args))
-            if not shown or any(_GRAPHQL.search(sw.word(self.s, i)) for i in range(g, hi + 1)):
+            if api.writes is None or any(_GRAPHQL.search(sw.word(self.s, i)) for i in range(g, hi + 1)):
                 self.add("R", "?")
 
 

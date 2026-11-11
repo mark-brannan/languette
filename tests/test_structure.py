@@ -79,7 +79,7 @@ KNOWN_READ_AFTER_WRITE = {"door": "languette-guard-github-issues.<session>",
                           "approvals": ".languette-ask",
                           "ruleset-cache": "languette/rulesets/"}
 # The acts and spends World makes after a verdict, at most (run.py's _state_failed writes outside them).
-KNOWN_WRITES = {"door-open", "door-spend", "send-keep", "worktree-keep", "worktree-leave", "ruleset-keep",
+KNOWN_WRITES = {"door-open", "door-spend", "send-keep", "send-fail", "worktree-keep", "worktree-leave", "ruleset-keep",
                 "terms-init", "approvals", "door"}
 
 

@@ -56,3 +56,44 @@ def test_the_world_asks_the_forges_own_client(client, tmp_path, forge, host, cod
     got = World(env, {}).answer(Need("forge-api", forge, host, "p"))
     assert_that(got, equal_to((status, answer if status else None)))
     assert_that((tmp_path / "log").read_text().strip(), equal_to(argv))
+
+
+def _api(command):
+    """The GhApi of a `gh api` command."""
+    s = scan.Scan(command)
+    return scan.gh_api(s, 2, len(s.w) - 1)
+
+
+@pytest.mark.parametrize("command, graphql, writes", [
+    ("gh api graphql -f query='{viewer{login}}'", True, False),
+    ("gh api https://ghe.example.com/api/graphql -f query='{viewer{login}}'", True, False),
+    ("gh api --hostname ghe.example.com graphql -f query='mutation{x}'", True, True),
+    ("gh api https://ghe.example.com/api/graphql -f query='mutation{x}'", True, True),
+    ("gh api -X POST graphql -f query='query{viewer{login}}'", True, False),
+    ('gh api graphql -f query="{repository(name:\\"$R\\"){id}}"', True, False),   # a read, filled at run time
+    ('gh api graphql -f query="$Q"', True, None),
+    ("gh api graphql --input q.json", True, None),
+    ("gh api graphql", True, False),                          # no query sent: nothing can run
+    ("gh api graphql -f variables='{}'", True, False),
+    ("gh api graphql -F query=@q.graphql", True, None),
+    ("gh api repos/o/r/issues", False, False),
+    ("gh api repos/o/r/issues -f title=t", False, True),
+    ("gh api -X GET repos/o/r/issues -f state=open", False, False),
+    ("gh api -X DELETE repos/o/r/issues/1/labels", False, True),
+])
+def test_one_reading_of_a_gh_api_call(command, graphql, writes):
+    api = _api(command)
+    assert_that((api.graphql, api.writes), equal_to((graphql, writes)))
+
+
+@pytest.mark.parametrize("command, repo", [
+    ("gh issue delete 7", None),
+    ("GH_REPO=a/one gh issue delete 7", "a/one"),
+    ("GH_REPO=a/one GH_REPO=b/two gh issue delete 7", "b/two"),      # the shell keeps the last
+    ("GH_REPO=a/one gh issue delete 7 -R c/three", "c/three"),
+    ("gh -R c/three issue delete 7 --repo=d/four", "d/four"),
+])
+def test_the_target_repo_reads_as_the_shell_and_gh_do(command, repo):
+    s = scan.Scan(command)
+    g = s.w.index("gh")
+    assert_that(scan.gh_repo(s, 0, g, len(s.w) - 1), equal_to(repo))

@@ -36,11 +36,7 @@ THREAD = re.compile(r"PRRT_[A-Za-z0-9_-]+")
 BOTS = frozenset("coderabbitai claude copilot-pull-request-reviewer github-actions".split())
 SHA = re.compile(r"(?<![0-9A-Za-z])[0-9a-f]{7,40}(?![0-9A-Za-z])", re.I)
 LINK = re.compile(r"https://\S+|(?<![\w./-])[\w.-]+/[\w.-]+#[0-9]+\b")
-GRAPHQL = re.compile(r"(?:api/(?:v3/)?)?graphql")                  # an endpoint after sw.gh_api_path
 VAR = re.compile(r"\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*|[0-9@*#?$!-])|\$\([^)]*\)|`[^`]*`")
-# A query GraphQL can only run as a read: the shorthand `{` must be the lone
-# operation, and a named `query` takes a second operation only by operationName.
-READ = re.compile(r"\s*(?:\{|query(?![A-Za-z0-9_]))")
 TIMEOUT = 10
 # The last 100 comments: the bot's last word and every reply after it.
 QUERY = ("query($id: ID!) { " + refs.VIEWER + " node(id: $id) { ... on PullRequestReviewThread { "
@@ -113,7 +109,7 @@ def _calls(doc, command, cwd, home):
             first = next((i for i in range(g + 1, b + 1) if s.k[i] in ("w", "q")), None)
             if "api" not in words and first not in live_at:
                 continue
-            if not any(GRAPHQL.fullmatch(sw.gh_api_path(w)) for w in words):
+            if not any(sw.GRAPHQL.fullmatch(sw.gh_api_path(w)) for w in words):
                 if any(_maybe_graphql(sw.word(s, i)) for i in live_at):
                     out.append({"why": "the endpoint is built at run time"})
                 continue
@@ -133,7 +129,7 @@ def _calls(doc, command, cwd, home):
             query = [f for f in fields if f[1] == "query"]
             if any(VAR.search(f[1]) for f in fields if f[3]):
                 rec["why"] = "a field's name is built at run time"
-            elif any(live and not (READ.match(v) and not any(f[1] == "operationName" for f in fields))
+            elif any(live and not (sw.GRAPHQL_READ.match(v) and not any(f[1] == "operationName" for f in fields))
                      for _, _, v, live in query):
                 rec["why"] = "the query is built at run time"
             elif query and not inputs and all(live for *_, live in query):

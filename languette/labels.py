@@ -196,7 +196,7 @@ def _input(f, src, live, path, ctx):
         f.unseen.append(str(e))
         return
     for t in texts:
-        if path == "graphql":
+        if sw.GRAPHQL.fullmatch(path):
             if GRAPHQL_LABELS.search(t):
                 f.unseen.append(GRAPHQL_WHY)
             continue
@@ -226,13 +226,13 @@ def _parses(t):
 
 def _api(f, s, i, b, ctx, cli="gh"):
     api = sw.gh_api(s, i, b, cli)
-    if api.method in ("GET", "HEAD") or (api.method == "" and not api.sends):
+    if api.writes is False:
         return
     fields = [(a.flag, a.text or "", a.live) for a in api.args if a.flag != "--input"]
     inputs = [(a.text or "", a.live) for a in api.args if a.flag == "--input"]
     # The first operand, even an empty one, where gh_api.path skips it.
     p = sw.gh_api_path(api.operands[0]) if api.operands else ""
-    if p == "graphql":
+    if sw.GRAPHQL.fullmatch(p):
         for flag, kv, live in fields:
             v = kv.split("=", 1)[1] if "=" in kv else kv
             if v.startswith("@") and flag in ("-F", "--field"):

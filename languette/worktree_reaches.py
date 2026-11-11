@@ -83,7 +83,7 @@ import os
 import re
 from collections import namedtuple
 
-from languette import scan as sw
+from languette import paths, scan as sw
 from languette.messages import say
 from languette.refs import git_asker, remote_heads
 from languette.verdict import Act, Need, Refuse, ask, context, deny
@@ -650,10 +650,8 @@ class _Session:
         self.sid = sid if isinstance(sid, str) else ""
         self.rec, self.pad = None, None
         if self.sid:
-            tag = re.sub(r"[^A-Za-z0-9_-]", "_", self.sid)
-            if isinstance(aid, str) and aid:
-                tag += "." + re.sub(r"[^A-Za-z0-9_-]", "_", aid)
-            self.rec = os.path.join(env.get("TMPDIR") or "/tmp", "languette-guard-worktrees." + tag)
+            ids = (self.sid, aid) if isinstance(aid, str) and aid else (self.sid,)
+            self.rec = paths.session_file(env, "languette-guard-worktrees.", *ids)
 
     def under_scratch(self, d):
         return bool(self.sid) and f"/{self.sid}/" in f"/{d}/"

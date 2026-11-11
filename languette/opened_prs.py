@@ -217,7 +217,7 @@ def _glab_api(s, g, hi):
             else:
                 _value(post, a.value, a.live)
     m = _GL_PROJECT.fullmatch(api.path)
-    if not m or api.method in ("GET", "HEAD") or (api.method == "" and not api.sends):
+    if not m or not api.writes:
         return None
     # glab fills :id from the cwd's project: None sends _slug to git; a numeric id is "?".
     repo = sw.gl_project(unquote(m.group(1)))
@@ -234,7 +234,7 @@ def _api(s, g, hi):
             else:
                 _value(post, a.value, a.live)
     m = re.fullmatch(rf"repos/({_NAME}|\{{owner\}})/({_NAME}|\{{repo\}})/pulls", api.path)
-    if not m or api.method in ("GET", "HEAD") or (api.method == "" and not api.sends):
+    if not m or not api.writes:
         return None
     # gh fills {owner}/{repo} from the cwd's repo: None sends _slug to git.
     post.repo = None if "{" in m.group(1) + m.group(2) else f"{m.group(1)}/{m.group(2)}"
@@ -256,8 +256,7 @@ def posts(doc):
             if g is None or g + 2 > b:
                 continue
             glab = sw.client(s.w[g]) == "glab"
-            env = "GITLAB_REPO=" if glab else "GH_REPO="
-            repo = next((s.w[i][len(env):] for i in range(a, g) if s.k[i] == "w" and s.w[i].startswith(env)), None)
+            repo = sw.gh_env_repo(s, a, g, "glab" if glab else "gh")
             if glab:
                 p = _mr_create(s, g, b, repo) if s.w[g + 1] == "mr" and s.w[g + 2] in _CREATE else \
                     _glab_api(s, g, b) if s.w[g + 1] == "api" else None
