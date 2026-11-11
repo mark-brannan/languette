@@ -541,7 +541,7 @@ def _strings(v):
     """Every string a decoded JSON value holds, in order."""
     if isinstance(v, str):
         return [v]
-    items = v if isinstance(v, list) else list(v.values()) if isinstance(v, dict) else []
+    items = v if isinstance(v, list) else [*v, *v.values()] if isinstance(v, dict) else []
     return [s for x in items for s in _strings(x)]
 
 

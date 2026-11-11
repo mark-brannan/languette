@@ -32,7 +32,7 @@ def _imports(path):
     for n in ast.walk(ast.parse(Path(path).read_text())):
         if isinstance(n, ast.ImportFrom) and n.level == 1 and n.module:
             out.add(n.module.split(".")[0])
-        elif isinstance(n, ast.ImportFrom) and n.module == "languette":
+        elif isinstance(n, ast.ImportFrom) and (n.module == "languette" or n.level == 1):
             out |= {a.name for a in n.names}
         elif isinstance(n, ast.ImportFrom) and (n.module or "").startswith("languette."):
             out.add(n.module.split(".")[1])

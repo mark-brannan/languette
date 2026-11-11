@@ -273,9 +273,9 @@ def test_the_state_hooks_run_one_command_on_the_tools_run_keeps_state_for():
     # Each state event's entry is written out by hand in hooks.json; one that drifts from the
     # others fails open on that event alone, and a matcher narrower than run's misses a read.
     hj = json.loads((ROOT / "hooks/hooks.json").read_text())["hooks"]
-    commands = {ev: h["command"] for ev in engine.STATE_EVENTS for e in hj[ev] for h in e["hooks"]}
-    assert_that(sorted(commands), equal_to(sorted(engine.STATE_EVENTS)))
-    assert_that(len(set(commands.values())), equal_to(1))
+    commands = [(ev, h["command"]) for ev in engine.STATE_EVENTS for e in hj[ev] for h in e["hooks"]]
+    assert_that(sorted({ev for ev, _ in commands}), equal_to(sorted(engine.STATE_EVENTS)))
+    assert_that(len({c for _, c in commands}), equal_to(1))
     tools = {t for ev in ("PostToolUse", "PostToolUseFailure") for e in hj[ev] for t in e["matcher"].split("|")}
     tools |= {"Read", "Edit", "Glob", "SendMessage", "WebFetchX", "mcp__github__create_issue"}
     for ev in ("PostToolUse", "PostToolUseFailure"):
