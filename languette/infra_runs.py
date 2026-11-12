@@ -116,11 +116,34 @@ _TOOL = re.compile(r"(?:^|/)(?:" + "|".join(sorted(TOOLS)) + r")(?:@[^/]*)?\Z")
 _ANY = re.compile(r"(?:^|/)(?:" + "|".join(sorted(TOOLS | sw.LAUNCH)) + r")(?:@[^/]*)?\Z")
 _LAUNCHER = re.compile(r"(?:^|/)(?:" + "|".join(sorted(sw.LAUNCH)) + r")\Z")
 HELP = frozenset("-h -help --help".split())
+# Each program's options that take the next word as their value, so the value is no subcommand
+# (docs/design/guard-rules.md, "A program description"); an option outside it is a flag.
+VALUED = {
+    "terragrunt": frozenset(
+        "--terragrunt-config --config --terragrunt-working-dir --working-dir --terragrunt-download-dir "
+        "--download-dir --terragrunt-iam-role --iam-assume-role --terragrunt-parallelism --parallelism "
+        "--terragrunt-include-dir --queue-include-dir --terragrunt-exclude-dir --queue-exclude-dir "
+        "--terragrunt-log-level --log-level --terragrunt-source --source".split()),
+    "pulumi": frozenset("--color --cwd -C --profiling --tracing --memprofilerate --verbose -v".split()),
+    "cdk": frozenset("-a --app -c --context -p --plugin --profile -r --role-arn -o --output --proxy "
+                     "--ca-bundle-path --toolkit-stack-name --build --lookups --notices".split()),
+    "aws": frozenset("--profile --region --endpoint-url --output --query --ca-bundle --cli-read-timeout "
+                     "--cli-connect-timeout --color --cli-binary-format".split()),
+    "kubectl": frozenset(
+        "-n --namespace --context --kubeconfig --cluster --user -s --server --token --as --as-group "
+        "--as-uid --certificate-authority --client-certificate --client-key --cache-dir "
+        "--request-timeout --tls-server-name --username --password --profile --profile-output "
+        "--log-flush-frequency -v --v --vmodule".split()),
+    "helm": frozenset("-n --namespace --kube-context --kubeconfig --kube-apiserver --kube-token "
+                      "--kube-as-user --kube-as-group --kube-ca-file --kube-tls-server-name "
+                      "--registry-config --repository-cache --repository-config --burst-limit "
+                      "--qps".split()),
+}
 
 
 def _name(word):
     """The tool a command word names: its basename, without an @version."""
-    b = word.rsplit("/", 1)[-1]
+    b = sw.basename(word)
     b = b.split("@", 1)[0] if "@" in b[1:] else b
     return "cdk" if b == "aws-cdk" else b
 
@@ -161,7 +184,7 @@ def _terraform(rest):
 
 def _terragrunt(rest):
     """Terraform, after terragrunt's own options and the run-all forms."""
-    words = sw.operands(rest, sw.PROGRAMS["terragrunt"]["valued"], options=True)
+    words = sw.operands(rest, VALUED["terragrunt"], options=True)
     pos = sw.operands(words)
     if pos and pos[0] in ("run-all", "run"):
         words = words[words.index(pos[0]) + 1:]
@@ -171,7 +194,7 @@ def _terragrunt(rest):
 
 
 def _pulumi(rest):
-    sub = (sw.operands(rest, sw.PROGRAMS["pulumi"]["valued"]) or [None])[0]
+    sub = (sw.operands(rest, VALUED["pulumi"]) or [None])[0]
     if _on(_flag(rest, "preview-only")):
         return None
     if sub in ("destroy", "down"):
@@ -182,7 +205,7 @@ def _pulumi(rest):
 
 
 def _cdk(rest):
-    sub = (sw.operands(rest, sw.PROGRAMS["cdk"]["valued"]) or [None])[0]
+    sub = (sw.operands(rest, VALUED["cdk"]) or [None])[0]
     if sub == "destroy":
         return "cdk-destroy"
     if sub == "deploy" and _after(rest, "require-approval") == "never":
@@ -190,7 +213,7 @@ def _cdk(rest):
 
 
 def _aws(rest):
-    pos = sw.operands(rest, sw.PROGRAMS["aws"]["valued"])
+    pos = sw.operands(rest, VALUED["aws"])
     service, op = (pos + [None, None])[:2]
     dry = _on(_flag(rest, "dry-run"))
     if op == "terminate-instances" and not dry:
@@ -204,7 +227,7 @@ def _aws(rest):
 
 
 def _kubectl(rest):
-    if (sw.operands(rest, sw.PROGRAMS["kubectl"]["valued"]) or [None])[0] != "delete":
+    if (sw.operands(rest, VALUED["kubectl"]) or [None])[0] != "delete":
         return None
     dry = _flag(rest, "dry-run")
     if dry is None or dry not in ("", "client", "server", "true"):
@@ -212,7 +235,7 @@ def _kubectl(rest):
 
 
 def _helm(rest):
-    if (sw.operands(rest, sw.PROGRAMS["helm"]["valued"]) or [None])[0] in ("uninstall", "delete", "del", "un") \
+    if (sw.operands(rest, VALUED["helm"]) or [None])[0] in ("uninstall", "delete", "del", "un") \
             and not _on(_flag(rest, "dry-run")):
         return "helm-uninstall"
 

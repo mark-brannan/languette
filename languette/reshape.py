@@ -7,12 +7,13 @@ refusal(pattern) is None for a pattern that is accepted, else why not:
     does not compile
     matches the empty string
     a backreference
-    a quantifier inside a quantified group      (a+)+  (\\d+)*x  (a|b?a)*
+    a quantifier inside a quantified group      (a+)+  (\\d+)*x  (a|b?a)*  (.*){12}
     two unbounded repeats in a row over the same characters      .*.*;  \\w+\\d+x
     overlapping alternatives inside a repeat      (?:a|aa)+x
 
 The three that backtrack without bound are found by overlap: a repeat is
-ambiguous when what its body can start with is what a repeat inside it, the
+ambiguous when what its body can start with is what a repeat inside it (an
+unbounded one, when the group's own count is bounded), the
 repeat after it, or another alternative can also consume. A delimiter in
 between keeps a pattern accepted: (\\.[\\w-]+)* is. Characters are compared over
 Latin-1 and a few others, case-folded. Standard library only.
@@ -142,13 +143,14 @@ def _shape(tree):
     if any(op in (C.GROUPREF, C.GROUPREF_EXISTS) for op, _ in items):
         return "a backreference"
     for item in items:
-        if not _unbounded(item):
+        outer = _repeat(item)
+        if outer is None or outer[1] < 2:
             continue
-        body = item[1][2]
-        start, _ = _first(body)
-        for inner in _items(body):
+        start, _ = _first(outer[2])
+        for inner in _items(outer[2]):
             r = _repeat(inner)
-            if r is not None and r[0] != r[1] and _both(_all(r[2]), start):
+            if r is not None and r[0] != r[1] and (_unbounded(item) or r[1] == C.MAXREPEAT) \
+                    and _both(_all(r[2]), start):
                 return "a quantifier inside a quantified group"
     for seq in _walk(tree):
         for a, b in zip(seq, seq[1:]):

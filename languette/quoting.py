@@ -3,6 +3,7 @@ or a substitution ends, the logical line an opener sits on, and heredoc
 bodies (stripped from the text, or read out of it).
 """
 
+import bisect
 import re
 
 
@@ -11,7 +12,8 @@ _OPENER = re.compile(r"(?<!<)<<-?[ \t]*(?:[A-Za-z_]|" + _DPART + r")(?:[A-Za-z0-
 _ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 # A word's run-time part that names one variable: $NAME or ${NAME}, the name in group 1 or 2.
 VAR_REF = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
-UNRESOLVED = re.compile(r"[$`*?\[]")           # a word the shell would still expand or glob
+# A word the shell would still expand, glob or brace-expand, so its text is not yet its value.
+UNREADABLE = re.compile(r"[$`*?\[{]")
 _CASE = re.compile(r"(?<![A-Za-z0-9_])case(?![A-Za-z0-9_])")
 
 
@@ -114,15 +116,15 @@ def _qopen(t):
     return "", -1
 
 
-def _line_end(t):
-    """Index of the newline that ends t's first logical line, or -1, read by
+def _line_end(t, i=0):
+    """Index of the newline that ends the logical line of t starting at i, or -1, read by
     the lexer's own rules (_qopen): a newline inside a quote, after a
     backslash, in `$'...'`, or in a `$(...)` or `...` substitution goes on,
     and `#` comments to the end of its line only before a word has begun. A
     heredoc body begins on the line after it. A quote or substitution left
     open to the end of t gives -1, so nothing after it is taken for a body and
     every word stays in the text."""
-    L, i, have, dollar, subs = len(t), 0, False, False, []
+    L, have, dollar, subs = len(t), False, False, []
     while i < L:
         c, after_dollar, dollar = t[i], dollar, False
         if c == "\\":
@@ -199,6 +201,27 @@ def heredoc_subs(s):
     return out
 
 
+def _closers(b):
+    """Every line of b by its text less the spaces and tabs around it: {text: [line start]}."""
+    out, at = {}, 0
+    for line in b.split("\n"):
+        out.setdefault(line.strip(" \t"), []).append(at)
+        at += len(line) + 1
+    return out
+
+
+def _closing(b, closers, d, q):
+    """(start, end) of the first line at or past q that is delimiter d with spaces and tabs
+    around it, end just past its newline; None when no such line comes."""
+    starts = closers.get(d.strip(" \t"), ())
+    for at in starts[bisect.bisect_left(starts, q):]:
+        e = b.find("\n", at)
+        e = len(b) if e < 0 else e
+        if re.fullmatch(r"[ \t]*" + re.escape(d) + r"[ \t]*", b[at:e]):
+            return at, min(e + 1, len(b))
+    return None
+
+
 def _heredocs(b):
     """(stripped, [(body, quoted)]) -- the awk's sw_heredocs walk. Every opener
     on a line takes its body in turn from the lines below; the rest of the
@@ -210,15 +233,17 @@ def _heredocs(b):
     substitutions (heredoc_subs). A body whose closing line never comes stays
     in the text as commands. body is "" when the opener ends the text. The
     search resumes after each heredoc, never inside what it kept, so a `<<X`
-    in a kept substitution cannot pair with a later X line."""
-    done, docs = "", []
+    in a kept substitution cannot pair with a later X line. The walk reads b
+    once: each closing line is looked up, not searched for."""
+    done, docs, at, closers = [], [], 0, None
     while True:
-        m = _OPENER.search(b)
+        m = _OPENER.search(b, at)
         if not m:
-            return done + b, docs
-        head, b = b[:m.start()], b[m.start():]
-        nl = _line_end(b)             # the opener's logical line, not its first physical one
-        seg, tail = (b, "") if nl < 0 else (b[:nl], b[nl + 1:])
+            done.append(b[at:])
+            return "".join(done), docs
+        head = b[at:m.start()]
+        nl = _line_end(b, m.start())  # the opener's logical line, not its first physical one
+        seg, q = (b[m.start():], len(b)) if nl < 0 else (b[m.start():nl], nl + 1)
         delims = []
 
         def opener(o):
@@ -236,15 +261,21 @@ def _heredocs(b):
         for d, quoted in delims:
             body = ""
             if closed:
-                e = re.search("(?:^|\n)[ \t]*" + re.escape(d) + "[ \t]*(?:\n|\\Z)", tail)
+                closers = _closers(b) if closers is None else closers
+                e = _closing(b, closers, d, q)
                 if e:
-                    body, tail = tail[:e.start()], tail[e.end():]
+                    body, q = b[q:max(q, e[0] - 1)], e[1]
                     subs += "" if quoted else heredoc_subs(body)
                 else:                       # never closes: keep it, as commands
-                    body, closed = tail, False
+                    body, closed = b[q:], False
             docs.append((body, quoted))
-        done += head + seg + subs
-        b = "" if nl < 0 else "\n" + tail
+        done.append(head + seg + subs)
+        if nl < 0:
+            return "".join(done), docs
+        if q >= len(b):
+            done.append("\n")
+            return "".join(done), docs
+        at = q - 1                          # the newline before the rest, as the line break it is
 
 
 def strip_heredocs(b):

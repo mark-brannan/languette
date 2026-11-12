@@ -18,15 +18,23 @@ GLAB = re.compile(r"(?:^|/)glab\Z")
 CLIENTS = re.compile(r"(?:^|/)(?:gh|glab)\Z")
 
 
-def client(w):
-    """"gh" or "glab" for a word CLIENTS matches, by its last path part."""
+def basename(w):
+    """The name a command word runs: its last path part (`/usr/bin/git` is `git`)."""
     return w.rsplit("/", 1)[-1]
+
+
+def client(w):
+    """"gh" or "glab" for a word CLIENTS matches, by its basename."""
+    return basename(w)
 
 
 # A word that is cd, pushd or popd: the builtins that move the working directory.
 CD = re.compile(r"\A(?:cd|pushd|popd)\Z")
 # git's global options that take the next word as their value.
 GIT_VALUE = frozenset("-C -c --git-dir --work-tree --namespace --config-env --attr-source".split())
+# `git push`'s options that take the next word as their value. A push takes any unambiguous prefix
+# of a long option; --exec is --receive-pack.
+GIT_PUSH_VALUE = frozenset("-o --push-option --repo --receive-pack --exec".split())
 PROSE = frozenset("grep egrep fgrep rg ag ack echo printf gh glab sed awk jq yq "
                   "cat tee test [ diff sort head tail wc tr cut less more".split()) | frozenset(GIT_WRAPPERS)
 # Process tools name a script to find it, not to run it.
@@ -48,18 +56,14 @@ WRAP = frozenset("sudo env command exec time nice nohup timeout doas builtin "
 
 
 def operands(words, valued=(), options=False):
-    """`words` less each option in `valued` and the word after it, its value;
-    the other options stay only when `options`. An option outside `valued` is
-    read as a flag. `valued` is a program description's (PROGRAMS)."""
-    out, skip = [], False
-    for w in words:
-        if skip:
-            skip = False
-        elif w in valued:
-            skip = True
-        elif options or not w.startswith("-"):
-            out.append(w)
-    return out
+    """`words` less each option in `valued` and its value, read as getopt reads them (a
+    cluster `-xn ns` included); the other options stay only when `options`, each word once.
+    An option outside `valued` is read as a flag, and `--` is one too. `valued` is a
+    program's own table of options that take a value."""
+    keep, valued = {}, frozenset(valued)
+    for i, opt, w in _getopt(words, dict.fromkeys(valued, 1), False, ()):
+        keep[i] = keep.get(i, True) and (opt is None or (options and opt not in valued))
+    return [words[i] for i, k in keep.items() if k]
 
 
 def getopt(words, options, abbreviate=False, ends=("--",)):
@@ -69,35 +73,38 @@ def getopt(words, options, abbreviate=False, ends=("--",)):
     = or to its short letter, 0 for a flag; an option it lacks is a flag, so it cannot hide
     what follows it. A cluster `-xvf` sets each letter up to a valued one, whose value is the
     rest. With `abbreviate`, a unique prefix of a long option in `options` is that option."""
+    for _, opt, w in _getopt(words, options, abbreviate, ends):
+        yield opt, w
+
+
+def _getopt(words, options, abbreviate, ends):
+    """getopt's reading, each item led by the index of its word."""
     i, n = 0, len(words)
     while i < n:
         w = words[i]
         i += 1
         if w in ends:
-            yield from ((None, x) for x in words[i:])
+            yield from ((x, None, words[x]) for x in range(i, n))
             return
         if w.startswith("--"):
             name, eq, _ = w.partition("=")
             same = [o for o in options if o == name]
             same = same or [o for o in options if abbreviate and o.startswith("--") and o.startswith(name)]
             name = same[0] if len(same) == 1 else name
-            yield name, w
+            yield i - 1, name, w
             i += 0 if eq else options.get(name, 0)
         elif w.startswith("-") and w != "-":
+            at = i - 1
             for j, ch in enumerate(w[1:], 1):
-                yield "-" + ch, w
+                yield at, "-" + ch, w
                 if options.get("-" + ch):
                     i += options["-" + ch] if j == len(w) - 1 else 0
                     break
         else:
-            yield None, w
+            yield i - 1, None, w
 
 
 def listed(value):
     """The entries of a comma-separated setting, trimmed and non-empty; none
     when it is unset."""
     return [x.strip() for x in (value or "").split(",") if x.strip()]
-
-
-def _base(w):
-    return w.rsplit("/", 1)[-1]

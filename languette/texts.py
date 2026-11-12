@@ -8,7 +8,7 @@ import re
 
 from . import lexer                            # lexer.Scan, so a stand-in for it reaches these calls too
 from .quoting import strip_heredocs, _ASSIGN, _heredocs
-from .lexicon import EXEC, GIT, LOOP, PROSE, SHELL, WRAP
+from .lexicon import basename, EXEC, GIT, LOOP, PROSE, SHELL, WRAP
 from .ladder import TooMany
 from .git_calls import git_wrapper
 from .lexer import seg_cmd
@@ -102,7 +102,7 @@ def texts_of(text, prose=PROSE, read=None):
 
 
 def _is_shell(word):
-    return word.rsplit("/", 1)[-1] in SHELL
+    return basename(word) in SHELL
 
 
 def shell_heredocs(text, scan=None):
@@ -214,7 +214,7 @@ def alone(scans, cmd):
                     return False
                 continue
             c = seg_cmd(s, a, b)
-            w = s.w[c].rsplit("/", 1)[-1] if c is not None else None
+            w = basename(s.w[c]) if c is not None else None
             if w not in INERT and not (w in SHELL and runs_quoted(s, c, b, w)):
                 return False
     return True

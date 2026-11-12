@@ -54,13 +54,14 @@ def test_a_project_regex_over_512_characters_is_refused():
         drive(secrets.load("/p/.languette/secrets.json"), json.dumps({"patterns": [{"id": "long", "regex": "a" * 513}]}))
 
 
-@pytest.mark.parametrize("regex", ["(a+)+$", "(a*)*b", "(\\w+\\s?)+$", "(?:x|(a+))+", "((ab)*)+"])
-def test_a_project_regex_nesting_unbounded_repeats_is_refused(regex):
-    with pytest.raises(Refuse, match="nests one unbounded repeat"):
+@pytest.mark.parametrize("regex", ["(a+)+$", "(a*)*b", "(\\w+\\s?)+$", "(?:x|(a+))+", "((ab)*)+", "(a{1,3})+",
+                                   "(.*){12}Z", "\\w+\\d+x"])
+def test_a_project_regex_the_terms_screen_refuses_is_refused(regex):
+    with pytest.raises(Refuse, match="a pattern languette will not run"):
         drive(secrets.load("/p/.languette/secrets.json"), json.dumps({"patterns": [{"id": "slow", "regex": regex}]}))
 
 
-@pytest.mark.parametrize("regex", ["acme_[a-z0-9]{24}", "(a+)b+", "(?:ab)+c", "(a{1,3})+", "^-----BEGIN .* KEY-----$",
+@pytest.mark.parametrize("regex", ["acme_[a-z0-9]{24}", "(a+)b+", "(?:ab)+c", "^-----BEGIN .* KEY-----$",
                                    "(?=.*\\d)[A-Za-z0-9]{32,}", "(a|b)*c"])
 def test_a_project_regex_with_one_level_of_repeat_is_kept(regex):
     _, loaded = drive(secrets.load("/p/.languette/secrets.json"), json.dumps({"patterns": [{"id": "ok", "regex": regex}]}))
