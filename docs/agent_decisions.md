@@ -749,3 +749,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t063006z
 - the exemption key on an ask-first match entry is 'except', a non-empty list of whole words; deny-always refuses it Undo: rename the key in command_rules ASK_MATCH_KEYS and its check ([#414](https://github.com/mark-brannan/languette/pull/414))
+
+### 20261112t063035z
+- labels stay unique within a file; where the user's list and the repo's both give one label, as #407 lets them with a warning, the guard wants one yes per run at the widest run count of the entries hit, the way it counts two match entries of one command Undo: sum the runs per shared label in listed_runs.approval instead of max ([#414](https://github.com/mark-brannan/languette/pull/414))
