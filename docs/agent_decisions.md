@@ -752,3 +752,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t063035z
 - labels stay unique within a file; where the user's list and the repo's both give one label, as #407 lets them with a warning, the guard wants one yes per run at the widest run count of the entries hit, the way it counts two match entries of one command Undo: sum the runs per shared label in listed_runs.approval instead of max ([#414](https://github.com/mark-brannan/languette/pull/414))
+
+### 20261112t063047z
+- the doctor's fix for a shared label or a broken user list is a printed line naming the edit, not a write Undo: add a --fix path in doctor that rewrites the label or moves the file aside on a yes ([#414](https://github.com/mark-brannan/languette/pull/414))
