@@ -779,3 +779,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t071600z
 - The read deny row checks two sample paths, .env in the working directory and a key under ~/.ssh, and is labelled read deny rather than secrets Undo: revert the line in doctor.py ([#385](https://github.com/mark-brannan/languette/issues/385)) (no PR, branch claude/doctor-layers-385)
+
+### 20261112t071603z
+- A sandbox on with failIfUnavailable off or unset is a warning, as is allowUnsandboxedCommands on or unset Undo: revert the line in doctor.py ([#385](https://github.com/mark-brannan/languette/issues/385)) (no PR, branch claude/doctor-layers-385)
