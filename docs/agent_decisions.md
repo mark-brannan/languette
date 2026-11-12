@@ -728,3 +728,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t052300z
 - Two calls racing for one yes: the spend waits 0.2 s past the transcript write timer, reads the transcripts again, and the earlier call by timestamp wins; nothing languette wrote is read Undo: drop SETTLE and the second read ([#410](https://github.com/mark-brannan/languette/pull/410))
+
+### 20261112t052314z
+- Replay a past call through every guard on for its tool, read-only facts only, acts dropped Undo: replay with a named list of approval guards ([#410](https://github.com/mark-brannan/languette/pull/410))
