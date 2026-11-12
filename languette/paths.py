@@ -41,14 +41,15 @@ def lexical(p):
 def word_path(word, cwd, home, live=True, tilde=True, names=None):
     """The absolute path a path word names, `..` applied as text, or None when the hook
     cannot tell. A leading ~ is the home directory where the shell expands it (`tilde`),
-    never where a $NAME puts it; $HOME, ${HOME} and the $NAMEs in `names` take their values
-    where the word is live. Any other $ or backtick, a literal $, a glob, or a relative path
-    with no cwd is None."""
+    never where a $NAME puts it, and else a directory named ~, as gh opens it; $HOME,
+    ${HOME} and the $NAMEs in `names` take their values where the word is live. Any other
+    $ or backtick, a literal $, a glob, or a relative path with no cwd is None."""
     p = word
     if p == "~" or p.startswith("~/"):
-        if not (tilde and home):
-            return None
-        p = home + p[1:]
+        if tilde:
+            if not home:
+                return None
+            p = home + p[1:]
     elif p.startswith("~"):
         return None
     if "$" in p or "`" in p:

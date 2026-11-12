@@ -1281,6 +1281,8 @@ Feature: guard-private-terms
       And the directory "{HOME}/pt-d"
 
     # --- the file's contents are scanned, its path is not -------------------------
+    # A leading ~ is home only where the shell expands it, at the start of an unquoted
+    # word; glued to --body-file=, -F or @, or quoted, gh opens a directory named ~.
 
     Scenario Outline: a file's contents decide, wherever the flag spells the path
       Given the working directory is "<cwd>"
@@ -1294,7 +1296,11 @@ Feature: guard-private-terms
       @also_guard-signed-comments
       Examples:
         | cwd    | command                                                                     | verdict                     |
-        | {PROJ} | gh issue comment 4 -R o/r --body-file=~/pt-term.md                          | denies, naming "Wanderlust" |
+        | {PROJ} | gh issue comment 4 -R o/r --body-file ~/pt-term.md                          | denies, naming "Wanderlust" |
+        | {PROJ} | gh issue comment 4 -R o/r --body-file=~/pt-term.md                          | denies, naming "{PROJ}/~/pt-term.md cannot be read" |
+        | {PROJ} | gh issue comment 4 -R o/r -F~/pt-term.md                                    | denies, naming "{PROJ}/~/pt-term.md cannot be read" |
+        | {PROJ} | gh issue comment 4 -R o/r --body-file "~/pt-term.md"                        | denies, naming "{PROJ}/~/pt-term.md cannot be read" |
+        | {PROJ} | gh api repos/o/r/issues/3/comments -F body=@~/pt-term.md                    | denies, naming "{PROJ}/~/pt-term.md cannot be read" |
         | {PROJ} | gh api repos/o/r/issues/3/comments -F body=@{PROJ}/body.md                  | denies, naming "Wanderlust" |
 
       @also_guard-github-issues

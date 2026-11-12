@@ -352,6 +352,38 @@ Feature: guard-signed-comments
         | source ./env.sh          |
         | let 'b=1'                |
         | declare -n r=b; r=x      |
+        | ref=b; printf -v "$ref" unsigned |
+        | ref=b; printf -v"$ref" unsigned |
+        | printf "-v" b unsigned   |
+        | ref=b; read -r "$ref" < notes.txt |
+        | read -r ${ref:-b} < notes.txt |
+        | mapfile -t "$ref" < notes.txt |
+        | unset "$ref"             |
+        | declare "$ref=x"         |
+        | export "$ref"=x          |
+        | declare -r -n r=b; r=x   |
+        | local -gn r=b; r=x       |
+
+    Scenario Outline: a builtin that names another variable leaves the heredoc readable
+      When the agent runs:
+        """
+        b=$(cat <<'EOF'
+        🤖 Fixed.
+
+        🤖 claude-opus-5-5 · high · 5a74df74
+        EOF
+        )
+        <other>
+        gh pr comment 1 -b "$b"
+        """
+      Then the guard is silent
+
+      Examples:
+        | other                               |
+        | IFS= read -r line < notes.txt       |
+        | printf -v n '%s' "$b"               |
+        | export NOTE="$t done"               |
+        | echo "read me first, then unset it" |
 
     Scenario: a typed HEREDOC0 word does not pass for the call's own heredoc
       When the agent runs:

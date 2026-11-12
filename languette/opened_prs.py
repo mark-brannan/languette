@@ -149,7 +149,7 @@ def _api_body(r, s, lo, g, hi, cli, key):
     for a in api.args:
         if a.key == key:
             if a.value.startswith("@") and a.typed:
-                post.parts.append(r.file(a.value[1:], a.live, True, s, lo, hi))
+                post.parts.append(r.file(a.value[1:], a.live, a.tilde, s, lo, hi))
             else:
                 post.parts.append(r.value(a.value, a.live))
     return api, post

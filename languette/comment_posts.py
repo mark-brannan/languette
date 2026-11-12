@@ -141,9 +141,9 @@ class _Read:
             if a.text is None:
                 continue
             if a.flag == "--input":
-                inp = self.bodies.file(a.text, a.live, True, self.s, lo, hi)
+                inp = self.bodies.file(a.text, a.live, a.tilde, self.s, lo, hi)
             elif a.typed and a.value.startswith("@"):
-                fields.append((a.key, self.bodies.file(a.value[1:], a.live, True, self.s, lo, hi)))
+                fields.append((a.key, self.bodies.file(a.value[1:], a.live, a.tilde, self.s, lo, hi)))
             elif a.key == "query" and a.live and not sw.VAR_REF.fullmatch(a.value) and not re.search(r"\$\(|`", a.value):
                 # A query is read for its shape: a $NAME inside it changes a value, never the mutation.
                 fields.append((a.key, ("text", a.value)))

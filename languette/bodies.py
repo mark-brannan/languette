@@ -18,6 +18,16 @@ _MARK = " HEREDOC "
 _DOC = re.compile(r"HEREDOC(\d+)")
 _FROM_DOC = re.compile(r"""\$\(\s*cat\s+(?:-\s+)?HEREDOC(\d+)\s*\)""")
 _SEP = re.compile(r"(\|\||&&|[;&|])")
+# A builtin that assigns the variables its words name, and the words a builtin's options take.
+_BUILTIN = re.compile(r"(?:^|[;&|(`{\n]|\b(?:then|do|else|if|elif|while|until|builtin|command|!)\s)\s*"
+                      r"(?:[A-Za-z_]\w*=\S*\s+)*(read|printf|mapfile|readarray|unset|getopts|for|select"
+                      r"|declare|typeset|local|export|readonly)\b([^;&|\n]*)")
+# A shell word, its quotes kept: a target typed with a quote or a $ is named at run time.
+_WORD = re.compile(r"""(?:[^\s"'\\`$]|\\.|"(?:[^"\\]|\\.)*"|'[^']*'|`[^`]*`|\$\([^)]*\)|\$)+""")
+_OPTARG = {"read": "dinNptu", "mapfile": "dnOsuCc", "readarray": "dnOsuCc"}
+_NAME = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]$`]*\])?")
+# An arithmetic command or expansion that assigns: =, op=, ++ or --, not == != <= >=.
+_ARITH_SET = re.compile(r"\(\((?:[^)]|\)(?!\)))*?(?:(?<![=!<>])=(?!=)|\+\+|--)")
 # A command that copies its stdin to a file unchanged: the file holds the heredoc's text.
 _COPIES = re.compile(r"(?:\S*/)?(?:cat|tee)\Z")
 
@@ -86,15 +96,19 @@ class Bodies:
     def _fed_var(self, name):
         """The heredoc a $NAME holds when this command assigns it once, from `$(cat <<EOF)`,
         before its first use, and never assigns it again (=, +=, read, printf -v,
-        mapfile, for, unset), and runs nothing that could (eval, source, let, a nameref); else None."""
+        mapfile, for, unset, declare), and runs nothing that could (eval, source, let, a
+        nameref, arithmetic, a builtin whose target is built at run time); else None."""
         t, n = self.text, re.escape(name)
         # A shell assignment, not a gh field (-f NAME=...) of the same name.
         sets = [a for a in re.finditer(r"(?:^|[\s;&|(])" + n + r"(?:\[[^\]]*\])?\+?=", t)
                 if not re.search(r"(?:-[fF]|--field|--raw-field)\s*\Z", t[:a.start() + 1])]
-        again = re.search(r"(?:^|[\s;&|(`])(?:read|printf|mapfile|readarray|unset|getopts|for|select)\b"
-                          r"[^;&|\n]*?(?<![$\w{])" + n + r"\b", t)
-        # eval, source, . and let assign from text these regexes never see; a nameref (declare -n) does too.
-        blind = re.search(r"(?:^|[\s;&|(`])(?:(?:eval|source|let)\b|\.(?=\s)|(?:declare|typeset|local)\s+-\w*n\b)", t)
+        targets = [w for m in _BUILTIN.finditer(t) for w in _targets(m.group(1), _WORD.findall(m.group(2)))]
+        names = [m.group(1) if (m := _NAME.fullmatch(w or "")) else None for w in targets]
+        again = name in names
+        # eval, source, . and let assign from text these regexes never see; so do arithmetic, a
+        # nameref and a target only run time names (printf -v "$ref", read "$ref").
+        blind = (re.search(r"(?:^|[\s;&|(`])(?:(?:eval|source|let)\b|\.(?=\s))", t) or _ARITH_SET.search(t)
+                 or None in names)
         use = re.search(r"\$\{?" + n + r"\b", t)
         if len(sets) != 1 or again or blind or not use or sets[0].end() > use.start() or "+=" in sets[0].group():
             return None
@@ -167,3 +181,40 @@ def _copied(line):
                 out += [(p, k) for p in dests]
                 piped = k
     return out
+
+
+
+def _targets(cmd, words):
+    """The names builtin cmd assigns, as typed in its words; None for a nameref
+    (declare -n), whose name stands for another."""
+    if cmd == "printf":
+        if any(w[:1] in "\"'\\" and re.sub(r"[\"'\\]", "", w).startswith("-v") for w in words):
+            return [None]  # a quoted -v: the target is spelled at run time
+        return [w[2:] or (words[i + 1] if i + 1 < len(words) else None)
+                for i, w in enumerate(words) if w.startswith("-v")]
+    if cmd in ("for", "select"):
+        return words[:1]
+    if cmd in ("declare", "typeset", "local") and any(re.fullmatch(r"-\w*n\w*", w) for w in words):
+        return [None]
+    out, skip = [], False
+    for w in words:
+        if skip:
+            out += [w] if skip == "name" else []
+            skip = False
+        elif re.fullmatch(r"\d*(?:<<<|<>|[<>]&?|>>)", w):
+            skip = True  # a redirection's target, not a name
+        elif re.match(r"\d*(?:<|>)", w):
+            pass
+        elif w[:1] in "-+" and len(w) > 1:
+            o = w[1:]
+            if cmd == "read" and "a" in o:  # -a NAME, the array read fills
+                rest = o[o.index("a") + 1:]
+                out += [rest] if rest else []
+                skip = "name" if not rest else False
+            elif o[-1] in _OPTARG.get(cmd, ""):
+                skip = True
+        elif cmd in ("declare", "typeset", "local", "export", "readonly"):
+            out.append(re.sub(r"\+?=.*", "", w, flags=re.S))
+        else:
+            out.append(w)
+    return out[1:] if cmd == "getopts" else out

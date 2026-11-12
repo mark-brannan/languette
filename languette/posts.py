@@ -177,7 +177,7 @@ class _Meta:
         key = v.split("=", 1)[0]
         v = v.split("=", 1)[1] if "=" in v else v
         if v.startswith("@"):
-            self.file(v[1:], live)
+            self.file(v[1:], live, False)  # the shell never expands a ~ after @
             return
         # An id or number field names a thing by its identifier; the API refuses
         # prose there, so a run-time value carries no text to check.
@@ -315,7 +315,7 @@ class _Meta:
             if a.text is None:
                 continue
             if a.flag == "--input":
-                self.file(a.text, a.live)
+                self.file(a.text, a.live, a.tilde)
             else:
                 self.field(a.text, a.live)
         for t in api.flags:
