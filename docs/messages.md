@@ -31,12 +31,26 @@ ask_first_unattended: `{id}` ({path}) needs the user's approval for each run, an
 ```
 bl_alone: is read at hook time, and another command in the same call could rewrite it before gh reads it; run the gh on its own
 bl_home: names a home directory the guard cannot see
+bl_unresolved: is built at run time, or holds a glob
 bl_relative: is a relative path, and the guard cannot tell where the command stands
 bl_not_read: is not read yet
-bl_input_live: the --input path `{src}` is built at run time
 bl_input_stdin: the --input payload comes from stdin and no heredoc in the command feeds it
 bl_heredoc_live: the heredoc feeding --input is built at run time (an unquoted delimiter and a $ or backtick)
 bl_input_file: the --input file `{src}` {err}
+```
+
+## body
+
+```
+body_run_time: the body is built at run time ({v})
+body_unpaired: the body comes from a heredoc this hook could not pair with its use
+body_heredoc_live: the body comes from a heredoc built at run time (an unquoted delimiter and a $ or backtick); quote the delimiter, <<'EOF'
+body_stdin: the body comes from stdin and no heredoc on this command feeds it
+body_unresolved: is not a path this hook can resolve (a $VAR, a glob, or a relative path after a cd)
+body_written_again: is changed again in this same command (written {n} times)
+body_appended: is appended to in this same command, so it holds its old text as well as the heredoc's
+body_not_heredoc: is changed in this same command, and not from a heredoc that it holds unchanged
+body_unreadable: cannot be read
 ```
 
 ## br
@@ -92,21 +106,11 @@ disks_refused: `{what}` is blocked: {why}. {way_out}
 disks_blocked: `{what} {raw}` is blocked: {abs_} is {kind}. {way_out}
 ```
 
-## dp
-
-```
-dp_relative_cd: is a relative path after a cd, and the guard cannot tell where the command stands
-```
-
 ## dup
 
 ```
-dup_body_opaque: the body is built at run time ({v}) and no heredoc in this command feeds it, so its text cannot be checked for an issue it closes. Write it literally, in a heredoc in the same command, or in a file and pass --body-file <path>.
-dup_body_stdin: the body comes from stdin (--body-file -) and there is no heredoc in the command, so it cannot be checked. Put the text in a heredoc in the same command, or in a file and pass --body-file <path>.
+dup_body_opaque: {why}, so its text cannot be checked for an issue it closes. Write it literally, in a heredoc in the same command, or in a file and pass --body-file <path>.
 dup_body_file: --body-file {v} {got}, so the body cannot be checked for an issue it closes. Write it to that path from a heredoc in this same command, or create the file in an earlier command and retry; spell the path out, since a variable set in an earlier command is invisible here.
-dup_body_rewritten: --body-file {v} is changed again in this same command (written {n} times), so neither a heredoc nor the file on disk is the text gh sends. Write the body to that path from one heredoc and nothing else in this command, or write the file in an earlier command and retry.
-dup_body_appended: --body-file {v} is appended to in this same command, so the text gh sends is the file's old text plus the append, not the heredoc alone. Write the body to that path with `>` from one heredoc, or write the file in an earlier command and retry.
-dup_body_not_heredoc: --body-file {v} is changed in this same command, and not from a heredoc, so the file on disk is not yet the text gh sends. Write the body to that path from a heredoc in this command, or write the file in an earlier command and retry.
 dup_repo_unknown: {guard}: this PR would close #{n}, and the hook can't tell which repo it is opened on (no --repo, and the working directory's origin is not on GitHub or GitLab, or a cd moves it), so it can't check whether an open PR already references #{n}. Pass --repo owner/name, or read the issue first.
 dup_github_silent: {guard}: this PR would close {repo}#{n}, and GitHub couldn't say whether an open PR already references it (gh missing, signed out, offline, an error, or a timeline past {page} events):
       gh api repos/{repo}/issues/{n}/timeline
@@ -379,7 +383,8 @@ signature_unread: {guard}: {why}
     
     {signed}
 signature_opaque_body: {what}, so its signature cannot be checked before it is posted. Write it literally, in a heredoc in the same command, or in a file and pass --body-file <path>.
-signature_body_file: the body file {why}, so its signature cannot be checked before it is posted. Spell out the path, or write the file from a heredoc in this same command (cat > PATH <<'EOF' ... EOF), or put the body in a heredoc and pass --body-file -.
+signature_body_file: the body file {path} {why}, so its signature cannot be checked before it is posted. Spell out the path, or write the file from a heredoc in this same command (cat > PATH <<'EOF' ... EOF), or put the body in a heredoc and pass --body-file -.
+signature_flag_shape: the flag `{flag}` carries the body in a shape this hook does not read
 signature_input_not_json: the --input payload is not JSON this hook can read, so its signature cannot be checked. Write the JSON literally in a heredoc fed to --input -.
 signature_graphql_not_literal: the graphql body is not a string literal this hook can read, so its signature cannot be checked. Pass it as a variable (-f body=..., or from a heredoc).
 signature_graphql_variable: the graphql {field} comes from ${name}, which this hook cannot read, so its signature cannot be checked. Pass the body as its own variable, -f body=... or from a heredoc in the same command.

@@ -65,7 +65,7 @@ ANSWERS = {"Refuse", "deny", "ask", "context"}
 # must fall inside one of these.
 KNOWN_TWICE = set()
 # Reads of a DOCUMENT_FIELDS key from the payload, at most, per guard.
-KNOWN_PAYLOAD_READS = {"posts": 1}
+KNOWN_PAYLOAD_READS = {}
 # Answers whose text is anything but a messages.say call, at most, per guard.
 KNOWN_INLINE_TEXT = {}
 # What a guard may ask of World that languette did not write: git, GitHub, the filesystem, the clock.
