@@ -46,8 +46,8 @@ one. A warn, as sent:
 
 **Who may change a decision:** the user only, through configuration the
 agent cannot write (the user tier in [guard rules](guard-rules.md)); the repo
-tier only adds denies. A crashed guard's deny and an unparsable command's
-deny are never downgraded: both fail closed.
+tier adds denies, the rest open there. A crashed guard's deny and an
+unparsable command's deny are never downgraded: both fail closed.
 
 The configuration's shape is open (#87): a `tell:` field per rule, defaulting
 by decision as the table does and with `warn` naming allow-and-tell-both, is
