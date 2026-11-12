@@ -27,7 +27,9 @@ stops the look through npx and kin. `file`, optional, names a rule file
 shipped beside the rule sets, read when present; its rules add denies, as
 `repo`'s do. `repo`, optional, names the file a project keeps, found as
 ask-first finds its list, whose rules add denies: the repo tier, which says
-nothing else, and whose `why` is the repo's own words. Its rules take an
+nothing else, and whose `why` is the repo's own words. `user`, optional, names
+the user's own file of the same shape, in paths.user_config, read before the
+repo's: its rules add denies in every repo, and no repo's file takes one away. Its rules take an
 optional `action`, which must be "deny". `calls`, optional, is "command" (the default: a call
 with no command is no finding) or "any": the guard judges a call that carries none, an MCP tool's. `opt_in`, optional, names the plugin
 option that must be "true" for the guard to run, as an opt-in guard module's
@@ -48,7 +50,7 @@ from languette import scan as sw
 from languette.messages import MESSAGES, say
 from languette.verdict import WAY_USER, Need, Refuse, judged
 
-_SET_KEYS = frozenset({"guard", "rules", "repo", "opt_in", "file", "read", "units", "calls", "on"})
+_SET_KEYS = frozenset({"guard", "rules", "repo", "user", "opt_in", "file", "read", "units", "calls", "on"})
 # The hook events that carry no decision, whose output run.py keeps off stdout: the ones `on` may name.
 STATE_EVENTS = frozenset({"PostToolUse", "PostToolUseFailure", "SubagentStart", "SessionStart", "UserPromptSubmit"})
 _READ_KEYS = frozenset({"process_prose", "launchers"})
@@ -121,6 +123,9 @@ def load(rule_set):
         raise sw.BadRules("guard must be a guard's name")
     if "repo" in rule_set and (not isinstance(rule_set["repo"], str) or not rule_set["repo"].startswith(".languette/")):
         raise sw.BadRules("repo must be a path under .languette/")
+    if "user" in rule_set and (not isinstance(rule_set["user"], str) or "/" in rule_set["user"]
+                               or not rule_set["user"].strip(".")):
+        raise sw.BadRules("user must be the name of a file in the user's languette config directory")
     if rule_set.get("calls", "command") not in ("command", "any"):
         raise sw.BadRules('calls must be "command" or "any"')
     if "file" in rule_set and (not isinstance(rule_set["file"], str) or "/" in rule_set["file"]):
@@ -207,6 +212,14 @@ def repo_rules(path, rules):
                                         taken={r["id"] for r in rules}, match_keys=sw.ENGINE_MATCH_KEYS))
 
 
+def user_rules(env, name, rules):
+    """(path, the rules of the user's own file `name`, or None when there is none), beside the
+    set's own loaded `rules`; Refuse naming the fault when it does not load. A repo's file may
+    repeat a user rule's id: each file's rules add denies, and none takes one away."""
+    return (yield from paths.user_rules(env, name, "rules", ("action", "why"), _repo, many=True,
+                                        taken={r["id"] for r in rules}, match_keys=sw.ENGINE_MATCH_KEYS))
+
+
 class Guard:
     """The guard a rule set module's RULE_SET is. Its judging code is this
     module's, so __file__ names it, and check(doc) takes the call alone, as a
@@ -268,6 +281,15 @@ class Guard:
             hit = yield from _hit(doc, rule, self._read, self.RULE_SET.get("units"))
             if hit:
                 return _denial(rule, hit[0], self.RULE_FILE)
+        if "user" in self.RULE_SET:
+            try:
+                upath, found = yield from user_rules(doc.env, self.RULE_SET["user"], rules)
+            except Refuse as e:
+                return say("rules_bad", file=paths.user_config(doc.env, self.RULE_SET["user"]), err=e)
+            for rule in found or ():
+                hit = yield from _hit(doc, rule, self._read, self.RULE_SET.get("units"))
+                if hit:
+                    return _denial(rule, hit[0], upath)
         if "repo" not in self.RULE_SET:
             return None
         path, usable = yield from paths.project_config(doc.payload, doc.env, self.RULE_SET["repo"])

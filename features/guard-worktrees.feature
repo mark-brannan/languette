@@ -804,7 +804,7 @@ Feature: guard-worktrees
         | home         |
         | /nonexistent |
 
-      @also_guard-disks @also_guard-permissions @also_guard-recursive-delete
+      @also_guard-disks @also_guard-permissions @also_guard-recursive-delete @also_ask-first @also_deny-always
       Examples:
         | home         |
         |              |
