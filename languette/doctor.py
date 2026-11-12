@@ -324,7 +324,7 @@ def check(cwd):
     rows.append(claude)
     rows += beside_rows(cwd)
 
-    paths ={name: shutil.which(name) for name in FORGES}
+    paths = {name: shutil.which(name) for name in FORGES}
     # The probes may reach the network: in parallel, a dead one costs one timeout, not one per client.
     with ThreadPoolExecutor() as pool:
         answers = {name: pool.submit(signed_in, path, *FORGES[name][:2]) for name, path in paths.items() if path}
@@ -369,6 +369,15 @@ SANDBOX = {
     "failIfUnavailable": (False, "Claude Code will not start where the sandbox cannot",
                           "where the sandbox cannot start, commands run outside it", OK),
 }
+# sandbox.<key> -> what it costs when on: the settings Claude Code itself names as loosening its sandbox.
+LOOSENS = {
+    "filesystem.disabled": "filesystem confinement is off",
+    "allowNestedUserNamespaces": "sandboxed commands can get around file deny rules",
+    "enableWeakerNestedSandbox": "the host's /proc is exposed",
+    "enableWeakerNetworkIsolation": "the network lock is loosened",
+    "allowAppleEvents": "macOS automation is not isolated",
+}
+READ_REACH = "the Read tool and file commands Claude Code recognises, such as cat; not a script that opens the file itself"
 # What a Read deny rule is checked against: (as shown, the path tried, from cwd and $HOME).
 SECRETS = ((".env here", lambda cwd, h: Path(cwd) / ".env"),
            ("~/.ssh", lambda cwd, h: h / ".ssh/id_ed25519"))
@@ -385,8 +394,7 @@ def _sandbox(layers, key):
             if found is None or (key == "allowUnsandboxedCommands" and scope in ("managed", "user")):
                 raise s
             continue
-        box = s.get("sandbox") if isinstance(s, dict) else None
-        v = box.get(key) if isinstance(box, dict) else None
+        v = _at(s, f"sandbox.{key}")
         if not isinstance(v, bool):
             continue
         if found is None:
@@ -394,6 +402,36 @@ def _sandbox(layers, key):
         elif key == "allowUnsandboxedCommands" and v is False and scope in ("managed", "user"):
             return v, path
     return found or (None, None)
+
+
+def _at(settings, dotted):
+    """settings[a][b]... for "a.b...", None where a step is missing or not an object."""
+    for k in dotted.split("."):
+        settings = settings.get(k) if isinstance(settings, dict) else None
+    return settings
+
+
+def _loosened(layers):
+    """Detail lines for each setting that loosens a sandbox that is on: Claude Code's own list."""
+    lines = []
+    for key, cost in LOOSENS.items():
+        try:
+            v, at = _sandbox(layers, key)
+        except Unreadable as e:                 # one line for the lot, not one per key
+            lines.append(line(WARN, f"settings that loosen the sandbox unknown: {e}"))
+            break
+        if v:
+            lines.append(line(WARN, f"{key} on, in {host.tilde(at)}: {cost}"))
+    excluded = [c for _, _, s in layers if not isinstance(s, Unreadable)
+                for c in (_at(s, "sandbox.excludedCommands") or []) if isinstance(c, str)]
+    if excluded:                                # lists merge across files
+        lines.append(line(WARN, f"excludedCommands: {', '.join(dict.fromkeys(excluded))} may run outside the sandbox"))
+    for scope, path, s in layers:               # read from managed settings alone
+        allowed = _at(s, "sandbox.enabledPlatforms") if scope == "managed" else None
+        if isinstance(allowed, list) and host.platform() not in allowed:
+            lines.append(line(WARN, f"enabledPlatforms excludes {host.platform()}, in {host.tilde(path)}: "
+                                    "the sandbox is off on this platform"))
+    return lines
 
 
 def _glob(pattern):
@@ -493,6 +531,7 @@ def beside_rows(cwd):
                 else:
                     mark = mark_on if v else (OK if mark_on == WARN else WARN)
                     lines.append(line(mark, f"{key} {'on' if v else 'off'}: {said_on if v else said_off}"))
+            lines += _loosened(found)
             rows.append((worst([m for m, _, _ in lines]), "sandbox", f"on, in {host.tilde(where)}", lines))
     bad = [(scope, p, s) for scope, p, s in found if isinstance(s, Unreadable)]
     denies = _read_denies(found)
@@ -509,7 +548,7 @@ def beside_rows(cwd):
         text = f"Read deny rules cover {', '.join(hits)}, not {' or '.join(missed)}{count}"
     else:
         text = f"no Read deny rule covers {' or '.join(missed)}{count}"
-    rows.append((WARN if missed else OK, "read deny", text, []))
+    rows.append((WARN if missed else OK, "read deny", text, [line("", READ_REACH)] if hits else []))
     return rows
 
 

@@ -200,6 +200,17 @@ MANAGED = {"darwin": "/Library/Application Support/ClaudeCode/managed-settings.j
 MANAGED_ELSE = "/etc/claude-code/managed-settings.json"     # Linux and WSL
 
 
+def platform():
+    """This platform as Claude Code names it in sandbox.enabledPlatforms: macos, windows, wsl or linux."""
+    if sys.platform in ("darwin", "win32"):
+        return {"darwin": "macos", "win32": "windows"}[sys.platform]
+    try:
+        wsl = "microsoft" in Path("/proc/version").read_text(encoding="utf-8").lower()
+    except OSError:
+        wsl = False
+    return "wsl" if wsl else "linux"
+
+
 def _repo_root(cwd):
     """Where Claude Code keeps .claude/settings.local.json: the git root above cwd, the main
     checkout's for a worktree, or cwd itself outside a repository, where the root is $HOME, or on

@@ -253,6 +253,20 @@ Feature: doctor
     And beneath it "allowUnsandboxedCommands unknown: no settings file sets it; Claude Code's default is on, so a command the sandbox blocks may retry outside it" is !
     And beneath it "failIfUnavailable unknown: no settings file sets it; Claude Code's default is off, so where the sandbox cannot start, commands run outside it" is !
 
+  Scenario: a setting Claude Code names as loosening its sandbox makes the row a !
+    Given the user's settings also hold `{"sandbox": {"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true, "filesystem": {"disabled": true}, "excludedCommands": ["docker"]}}`
+    And "~/project/.claude/settings.json" holds `{"sandbox": {"excludedCommands": ["git", "docker"]}}`
+    When the doctor runs
+    Then the "sandbox" row is ! "on, in ~/.claude/settings.json"
+    And beneath it "filesystem.disabled on, in ~/.claude/settings.json: filesystem confinement is off" is !
+    And beneath it "excludedCommands: git, docker may run outside the sandbox" is !
+
+  Scenario: a Read deny row that covers a path says which reads the rule stops
+    Given the user's settings also hold `{"permissions": {"deny": ["Read(.env)", "Read(~/.ssh/**)"]}}`
+    When the doctor runs
+    Then the "read deny" row is ✓ "Read deny rules cover .env here and ~/.ssh (2 rules)"
+    And beneath it "the Read tool and file commands Claude Code recognises, such as cat; not a script that opens the file itself" is bare
+
   Scenario: the project's local settings outrank the user's
     Given the user's settings also hold `{"sandbox": {"enabled": true}}`
     And "~/project/.claude/settings.local.json" holds `{"sandbox": {"enabled": false}}`

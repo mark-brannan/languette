@@ -328,6 +328,11 @@ def _beneath(doctor, text, mark):
     doctor.beneath(doctor.last, text, mark)
 
 
+@then(parsers.re(r'beneath it "(?P<text>[^"]+)" is bare'))
+def _beneath_bare(doctor, text):
+    doctor.beneath(doctor.last, text, "")
+
+
 @then(parsers.re(r'beneath the "(?P<label>[^"]+)" row "(?P<text>[^"]+)" is (?P<mark>[✓!✗])'))
 def _beneath_row(doctor, label, text, mark):
     doctor.last = label
