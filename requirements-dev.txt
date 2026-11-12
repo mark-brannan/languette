@@ -2,5 +2,5 @@ pytest==9.2.0
 pytest-bdd==9.0.1
 PyHamcrest==2.1.0
 pytest-xdist==3.8.0
-coverage==7.17.0
+coverage==7.17.2
 pytest-cov==7.1.0
