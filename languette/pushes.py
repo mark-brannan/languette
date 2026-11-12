@@ -46,17 +46,17 @@ every matching branch).
 
 import os
 import re
+from functools import partial
 from urllib.parse import quote
 
 from languette import scan as sw
-from languette.refs import default_branches
+from languette.refs import default_branches, git_asker
 from languette.messages import say
 from languette.verdict import Act, Need, Refuse, ask, deny
 
 TTL = 3600
 
 _EXPORT = frozenset("export declare typeset".split())
-_GIT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
 _ALL = frozenset("--all --branches --mirror".split())
 # The operators a separator's text is made of, as Scan piles them up (`;}&&` for `; } &&`).
 _OPS = re.compile(sw.SEP_OPS.pattern + r"|\{|\}|`")
@@ -164,46 +164,29 @@ def _ops(op):
     return out
 
 
-def _config_value(s, i, b):
-    """The lower-cased `name=value` a `-c` or `--config-env` word at i sets, in any spelling."""
-    x = s.w[i]
-    if x in ("-c", "--config-env"):
-        return s.w[i + 1].lower() if i + 1 <= b else None
-    if x.startswith("--config-env="):
-        return x[13:].lower()
-    if x.startswith("-c") and not x.startswith("--"):
-        return x[2:].lower()
-    return None
-
-
 def _opt(x, full):
-    """Whether x is `full` or an abbreviation git would accept for it (`--al` for `--all`)."""
-    x = x.split("=", 1)[0]
-    return len(x) > 2 and x.startswith("--") and full.startswith(x)
+    """Whether x is git push's long option `full`, or an abbreviation git takes for it (`--al` for `--all`)."""
+    return sw.long_option(x, full, "push")
 
 
 def _push(s, a, b, nested, here, lits=None):
     g = sw.cmd_index(s, a, b, sw.GIT, nested)
     if g is None:
         return None
-    prog, row = sw.git_wrapper(s.w[g])
-    if any(s.w[i].startswith(_GIT_ENV) for i in range(a, g)):
-        here = None
-    repo, sub = sw.git_call(s, g, b)
-    for i in sw.git_options(s, g, sub):
-        x = s.w[i]
-        if x == "-C" and i + 1 <= b:
-            lit = lits and s.live[i + 1] and lits.word(i + 1, a)
-            here = _resolve(here, lit, False) if lit else _resolve(here, s.w[i + 1], s.live[i + 1])
-        if x.startswith(("--git-dir", "--work-tree")):
+    call = sw.GitCall(s, a, g, b)
+    prog, row, repo = call.prog, call.row, call.repo
+    for kind, v, j in call.places:
+        if kind != "C":
             here = None
-        cfg = _config_value(s, i, b)
-        if cfg and (cfg.startswith("alias.") or "insteadof" in cfg):
-            raise Refuse(say("br_alias"))
-    i = sub
+        elif v is not None:
+            lit = lits and s.live[j] and lits.word(j, a)
+            here = _resolve(here, lit, False) if lit else _resolve(here, v, s.live[j])
+    if any(c and (c.startswith("alias.") or "insteadof" in c) for c in call.configs):
+        raise Refuse(say("br_alias"))
+    i = call.sub
     if i > b:
         return None
-    x = sw.git_verb(s.w[g], s.w[i])
+    x = call.verb
     if row.repo and repo is None and x == "push":
         return _Push(prog, here, None, [IMPLICIT])    # in every repository, a bare push: vcsh push ignores what follows
     if x != "push":
@@ -236,7 +219,8 @@ def _push(s, a, b, nested, here, lits=None):
             return None                        # a deletion is other guards'
         elif _opt(x, "--dry-run") or re.match(r"-[^o-]*n", x):
             dry = True                         # a dry run pushes nothing
-        if x in sw.GIT_PUSH_VALUE or (_opt(x, "--repo") and "=" not in x):
+        if x in sw.GIT_PUSH_VALUE or (
+                "=" not in x and any(_opt(x, v) for v in sw.GIT_PUSH_VALUE if v.startswith("--"))):
             i += 1
         i += 1
     if dry:
@@ -286,8 +270,8 @@ def _admin_merge(s, a, b, nested):
             if dyn[k]:                         # a run-time -R value may split into `pr merge`
                 first.append(k)
         elif x.startswith("-"):
-            skip = x in sw.GH_REPO_FLAGS or _opt(x, "--repo") and "=" not in x
-            odd = odd or len(first) < 2 and not (skip or _opt(x, "--repo"))
+            skip = x in sw.GH_REPO_FLAGS or sw.long_option(x, "--repo") and "=" not in x
+            odd = odd or len(first) < 2 and not (skip or sw.long_option(x, "--repo"))
         elif len(first) < 2:
             first.append(k)
     # Certain only when no flag ahead of the verb but the repo flag could hide a value.
@@ -405,7 +389,7 @@ def _walk(doc, cmd, cwd, home=None):
                     here = _resolve(here, s.w[c + 1], s.live[c + 1], home, s.quoted[c + 1])
                 cond_cd = cond_cd or list_cmd
                 moved = list_cd = True
-            elif c is not None and s.w[c] in _EXPORT and any(s.w[j].startswith(_GIT_ENV) for j in range(c + 1, b + 1)):
+            elif c is not None and s.w[c] in _EXPORT and any(sw.git_env(s.w[j]) for j in range(c + 1, b + 1)):
                 here = None                    # an exported GIT_DIR moves every later git
             elif a <= b:
                 try:
@@ -428,7 +412,7 @@ def _git(p, env, *args):
     run = sw.wrapper_git(p.prog, p.repo, env)
     if run is None:
         return None                            # a vcsh repository that cannot be told from a verb or a path
-    return (yield Need("git", run[0], p.here or env.get("HOME") or "/", *run[1], *args))
+    return (yield from git_asker(p.here or env.get("HOME") or "/", *run)(*args))
 
 
 def _says(body, words):
@@ -533,10 +517,7 @@ def _judge(p, env):
         remote = remote or "origin"
     url = remote if ("/" in remote or ":" in remote) else (yield from _git(p, env, "remote", "get-url", "--push",
                                                                            remote))
-
-    def read(*argv):
-        return (yield from _git(p, env, *argv))
-    defaults = yield from default_branches(read, remote)
+    defaults = yield from default_branches(partial(_git, p, env), remote)
     hits = defaults if ALL in dsts else [d for d in dsts if d in defaults]
     if not hits:
         return None

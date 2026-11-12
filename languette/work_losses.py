@@ -45,7 +45,7 @@ import re
 from languette import paths
 from languette import scan as sw
 from languette.messages import say
-from languette.refs import FALLBACK, default_branches
+from languette.refs import FALLBACK, default_branches, git_asker
 from languette.verdict import Need, Refuse, ask, deny
 from languette.worktree_reaches import in_own_place
 
@@ -84,7 +84,6 @@ _STOW_SHORT = {"-n": "--simulate", "-v": "--verbose", "-p": "--compat", "-S": "-
 # option naming a tree or config counts only as one of git's own (`sh -c` is not git's -c);
 # the environment's spelling and any config naming a work tree count in any word. A cd,
 # pushd, popd or wrapper chdir is paths.moves_directory's.
-_AIM_OPT = re.compile(r"(?:-C|-c|--git-dir|--work-tree|--config-env)\Z|(?:--git-dir|--work-tree|--config-env)=.*", re.I)
 _AIM_ANY = re.compile(r"(?:GIT_(?:DIR|WORK_TREE|COMMON_DIR|INDEX_FILE|CONFIG\w*)=.*|.*core\.worktree=.*)\Z", re.I)
 
 
@@ -96,7 +95,8 @@ def _reaimed(scans):
             return True
         for a, b in s.segments():
             g = sw.cmd_index(s, a, b, sw.GIT, nested) if a <= b else None
-            if g is not None and any(_AIM_OPT.match(s.w[i]) for i in sw.git_options(s, g, sw.git_subcommand(s, g, b))):
+            call = sw.GitCall(s, a, g, b) if g is not None else None
+            if call and (call.places or call.configs):
                 return True
     return False
 
@@ -106,94 +106,13 @@ def _has(t, ch):
     return re.fullmatch(r"-[A-Za-z0-9]*" + ch + r"[A-Za-z0-9]*", t) is not None
 
 
-def _pfx(t, full):
-    return len(t) >= 3 and full.startswith(t)
-
-
 def _dst(t):
     t = t[1:] if t.startswith("+") else t
     return t.split(":", 1)[1] if ":" in t else t
 
 
-# git add's own option table (builtin/add.c, git 2.53): long name -> (takes a value, negatable).
-# git takes any unambiguous prefix of a long name or of its --no- form, and a value either after
-# `=` or as the next word. An option missing from here is refused rather than guessed at, since a
-# guessed value could be a word git reads as the option's and the guard as a path.
-_ADD_LONG = {
-    "dry-run": (False, True), "verbose": (False, True), "interactive": (False, True),
-    "patch": (False, True), "unified": (True, False), "inter-hunk-context": (True, False),
-    "edit": (False, True), "force": (False, True), "update": (False, True),
-    "renormalize": (False, True), "intent-to-add": (False, True), "all": (False, True),
-    "ignore-removal": (False, True), "refresh": (False, True), "ignore-errors": (False, True),
-    "ignore-missing": (False, True), "sparse": (False, True), "chmod": (True, True),
-    "warn-embedded-repo": (False, True), "pathspec-from-file": (True, True),
-    "pathspec-file-nul": (False, True),
-}
-_ADD_SHORT = {"n": "dry-run", "v": "verbose", "i": "interactive", "p": "patch", "U": "unified",
-              "e": "edit", "f": "force", "u": "update", "N": "intent-to-add", "A": "all"}
-
-
-def _add_long(t):
-    """`--name[=value]` as git reads it: (canonical name, negated, glued value or None). An
-    unknown or ambiguous name raises Refuse."""
-    name, eq, val = t[2:].partition("=")
-    forms = {}
-    for full, (_, neg) in _ADD_LONG.items():
-        forms[full] = (full, False)
-        if neg:
-            forms["no-" + full] = (full, True)
-    if name in forms:
-        hit = [forms[name]]
-    else:
-        hit = list({forms[f] for f in forms if f.startswith(name)}) if name else []
-    if len(hit) != 1:
-        raise Refuse(say("wl_add_unknown", t=t))
-    full, negated = hit[0]
-    if eq and not _ADD_LONG[full][0]:
-        raise Refuse(say("wl_add_no_value", t=t))
-    return full, negated, (val if eq else None)
-
-
-def add_options(a):
-    """Split git add's words into the options set (canonical names, a negated one as no-<name>)
-    and the pathspecs' indexes into a, from git's own option table. A value option eats the
-    next word when its value is not glued on; `--` and `--end-of-options` end the options."""
-    opts, specs = [], []
-    i, n = 0, len(a)
-    while i < n:
-        t = a[i]
-        i += 1
-        if t in ("--", "--end-of-options"):
-            specs.extend(range(i, n))
-            break
-        if t in ("-h", "--help"):     # git prints usage or the manual and stages nothing
-            opts.append("help")
-        elif t.startswith("--"):
-            full, negated, val = _add_long(t)
-            if _ADD_LONG[full][0] and not negated and val is None:
-                if i >= n:
-                    raise Refuse(say("wl_add_needs_value", t=t))
-                i += 1
-            opts.append(("no-" if negated else "") + full)
-        elif t.startswith("-") and t != "-":
-            for j, ch in enumerate(t[1:], 1):
-                full = _ADD_SHORT.get(ch)
-                if full is None:
-                    raise Refuse(say("wl_add_unknown_short", t=t, ch=ch))
-                opts.append(full)
-                if _ADD_LONG[full][0]:
-                    if j == len(t) - 1:
-                        if i >= n:
-                            raise Refuse(say("wl_add_needs_value", t=t))
-                        i += 1
-                    break
-        else:
-            specs.append(i - 1)
-    return opts, specs
-
-
 def _add(a):
-    opts, at = add_options(a)
+    opts, at = sw.add_options(a)
     names = [a[i] for i in at]
     if "help" in opts:
         return
@@ -213,7 +132,7 @@ def _add(a):
 
 
 def _commit(a):
-    if any(_pfx(t, "--all") or _has(t, "a") for t in a):
+    if any(sw.long_option(t, "--all", "commit") or _has(t, "a") for t in a):
         raise Refuse(say("wl_commit_a"))
 
 
@@ -234,7 +153,7 @@ def _default(branches):
 
 def _push_may_hurt(a):
     """Whether a push could force, lease, delete or colon-refspec: only then does the default branch matter."""
-    return any(t.startswith((":", "+", "--force", "--delete")) or _pfx(t, "--force") or _pfx(t, "--delete")
+    return any(t.startswith((":", "+", "--force", "--delete")) or sw.long_option(t, "--force", "push") or sw.long_option(t, "--delete", "push")
                or _has(t, "f") or _has(t, "d") for t in a)
 
 
@@ -247,12 +166,12 @@ def _push(doc, a):
     protected_branch = ""  # the default branch this push targets, or "" if none
     for t in a:
         if t.startswith("--force-with-lease=") or (t.startswith("--force-") and (
-                _pfx(t, "--force-with-lease") or _pfx(t, "--force-if-includes"))):
+                sw.long_option(t, "--force-with-lease", "push") or sw.long_option(t, "--force-if-includes", "push"))):
             lease = True
             continue
-        if _pfx(t, "--force") or _has(t, "f"):
+        if sw.long_option(t, "--force", "push") or _has(t, "f"):
             force = True
-        elif _pfx(t, "--delete") or _has(t, "d"):
+        elif sw.long_option(t, "--delete", "push") or _has(t, "d"):
             delete = True
         elif t.startswith("+"):
             force = True
@@ -273,8 +192,8 @@ def _discard(sub, a):
     staged = wt = False
     wh = ""
     for t in a:
-        staged = staged or t == "-S" or _pfx(t, "--staged") or _has(t, "S")
-        wt = wt or t == "-W" or _pfx(t, "--worktree") or _has(t, "W")
+        staged = staged or t == "-S" or sw.long_option(t, "--staged", sub) or _has(t, "S")
+        wt = wt or t == "-W" or sw.long_option(t, "--worktree", sub) or _has(t, "W")
         if _WHOLE.match(t):
             wh = t
     if wh and not (sub == "restore" and staged and not wt):
@@ -282,8 +201,8 @@ def _discard(sub, a):
 
 
 def _clean(a):
-    force = any(_pfx(t, "--force") or _has(t, "f") for t in a)
-    dry = any(_pfx(t, "--dry-run") or _has(t, "n") for t in a)
+    force = any(sw.long_option(t, "--force", "clean") or _has(t, "f") for t in a)
+    dry = any(sw.long_option(t, "--dry-run", "clean") or _has(t, "n") for t in a)
     if force and not dry:
         raise Refuse(say("wl_clean_f"))
 
@@ -293,14 +212,14 @@ def _branch(a):
     for t in a:
         if t == "-D" or _has(t, "D"):
             raise Refuse(say("wl_branch_D"))
-        delete = delete or t == "-d" or _pfx(t, "--delete") or _has(t, "d")
-        force = force or t == "-f" or _pfx(t, "--force") or _has(t, "f")
+        delete = delete or t == "-d" or sw.long_option(t, "--delete", "branch") or _has(t, "d")
+        force = force or t == "-f" or sw.long_option(t, "--force", "branch") or _has(t, "f")
     if delete and force:
         raise Refuse(say("wl_branch_delete_force"))
 
 
 def _reset(a):
-    if any(_pfx(t, "--hard") for t in a):
+    if any(sw.long_option(t, "--hard", "reset") for t in a):
         raise Refuse(say("wl_reset_hard"))
 
 
@@ -311,7 +230,7 @@ def _short(t, ch):
 
 def _exclude(t):
     """clean's --exclude, in any unambiguous prefix, separate or `=` form."""
-    return _pfx(t.split("=", 1)[0], "--exclude")
+    return sw.long_option(t, "--exclude", "clean")
 
 
 def _own_command(s, a, b, g):
@@ -355,7 +274,7 @@ def _upstream_target(args):
     remote, _, branch = refs[0].partition("/") if len(refs) == 1 else ("", "", "")
     if not remote or not branch:
         return None
-    if not all(_pfx(t, "--hard") or t == "-q" or _pfx(t, "--quiet") for t in flags):
+    if not all(sw.long_option(t, "--hard", "reset") or t == "-q" or sw.long_option(t, "--quiet", "reset") for t in flags):
         return None
     return remote, branch
 
@@ -418,12 +337,8 @@ def _default_branches(doc):
     cwd = doc.payload.get("cwd")
     if not isinstance(cwd, str) or not cwd.startswith("/"):
         return FALLBACK
-
-    def ask(*argv):
-        rc, out, _ = yield Need("run", cwd, STATUS_TIMEOUT, "git", *argv)
-        return out if rc == 0 else None
     try:
-        return (yield from default_branches(ask))
+        return (yield from default_branches(git_asker(cwd)))
     except Exception:  # noqa: BLE001
         return FALLBACK
 
@@ -503,16 +418,16 @@ def _git(s, a, b, nested, env):
     g = sw.cmd_index(s, a, b, sw.GIT, nested)
     if g is None:
         return None
-    i = sw.git_subcommand(s, g, b)
-    if i > b:
+    call = sw.GitCall(s, a, g, b)
+    i, sub = call.sub, call.verb
+    if sub is None:
         return None
-    sub = s.w[i]
     rule = RULE.get(sub)
     if rule and _off(env, rule):
         return None
     args = s.w[i + 1:b + 1]
     found = {"sub": sub, "args": args, "rule": rule,
-             "mine": not sw.git_wrapper(s.w[g])[1].home and _own_command(s, a, b, g)}
+             "mine": not call.row.home and _own_command(s, a, b, g)}
     try:
         if sub == "add":
             _add(args)

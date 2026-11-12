@@ -556,7 +556,8 @@ Feature: guard-git-work-loss
       | git add --al                                       | denies    | an abbreviated long option      |
       | git clean --forc                                   | denies    | an abbreviated long option      |
       | git clean --forc --dry                             | is silent |                                 |
-      | git branch --del --for topic                       | denies    |                                 |
+      | git branch --del --forc topic                      | denies    |                                 |
+      | git branch --del --for topic                       | is silent | --for is --force or --format    |
       | git push --force-w origin topic                    | is silent | --force-w is --force-with-lease |
       | git commit -m "hooks: block git add -A everywhere" | is silent | prose in a commit message       |
       | git commit -m "block git add -A everywhere"        | is silent | prose in a commit message       |

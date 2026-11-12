@@ -52,6 +52,7 @@ Feature: guard-bypass-hooks
       | yadm commit -n -m x                          | yadm is git                           |
       | vcsh dots commit -n -m x                     | vcsh is git                           |
       | vcsh run dots git commit --no-verify         | vcsh run, then git                    |
+      | git -c "core.hooksPath=/tmp/my hooks" commit -m x | a quoted value holding whitespace |
       | vcsh run dots git -c core.hooksPath=x commit | git options after vcsh run's git      |
       | vcsh dots -c core.hooksPath=x commit -m x    | git options after the repository      |
       | vcsh commit --no-verify                      | vcsh commit runs git commit in every repository |
@@ -142,6 +143,7 @@ Feature: guard-bypass-hooks
       | git commit --message=--no-verify                    | attached message                    |
       | git commit --amend --no-edit                        | --no-edit is not --no-verify        |
       | git commit -s -m x                                  | other short flags                   |
+      | git merge --no-veri feature                         | --no-verify or --no-verify-signatures: git refuses it |
       | git log --no-verify                                 | not commit or push                  |
       | git status -n                                       | not commit or push                  |
       | echo git push --no-verify                           | echo with no shell                  |
