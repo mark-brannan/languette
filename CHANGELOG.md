@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.0.26](https://github.com/mark-brannan/languette/compare/v0.0.25...v0.0.26) (2026-11-12)
+
+
+### Features
+
+* **doctor:** report the sandbox and Read deny rules beside the guards ([#416](https://github.com/mark-brannan/languette/issues/416)) ([709148d](https://github.com/mark-brannan/languette/commit/709148d81a4f360e82effeebbf54382856cf8732))
+
+
+### Bug Fixes
+
+* **posts:** one reader of where a post's body comes from ([#375](https://github.com/mark-brannan/languette/issues/375)) ([#417](https://github.com/mark-brannan/languette/issues/417)) ([e27a7d5](https://github.com/mark-brannan/languette/commit/e27a7d5bdb37c9e7b4d366efb57f0e9b0cc6eaff))
+
+
+### Documentation
+
+* **design:** who the verdict tells, and one spend after it ([#409](https://github.com/mark-brannan/languette/issues/409)) ([2d6d977](https://github.com/mark-brannan/languette/commit/2d6d977680ff61119d5f8b9aca7f5ebe34fad25e))
+
 ## [0.0.25](https://github.com/mark-brannan/languette/compare/v0.0.24...v0.0.25) (2026-11-12)
 
 
