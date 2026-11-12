@@ -716,3 +716,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t045935z
 - Option name signed_comments_mcp, a string: deny (default; also unset or unknown), ask, allow Undo: rename or reshape the option before release ([#367](https://github.com/mark-brannan/languette/issues/367)) (no PR, branch claude/mcp-comment-setting-367)
+
+### 20261112t045937z
+- Under ask and allow the body is still judged against opening and signature; a bad body denies Undo: skip the body check under allow ([#367](https://github.com/mark-brannan/languette/issues/367)) (no PR, branch claude/mcp-comment-setting-367)
