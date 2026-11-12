@@ -791,3 +791,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t073537z
 - A leading ~ in a body path is the home directory in every unquoted spelling (--body-file=~/b.md, -F~/b.md, @~/b.md), as guard-private-terms' feature reads it Undo: pass tilde=False for the --x= and glued forms in forges.flag_words ([#417](https://github.com/mark-brannan/languette/pull/417))
+
+### 20261112t073545z
+- A graphql query field with a $NAME inside is read for its shape in guard-signed-comments, as on main, rather than as built at run time Undo: drop the query special case in comment_posts._Read.api ([#417](https://github.com/mark-brannan/languette/pull/417))
