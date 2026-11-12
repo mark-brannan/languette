@@ -176,7 +176,8 @@ def installs(files):
 
 def settings_files(cwd):
     """path -> parsed JSON (or the Unreadable) for the user's settings.json and every
-    .claude/settings{,.local}.json from cwd up to, not including, $HOME."""
+    .claude/settings{,.local}.json from cwd up to, not including, $HOME. Wider than the files
+    Claude Code reads, which `layers` lists."""
     h = home()
     paths = [user_settings()]
     d = Path(cwd)
@@ -190,6 +191,70 @@ def settings_files(cwd):
             out[p] = read_json(p, missing={})
         except Unreadable as e:
             out[p] = e
+    return out
+
+
+# Where an administrator's managed-settings.json sits (code.claude.com/docs/en/managed-settings).
+MANAGED = {"darwin": "/Library/Application Support/ClaudeCode/managed-settings.json",
+           "win32": r"C:\Program Files\ClaudeCode\managed-settings.json"}
+MANAGED_ELSE = "/etc/claude-code/managed-settings.json"     # Linux and WSL
+
+
+def managed_dropins():
+    """The .json files in managed-settings.d beside managed-settings.json, which the doctor does not merge."""
+    try:
+        return sorted((Path(MANAGED.get(sys.platform, MANAGED_ELSE)).parent / "managed-settings.d").glob("*.json"))
+    except OSError:
+        return []
+
+
+def platform():
+    """This platform as Claude Code names it in sandbox.enabledPlatforms: macos, windows, wsl or linux."""
+    if sys.platform in ("darwin", "win32"):
+        return {"darwin": "macos", "win32": "windows"}[sys.platform]
+    try:
+        wsl = "microsoft" in Path("/proc/version").read_text(encoding="utf-8").lower()
+    except OSError:
+        wsl = False
+    return "wsl" if wsl else "linux"
+
+
+def _repo_root(cwd):
+    """Where Claude Code keeps .claude/settings.local.json: the git root above cwd, the main
+    checkout's for a worktree, or cwd itself outside a repository, where the root is $HOME, or on
+    Windows."""
+    h, d = home(), Path(cwd)
+    if sys.platform == "win32":
+        return d
+    for p in (d, *d.parents):
+        if (p / ".git").exists():
+            try:                                # a worktree's .git is a file: gitdir: <main>/.git/worktrees/<name>
+                m = re.match(r"gitdir: (.+)", (p / ".git").read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError):
+                m = None
+            gitdir = Path(m[1].strip()) if m else None
+            if gitdir and gitdir.parent.name == "worktrees" and gitdir.parents[1].name == ".git":
+                p = gitdir.parents[2]
+            return d if p == h else p
+    return d
+
+
+def layers(cwd):
+    """[(scope, path, parsed JSON or the Unreadable)], highest precedence first, for the settings
+    files Claude Code reads in a session started at cwd: managed, project local (the repo root's,
+    then an earlier version's beside cwd), shared project, user. MDM, server-managed settings and
+    --settings are not files here, so a key none of these sets is not known to be unset."""
+    local = [_repo_root(cwd) / ".claude/settings.local.json"]
+    if Path(cwd) / ".claude/settings.local.json" != local[0]:
+        local.append(Path(cwd) / ".claude/settings.local.json")
+    found = [("managed", Path(MANAGED.get(sys.platform, MANAGED_ELSE))), *(("local", p) for p in local),
+             ("project", Path(cwd) / ".claude/settings.json"), ("user", user_settings())]
+    out = []
+    for scope, p in found:
+        try:
+            out.append((scope, p, read_json(p, missing={})))
+        except Unreadable as e:
+            out.append((scope, p, e))
     return out
 
 

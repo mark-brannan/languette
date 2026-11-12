@@ -30,14 +30,13 @@ submits a comment, review or thread reply; and on the GitHub MCP tools that
 post one, where every `body` in the input is judged. The body is read where it
 is written: --body/-b, --body-file/-F, a gh api body field (literal or -F
 @file), --input JSON, a heredoc in the command, `$(cat <<EOF)` around one, or
-a $VAR this command assigns from one. Off by default: the signature is a
+a $VAR this command assigns once from one (languette.bodies). Off by default: the signature is a
 convention a workflow sets, so the guard runs only when its option is true.
 Anything else built at run time is a deny, read as guard-private-terms reads
 it, with the fix in the reason.
 """
 
 import json
-import os
 import re
 
 from languette import paths, refs
@@ -62,9 +61,6 @@ _MUTATION = re.compile(r"\b(?:addComment|addPullRequestReviewComment|addPullRequ
                        r"updatePullRequestReviewComment|updatePullRequestReview|addDiscussionComment|"
                        r"updateDiscussionComment)\b")
 _COMMENTS = re.compile(r"(?:^|/)(?:comments|reviews)(?:/|\Z)")
-_FROM_DOC = re.compile(r"\$\(\s*cat\s+(?:-\s+)?HEREDOC(\d+)\s*\)")
-_HOME = re.compile(r"(?:~|\$HOME|\$\{HOME\})(?=/|\Z)")
-_MARK = " HEREDOC "
 # A word that chooses which account gh posts as, read from the command's own words:
 # `NAME=...` (a prefix, export or env), `env -u NAME`, `unset NAME`.
 _ACCOUNT = re.compile(r"(?:--unset=|-u)?(?:GH_TOKEN|GITHUB_TOKEN|GH_ENTERPRISE_TOKEN|GITHUB_ENTERPRISE_TOKEN|"
@@ -84,32 +80,17 @@ def _short(v):
 
 
 class _Read:
-    """The command's posts, each a list of body sources:
-    (text, s) | (doc, k) heredoc k | (file, path) | (json, src) | (graphql, qsrc, fields, input) |
-    (opaque, why)."""
+    """The command's posts, each a list of body sources (languette.bodies), and beside
+    them (json, src) | (graphql, qsrc, fields, input)."""
+
+    _VALUED = {"c": ("--comment", "-c"), "b": ("--body", "-b", "--body-file", "-F")}
 
     def __init__(self, doc, command):
-        buf = command + "\n"
-        self.docs = [b for b, _ in doc.heredocs(buf)]
-        stripped = doc.stripped(buf)
-        parts = stripped.split(_MARK)
-        # Number each marker so a value, a stdin or a file can name its heredoc.
-        if len(parts) - 1 == len(self.docs):
-            stripped = "".join(p + (f" HEREDOC{k} " if k < len(parts) - 1 else "") for k, p in enumerate(parts))
-        else:
-            self.docs = None
-        self.text = stripped
-        self.fed, self.written = {}, {}
-        for line in stripped.split("\n"):
-            ks = re.findall(r"\bHEREDOC(\d+)\b", line)
-            for p in sw.writes(line, False):
-                self.written[p] = self.written.get(p, 0) + 1
-                if len(ks) == 1:
-                    self.fed[p] = int(ks[0])
+        self.bodies = sw.Bodies(doc, command)
         self.cd = False
         self.posts = []
         self.account = None            # the word by which this command picks gh's account itself
-        for text, nested in doc.texts(text=stripped):
+        for text, nested in self.bodies.texts():
             s = self.s = doc.scan(text)
             self.cd = self.cd or sw.cd_present(s)
             self.account = self.account or next((w for k, w in zip(s.k, s.w) if k == "w" and _ACCOUNT.match(w)), None)
@@ -117,41 +98,11 @@ class _Read:
                 if a <= b:
                     self.segment(a, b, nested)
 
-    def doc(self, k):
-        return ("doc", k) if self.docs is not None else ("opaque", "a heredoc this hook could not pair with its use")
-
     def val(self, v, live):
-        """A posted value, read as guard-private-terms reads one."""
-        if not live:
-            return ("text", v)
-        m = _FROM_DOC.fullmatch(v.strip())
-        if m:
-            return self.doc(int(m.group(1)))
-        if "$(" in v or "`" in v:
-            return ("opaque", f"the body is built at run time ({_short(v)})")
-        m = sw.VAR_REF.match(v)
-        if m:
-            name = m.group(1) or m.group(2)
-            # A shell assignment, not a gh field (-f NAME=...) of the same name.
-            sets = [a for a in re.finditer(r"(?:^|[\s;&|(])" + name + "=", self.text)
-                    if not re.search(r"(?:-[fF]|--field|--raw-field)\s*\Z", self.text[:a.start() + 1])]
-            fed = re.compile(r"""["']?\$\(\s*cat\s+(?:-\s+)?HEREDOC(\d+)\s*\)""").match(self.text, sets[0].end()) \
-                if len(sets) == 1 else None
-            use = re.search(r"\$\{?" + name + r"\b", self.text)
-            # Only one assignment, and it comes before the body is used: a second could replace it.
-            if m.end() == len(v) and fed and use and sets[0].end() <= use.start():
-                return self.doc(int(fed.group(1)))
-            return ("opaque", f"the body is built at run time ({_short(v)})")
-        return ("text", v)
+        return self.bodies.value(v, live)
 
-    def stdin(self, lo, hi):
-        ks = [int(w[7:]) for w in self.s.w[lo:hi + 1] if re.fullmatch(r"HEREDOC\d+", w)]
-        if len(ks) == 1:
-            return self.doc(ks[0])
-        return ("opaque", "the body comes from stdin and no heredoc on this command feeds it")
-
-    def file(self, p, lo, hi):
-        return self.stdin(lo, hi) if p == "-" else ("file", p)
+    def file(self, f, lo, hi):
+        return self.bodies.file(f.value, f.live, f.tilde, self.s, lo, hi)
 
     def segment(self, lo, hi, nested):
         s = self.s
@@ -162,7 +113,7 @@ class _Read:
             self.account = self.account or f"gh auth {s.w[g + 2]}"
         self.account = self.account or next((w for w in s.w[g + 1:hi + 1] if w.split("=")[0] == "--hostname"), None)
         if s.w[g + 1] == "api":
-            self.api(g, hi)
+            self.api(lo, g, hi)
             return
         v = g + 2                          # -R/--repo may come before the verb
         while v <= hi and (r := sw.gh_repo_flag(s, v, hi)):
@@ -170,46 +121,32 @@ class _Read:
         verb = _VERBS.get((s.w[g + 1], sw.word(self.s, v))) if v <= hi else None
         if verb is None:
             return
-        bodies, i = [], v + 1
-        while i <= hi:
-            t, live = sw.word(self.s, i), s.live[i]
-            if verb == "c":                 # close / reopen: only --comment/-c posts text
-                if t in ("--comment", "-c") and i < hi:
-                    i += 1
-                    bodies.append(self.val(sw.word(self.s, i), s.live[i]))
-                elif t.startswith("--comment="):
-                    bodies.append(self.val(t[10:], live))
-                elif re.match(r"-c.", t):
-                    bodies.append(self.val(t[2:], live))
-            elif t in ("--body", "-b") and i < hi:
-                i += 1
-                bodies.append(self.val(sw.word(self.s, i), s.live[i]))
-            elif t in ("--body-file", "-F") and i < hi:
-                i += 1
-                bodies.append(self.file(sw.word(self.s, i), lo, hi))
-            elif t.startswith("--body="):
-                bodies.append(self.val(t[7:], live))
-            elif t.startswith("--body-file="):
-                bodies.append(self.file(t[12:], lo, hi))
-            elif re.match(r"-b.", t):
-                bodies.append(self.val(t[2:], live))
-            elif re.match(r"-F.", t):
-                bodies.append(self.file(t[2:], lo, hi))
-            elif t.startswith("--body"):
-                bodies.append(("opaque", f"the flag `{_short(t)}` carries the body in a shape this hook does not read"))
-            i += 1
+        bodies = []
+        for f in sw.flag_words(s, v + 1, hi, self._VALUED[verb]):
+            if f.name is None:
+                if verb == "b" and f.value.startswith("--body"):
+                    bodies.append(("opaque", say("signature_flag_shape", flag=_short(f.value))))
+            elif f.value is None:
+                bodies.append(("opaque", say("signature_flag_shape", flag=f.name)))
+            elif f.name in ("--body-file", "-F"):
+                bodies.append(self.file(f, lo, hi))
+            else:
+                bodies.append(self.val(f.value, f.live))
         if bodies:
             self.posts.append(bodies)
 
-    def api(self, g, hi):
+    def api(self, lo, g, hi):
         api, fields, inp = sw.gh_api(self.s, g + 2, hi), [], None
         for a in api.args:
             if a.text is None:
                 continue
             if a.flag == "--input":
-                inp = self.file(a.text, g, hi)
+                inp = self.bodies.file(a.text, a.live, a.tilde, self.s, lo, hi)
             elif a.typed and a.value.startswith("@"):
-                fields.append((a.key, self.file(a.value[1:], g, hi)))
+                fields.append((a.key, self.bodies.file(a.value[1:], a.live, a.tilde, self.s, lo, hi)))
+            elif a.key == "query" and a.live and not sw.VAR_REF.fullmatch(a.value) and not re.search(r"\$\(|`", a.value):
+                # A query is read for its shape: a $NAME inside it changes a value, never the mutation.
+                fields.append((a.key, ("text", a.value)))
             else:
                 fields.append((a.key, self.val(a.value, a.live)))
         if api.graphql:
@@ -302,46 +239,33 @@ def signatures(doc, guard, found):
     home = env.get("HOME") or ""
     files = {}
 
-    def resolve(p):
-        p = _HOME.sub(home, p, count=1) if home and _HOME.match(p) else p
-        if "$" in p or "`" in p or p.startswith("~"):
-            return None
-        if p.startswith("/"):
-            return os.path.normpath(p)
-        return os.path.normpath(os.path.join(cwd, p)) if cwd and not r.cd else None
+    def resolve(p, live, tilde):
+        return paths.word_path(p, None if r.cd else cwd, home, live, tilde)
 
     def text(src):
         """The body src holds, as a generator yielding Needs; raises _Unread."""
         kind = src[0]
-        if kind == "text":
-            return src[1]
-        if kind == "doc":
-            return r.docs[src[1]]
-        if kind == "opaque":
-            raise _Unread(say("signature_opaque_body", what=src[1]))
         if kind == "json":
             return (yield from text(src[1]))
-        p = src[1]
-        f = resolve(p)
-        hit = [q for q in r.written if resolve(q) == f] if f else []
-        if f and len(hit) == 1 and r.written[hit[0]] == 1 and hit[0] in r.fed:
-            return r.docs[r.fed[hit[0]]]
-        why = None
-        if f is None:
-            why = f"{p} is not a path this hook can resolve (a $VAR, or a relative path after a cd)"
-        elif hit:
-            why = f"{p} is written by this same command, not from a heredoc"
-        else:
-            if f not in files:
-                try:
-                    files[f] = yield Need("read", f, paths.MAX_READ)
-                except Exception:  # noqa: BLE001
-                    files[f] = None
-            if files[f] is None:
-                why = f"{p} cannot be read"
-        if why:
-            raise _Unread(say("signature_body_file", why=why))
-        return files[f]
+        if kind == "file":
+            p, src = src[1], r.bodies.where(src, resolve)
+            if src[0] == "read":
+                f = src[1]
+                if f not in files:
+                    try:
+                        files[f] = yield Need("read", f, paths.MAX_READ)
+                    except Exception:  # noqa: BLE001
+                        files[f] = None
+                if files[f] is None:
+                    raise _Unread(say("signature_body_file", path=p, why=say("body_unreadable")))
+                return files[f]
+            if src[0] == "unread":
+                raise _Unread(say("signature_body_file", path=p, why=src[1]))
+        if src[0] == "text":
+            return src[1]
+        if src[0] == "doc":
+            return r.bodies.docs[src[1]][0]
+        raise _Unread(say("signature_opaque_body", what=src[1]))
 
     def bodies(src):
         """The bodies src posts: a JSON payload may hold several, a graphql query none."""

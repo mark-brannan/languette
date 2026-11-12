@@ -43,7 +43,6 @@ command.
 """
 
 import json
-import os
 import re
 
 from languette import paths
@@ -58,13 +57,13 @@ DEFAULT = ()                                   # no label is guarded until the o
 WRITES = frozenset("create new edit".split())
 LABEL_FLAGS = frozenset("--label --add-label -l".split())
 # Each forge's client, a row (docs/design/forges.md): the groups and verbs that
-# apply labels, their label flags and glued spellings, and `label edit`'s rename.
+# apply labels, their label flags, and `label edit`'s rename.
 _CLIENTS = {
-    "gh": {"groups": ("pr", "issue"), "writes": WRITES, "label": (LABEL_FLAGS, ("--label=", "--add-label=")),
-           "rename": (frozenset(("--name", "-n")), ("--name=",))},
+    "gh": {"groups": ("pr", "issue"), "writes": WRITES, "label": tuple(sorted(LABEL_FLAGS)),
+           "rename": ("--name", "-n")},
     "glab": {"groups": ("mr", "issue"), "writes": frozenset("create new update".split()),
-             "label": (frozenset(("--label", "-l")), ("--label=",)),
-             "rename": (frozenset(("--new-name", "-n")), ("--new-name=",))},
+             "label": ("--label", "-l"),
+             "rename": ("--new-name", "-n")},
 }
 # Paths whose write can carry labels in an --input payload.
 REPO = r"(?:repos/[^/]+/[^/]+|repositories/[^/]+)"
@@ -131,28 +130,21 @@ class _Found:
             self.unseen.append(f"{what} is not a list of label names")
 
 
-def _glued(t):
-    """The value of a glued short flag: pflag reads -lx and -l=x alike."""
-    return t[3:] if t[2:3] == "=" else t[2:]
-
-
-def _read(path, ctx):
+def _read(path, live, ctx):
     """The text of the file `path` names, as the shell will open it and the
     runner read it (ctx's files); raises Refuse, with what is wrong with the
     path, when the guard cannot have the same file, or when another command in
     the call could rewrite it first."""
-    cwd, env, moved = ctx["cwd"], ctx["env"], ctx["moved"]
+    cwd, home, moved = ctx["cwd"], ctx["env"].get("HOME") or "", ctx["moved"]
     if not ctx["alone"]:
         raise Refuse(say("bl_alone"))
-    p = path
-    if p == "~" or p.startswith("~/"):
-        if not env.get("HOME"):
-            raise Refuse(say("bl_home"))
-        p = env["HOME"] + p[1:]
-    if not os.path.isabs(p):
-        if moved or not (isinstance(cwd, str) and os.path.isabs(cwd)):
-            raise Refuse(say("bl_relative"))
-        p = os.path.join(cwd, p)
+    p = paths.word_path(path, cwd if not moved and isinstance(cwd, str) and cwd.startswith("/") else None, home, live)
+    if p is None and not home and re.match(r"(?:~|\$HOME\b|\$\{HOME\})", path):
+        raise Refuse(say("bl_home"))
+    if p is None and re.search(r"[$`*?\[~]", path):
+        raise Refuse(say("bl_unresolved"))
+    if p is None:
+        raise Refuse(say("bl_relative"))
     if p not in ctx["files"]:
         ctx["wanted"].append(p)
         raise Refuse(say("bl_not_read"))        # plan asks for it, judge walks the command again
@@ -173,25 +165,24 @@ def _text(got):
     return got
 
 
-def _payloads(src, live, ctx):
-    """The JSON texts an --input value feeds gh api."""
-    if live:
-        raise Refuse(say("bl_input_live", src=src))
+def _payloads(src, live, ctx, at):
+    """The JSON texts an --input value feeds gh api; `at` is (scan, lo, hi), the gh's words."""
     if src == "-":
-        if not ctx["bodies"]:
+        got = ctx["read"].stdin(*at)
+        if got[0] == "stdin":
             raise Refuse(say("bl_input_stdin"))
-        if any(live for _, live in ctx["bodies"]):
+        if got[0] != "doc":
             raise Refuse(say("bl_heredoc_live"))
-        return [body for body, _ in ctx["bodies"]]
+        return [ctx["read"].docs[got[1]][0]]
     try:
-        return [_read(src, ctx)]
+        return [_read(src, live, ctx)]
     except Refuse as e:
         raise Refuse(say("bl_input_file", src=src, err=e))
 
 
-def _input(f, src, live, path, ctx):
+def _input(f, src, live, path, ctx, at):
     try:
-        texts = _payloads(src, live, ctx)
+        texts = _payloads(src, live, ctx, at)
     except Refuse as e:
         f.unseen.append(str(e))
         return
@@ -224,8 +215,8 @@ def _parses(t):
         return False
 
 
-def _api(f, s, i, b, ctx, cli="gh"):
-    api = sw.gh_api(s, i, b, cli)
+def _api(f, s, lo, i, b, ctx, cli="gh"):
+    api, at = sw.gh_api(s, i, b, cli), (s, lo, b)
     if api.writes is False:
         return
     fields = [(a.flag, a.text or "", a.live) for a in api.args if a.flag != "--input"]
@@ -237,14 +228,14 @@ def _api(f, s, i, b, ctx, cli="gh"):
             v = kv.split("=", 1)[1] if "=" in kv else kv
             if v.startswith("@") and flag in ("-F", "--field"):
                 try:
-                    v = _read(v[1:], ctx)
+                    v = _read(v[1:], live, ctx)
                 except Refuse as e:
                     f.unseen.append(f"the graphql field reads the file `{v[1:]}`, which {e}")
                     continue
             if GRAPHQL_LABELS.search(v):
                 f.unseen.append(GRAPHQL_WHY)
         for src, live in inputs:
-            _input(f, src, live, p, ctx)
+            _input(f, src, live, p, ctx, at)
         return
     for flag, kv, live in fields:
         if "=" not in kv:
@@ -254,47 +245,39 @@ def _api(f, s, i, b, ctx, cli="gh"):
             continue
         if v.startswith("@") and flag in ("-F", "--field"):
             try:
-                f.value(_read(v[1:], ctx).strip(), live)
+                f.value(_read(v[1:], live, ctx).strip(), False)
             except Refuse as e:
                 f.unseen.append(f"the field {key} reads the file `{v[1:]}`, which {e}")
         else:
             f.value(v, live, f"the field {key}")
     for src, live in inputs:
-        _input(f, src, live, p, ctx)
+        _input(f, src, live, p, ctx, at)
 
 
-def _gh(f, s, g, b, ctx):
+def _gh(f, s, a, g, b, ctx):
     if g + 2 > b:
         return
     cli, group, act = sw.client(s.w[g]), s.w[g + 1], s.w[g + 2]
     if group == "api":
-        _api(f, s, g + 2, b, ctx, cli)
+        _api(f, s, a, g + 2, b, ctx, cli)
         return
     row = _CLIENTS[cli]
     if group == "alias":
         _alias(f, s, g, b, act)
         return
     if group in row["groups"] and act in row["writes"]:
-        flags, glued = row["label"]
+        flags = row["label"]
     elif group == "label" and act == "edit":
-        flags, glued = row["rename"]
+        flags = row["rename"]
     else:
         return
-    short = next(x for x in flags if len(x) == 2)
-    j = g + 3
-    while j <= b:
-        t = sw.word(s, j)
-        if t in flags:
-            if j == b:
-                f.unseen.append(f"`{t}` has no value the guard can see")
-            else:
-                f.value(sw.word(s, j + 1), s.live[j + 1])
-            j += 1
-        elif t.startswith(glued):
-            f.value(t.split("=", 1)[1], s.live[j])
-        elif t.startswith(short) and len(t) > 2 and not t.startswith("--"):
-            f.value(_glued(t), s.live[j])
-        j += 1
+    for x in sw.flag_words(s, g + 3, b, flags):
+        if x.name is None:
+            continue
+        if x.value is None:
+            f.unseen.append(f"`{x.name}` has no value the guard can see")
+        else:
+            f.value(x.value, x.live)
 
 
 def _alias(f, s, g, b, act):
@@ -313,9 +296,10 @@ def _alias(f, s, g, b, act):
 
 
 def _bash(f, doc, cmd, cwd, env, depth=0, alone=True):
-    scans = [(doc.scan(t), nested) for t, nested in doc.texts(text=cmd)]
+    read = sw.Bodies(doc, cmd)
+    scans = [(doc.scan(t), nested) for t, nested in read.texts()]
     bodies = doc.heredocs(cmd)
-    ctx = {"cwd": cwd, "env": env, "bodies": bodies, "files": f.files, "wanted": f.wanted,
+    ctx = {"cwd": cwd, "env": env, "read": read, "files": f.files, "wanted": f.wanted,
            "moved": any(sw.cd_present(s) for s, _ in scans),
            "alone": alone and sw.alone(scans, sw.CLIENTS)}
     for s, nested in scans:
@@ -324,7 +308,7 @@ def _bash(f, doc, cmd, cwd, env, depth=0, alone=True):
                 continue
             g = sw.cmd_index(s, a, b, sw.CLIENTS, nested)
             if g is not None:
-                _gh(f, s, g, b, ctx)
+                _gh(f, s, a, g, b, ctx)
     # A heredoc fed to a shell (`sh <<EOF`, `cat <<EOF | sh`) is a command of
     # its own; fed to anything else it is text.
     # Its pipeline is its own segment and every segment piped on from it.
@@ -334,7 +318,7 @@ def _bash(f, doc, cmd, cwd, env, depth=0, alone=True):
         while e + 1 in top.pipes:
             e = next(y for x, y in top.segments() if x == e + 2)
         for j in range(a, b + 1):
-            if top.k[j] == "w" and top.w[j] == "HEREDOC":
+            if top.k[j] == "w" and re.fullmatch(r"HEREDOC\d*", top.w[j]):
                 shell = any(top.k[i] == "w" and top.w[i] in sw.SHELL for i in range(a, e + 1))
                 if shell and k < len(bodies) and depth < DEPTH:
                     if bodies[k][1]:

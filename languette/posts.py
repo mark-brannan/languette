@@ -64,7 +64,8 @@ Only the hard block fails closed on text it cannot see. With a blocked terms
 file loaded: a body built at run time that no heredoc feeds, stdin with no
 heredoc, a file it cannot read or that the command writes other than from one
 heredoc, a $VAR assigned again, or a flag whose shape says it carries text but
-is not one it knows -> deny, with the fix in the reason.
+is not one it knows -> deny, with the fix in the reason. Where a body comes
+from is read as the other guards that judge a post read it (languette.bodies).
 """
 
 import re
@@ -88,6 +89,10 @@ _MCP_TOOL = re.compile(rf"mcp__.*__(?:{_MCP})\Z")
 TO_PRIVATE = "target a repo listed in the private_repos option"
 _UNSEEN = re.compile(r"--[A-Za-z-]*(?:body|comment|message)[A-Za-z-]*")
 _ACTS = frozenset("create comment edit review close reopen merge".split())
+# gh issue|pr's flags that carry posted text: a body file, a label list, a value.
+_FILE_FLAGS = ("--body-file", "--comment-file", "-F")
+_LABEL_FLAGS = ("--label", "--add-label", "-l")
+_GH_FLAGS = sw.GH_REPO_FLAGS + _FILE_FLAGS + _LABEL_FLAGS + ("--body", "--title", "--comment", "--subject", "-b", "-t", "-c")
 _GRAPHQL = re.compile(r"addComment|createIssue|updateIssue|createPullRequest|updatePullRequest|"
                       r"addPullRequestReview|submitPullRequestReview|addDiscussionComment|"
                       r"createNote|updateNote|createDiffNote|mergeRequestCreate|mergeRequestUpdate|"
@@ -112,29 +117,19 @@ def _flat(t):
 class _Meta:
     """The command's records, in command order, as (kind, value):
     R repo (- = the cwd's, ? = unknown) | T posted text | HDTXT heredoc text |
-    F / FX file (FX: in nested text) | CDTO dir | CDPUSH / CDPOP | A NAME=VALUE |
-    HFED path one heredoc alone writes | STDIN | OPAQUE (what, value) | HEREDOC | CD |
-    UNSEEN flag. wrote: the paths the command writes any other way."""
+    F / FX file (path, live, tilde; FX: in nested text) | CDTO dir | CDPUSH / CDPOP |
+    A NAME=VALUE | STDIN, stdin no heredoc feeds | OPAQUE (what, value) | CD | UNSEEN flag.
+    read: the command's Bodies, where a body comes from (not a record: the paths it
+    writes are read with a > inside quotes too, so a redaction's put would add one)."""
 
     def __init__(self, doc, command):
         self.out = []
-        buf = self.orig = command + "\n"
-        counts = {}
-        for p in sw.writes(buf, False):
-            counts[p] = counts.get(p, 0) + 1
-        for p in sw.writes(buf, True):
-            if counts.get(p) == 1:
-                self.add("HFED", p)
-                del counts[p]
-        # Not a record: sw.writes reads a > inside quotes too, so a redaction's put would add one.
-        self.wrote = list(counts)
-        self.flat = doc.stripped(buf)
-        if doc.heredocs():
-            self.add("HEREDOC")
+        self.orig = command + "\n"
+        self.read = sw.Bodies(doc, command)
         for body in doc.heredoc_bodies():
             for line in body.split("\n") if body else ():
                 self.add("HDTXT", line)
-        for text, nested in doc.texts():
+        for text, nested in self.read.texts():
             s = self.s = doc.scan(text)
             if sw.cd_present(s):
                 self.add("CD")
@@ -153,41 +148,24 @@ class _Meta:
     def add(self, kind, value=""):
         self.out.append((kind, value))
 
-    def file(self, p):
-        if p == "-":
+    def file(self, p, live=True, tilde=True):
+        """A body file, `-` being stdin; a heredoc's text is already an HDTXT record."""
+        src = self.read.file(p, live, tilde, self.s, self.lo, self.hi)
+        if src[0] == "file":
+            self.add("FX" if self.nested else "F", (_flat(p), live, tilde))
+        elif src[0] == "stdin":
             self.add("STDIN")
-        else:
-            self.add("FX" if self.nested else "F", _flat(p))
-
-    def fed(self, v):
-        """A $VAR this command assigns once, from a heredoc, before its first use: a second
-        assignment could replace the text the guard read."""
-        name = re.sub(r"^\$\{?", "", v, count=1)
-        name = re.sub(r"[^A-Za-z0-9_].*", "", name, count=1, flags=re.S)
-        if name == "":
-            return False
-        t = self.flat
-        # A shell assignment, not a gh field (-f NAME=...) of the same name.
-        sets = [a for a in re.finditer(r"(?:^|[\s;&|(])" + name + "=", t)
-                if not re.search(r"(?:-[fF]|--field|--raw-field)\s*\Z", t[:a.start() + 1])]
-        use = re.search(r"\$\{?" + name + r"\b", t)
-        return (len(sets) == 1 and use is not None and sets[0].end() <= use.start()
-                and re.match(r"""["']?\$\([^)]*\bHEREDOC\b""", t[sets[0].end():]) is not None)
+        elif src[0] == "opaque":
+            self.add("OPAQUE", (say("pt_what_body"), _flat(p)))
 
     def val(self, v, live, what=None):
         """A posted value: text, or OPAQUE (what it is, the value) when built at run
-        time and no heredoc on the value itself feeds it."""
-        what = what or say("pt_what_body")
-        if not live:
-            self.add("T", _flat(v))                  # single-quoted: posted verbatim
-        elif "$(" in v or "`" in v:
-            if "<<" not in v and " HEREDOC " not in v:
-                self.add("OPAQUE", (what, _flat(v)))
-        elif re.match(r"\$[A-Za-z_{]", v):
-            if not self.fed(v):
-                self.add("OPAQUE", (what, _flat(v)))
-        else:
+        time and not wholly a heredoc's (languette.bodies)."""
+        src = self.read.value(v, live)
+        if src[0] == "text":
             self.add("T", _flat(v))
+        elif src[0] == "opaque":
+            self.add("OPAQUE", (what or say("pt_what_body"), _flat(v)))
 
     def lab(self, v):
         for part in v.split(","):
@@ -199,7 +177,7 @@ class _Meta:
         key = v.split("=", 1)[0]
         v = v.split("=", 1)[1] if "=" in v else v
         if v.startswith("@"):
-            self.file(v[1:])
+            self.file(v[1:], live, False)  # the shell never expands a ~ after @
             return
         # An id or number field names a thing by its identifier; the API refuses
         # prose there, so a run-time value carries no text to check.
@@ -243,7 +221,7 @@ class _Meta:
         self.add("A", _flat(a))
 
     def segment(self, lo, hi, nested):
-        s, self.nested = self.s, nested
+        s, self.nested, self.lo, self.hi = self.s, nested, lo, hi
         if not nested:
             c = sw.seg_cmd(s, lo, hi)
             ok = c is None and all(s.k[i] == "w" and sw._ASSIGN.match(s.w[i]) for i in range(lo, hi + 1))
@@ -268,38 +246,19 @@ class _Meta:
             return
         if sub not in ("issue", "pr") or g + 2 > hi or s.w[g + 2] not in _ACTS:
             return
-        i = g + 3
-        while i <= hi:
-            t = sw.word(self.s, i)                       # a glued flag+quoted-value token may not be kind "w"
-            live = s.live[i]
-            if r := sw.gh_repo_flag(s, i, hi, repo):
-                repo, i = r
-            elif t in ("--body-file", "--comment-file", "-F"):
-                if i < hi:
-                    i += 1
-                    self.file(sw.word(self.s, i))
-            elif t.startswith("--body-file="):
-                self.file(t[12:])
-            elif t.startswith("--comment-file="):
-                self.file(t[15:])
-            elif t.startswith("-F") and len(t) > 2:
-                self.file(t[2:])
-            elif t in ("--body", "--title", "--comment", "--subject", "-b", "-t", "-c"):
-                if i < hi:
-                    i += 1
-                    self.val(sw.word(self.s, i), s.live[i], say("pt_what_flag", name=t))
-            elif re.match(r"--(?:body|title|comment|subject)=", t):
-                self.val(t.split("=", 1)[1], live, say("pt_what_flag", name=t.split("=", 1)[0]))
-            elif re.match(r"-[btc].", t):
-                self.val(t[2:], live, say("pt_what_flag", name=t[:2]))
-            elif t in ("--label", "--add-label", "-l"):
-                if i < hi:
-                    i += 1
-                    self.lab(sw.word(self.s, i))
-            elif re.match(r"--(?:add-)?label=", t):
-                self.lab(t.split("=", 1)[1])
-            elif t.startswith("-l") and len(t) > 2:
-                self.lab(t[2:])
+        for f in sw.flag_words(s, g + 3, hi, _GH_FLAGS):
+            t = f.value
+            if f.name in sw.GH_REPO_FLAGS:
+                repo = repo if t is None else t
+            elif f.name is not None:
+                if t is None:
+                    continue
+                if f.name in _FILE_FLAGS:
+                    self.file(t, f.live, f.tilde)
+                elif f.name in _LABEL_FLAGS:
+                    self.lab(t)
+                else:
+                    self.val(t, f.live, say("pt_what_flag", name=f.name))
             elif _UNSEEN.match(t):
                 # A flag whose name says it carries posted text, in a shape not read above.
                 self.add("UNSEEN", _flat(t))
@@ -308,7 +267,6 @@ class _Meta:
                 posrepo = u[3] + "/" + u[4]
             elif re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+", t):
                 posrepo = t.split("#", 1)[0]
-            i += 1
         if posrepo:
             self.add("R", _flat(posrepo))
         if repo or not posrepo:
@@ -323,40 +281,29 @@ class _Meta:
         acts = _GLAB_MERGE if sub == "mr" and verb is not None and s.w[verb] in ("merge", "accept") else _GLAB_ACTS
         if sub not in ("issue", "mr") or verb is None or s.w[verb] not in acts:
             return
-        i = g + 2
-        while i <= hi:
-            t = sw.word(s, i)
-            if r := sw.gh_repo_flag(s, i, hi, repo):
-                repo, i = r
-            elif t == "--description-file":
-                if i < hi:
-                    i += 1
-                    self.file(sw.word(s, i))
-            elif t.startswith("--description-file="):
-                self.file(t[19:])
-            elif t in acts[s.w[verb]]:
-                if i < hi:
-                    i += 1
-                    self.val(sw.word(s, i), s.live[i], say("pt_what_flag", name=t))
-            elif "=" in t and t.split("=", 1)[0] in acts[s.w[verb]] and t.startswith("--"):
-                self.val(t.split("=", 1)[1], s.live[i], say("pt_what_flag", name=t.split("=", 1)[0]))
-            elif re.match(r"-[tdm].", t) and t[:2] in acts[s.w[verb]]:
-                self.val(t[2:], s.live[i], say("pt_what_flag", name=t[:2]))
-            elif t in ("--label", "-l") and s.w[verb] not in ("merge", "accept"):
-                if i < hi:
-                    i += 1
-                    self.lab(sw.word(s, i))
+        # mr merge takes no spaced label: its -l is no label flag, and only --label= is read.
+        labels = () if s.w[verb] in ("merge", "accept") else ("--label", "-l")
+        for f in sw.flag_words(s, g + 2, hi, sw.GH_REPO_FLAGS + ("--description-file",) + acts[s.w[verb]] + labels):
+            t = f.value
+            if f.name in sw.GH_REPO_FLAGS:
+                repo = repo if t is None else t
+            elif f.name is not None:
+                if t is None:
+                    continue
+                if f.name == "--description-file":
+                    self.file(t, f.live, f.tilde)
+                elif f.name in labels:
+                    self.lab(t)
+                else:
+                    self.val(t, f.live, say("pt_what_flag", name=f.name))
             elif t.startswith("--label="):
                 self.lab(t[8:])
-            elif t.startswith("-l") and len(t) > 2 and s.w[verb] not in ("merge", "accept"):
-                self.lab(t[2:])
             elif _UNSEEN.match(t) or t.startswith("--description"):
                 self.add("UNSEEN", _flat(t))
             elif m := re.match(r"https?://[^/]+/(.+?)/-/(?:issues|merge_requests)/", t):
                 posrepo = m.group(1)
             elif re.fullmatch(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+[#!][0-9]+", t):
                 posrepo = re.split(r"[#!]", t, maxsplit=1)[0]
-            i += 1
         if posrepo:
             self.add("R", _flat(posrepo))
         if repo or not posrepo:
@@ -368,7 +315,7 @@ class _Meta:
             if a.text is None:
                 continue
             if a.flag == "--input":
-                self.file(a.text)
+                self.file(a.text, a.live, a.tilde)
             else:
                 self.field(a.text, a.live)
         for t in api.flags:
@@ -423,13 +370,8 @@ class _Replay:
                 out += "$"
         return out + s
 
-    def resolve(self, p):
-        p = self.expand(p)
-        if "$" in p or "`" in p:
-            return None
-        if p.startswith("/"):
-            return paths.lexical(p)
-        return paths.lexical(self.vcwd + "/" + p) if self.vcwd else None
+    def resolve(self, p, live=True, tilde=True):
+        return paths.word_path(p, self.vcwd, self.home, live, tilde, self.vars)
 
 
 def _load(kind, env, penv):
@@ -476,7 +418,7 @@ def check(doc):
         if not isinstance(cmd, str) or not cmd:
             return None
         m = _Meta(doc, cmd)
-        meta, wrote = m.out, m.wrote
+        meta = m.out
         # The tokeniser can lose a segment behind an odd construct; the raw string is
         # the backstop, so a gh write it names is scanned with the repo unknown.
         if not any(k == "R" for k, _ in meta) and _BACKSTOP.search(cmd):
@@ -486,7 +428,7 @@ def check(doc):
         text_cmd = "".join(v + "\n" for k, v in meta if k in ("T", "HDTXT"))
     elif _MCP_TOOL.match(tool):
         owner, repo = ti.get("owner"), ti.get("repo")
-        meta, wrote = [("R", f"{owner}/{repo}" if owner not in (None, "") and repo not in (None, "") else "-")], []
+        meta = [("R", f"{owner}/{repo}" if owner not in (None, "") and repo not in (None, "") else "-")]
         text_cmd = "\n".join(_strings(ti)) + "\n"
     else:
         return None
@@ -524,14 +466,12 @@ def check(doc):
     if gate and opaque is not None:
         what, value = opaque
         return deny(say("pt_opaque", guard=NAME, what=what, opaque=value))
-    kinds = {k for k, _ in meta}
-    if gate and "HEREDOC" not in kinds and "STDIN" in kinds:
+    if gate and any(k == "STDIN" for k, _ in meta):
         return deny(say("pt_stdin", guard=NAME))
 
     # Replayed in command order, so a cd or an assignment before a path applies to it.
     home = env.get("HOME") or ""
     rp = _Replay(cwd, home)
-    hfed = [v for k, v in meta if k == "HFED" and v]
     text_file, files, bad = "", [], None
     for kind, a in meta:
         if kind == "CDTO":
@@ -547,22 +487,20 @@ def check(doc):
             name, _, value = a.partition("=")
             rp.vars[name] = rp.expand(value)
             continue
-        if kind == "FX" and ("$" in a or not a.startswith("/")):
-            bad = a
-            continue
         if kind not in ("F", "FX"):
             continue
-        f = rp.resolve(a)
-        if f is None:
-            bad = a
+        if kind == "FX" and ("$" in a[0] or not a[0].startswith("/")):
+            bad = a[0]
             continue
-        # A file this command writes from one heredoc holds that heredoc's text, already
+        # A file this command fills from one heredoc holds that heredoc's text, already
         # scanned; one it writes any other way is not yet what the post will send.
-        if any(rp.resolve(h) == f for h in hfed):
+        got = m.read.where(("file", *a), rp.resolve)
+        if got[0] == "doc":
             continue
-        if any(rp.resolve(w) == f for w in wrote):
-            bad = f
+        if got[0] != "read":
+            bad = rp.resolve(*a) or a[0]
             continue
+        f = got[1]
         try:
             body = yield Need("read", f, paths.MAX_READ)
         except Exception:  # noqa: BLE001
@@ -628,7 +566,7 @@ def _rewrite_posted(doc, cmd, meta, applied):
         return scanned[c]
 
     def rescan(c):
-        d = type(doc)({**doc.payload, "tool_input": {**doc.payload["tool_input"], "command": c}}, doc.env)
+        d = type(doc)({**doc.payload, "tool_input": {**doc.tool_input, "command": c}}, doc.env)
         m = _Meta(d, c).out
         return [(k, v) for k, v in m if k in ("T", "HDTXT")], [r for r in m if r[0] not in ("T", "HDTXT")]
 
