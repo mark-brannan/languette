@@ -755,3 +755,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t063047z
 - the doctor's fix for a shared label or a broken user list is a printed line naming the edit, not a write Undo: add a --fix path in doctor that rewrites the label or moves the file aside on a yes ([#414](https://github.com/mark-brannan/languette/pull/414))
+
+### 20261112t063054z
+- a script in the user's ask-first list matches the word as written, not resolved against a project root Undo: pass an at root for the user's list in listed_runs.approval ([#414](https://github.com/mark-brannan/languette/pull/414))
