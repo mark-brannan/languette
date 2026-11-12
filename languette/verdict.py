@@ -221,7 +221,8 @@ def verdict(event, findings, mode=None, chained=None):
     allow (a redaction), and an ask carries a rewrite along; the first rewrite wins, since two cannot both apply.
     A deny ends with the chain footer when `chained`, a callable read only then, says the
     command had more than one segment (languette.document.Document.chained).
-    In a permission `mode` where no one can answer (NO_PROMPT), an ask is a deny that says so."""
+    In a permission `mode` where no one can answer (NO_PROMPT), an ask is a deny that names
+    each ask and leaves the call to the user."""
     if event != "PreToolUse":                  # state-keeping events: nothing to decide
         return None
     reasons, asks, allows, notes, rewrites = [], [], [], [], []
@@ -242,7 +243,7 @@ def verdict(event, findings, mode=None, chained=None):
         return deny("\n\n".join(reasons + _footer(chained)))
     if asks and mode in NO_PROMPT:
         return deny("\n\n".join([say("unattended_ask", guard=n, mode=mode, why=r) for n, r in asks]
-                                 + _footer(chained)))
+                                 + [say("unattended_way")] + _footer(chained)))
     if asks:
         return {**ask("\n\n".join(r for _, r in asks)), **({"updatedInput": rewrites[0]} if rewrites else {})}
     if allows:

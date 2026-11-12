@@ -244,8 +244,9 @@ denies every command until it is fixed, because the guard can no longer tell wha
 meant. One click pays for one run, read from the transcripts; each
 spend is logged in `<transcript>.languette-ask`, which no guard reads.
 
-In an unattended session, an ask is a deny
-(planned: [#164](https://github.com/mark-brannan/languette/issues/164)).
+In an unattended session (permission mode `dontAsk` or
+`bypassPermissions`), an ask is a deny that names what it would have asked
+and leaves the call to the user.
 
 ## Deny always
 

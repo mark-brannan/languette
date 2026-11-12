@@ -140,6 +140,7 @@ Feature: guard-git-stacked-base
     Given the permission mode is "<mode>"
     When the agent runs `git push origin --delete "$b"`
     Then the guard denies, naming "guard-git-stacked-base: this needs the user's approval, and in <mode> no one is there to approve it"
+    And the guard denies, naming "if the call still needs making, the user makes it themselves"
 
     Examples:
       | mode              |

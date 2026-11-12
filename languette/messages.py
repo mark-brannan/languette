@@ -27,6 +27,11 @@ MESSAGES = {
         "{guard}: this needs the user's approval, and in {mode} no one is there to approve it, "
         "so it is denied instead of asked. What it would have asked: {why}"
     ),
+    # Said once after every unattended_ask in a deny: the call is the user's now.
+    "unattended_way": (
+        "Don't work around it: if the call still needs making, the user makes it themselves. Say what "
+        "it is for and hand them the exact call."
+    ),
     # A spend the runner could not make after the verdict (run._spend).
     "approval_lost": (
         "languette: another call spent the user's approval while this one was judged ({guards}), "
