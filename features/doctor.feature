@@ -10,7 +10,7 @@ Feature: doctor
   something it needs failed is a ! row saying so, never skipped silently,
   except fail-closed: no hook to probe means no protection, so it is ✗.
   Rows run in this order: version, shell parser, parse check, fail-closed,
-  Claude Code (its guards beneath it), gh, the other forge clients, configs,
+  Claude Code (its guards beneath it), sandbox, read deny, gh, the other forge clients, configs,
   redacted terms, blocked terms; a configs row that denies every command comes
   first. A row's detail lines are indented beneath it.
 
@@ -222,6 +222,71 @@ Feature: doctor
       | ~/.claude/settings.json                  | {not json               | ~/.claude/settings.json is not JSON, so which guards are on is unknown |
       | ~/.claude/settings.json                  | {"pluginConfigs": []}   | pluginConfigs in ~/.claude/settings.json has a shape the doctor does not know |
       | ~/.claude/plugins/installed_plugins.json | {"plugins": {"languette@languette": 3}} | installed_plugins.json has a shape the doctor does not know |
+
+  # --- beside the guards: Claude Code's sandbox and Read deny rules -------------
+  # Report only: read from the settings files Claude Code reads (managed, project
+  # local, shared project, user), highest first, never written. A row says a
+  # setting is on or off; a setting no file sets is unknown, since MDM, server-managed
+  # settings and --settings are not files the doctor can read. Neither row is ever a ✗.
+
+  Scenario: the sandbox and the Read deny rules sit beside the guards
+    Given languette "cd31356ad5db" is installed at user scope
+    When the doctor runs
+    Then the "Claude Code" row comes before the "sandbox" row
+    And the "sandbox" row comes before the "read deny" row
+    And the "read deny" row comes before the "gh" row
+    And the "sandbox" row is ! "unknown: no settings file sets sandbox.enabled; Claude Code's default is off (/sandbox)"
+    And the "read deny" row is ! "no Read deny rule covers .env here or ~/.ssh"
+    And the doctor exits 0
+
+  Scenario: a sandbox on, with no retry outside it, and no start without it
+    Given the user's settings also hold `{"sandbox": {"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true}}`
+    When the doctor runs
+    Then the "sandbox" row is ✓ "on, in ~/.claude/settings.json"
+    And beneath it "allowUnsandboxedCommands off: a command the sandbox blocks is not retried outside it" is ✓
+    And beneath it "failIfUnavailable on: Claude Code will not start where the sandbox cannot" is ✓
+
+  Scenario: a sandbox on with its defaults may be stepped around, and the row says so
+    Given the user's settings also hold `{"sandbox": {"enabled": true}}`
+    When the doctor runs
+    Then the "sandbox" row is ! "on, in ~/.claude/settings.json"
+    And beneath it "allowUnsandboxedCommands unknown: no settings file sets it; Claude Code's default is on, so a command the sandbox blocks may retry outside it" is !
+    And beneath it "failIfUnavailable unknown: no settings file sets it; Claude Code's default is off, so where the sandbox cannot start, commands run outside it" is !
+
+  Scenario: the project's local settings outrank the user's
+    Given the user's settings also hold `{"sandbox": {"enabled": true}}`
+    And "~/project/.claude/settings.local.json" holds `{"sandbox": {"enabled": false}}`
+    When the doctor runs
+    Then the "sandbox" row is ! "off, in ~/project/.claude/settings.local.json: the guards judge commands, nothing confines what they let through (/sandbox)"
+
+  Scenario: the user's false allowUnsandboxedCommands holds over a project's true
+    Given the user's settings also hold `{"sandbox": {"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true}}`
+    And "~/project/.claude/settings.json" holds `{"sandbox": {"allowUnsandboxedCommands": true}}`
+    When the doctor runs
+    Then the "sandbox" row is ✓ "on, in ~/.claude/settings.json"
+    And beneath it "allowUnsandboxedCommands off: a command the sandbox blocks is not retried outside it" is ✓
+
+  Scenario: a settings file that will not parse leaves the sandbox unknown, never a traceback
+    Given the user's settings also hold `{"sandbox": {"enabled": true}}`
+    And "~/project/.claude/settings.local.json" holds `{not json`
+    When the doctor runs
+    Then the "sandbox" row is ! "unknown: ~/project/.claude/settings.local.json is not JSON"
+    And the "read deny" row is ! "unknown for .env here or ~/.ssh: ~/project/.claude/settings.local.json is not JSON"
+    And the doctor prints no traceback
+
+  Scenario Outline: Read deny rules are matched as Claude Code anchors them
+    Given the user's settings also hold `{"permissions": {"deny": <rules>}}`
+    When the doctor runs
+    Then the "read deny" row is <mark> "<text>"
+
+    Examples:
+      | rules                                          | mark | text                                                  |
+      | ["Read(./.env)", "Read(~/.ssh/**)"]            | ✓    | Read deny rules cover .env here and ~/.ssh (2 rules)  |
+      | ["Read(.env)", "Read(//**/.ssh)"]              | ✓    | Read deny rules cover .env here and ~/.ssh (2 rules)  |
+      | ["Read"]                                       | ✓    | Read deny rules cover .env here and ~/.ssh (1 rule)   |
+      | ["Read(*.env)", "Bash(rm *)"]                  | !    | Read deny rules cover .env here, not ~/.ssh (1 rule)  |
+      | ["Read(/.ssh/**)"]                             | !    | no Read deny rule covers .env here or ~/.ssh (1 rule) |
+      | ["Read(*.env)", "Read(!.env)", "Read(~/.ssh)"] | !    | Read deny rules cover ~/.ssh, not .env here (3 rules) |
 
   # --- guard-private-terms' files, through the guard's own loader ----------------
   # A row per terms file, counting only the entries in that file; the doctor can write

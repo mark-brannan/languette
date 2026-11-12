@@ -193,6 +193,43 @@ def settings_files(cwd):
     return out
 
 
+# Where an administrator's managed-settings.json sits (code.claude.com/docs/en/managed-settings).
+MANAGED = {"darwin": "/Library/Application Support/ClaudeCode/managed-settings.json",
+           "win32": r"C:\Program Files\ClaudeCode\managed-settings.json"}
+MANAGED_ELSE = "/etc/claude-code/managed-settings.json"     # Linux and WSL
+
+
+def _repo_root(cwd):
+    """Where Claude Code keeps .claude/settings.local.json: the git root above cwd, or cwd itself
+    outside a repository, where the root is $HOME, or on Windows."""
+    h, d = home(), Path(cwd)
+    if sys.platform == "win32":
+        return d
+    for p in (d, *d.parents):
+        if (p / ".git").exists():
+            return d if p == h else p
+    return d
+
+
+def layers(cwd):
+    """[(scope, path, parsed JSON or the Unreadable)], highest precedence first, for the settings
+    files Claude Code reads in a session started at cwd: managed, project local (the repo root's,
+    then an earlier version's beside cwd), shared project, user. MDM, server-managed settings and
+    --settings are not files here, so a key none of these sets is not known to be unset."""
+    local = [_repo_root(cwd) / ".claude/settings.local.json"]
+    if Path(cwd) / ".claude/settings.local.json" != local[0]:
+        local.append(Path(cwd) / ".claude/settings.local.json")
+    found = [("managed", Path(MANAGED.get(sys.platform, MANAGED_ELSE))), *(("local", p) for p in local),
+             ("project", Path(cwd) / ".claude/settings.json"), ("user", user_settings())]
+    out = []
+    for scope, p in found:
+        try:
+            out.append((scope, p, read_json(p, missing={})))
+        except Unreadable as e:
+            out.append((scope, p, e))
+    return out
+
+
 def in_effect(found, cwd):
     """The install in effect for cwd: the most specific project or local install
     whose projectPath holds cwd, local before project, else the user's."""
