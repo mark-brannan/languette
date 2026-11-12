@@ -18,12 +18,13 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 ## A repo rule's `why`: 2026-11-11
 
 - A repo rule's `why` stays agent-facing, bounded as today: one line, 200
-  characters, labelled as data (`engine._quoted`). Documented, not removed
-  ([#383](https://github.com/mark-brannan/languette/issues/383)). "keep the
+  characters, labelled as data (`engine._quoted`)
+  ([#383](https://github.com/mark-brannan/languette/issues/383)): "keep the
   why and document".
-- Why: the same repo writes the CLAUDE.md the agent reads whole, so the `why`
-  adds no new channel
-  ([research](research/repo-rule-why.md)).
+- Why (the agent's reading, not a quote): the same repo writes the CLAUDE.md
+  the agent reads whole, so the `why` adds no new channel; the residual, a
+  model following text the guard quotes, is accepted
+  ([research](research/repo-rule-why.md), direction A).
 
 ## Uninstall and the user's options: 2026-11-05
 
