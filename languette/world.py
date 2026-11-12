@@ -29,6 +29,7 @@ from languette.verdict import short
 GIT_TIMEOUT = 5
 FORGE_TIMEOUT = 10
 PR_LIST_TIMEOUT = 25                # past the `timeout 20` guard-git-stacked-base wraps gh pr list in
+SPENT = ".languette-ask"            # appended to the transcript path: the spends' log, never read
 # Seconds the approvals spend waits before its last read: past Claude Code's
 # transcript write timer (100 ms), so a call queued before this hook began is on disk.
 SETTLE = 0.2
@@ -435,15 +436,34 @@ class World:
     def _claim(self, wants):
         """The approvals spend: True when every label of `wants` ({approve_label:
         runs}, every asking guard's together) still has its runs' worth, False when
-        one fell short (a parallel call spent it since the guard looked). Nothing is
-        written: the transcript is the record of the spend, this call's tool_use and
-        result in it. The read waits SETTLE first, past Claude Code's transcript
-        write timer, and reads afresh, so a parallel call queued before this hook
-        began is on disk and counts, and of two the earlier in transcript order
-        wins. Raises OSError as _approvals does."""
+        one fell short (a parallel call spent it since the guard looked). The
+        transcript is the record of the spend, this call's tool_use and result in
+        it. The read waits SETTLE first, past Claude Code's transcript write timer,
+        and reads afresh, so a parallel call queued before this hook began is on
+        disk and counts, and of two the earlier in transcript order wins. Raises
+        OSError as _approvals does. A spend is then logged (_log_spend)."""
         time.sleep(SETTLE)
         self._seen = None
-        return not short(self._replay(wants)[0], wants)
+        approved = self._replay(wants)[0]
+        if short(approved, wants):
+            return False
+        self._log_spend(wants, approved)
+        return True
+
+    def _log_spend(self, wants, approved):
+        """Append what this call spent to <transcript>.languette-ask, one JSON line per
+        yes: a log for the user, which no guard reads. Whole lines, under an exclusive
+        lock; silent on any failure, since nothing is decided from it."""
+        call, now = self._call(), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        lines = "".join(json.dumps({"t": now, "label": label, "approval": i, "call": call}) + "\n"
+                        for label, n in wants.items() for i in approved[label][:n])
+        try:
+            fd = os.open(self._transcript() + SPENT, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "a", encoding="utf-8") as f:
+                fcntl.flock(f, fcntl.LOCK_EX)
+                f.write(lines)
+        except OSError:
+            pass
 
     def _send_file(self, session):
         return self._session_file(SEND_STATE, session)

@@ -1,7 +1,7 @@
 """A click pays for one run: a guard only reads it, the runner checks it again
 once after the verdict, and the transcript alone says who spent it: the first
 later call that wanted its label and did not show it never ran. Nothing is
-written beside the transcript."""
+read back: each spend is only logged beside the transcript."""
 
 import json
 import re
@@ -126,10 +126,25 @@ def test_a_call_that_ran_or_may_have_keeps_its_click(tmp_path, result):
     assert not _claim(tp, "toolu_B2")[1]
 
 
-def test_neither_reading_nor_spending_writes_a_file(tmp_path):
+def test_reading_writes_nothing(tmp_path):
     tp = _transcript(tmp_path)
-    assert _claim(tp, "toolu_B1") == ({"Run e2e": ["toolu_A"]}, True)
+    assert _world(tp, "toolu_B1").answer(Need("approvals", {"Run e2e": 1})) == {"Run e2e": ["toolu_A"]}
     assert sorted(p.name for p in tmp_path.iterdir()) == ["t.jsonl"]
+
+
+def test_a_spend_is_logged_and_the_log_is_never_read(tmp_path):
+    tp = _transcript(tmp_path)
+    log = tmp_path / "t.jsonl.languette-ask"
+    log.write_text("toolu_A\n" + json.dumps({"label": "Run e2e", "approval": "toolu_A", "call": "toolu_X"}) + "\n")
+    assert _claim(tp, "toolu_B1") == ({"Run e2e": ["toolu_A"]}, True)
+    rec = json.loads(log.read_text().splitlines()[-1])
+    assert (rec["label"], rec["approval"], rec["call"]) == ("Run e2e", "toolu_A", "toolu_B1")
+
+
+def test_a_log_that_cannot_be_written_spends_all_the_same(tmp_path):
+    tp = _transcript(tmp_path)
+    (tmp_path / "t.jsonl.languette-ask").mkdir()
+    assert _claim(tp, "toolu_B1")[1]
 
 
 def _asking(label):
