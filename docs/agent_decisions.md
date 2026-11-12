@@ -794,3 +794,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t073545z
 - A graphql query field with a $NAME inside is read for its shape in guard-signed-comments, as on main, rather than as built at run time Undo: drop the query special case in comment_posts._Read.api ([#417](https://github.com/mark-brannan/languette/pull/417))
+
+### 20261112t081349z
+- doctor sandbox row: a ! line per setting Claude Code lists as loosening its sandbox, autoAllowBashIfSandboxed left out (prompt, not confinement); read deny row carries a bare line on what a Read deny stops Undo: drop _loosened and READ_REACH in languette/doctor.py ([#416](https://github.com/mark-brannan/languette/pull/416))
