@@ -65,14 +65,12 @@ did not run (#84).
 - **The source of a yes is an input:** a click on the agent's question, the
   human's own turn, others later. A guard reads that a yes stands and never
   knows which source gave it.
-- **A guard spends nothing.** Its finding names the yes the call needs. The
-  runner spends it once, in act, after the verdict, and only when
-  the verdict lets the call through: atomic, recorded against the tool call,
-  given back when the call never ran. A deny spends nothing, so a click is
-  not lost on a command another guard refused (#83).
+- **A guard spends nothing.** The runner spends the yes once, in act, only
+  when the verdict lets the call through (#83).
 - **One click is one run,** whichever guards asked: every guard's asks for a
   call are spent together. A spend lost to a parallel call, or one that
-  cannot be recorded, makes the call a deny.
+  cannot be recorded, makes the call a deny: act's one refusal, the only
+  decision after the verdict.
 - **Nobody to answer:** an ask falls back to a deny, in the verdict, from the
   mode. The fallback sits outside every guard so it can change without
   touching one; whether it is configurable is open (#84).
