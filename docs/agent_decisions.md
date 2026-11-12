@@ -722,3 +722,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t050002z
 - Who is told takes four values, adding 'the user' to #87's nobody/agent/both, so ask's default (the user) has a row Undo: drop the 'the user' row from the table ([#87](https://github.com/mark-brannan/languette/issues/87)) (no PR, branch claude/who-is-told-87-84)
+
+### 20261112t050005z
+- The warn example uses a placeholder guard name, not a real guard's message Undo: swap in a real guard's message ([#87](https://github.com/mark-brannan/languette/issues/87)) (no PR, branch claude/who-is-told-87-84)
