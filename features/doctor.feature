@@ -373,6 +373,29 @@ Feature: doctor
     And beneath it "~/project/.languette/notes.json: no guard reads it" is !
     And the doctor exits 0
 
+  # The user's own lists, beside the repo's: the same loader, and the way to mend a broken one.
+  Scenario: a user list that does not load is reported first, with how to mend it
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{}`
+    And "~/.config/languette/ask-first.json" holds `{"commands": 3}`
+    When the doctor runs
+    Then the "configs" row is ✗ "every Bash command is denied until ~/.config/languette/ask-first.json loads"
+    And it prints "✗ ~/.config/languette/ask-first.json: the top level must be"
+    And it prints "to fix: edit ~/.config/languette/ask-first.json until `languette doctor` shows it ✓, or move it aside to stop it denying"
+    And the doctor exits 1
+
+  Scenario: an approve_label the user's list and the repo's share is a warning, with the fix
+    Given languette "cd31356ad5db" is installed at user scope
+    And the languette options are `{}`
+    And "~/.config/languette/ask-first.json" holds `{"commands": [{"id": "e2e", "match": [{"cmd": "npm", "args": ["run", "e2e"]}], "cost": "c", "approve_label": "Run e2e"}]}`
+    And "~/project/.languette/ask-first.json" holds `{"commands": [{"id": "walk", "match": [{"cmd": "npm", "args": ["run", "walk"]}], "cost": "c", "approve_label": "Run e2e"}]}`
+    When the doctor runs
+    Then the "configs" row is ! "every option and 1 file under .languette/ load as their guards read them; 1 user list"
+    And beneath it "~/.config/languette/ask-first.json" is ✓
+    And beneath it "approve_label 'Run e2e' is in both ~/.config/languette/ask-first.json and ~/project/.languette/ask-first.json: one click pays for a run of both" is !
+    And it prints "to fix: give one of them its own approve_label, in ~/project/.languette/ask-first.json or ~/.config/languette/ask-first.json"
+    And the doctor exits 0
+
   Scenario: an option its guard refuses fails the row, and the fix is offered as a diff
     Given languette "cd31356ad5db" is installed at user scope
     And the languette options are `{"signed_comments_signature": "("}`
