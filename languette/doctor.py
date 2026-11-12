@@ -382,7 +382,7 @@ def _sandbox(layers, key):
     found = None
     for scope, path, s in layers:
         if isinstance(s, Unreadable):
-            if found is None:
+            if found is None or (key == "allowUnsandboxedCommands" and scope in ("managed", "user")):
                 raise s
             continue
         box = s.get("sandbox") if isinstance(s, dict) else None

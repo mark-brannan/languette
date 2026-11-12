@@ -259,6 +259,19 @@ Feature: doctor
     When the doctor runs
     Then the "sandbox" row is ! "off, in ~/project/.claude/settings.local.json: the guards judge commands, nothing confines what they let through (/sandbox)"
 
+  Scenario: in a git worktree the local settings are the main checkout's
+    Given the project is a git worktree of "~/main"
+    And "~/main/.claude/settings.local.json" holds `{"sandbox": {"enabled": false}}`
+    When the doctor runs
+    Then the "sandbox" row is ! "off, in ~/main/.claude/settings.local.json: the guards judge commands, nothing confines what they let through (/sandbox)"
+
+  Scenario: an unreadable user file leaves allowUnsandboxedCommands unknown, since its false would hold
+    Given "~/project/.claude/settings.local.json" holds `{"sandbox": {"enabled": true, "allowUnsandboxedCommands": true}}`
+    And "~/.claude/settings.json" holds `{not json`
+    When the doctor runs
+    Then the "sandbox" row is ! "on, in ~/project/.claude/settings.local.json"
+    And beneath it "allowUnsandboxedCommands unknown: ~/.claude/settings.json is not JSON" is !
+
   Scenario: the user's false allowUnsandboxedCommands holds over a project's true
     Given the user's settings also hold `{"sandbox": {"enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true}}`
     And "~/project/.claude/settings.json" holds `{"sandbox": {"allowUnsandboxedCommands": true}}`

@@ -71,29 +71,12 @@ and on a machine that sets neither:
 ! read deny     no Read deny rule covers .env here or ~/.ssh
 ```
 
-- **Report only.** These are another tool's settings; the doctor reads
-  them and never writes them. The way to change one is named (`/sandbox`).
-- **On or off, never safe.** A ✓ says a setting is on, not that the
-  machine is safe. Neither row is ever a ✗: the guards' protection does
-  not depend on them.
-- **Unknown, not off.** A setting no file sets reads "unknown", with
-  Claude Code's default beside it: MDM, server-managed settings and
-  `--settings` are sources the doctor cannot read. A file that will not
-  parse makes the answer unknown, never a traceback.
-- **Read as Claude Code reads them.** The files are managed, project local,
-  shared project and user, highest first; a key comes from the highest file
-  that sets it, and a `false` `allowUnsandboxedCommands` in the user's or
-  managed settings holds over a project's `true`. Read deny rules merge
-  across files and are matched with Claude Code's anchors (`//`, `~/`, `/`,
-  relative) and gitignore patterns, against `.env` in the working directory
-  and a key under `~/.ssh`.
-- **Claude Code only.** Each host has its own sandbox and settings
-  (#5, #102); a row for another host waits on that host.
-- **Drift.** These are another project's setting names. They are read from
-  [sandboxing](https://code.claude.com/docs/en/sandboxing),
-  [settings](https://code.claude.com/docs/en/settings) and
-  [permissions](https://code.claude.com/docs/en/permissions); a rename
-  there reads here as "unknown", never as off.
+- **Report only.** Another tool's settings: read, never written; `/sandbox` changes them.
+- **On or off, never safe.** A ✓ says a setting is on; neither row is ever a ✗.
+- **Unknown, not off.** A key no file sets reads "unknown", Claude Code's default beside it.
+- **Read as Claude Code reads them.** Four files, highest first; deny lists merge, with its anchors.
+- **Claude Code only.** Each host has its own sandbox and settings (#5, #102).
+- **Drift.** Names from the [sandboxing](https://code.claude.com/docs/en/sandboxing) and [permissions](https://code.claude.com/docs/en/permissions) docs; a rename reads "unknown".
 
 ## Limits
 

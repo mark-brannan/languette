@@ -176,7 +176,8 @@ def installs(files):
 
 def settings_files(cwd):
     """path -> parsed JSON (or the Unreadable) for the user's settings.json and every
-    .claude/settings{,.local}.json from cwd up to, not including, $HOME."""
+    .claude/settings{,.local}.json from cwd up to, not including, $HOME. Wider than the files
+    Claude Code reads, which `layers` lists."""
     h = home()
     paths = [user_settings()]
     d = Path(cwd)
@@ -200,13 +201,21 @@ MANAGED_ELSE = "/etc/claude-code/managed-settings.json"     # Linux and WSL
 
 
 def _repo_root(cwd):
-    """Where Claude Code keeps .claude/settings.local.json: the git root above cwd, or cwd itself
-    outside a repository, where the root is $HOME, or on Windows."""
+    """Where Claude Code keeps .claude/settings.local.json: the git root above cwd, the main
+    checkout's for a worktree, or cwd itself outside a repository, where the root is $HOME, or on
+    Windows."""
     h, d = home(), Path(cwd)
     if sys.platform == "win32":
         return d
     for p in (d, *d.parents):
         if (p / ".git").exists():
+            try:                                # a worktree's .git is a file: gitdir: <main>/.git/worktrees/<name>
+                m = re.match(r"gitdir: (.+)", (p / ".git").read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError):
+                m = None
+            gitdir = Path(m[1].strip()) if m else None
+            if gitdir and gitdir.parent.name == "worktrees" and gitdir.parents[1].name == ".git":
+                p = gitdir.parents[2]
             return d if p == h else p
     return d
 

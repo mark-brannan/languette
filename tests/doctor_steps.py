@@ -234,6 +234,13 @@ def _user_keys(doctor, keys):
     doctor.write_settings({**doctor.settings(), **json.loads(keys)})
 
 
+@given(parsers.parse('the project is a git worktree of "{main}"'))
+def _worktree(doctor, main):
+    gitdir = Path(doctor.expand(main)) / ".git/worktrees/project"
+    gitdir.mkdir(parents=True)
+    (doctor.home / "project/.git").write_text(f"gitdir: {gitdir}\n")
+
+
 @given("the user's settings.json has a by-hand guard-recursive-delete hook")
 def _by_hand(doctor):
     # The README's "If you cannot run the installer" entry, pointed at this repo.
