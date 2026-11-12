@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.25](https://github.com/mark-brannan/languette/compare/v0.0.24...v0.0.25) (2026-11-12)
+
+
+### Features
+
+* **ask-first:** a user list beside the repo's, and except words ([#414](https://github.com/mark-brannan/languette/issues/414)) ([a2ad15f](https://github.com/mark-brannan/languette/commit/a2ad15f3cdaa41c4480c343969d159ae092dd49d))
+* **verdict:** an unattended ask's deny leaves the call to the user ([#413](https://github.com/mark-brannan/languette/issues/413)) ([fb21a8b](https://github.com/mark-brannan/languette/commit/fb21a8b4c336c7e25310bbc297c5a4f68ca8ffe9))
+
+
+### Documentation
+
+* **decisions:** a repo rule's why stays agent-facing, bounded ([#415](https://github.com/mark-brannan/languette/issues/415)) ([09b5677](https://github.com/mark-brannan/languette/commit/09b56772171a8ff71fb1e060509601d67922868f))
+
 ## [0.0.24](https://github.com/mark-brannan/languette/compare/v0.0.23...v0.0.24) (2026-11-12)
 
 
