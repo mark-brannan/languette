@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.23](https://github.com/mark-brannan/languette/compare/v0.0.22...v0.0.23) (2026-11-12)
+
+
+### Features
+
+* **guard-signed-comments:** signed_comments_mcp setting for MCP comment posts ([#408](https://github.com/mark-brannan/languette/issues/408)) ([9fd4cb0](https://github.com/mark-brannan/languette/commit/9fd4cb0a902b02a8ccd36c83dc67ce3bb5a0e009))
+
 ## [0.0.22](https://github.com/mark-brannan/languette/compare/v0.0.21...v0.0.22) (2026-11-12)
 
 
