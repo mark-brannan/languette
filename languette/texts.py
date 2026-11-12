@@ -28,11 +28,12 @@ def _unq(t):
     return t.replace('"', "").replace("'", "")
 
 
-def writes(b, heredoc_only):
+def writes(b, heredoc_only, appends=False):
     """The file paths `b` writes with a redirection or `tee`, heredoc bodies
     skipped; with heredoc_only, only those on a line that opens a heredoc --
     the paths whose content is the heredoc body. Quotes are stripped; a path
-    built from $VAR comes back unresolved."""
+    built from $VAR comes back unresolved. With appends, each comes as
+    (path, whether it is appended to: `>>`, `tee -a`)."""
     out, delim = [], ""
     for line in b.split("\n"):
         if delim:
@@ -42,29 +43,32 @@ def writes(b, heredoc_only):
         m = re.search(r"""<<-?[ \t]*["']?[A-Za-z_][A-Za-z0-9_]*["']?""", line)
         if m:
             delim = _unq(re.sub(r"^<<-?[ \t]*", "", m.group()))
-            pre = line[:m.start()]
+            pre = line[:m.start()] + " " + line[m.end():]   # `cat <<EOF > f` writes f too
         else:
             pre = line
         if heredoc_only and not m:
             continue
         pre = re.sub(r"[;|&]", " ; ", pre)
-        pre = re.sub(r">>?", " @redir@ ", pre)
+        pre = re.sub(r">>", " @append@ ", pre)
+        pre = re.sub(r">", " @redir@ ", pre)
         t = [x for x in re.split(r"[ \t]+", pre) if x != ""]
-        teeing = False
+        teeing = tee_append = False
         for x, tok in enumerate(t):
             if tok == ";":
                 teeing = False
                 continue
-            if tok == "@redir@":
-                if x + 1 < len(t) and t[x + 1] not in (";", "@redir@"):
-                    out.append(_unq(t[x + 1]))
+            if tok in ("@redir@", "@append@"):
+                if x + 1 < len(t) and t[x + 1] not in (";", "@redir@", "@append@"):
+                    out.append((_unq(t[x + 1]), tok == "@append@"))
                 continue
             if _unq(tok) == "tee":
-                teeing = True
+                teeing, tee_append = True, False
                 continue
-            if teeing and not tok.startswith("-"):
-                out.append(_unq(tok))
-    return out
+            if teeing and tok.startswith("-"):
+                tee_append = tee_append or tok == "--append" or (not tok.startswith("--") and "a" in tok)
+            elif teeing:
+                out.append((_unq(tok), tee_append))
+    return out if appends else [p for p, _ in out]
 
 
 def texts_of(text, prose=PROSE, read=None):

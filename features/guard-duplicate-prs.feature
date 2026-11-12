@@ -68,6 +68,42 @@ Feature: guard-duplicate-prs
       """
     Then the guard denies, naming "PR #120"
 
+  Scenario: the body from a variable a heredoc fills is read
+    Given GH_TIMELINE is "open-pr"
+    When the agent runs:
+      """
+      BODY=$(cat <<'EOF'
+      Closes #114
+      EOF
+      )
+      gh pr create -t t --body "$BODY"
+      """
+    Then the guard denies, naming "PR #120"
+
+  Scenario: the body from stdin a heredoc pipes in through cat is read
+    Given GH_TIMELINE is "open-pr"
+    When the agent runs:
+      """
+      cat <<'EOF' | gh pr create -t t --body-file -
+      Fixes #114
+      EOF
+      """
+    Then the guard denies, naming "PR #120"
+
+  Scenario Outline: a body file under the home directory is read, in either spelling
+    Given GH_TIMELINE is "open-pr"
+    And the file "{HOME}/pr.md" holds:
+      """
+      Closes #114
+      """
+    When the agent runs `gh pr create -R o/r -t t -F <path>`
+    Then the guard denies, naming "PR #120"
+
+    Examples:
+      | path        |
+      | ~/pr.md     |
+      | $HOME/pr.md |
+
   Scenario: --repo names the repo when the working directory has none
     Given GH_TIMELINE is "open-pr"
     And the working directory is "{HOME}"
@@ -162,6 +198,17 @@ Feature: guard-duplicate-prs
     When the agent runs:
       """
       cat > /nonexistent-dir/body.md <<'EOF'
+      Closes #114
+      EOF
+      gh pr create -t t --body-file /nonexistent-dir/body.md
+      """
+    Then the guard denies, naming "PR #120"
+
+  Scenario: a body file a heredoc writes with the redirect after it is read from the heredoc
+    Given GH_TIMELINE is "open-pr"
+    When the agent runs:
+      """
+      cat <<'EOF' > /nonexistent-dir/body.md
       Closes #114
       EOF
       gh pr create -t t --body-file /nonexistent-dir/body.md

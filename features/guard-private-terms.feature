@@ -1077,6 +1077,14 @@ Feature: guard-private-terms
         ); b="$(cat notes.md)"; gh pr comment 3 -R o/r --body "$b"
         """
       Then the guard denies, naming "run time"
+      When the agent runs:
+        """
+        b=$(cat <<EOF
+        public text
+        EOF
+        ); b+=" $(cat notes.md)"; gh pr comment 3 -R o/r --body "$b"
+        """
+      Then the guard denies, naming "run time"
 
     Scenario Outline: single quotes make $ and a backtick ordinary characters, double quotes do not
       When the agent runs `<command>`

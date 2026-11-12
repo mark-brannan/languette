@@ -192,6 +192,26 @@ Feature: guard-signed-comments
         """
       Then the guard denies, naming "first line"
 
+    Scenario: a body file `cat <<EOF > path` writes is judged by that heredoc
+      When the agent runs:
+        """
+        cat <<'EOF' > {TMP}/reply.md
+        Replacement is the intent.
+        EOF
+        gh pr comment 1 --body-file {TMP}/reply.md
+        """
+      Then the guard denies, naming "first line"
+
+    Scenario: a body file under $HOME is read
+      Given the file "{HOME}/signed.md" holds:
+        """
+        🤖 Fixed in a03793a.
+
+        🤖 claude-opus-5-5 · high · 5a74df74
+        """
+      When the agent runs `gh pr comment 1 --body-file $HOME/signed.md`
+      Then the guard is silent
+
     Scenario: a body file on disk is read, never its path
       Given a project directory
       And the file "signed.md" holds:
@@ -307,6 +327,38 @@ Feature: guard-signed-comments
         gh pr comment 1 -b "$b"
         """
       Then the guard denies, naming "heredoc"
+
+    Scenario Outline: a variable assigned again in any form cannot be read
+      When the agent runs:
+        """
+        b=$(cat <<'EOF'
+        🤖 Fixed.
+
+        🤖 claude-opus-5-5 · high · 5a74df74
+        EOF
+        )
+        <again>
+        gh pr comment 1 -b "$b"
+        """
+      Then the guard denies, naming "heredoc"
+
+      Examples:
+        | again                    |
+        | b+=" and more"           |
+        | read -r b < notes.txt    |
+        | printf -v b '%s' later   |
+        | for b in x y; do :; done |
+
+    Scenario: a heredoc built at run time cannot be read
+      When the agent runs:
+        """
+        gh pr comment 1 --body-file - <<EOF
+        🤖 Fixed in $(git rev-parse --short HEAD).
+
+        🤖 claude-opus-5-5 · high · 5a74df74
+        EOF
+        """
+      Then the guard denies, naming "quote the delimiter"
 
   Rule: what is not a comment is silent
 

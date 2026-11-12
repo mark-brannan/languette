@@ -38,6 +38,31 @@ def lexical(p):
     return "/" + "/".join(parts)
 
 
+def word_path(word, cwd, home, live=True, tilde=True, names=None):
+    """The absolute path a path word names, `..` applied as text, or None when the hook
+    cannot tell. A leading ~ is the home directory where the shell expands it (`tilde`),
+    never where a $NAME puts it; $HOME, ${HOME} and the $NAMEs in `names` take their values
+    where the word is live. Any other $ or backtick, a literal $, a glob, or a relative path
+    with no cwd is None."""
+    p = word
+    if p == "~" or p.startswith("~/"):
+        if not (tilde and home):
+            return None
+        p = home + p[1:]
+    elif p.startswith("~"):
+        return None
+    if "$" in p or "`" in p:
+        if not live:
+            return None
+        values = {"HOME": home, **(names or {})}
+        p = sw.VAR_REF.sub(lambda m: values.get(m.group(1) or m.group(2)) or m.group(0), p)
+    if re.search(r"[$`*?\[]", p):
+        return None
+    if p.startswith("/"):
+        return lexical(p)
+    return lexical(cwd + "/" + p) if cwd else None
+
+
 def resolve(word, quoted, cwd, home, moved):
     """One word of a command, as the absolute path it names, or Unresolved."""
     t = word

@@ -155,7 +155,7 @@ Feature: guard-github-issues
     Then the guard is silent
 
   # A typed word HEREDOC is not scan's mark: the stdin comes from a pipe, so it is unread.
-  @also_guard-review-threads @also_guard-signed-comments
+  @also_guard-review-threads @also_guard-signed-comments @also_guard-bypass-labels
   Scenario: a typed HEREDOC word does not pass for the call's own heredoc
     When the agent runs:
       """

@@ -85,18 +85,50 @@ def remote(url):
     return None
 
 
-def _gh_valued(s, i, hi, spaced, long_eq, short, default):
-    """(value, index of the flag's last word) when word i is the flag: `spaced`
-    then its value (`default` when that would pass hi), `long_eq`value, or
-    `short`value glued on. Else None."""
+def _flag(s, i, hi, names, default):
+    """(name, value, index of the flag's last word) for flag_value."""
     t = word(s, i)
-    if t in spaced:
-        return (word(s, i + 1), i + 1) if i < hi else (default, i)
-    if t.startswith(long_eq):
-        return t[len(long_eq):], i
-    if t.startswith(short) and len(t) > len(short):
-        return t[len(short):], i
+    if t in names:
+        return (t, word(s, i + 1), i + 1) if i < hi else (t, default, i)
+    for n in names:
+        if n.startswith("--") and t.startswith(n + "="):
+            return n, t[len(n) + 1:], i
+        if len(n) == 2 and not t.startswith("--") and t.startswith(n) and len(t) > 2:
+            return n, t[3:] if t[2] == "=" else t[2:], i
     return None
+
+
+def flag_value(s, i, hi, names, default=None):
+    """(value, index of the flag's last word) when word i is one of the flags
+    `names` in any spelling pflag reads: the flag then its value (`default`
+    when that would pass hi), --long=value, or a short flag with its value
+    glued on (-bvalue, -b=value). Else None."""
+    got = _flag(s, i, hi, names, default)
+    return got[1:] if got else None
+
+
+Flag = namedtuple("Flag", "at name value live tilde")
+Flag.__doc__ = """One word, or one flag with its value, of a call's words (flag_words). at: the
+flag's first word; name: the flag as `names` spells it, None for a word that is none
+of them; value: the flag's value (None when no word is left for it), or the word
+itself; live: the value's word is live; tilde: a leading ~ in the value is the home
+directory (its word is unquoted; read so in every spelling, as the guards' specs read
+--body-file=~/b.md)."""
+
+
+def flag_words(s, lo, hi, names):
+    """A Flag per word lo..hi: each flag in `names`, read by flag_value with its value
+    taken with it, and every other word as itself."""
+    i = lo
+    while i <= hi:
+        got = _flag(s, i, hi, names, None)
+        if got is None:
+            yield Flag(i, None, word(s, i), s.live[i], not s.quoted[i])
+        else:
+            name, v, j = got
+            yield Flag(i, name, v, s.live[j], not s.quoted[j])
+            i = j
+        i += 1
 
 
 def gh_env_repo(s, lo, g, cli="gh"):
@@ -136,20 +168,17 @@ def gh_repo_flag(s, i, hi, default=None):
     """(repo, index of its last word) when word i is -R/--repo in any spelling
     (-R x, -Rx, --repo x, --repo=x); repo is `default` when its value would
     pass hi. Else None."""
-    return _gh_valued(s, i, hi, GH_REPO_FLAGS, "--repo=", "-R", default)
+    return flag_value(s, i, hi, GH_REPO_FLAGS, default)
 
 
 def gh_method_flag(s, i, hi, default=""):
     """(method upper-cased, index of its last word) when word i of `gh api` sets
     the HTTP method (-X M, -XM, -X=M, --method M, --method=M); method is
     `default` when its value would pass hi. Else None."""
-    got = _gh_valued(s, i, hi, GH_METHOD_FLAGS, "--method=", "-X", None)
+    got = flag_value(s, i, hi, GH_METHOD_FLAGS)
     if not got:
         return None
-    m = default if got[0] is None else got[0]
-    if word(s, i).startswith("-X="):           # pflag reads -X=M as -XM
-        m = m[1:]
-    return m.upper(), got[1]
+    return (default if got[0] is None else got[0]).upper(), got[1]
 
 
 class GhArg(namedtuple("GhArg", "flag text live")):
