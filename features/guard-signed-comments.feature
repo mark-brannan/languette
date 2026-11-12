@@ -17,7 +17,8 @@ Feature: guard-signed-comments
   GraphQL viewer, read with one gh call, is an App's, its login ending in
   `[bot]` (GitHub types the viewer User even then, so the login tells). A
   person's login is denied, and so is a GitHub MCP tool, whose account this
-  hook cannot read; gh that cannot say is an ask. The deny names what is
+  hook cannot read, unless the MCP setting says ask or allow; gh that cannot
+  say is an ask. The deny names what is
   missing: the account, the signature, or both. gh is the stub throughout,
   answering as GH_LOGIN, `agent[bot]` unless a scenario sets it.
 
@@ -223,11 +224,13 @@ Feature: guard-signed-comments
       When the agent runs `gh api repos/o/r/pulls/4/reviews --input {PROJ}/review.json`
       Then the guard denies, naming "first line"
 
-  Rule: the GitHub MCP tools that post a comment are read the same, and denied for their account
+  Rule: the GitHub MCP tools that post a comment are read the same, and denied for their account unless the MCP setting says otherwise
 
     A GitHub MCP server posts with its own token, whose account this hook
     cannot read, so a post through one is denied as not known to be a bot's;
-    the reason names any signature problem too.
+    the reason names any signature problem too. The signed_comments_mcp
+    setting turns that deny into an ask or an allow; an unknown value denies,
+    naming the setting. The body is judged under every value.
 
     Scenario Outline: every body in the tool's input is read
       When the agent calls MCP tool "<tool>" with input `<input>`
@@ -249,6 +252,21 @@ Feature: guard-signed-comments
         | mcp__plugin_github_github__add_issue_comment | {"owner":"o","repo":"r","issue_number":3,"reaction":"+1"} | is silent |
         | mcp__plugin_github_github__pull_request_review_write | {"method":"resolve_thread","owner":"o","repo":"r","pullNumber":4,"threadId":"T"} | is silent |
         | mcp__plugin_github_github__pull_request_read | {"owner":"o","repo":"r","pullNumber":4,"body":"Replacement is the intent"} | is silent |
+
+    Scenario Outline: the MCP setting says what a post through an MCP tool gets
+      Given CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_MCP is "<rule>"
+      When the agent calls MCP tool "mcp__github__add_issue_comment" with input `<input>`
+      Then the guard <verdict>
+
+      Examples:
+        | rule  | input | verdict |
+        |       | {"owner":"o","repo":"r","issue_number":3,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | denies, naming "MCP server's own token" |
+        | deny  | {"owner":"o","repo":"r","issue_number":3,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | denies, naming "MCP server's own token" |
+        | ask   | {"owner":"o","repo":"r","issue_number":3,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | asks, naming "Approve only if that server posts as" |
+        | ask   | {"owner":"o","repo":"r","issue_number":3,"body":"Replacement is the intent"} | denies, naming "first line" |
+        | allow | {"owner":"o","repo":"r","issue_number":3,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | is silent |
+        | allow | {"owner":"o","repo":"r","issue_number":3,"body":"Replacement is the intent"} | denies, naming "first line" |
+        | yes   | {"owner":"o","repo":"r","issue_number":3,"body":"🤖 Done.\\n\\n🤖 claude-opus-5-5 · high · 5a74df74"} | denies, naming "the signed_comments_mcp setting `yes`" |
 
   Rule: a body the guard cannot read is denied, with the fix in the reason
 
