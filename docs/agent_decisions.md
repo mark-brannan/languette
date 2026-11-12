@@ -800,3 +800,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t081857z
 - doctor sandbox row names unread sources (managed-settings.d, MDM, server-managed, --settings) beneath an on/off row, a ! when a drop-in exists; drop-ins are not merged Undo: drop _unread in languette/doctor.py ([#416](https://github.com/mark-brannan/languette/pull/416))
+
+### 20261112t082807z
+- The verdict and approvals design sits in its own doc, docs/design/verdict.md, budgeted at 90 lines Undo: fold verdict.md back into guard-pipeline.md and raise its cap ([#409](https://github.com/mark-brannan/languette/pull/409))
