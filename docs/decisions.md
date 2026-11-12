@@ -18,7 +18,7 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 ## A repo rule's `why`: 2026-11-11
 
 - A repo rule's `why` stays agent-facing, bounded as today: one line, 200
-  characters, labelled as data (`engine._quoted`)
+  characters, labelled as data (`engine.one_line`, `engine._quoted`)
   ([#383](https://github.com/mark-brannan/languette/issues/383)): "keep the
   why and document".
 - Why (the agent's reading, not a quote): the same repo writes the CLAUDE.md
