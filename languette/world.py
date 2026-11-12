@@ -66,6 +66,7 @@ class World:
         # (payload, door open) -> ({label: runs}, door taken): what the runner would have spent
         # for a past call (run.py sets it); the approvals replay asks it of each.
         self.wants_of = None
+        self.door_tools = None                 # the tool-name pattern of a call that can take the door (run.py)
         self._wants = {}                       # (past call, door open) -> wants_of's answer
 
     def answer(self, need):
@@ -412,7 +413,8 @@ class World:
                 for label in labels:
                     if _said(answer, label):
                         pool[label].append(ask_id)
-            elif kind == "call" and rest[0] not in hist.never_ran and (door or any(pool.values())):
+            elif kind == "call" and rest[0] not in hist.never_ran and (
+                    any(pool.values()) or (door and self._may_take_door(rest[1]))):
                 if (rest[0], door) not in self._wants:     # the spend's second read judges none again
                     self._wants[rest[0], door] = self.wants_of(self._past(*rest), door)
                 wants, took = self._wants[rest[0], door]
@@ -423,6 +425,11 @@ class World:
                 for label in pool:
                     pool[label] = [i for i in pool[label] if i not in picks]
         return pool, used
+
+    def _may_take_door(self, tool):
+        """Whether a past call of this tool could have taken the door; without the
+        runner's pattern (door_tools), any call could."""
+        return self.door_tools is None or self.door_tools.match(tool or "") is not None
 
     def _past(self, call, name, inp, cwd):
         """The PreToolUse payload a past call was judged on, as near as the transcript gives it."""
@@ -688,10 +695,6 @@ def _said(answer, label):
     return re.search(r'(?:^|: )' + re.escape(f'"{questions[0]}"="{label}"') + r'(?:\.|$)', text, re.M) is not None
 
 
-def _yes(answers, label):
-    return [i for i, answer in answers if _said(answer, label)]
-
-
 # A call that never ran, by the result Claude Code records for it: the user
 # declined the prompt, a hook or the classifier denied it, or a languette guard
 # did. Any other error is a call that ran and failed, and keeps its click.
@@ -746,8 +749,12 @@ def _when(rec, last):
 
 
 def _prompt(rec, content):
-    """A human's own turn: not a tool result, not Claude Code's meta text."""
-    return (rec.get("type") == "user" and isinstance(rec.get("origin"), dict) and rec["origin"].get("kind") == "human"
+    """A human's own turn: not a tool result, not Claude Code's meta text. Claude Code
+    2.1.319 and 2.1.321 mark an interactive turn `origin.kind` human and a notification
+    with another kind; a headless or older transcript has no `origin`, and there the
+    shape stands: a user record, not meta, with no tool result."""
+    origin = rec.get("origin")
+    return (rec.get("type") == "user" and (origin is None or isinstance(origin, dict) and origin.get("kind") == "human")
             and not rec.get("isMeta") and not any(isinstance(c, dict) and c.get("type") == "tool_result"
                                                   for c in (content if isinstance(content, list) else ())))
 

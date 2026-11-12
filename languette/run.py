@@ -259,6 +259,7 @@ def _respond(payload, env, only):
             guards = [g for g in guards if g is require_well_formed]
     world = World(env, payload)
     world.wants_of = _past_wants(world, env)
+    world.door_tools = issue_writes.TOOLS
     findings, acts = [], []
     for g in guards:
         r, crashed = _finding(g, doc, world, acts)
