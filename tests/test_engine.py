@@ -31,6 +31,8 @@ def _with_rule(**changes):
     (_with_rule(why="no_such_message"), "rules[0].why must name a message"),
     ({**GOOD, "read": {"prose": True}}, "read must be an object"),
     ({**GOOD, "file": "../x.json"}, "file must be the name of a file"),
+    ({**GOOD, "user": "a/b.json"}, "user must be the name of a file"),
+    ({**GOOD, "user": ".."}, "user must be the name of a file"),
     (_with_rule(match=[{"cmd": "foo", "unit": "listed", "program": "pkill"}]), 'unit must be "listed"'),
     (_with_rule(match=[{"cmd": "foo", "program": "pkill"}]), "belong to an entry with a unit"),
     (_with_rule(match=[{"test": "no-such-test"}]), "test must name a test languette holds"),

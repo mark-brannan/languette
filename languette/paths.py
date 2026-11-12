@@ -334,6 +334,26 @@ def project_config(payload, env, name):
     return None, bool(usable)
 
 
+def user_config(env, name):
+    """The user's own `name` file, $XDG_CONFIG_HOME/languette/<name>, ~/.config by default:
+    one file for every repo. "" when there is no home to look in."""
+    home = env.get("HOME") or ""
+    base = env.get("XDG_CONFIG_HOME") or (home + "/.config" if home else "")
+    return os.path.join(base, "languette", name) if base else ""
+
+
+def user_rules(env, name, *args, **kwargs):
+    """(path, the command rules of the user's `name` file, as read_rules gives them after the
+    path), or (path, None) when there is none. Raises Refuse when the file is there and does
+    not load: a broken user file is as unreadable as a broken repo file."""
+    path = user_config(env, name)
+    if not path:
+        raise Refuse(say("user_config_nowhere", name=name))
+    if not (yield Need("path", "lexists", path)):
+        return path, None
+    return path, (yield from read_rules(path, *args, **kwargs))
+
+
 def read_refusal(exc):
     """The Refuse a failed read's exception comes to, or None for any other exception."""
     if isinstance(exc, UnicodeDecodeError):

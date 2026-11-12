@@ -16,7 +16,8 @@ from .stops import stop_of, unit_test
 # a command word (`cmd`, by basename) and any of: `args`, a run of its
 # non-option words; `script`, a later word that is it or ends in `/script`;
 # `flags`, short option letters each present in a short-option cluster;
-# `at: "command"`, the word only where it runs, never as another command's operand.
+# `at: "command"`, the word only where it runs, never as another command's operand;
+# `except`, words any one of which, as a whole argument of the segment, exempts the run.
 _CLUSTER = re.compile(r"-[A-Za-z]+")
 
 
@@ -58,6 +59,8 @@ def _hit(match, name, rest, place=None):
             if w is not None:
                 return _hit(match, cmd, rest[rest.index(w) + 1:], place)
         return False
+    if any(w in match.get("except", ()) for w in rest):
+        return False
     ok = True
     if "args" in match:
         a = match["args"]
@@ -78,6 +81,8 @@ class BadRules(ValueError):
 
 
 _MATCH_KEYS = ("args", "cmd", "flags", "script")
+# A match ask-first reads: `except` too, the words that exempt a run, as a usage flag does.
+ASK_MATCH_KEYS = (*_MATCH_KEYS, "except")
 # A match the rules engine reads (languette/engine.py): `at` too, and `cmd` alone is the whole program.
 ENGINE_MATCH_KEYS = (*_MATCH_KEYS, "at")
 # A shipped rule set's: a stop of a unit too (stop_of), which no tier but the shipped one may say.
@@ -99,7 +104,7 @@ def _check_match(m, w, keys=_MATCH_KEYS):
     cmds = m["cmd"] if isinstance(m.get("cmd"), list) and m["cmd"] and "unit" in m else [m.get("cmd")]
     if not all(isinstance(c, str) and re.fullmatch(r"[A-Za-z0-9._+-]+", c) for c in cmds):
         raise BadRules(f"{w}.cmd must be a bare command name")
-    if keys is _MATCH_KEYS and not {"args", "script", "flags"} & set(m):
+    if "at" not in keys and not {"args", "script", "flags"} & set(m):
         raise BadRules(f"{w} needs args or script (or flags), or it would match every {m['cmd']}")
     if "at" in m and m["at"] != "command":
         raise BadRules(f'{w}.at must be "command"')
@@ -107,6 +112,8 @@ def _check_match(m, w, keys=_MATCH_KEYS):
         _listed(m["args"], f"{w}.args")
     if "flags" in m:
         _listed(m["flags"], f"{w}.flags", r"[A-Za-z]", "single option letters")
+    if "except" in m:
+        _listed(m["except"], f"{w}.except", r"\S+", "whole words")
     if "script" in m and (not isinstance(m["script"], str) or not m["script"].strip("./")):
         raise BadRules(f"{w}.script must be a non-empty path")
 
