@@ -377,6 +377,7 @@ LOOSENS = {
     "enableWeakerNetworkIsolation": "the network lock is loosened",
     "allowAppleEvents": "macOS automation is not isolated",
 }
+UNREAD = "not read, and may override this: managed-settings.d, MDM, server-managed settings, --settings"
 READ_REACH = "the Read tool and file commands Claude Code recognises, such as cat; not a script that opens the file itself"
 # What a Read deny rule is checked against: (as shown, the path tried, from cwd and $HOME).
 SECRETS = ((".env here", lambda cwd, h: Path(cwd) / ".env"),
@@ -402,6 +403,15 @@ def _sandbox(layers, key):
         elif key == "allowUnsandboxedCommands" and v is False and scope in ("managed", "user"):
             return v, path
     return found or (None, None)
+
+
+def _unread():
+    """The sources above the files read that may override what the row says: ! where a drop-in is there."""
+    dropins = host.managed_dropins()
+    if dropins:
+        return line(WARN, f"{host.tilde(dropins[0].parent)} holds {len(dropins)} file{'' if len(dropins) == 1 else 's'} "
+                          "the doctor does not merge; they may override this")
+    return line("", UNREAD)
 
 
 def _at(settings, dotted):
@@ -516,7 +526,7 @@ def beside_rows(cwd):
                                           "Claude Code's default is off (/sandbox)", []))
         elif not on:
             rows.append((WARN, "sandbox", f"off, in {host.tilde(where)}: the guards judge commands, "
-                                          "nothing confines what they let through (/sandbox)", []))
+                                          "nothing confines what they let through (/sandbox)", [_unread()]))
         else:
             lines = []
             for key, (default, said_on, said_off, mark_on) in SANDBOX.items():
@@ -531,7 +541,7 @@ def beside_rows(cwd):
                 else:
                     mark = mark_on if v else (OK if mark_on == WARN else WARN)
                     lines.append(line(mark, f"{key} {'on' if v else 'off'}: {said_on if v else said_off}"))
-            lines += _loosened(found)
+            lines += [*_loosened(found), _unread()]
             rows.append((worst([m for m, _, _ in lines]), "sandbox", f"on, in {host.tilde(where)}", lines))
     bad = [(scope, p, s) for scope, p, s in found if isinstance(s, Unreadable)]
     denies = _read_denies(found)

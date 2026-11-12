@@ -21,5 +21,14 @@ def test_enabled_platforms_from_managed_settings_alone(monkeypatch, tmp_path, sc
               ("user", tmp_path / "settings.json", {"sandbox": {**ON["sandbox"], **(box["sandbox"] if scope == "user" else {})}})]
     monkeypatch.setattr(host, "layers", lambda cwd: layers)
     monkeypatch.setattr(host, "platform", lambda: "linux")
+    monkeypatch.setattr(host, "managed_dropins", lambda: [])
     [sandbox] = [r for r in doctor.beside_rows(tmp_path) if r[1] == "sandbox"]
     assert sandbox[0] == mark, sandbox
+
+
+def test_a_managed_drop_in_makes_the_sandbox_row_a_warning(monkeypatch, tmp_path):
+    layers = [("user", tmp_path / "settings.json", ON)]
+    monkeypatch.setattr(host, "layers", lambda cwd: layers)
+    monkeypatch.setattr(host, "managed_dropins", lambda: [MANAGED.parent / "managed-settings.d/10-org.json"])
+    [sandbox] = [r for r in doctor.beside_rows(tmp_path) if r[1] == "sandbox"]
+    assert sandbox[0] == doctor.WARN and any("does not merge" in text for _, text, _ in sandbox[3]), sandbox

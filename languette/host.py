@@ -200,6 +200,14 @@ MANAGED = {"darwin": "/Library/Application Support/ClaudeCode/managed-settings.j
 MANAGED_ELSE = "/etc/claude-code/managed-settings.json"     # Linux and WSL
 
 
+def managed_dropins():
+    """The .json files in managed-settings.d beside managed-settings.json, which the doctor does not merge."""
+    try:
+        return sorted((Path(MANAGED.get(sys.platform, MANAGED_ELSE)).parent / "managed-settings.d").glob("*.json"))
+    except OSError:
+        return []
+
+
 def platform():
     """This platform as Claude Code names it in sandbox.enabledPlatforms: macos, windows, wsl or linux."""
     if sys.platform in ("darwin", "win32"):

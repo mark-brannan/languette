@@ -260,6 +260,7 @@ Feature: doctor
     Then the "sandbox" row is ! "on, in ~/.claude/settings.json"
     And beneath it "filesystem.disabled on, in ~/.claude/settings.json: filesystem confinement is off" is !
     And beneath it "excludedCommands: git, docker may run outside the sandbox" is !
+    And beneath it "not read, and may override this: managed-settings.d, MDM, server-managed settings, --settings" is bare
 
   Scenario: a Read deny row that covers a path says which reads the rule stops
     Given the user's settings also hold `{"permissions": {"deny": ["Read(.env)", "Read(~/.ssh/**)"]}}`

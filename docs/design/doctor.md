@@ -62,6 +62,7 @@ layers that stand next to them: the sandbox and the Read deny rules.
     ! allowUnsandboxedCommands unknown: no settings file sets it; Claude Code's default is on, so a command the sandbox blocks may retry outside it
     ✓ failIfUnavailable on: Claude Code will not start where the sandbox cannot
     ! excludedCommands: docker may run outside the sandbox
+      not read, and may override this: managed-settings.d, MDM, server-managed settings, --settings
 ! read deny     Read deny rules cover .env here, not ~/.ssh (1 rule)
       the Read tool and file commands Claude Code recognises, such as cat; not a script that opens the file itself
 ```
@@ -77,6 +78,7 @@ and on a machine that sets neither:
 - **On or off, never safe.** A ✓ says a setting is on; neither row is ever a ✗.
 - **A loosened sandbox is a !.** Each setting Claude Code itself names as loosening its sandbox gets a line beneath it.
 - **A Read deny rule says what it stops:** the Read tool and the file commands Claude Code recognises, not a script that opens the file itself.
+- **Unread, not absent.** A sandbox that is on or off names the sources that could override it; a drop-in present is a !.
 - **Unknown, not off.** A key no file sets reads "unknown", Claude Code's default beside it.
 - **Read as Claude Code reads them.** Four files, highest first; deny lists merge, with its anchors.
 - **Claude Code only.** Each host has its own sandbox and settings (#5, #102).
