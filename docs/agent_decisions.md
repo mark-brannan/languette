@@ -788,3 +788,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t073518z
 - Where the four post readers disagreed, the strictest reading stands: a live heredoc, stdin not on the gh's segment, a value with any run-time part, and a body file not written straight from one heredoc by cat or tee are unread Undo: revert languette/bodies.py's stricter branches ([#375](https://github.com/mark-brannan/languette/issues/375)) ([#417](https://github.com/mark-brannan/languette/pull/417))
+
+### 20261112t073537z
+- A leading ~ in a body path is the home directory in every unquoted spelling (--body-file=~/b.md, -F~/b.md, @~/b.md), as guard-private-terms' feature reads it Undo: pass tilde=False for the --x= and glued forms in forges.flag_words ([#417](https://github.com/mark-brannan/languette/pull/417))
