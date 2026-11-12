@@ -19,7 +19,7 @@ approval_lost: languette: another call spent the user's approval while this one 
 
 ```
 ask_first_cannot_look: ask-first: {err}. A gate that cannot look fails closed: retry from the project directory.
-ask_first_invalid: ask-first: {path} is invalid: {err}. Every Bash command is denied until it is fixed, because the guard cannot tell which commands the repo meant to cover. Fix it with the Edit tool, or tell the user.
+ask_first_invalid: ask-first: {path} is invalid: {err}. Every Bash command is denied until it is fixed, because the guard cannot tell which commands the list meant to cover. Fix it with the Edit tool, or tell the user.
 ask_first_times: ; this command runs it {n} times and has {have} unspent
 ask_first_cheaper:  Cheaper forms: {cheaper}.
 ask_first_need: `{id}` ({path}) needs the user's approval for each run{times}. Cost: {cost}.{cheaper} If a cheaper form answers the question, use it instead. Otherwise call AskUserQuestion: give the exact command (`{cmd}`), why it must run now, and the cost above, with one option labelled exactly "{label}" and one to skip. One approval is one run; ask again before running it again.
@@ -432,6 +432,7 @@ transcript_unreadable: {guard}: cannot read the session transcript to look for t
 
 ```
 unattended_ask: {guard}: this needs the user's approval, and in {mode} no one is there to approve it, so it is denied instead of asked. What it would have asked: {why}
+unattended_way: Don't work around it: if the call still needs making, the user makes it themselves. Say what it is for and hand them the exact call.
 ```
 
 ## unknown
@@ -450,6 +451,12 @@ unparsed: require-well-formed: this command does not parse ({rung}: {err}). Noth
 
 ```
 unreadable_file: cannot be read ({err})
+```
+
+## user
+
+```
+user_config_nowhere: neither $HOME nor $XDG_CONFIG_HOME is set, so the user's {name} cannot be looked for: a gate that cannot look fails closed
 ```
 
 ## wl
