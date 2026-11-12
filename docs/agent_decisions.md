@@ -746,3 +746,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t062957z
 - ask-first and deny-always user lists live at $XDG_CONFIG_HOME/languette/ask-first.json and deny-always.json, the repo files' names Undo: rename the user file in paths.user_config callers (listed_runs.USER, deny_always RULE_SET user) ([#414](https://github.com/mark-brannan/languette/pull/414))
+
+### 20261112t063006z
+- the exemption key on an ask-first match entry is 'except', a non-empty list of whole words; deny-always refuses it Undo: rename the key in command_rules ASK_MATCH_KEYS and its check ([#414](https://github.com/mark-brannan/languette/pull/414))
