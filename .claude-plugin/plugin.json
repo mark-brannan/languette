@@ -206,7 +206,7 @@
     "guard_signed_comments": {
       "type": "boolean",
       "title": "Experimental, opt-in: sign an agent's GitHub comments as an agent's",
-      "description": "Experimental and off by default: the signature is one workflow's convention. Deny a PR or issue comment, review or review-thread reply posted through gh, gh api or a GitHub MCP tool unless it comes from a bot's account (a GitHub App's, its login ending in [bot]; an MCP tool's account cannot be read, so it is denied) and its body's first line starts with signed_comments_opening and its last line matches signed_comments_signature, each when set. If the agent posts under your login, the signature keeps its words from being read as yours. Turn on if your agents post through a GitHub App and sign their comments that way.",
+      "description": "Experimental and off by default: the signature is one workflow's convention. Deny a PR or issue comment, review or review-thread reply posted through gh, gh api or a GitHub MCP tool unless it comes from a bot's account (a GitHub App's, its login ending in [bot]; an MCP tool's account cannot be read, so signed_comments_mcp says what happens) and its body's first line starts with signed_comments_opening and its last line matches signed_comments_signature, each when set. If the agent posts under your login, the signature keeps its words from being read as yours. Turn on if your agents post through a GitHub App and sign their comments that way.",
       "default": false
     },
     "signed_comments_opening": {
@@ -221,6 +221,13 @@
       "title": "Signed comments: signature",
       "description": "A regular expression a signed comment's last non-empty line must match whole; {session} in it is the first eight hex of the session id. Empty, the default, means the last line is not checked. For example `🤖 \\S+ · (?:low|medium|high|xhigh|max|-) · {session}`: the robot emoji, model, effort and session. A pattern that does not compile denies every comment.",
       "default": "",
+      "required": false
+    },
+    "signed_comments_mcp": {
+      "type": "string",
+      "title": "Signed comments: posts through a GitHub MCP tool",
+      "description": "What happens to a comment posted through a GitHub MCP tool, whose account this hook cannot read: deny, the default; ask, so you approve each post; or allow, trusting the MCP server to post as a bot's account. The body is checked against the opening and the signature either way. Empty or any other value denies.",
+      "default": "deny",
       "required": false
     },
     "guard_cross_session_send": {

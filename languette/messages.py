@@ -273,6 +273,14 @@ MESSAGES = {
         "{guard}: {tool} posts with its MCP server's own token, and this hook cannot read whose account "
         "that is, so it cannot tell that a bot posts it. Post it with gh, through the agent's GitHub App.{also}"
     ),
+    "signature_mcp_ask": (
+        "{guard}: {tool} posts with its MCP server's own token, and this hook cannot read whose account "
+        "that is. Approve only if that server posts as the agent's GitHub App, whose login ends in [bot]."
+    ),
+    "signature_mcp_unknown": (
+        "{guard}: the signed_comments_mcp setting `{rule}` is not one of {rules}, so a post through a "
+        "GitHub MCP tool is denied. Fix the setting, or empty it to deny such posts."
+    ),
     "signature_account_unread": (
         "{guard}: this posts to GitHub, and gh could not say which account it posts as ({got}). "
         "Approve only if it posts through the agent's GitHub App, whose login ends in [bot]."

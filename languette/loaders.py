@@ -47,6 +47,8 @@ def option(name, value, env):
             comment_posts.signature_patterns(value)
         except re.error as e:
             return f"is not a regular expression ({e})"
+    if name == "signed_comments_mcp" and value not in comment_posts.MCP_RULES:
+        return f"is not one of {', '.join(comment_posts.MCP_RULES)}"
     return None
 
 
