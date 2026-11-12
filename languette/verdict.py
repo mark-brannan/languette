@@ -14,13 +14,12 @@ import inspect
 
 from languette.messages import say
 
-# Claude Code's permission_mode values in which a hook's ask reaches no one:
-# dontAsk denies every prompt unseen, bypassPermissions skips it. A headless
-# run sends its configured mode, so it is not told apart here.
-NO_PROMPT = frozenset({"dontAsk", "bypassPermissions"})
-# ...and those in which AskUserQuestion reaches no one: dontAsk denies it even
-# when allowed; bypassPermissions still shows it.
-NO_QUESTION = frozenset({"dontAsk"})
+# Claude Code's permission_mode values in which neither a hook's ask nor
+# AskUserQuestion reaches anyone: dontAsk denies every prompt unseen, and
+# AskUserQuestion even when allowed. bypassPermissions is not one: a user who
+# picks it is there and chose to skip prompts, so an ask stays an ask. A
+# headless run sends its configured mode, so it is not told apart here.
+NO_PROMPT = frozenset({"dontAsk"})
 
 WAY_USER = "That is the user's to run, not an agent's: say what you need and hand them the exact command."
 

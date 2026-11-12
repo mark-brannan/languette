@@ -51,7 +51,7 @@ from languette import paths
 from languette import scan as sw
 from languette.messages import say
 from languette.secrets import quote
-from languette.verdict import NO_QUESTION, Need, Refuse, approve, deny
+from languette.verdict import NO_PROMPT, Need, Refuse, approve, deny
 
 CONFIG = ".languette/ask-first.json"
 
@@ -143,7 +143,7 @@ def approval(doc, guard, found):
         if have >= runs[c["id"]]:
             continue
         cheaper = say("ask_first_cheaper", cheaper=c["cheaper"]) if c.get("cheaper") else ""
-        if doc.mode in NO_QUESTION:  # any other mode, unknown or missing included, stays an ask
+        if doc.mode in NO_PROMPT:  # any other mode, unknown or missing included, stays an ask
             parts.append(say("ask_first_unattended", id=c["id"], path=path, mode=doc.mode, cost=c["cost"],
                              cheaper=cheaper, cmd=shown))
             continue
