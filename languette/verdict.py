@@ -51,7 +51,8 @@ class Need:
                                              -> (usable, adopt); kept rec -> bool; recorded rec, top -> bool;
                                              scratchpad sid -> dir, or None
         approvals     {label: runs}       -> {label: [AskUserQuestion ids]}: the user's yeses to
-                                             each label this call may spend, its own first; read only
+                                             each label that no earlier call spent, from the
+                                             transcripts alone (world.World._replay); read only
         run           cwd, timeout, *argv -> (exit code, stdout, stderr); raises on a
                                              program that cannot start or times out
         door          session             -> guard-github-issues' per-session door: True when it
@@ -94,9 +95,11 @@ def spend(kind, *args, lost=None):
     verdict, and only when the verdict lets the call through (run.py). The guard
     spends nothing itself, so no approval goes on a call another guard denies.
 
-        approvals   {label: runs}         one of the user's yeses per run, recorded
-                                          against this tool call; every guard's
-                                          labels are spent together, in one claim
+        approvals   {label: runs}         one of the user's yeses per run, read again
+                                          after the verdict; every guard's labels
+                                          are spent together, in one claim, and the
+                                          transcript, this call's tool_use in it, is
+                                          the record of the spend
         door        claim|take, session, call
                                           guard-github-issues' door, taken for this call
 
@@ -109,8 +112,8 @@ def spend(kind, *args, lost=None):
 
 def approvals(wants):
     """The user's yeses this call may spend, per label: `approved = yield from
-    approvals({label: runs})` is {label: AskUserQuestion ids}, the ones already
-    recorded against this tool call first, then the unspent. Nothing is written.
+    approvals({label: runs})` is {label: AskUserQuestion ids}, the yeses no earlier
+    call spent, oldest first. Nothing is written.
     The world's OSError or ValueError, for a payload with no transcript or a
     transcript that can't be read, is raised from here."""
     return (yield Need("approvals", dict(wants)))

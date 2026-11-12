@@ -15,8 +15,8 @@ the flag is not the flag.
 
 Approval is the mechanism ask-first uses (languette/listed_runs.py): the
 user's answer to an AskUserQuestion is exactly APPROVE_LABEL, the question's
-text proves nothing, and each approval allows one run: it is recorded as
-spent beside the transcript and never counts again. A command that skips the
+text proves nothing, and each approval allows one run: the first later call
+that skips the hooks, as the transcript shows it, spends it for good. A command that skips the
 hooks twice needs two approvals; one inside a loop or xargs is denied
 outright.
 """

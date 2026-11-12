@@ -11,6 +11,7 @@ import string
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from paths import ROOT
 
@@ -106,6 +107,7 @@ class Ctx:
         self.mode = None                       # permission_mode in the payload, for guard-cross-session-send
         self._doordir = None
         self.calls = 0                         # tool_use_id in the payload: one per call, as Claude Code gives
+        self.logged = set()                    # the calls whose tool_use is in the transcript
         self.stdin = self.verdict = self.scanned = None
         self.crashed = set()                   # in-process: the guards whose check raised on the last call
         self._dirs = []
@@ -196,7 +198,50 @@ class Ctx:
             env["XDG_CACHE_HOME"] = self.cache
         return env
 
+    def _log(self, rec):
+        """Append `rec` to the session's transcript, stamped, as Claude Code writes it; nothing
+        when the scenario has none."""
+        tp = Path(self.proj, "t.jsonl") if self.proj else None
+        if tp and tp.exists():
+            now = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+            with tp.open("a") as f:
+                f.write(json.dumps({**rec, "timestamp": now}) + "\n")
+
+    def _logged(self, stdin):
+        """`stdin` with a tool_use_id, as Claude Code always sends one, once its call or the human's
+        turn is in the transcript: Claude Code writes a call's tool_use before its hooks read the
+        transcript, and the approvals replay reads it there."""
+        try:
+            p = json.loads(stdin)
+        except ValueError:
+            return stdin, None
+        if not isinstance(p, dict):
+            return stdin, None
+        event = p.get("hook_event_name") or (EVENTS[self.arg] if self.arg else "PreToolUse")
+        if event == "UserPromptSubmit":
+            self._log({"type": "user", "origin": {"kind": "human"},
+                       "message": {"role": "user", "content": str(p.get("prompt", ""))}})
+        if event != "PreToolUse" or not isinstance(p.get("tool_name"), str):
+            return stdin, None
+        if not p.get("tool_use_id"):
+            self.calls += 1
+            p["tool_use_id"] = f"toolu_call{self.calls}"
+            stdin = json.dumps(p)
+        if p["tool_use_id"] not in self.logged:
+            self.logged.add(p["tool_use_id"])
+            self._log({"type": "assistant", "cwd": p.get("cwd"), "message": {"role": "assistant", "content": [
+                {"type": "tool_use", "id": p["tool_use_id"], "name": p["tool_name"], "input": p.get("tool_input")}]}})
+        return stdin, p["tool_use_id"]
+
+    def _refused(self, call, out):
+        """A call the hook denied never runs: Claude Code records the deny as its result."""
+        v = Verdict(out)
+        if call and v.decision == "deny":
+            self._log({"type": "user", "message": {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": call, "content": v.reason, "is_error": True}]}})
+
     def run(self, stdin):
+        stdin, call = self._logged(stdin)
         self.stdin, self.crashed = stdin, set()
         if self.engine in IN_PROCESS:
             # A hook command only shapes a subprocess; in-process it would do nothing.
@@ -222,6 +267,7 @@ class Ctx:
                 self.verdict = Verdict(_respond_all(stdin, env, seen, docs))
             finally:
                 os.chdir(here)
+            self._refused(call, self.verdict.stdout)
             self.crashed = {g for g, _, crashed in seen if crashed}
             if self.guard and seen:
                 others = {g: r for g, r, _ in seen if r and g != self.guard}
@@ -252,6 +298,7 @@ class Ctx:
             r = subprocess.run(argv, input=stdin, env=env, cwd=self.process_dir, capture_output=True, text=True,
                                timeout=5)
             self.verdict = Verdict(r.stdout, r.returncode, r.stderr)
+            self._refused(call, r.stdout)
         except subprocess.TimeoutExpired:
             self.verdict = Verdict("", 124, "TIMEOUT after 5 s")
 

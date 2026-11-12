@@ -258,6 +258,8 @@ def _respond(payload, env, only):
         if refused:
             guards = [g for g in guards if g is require_well_formed]
     world = World(env, payload)
+    world.wants_of = _past_wants(world, env)
+    world.door_tools = issue_writes.TOOLS
     findings, acts = [], []
     for g in guards:
         r, crashed = _finding(g, doc, world, acts)
@@ -265,6 +267,51 @@ def _respond(payload, env, only):
     judged = (world, payload, findings, acts, doc)
     fields = _spend(world, event, findings, verdict(event, findings, doc.mode, lambda: doc.chained))
     return (_out(event, fields) if fields else ""), judged
+
+
+# What a past call judged again may ask of the world: read-only facts of this
+# machine. Anything else (a program, a forge, languette's own state) is refused,
+# so a replay starts nothing and reads nothing back.
+_REPLAY_FACTS = frozenset(("read", "path", "physical", "which", "clock", "hostname"))
+
+
+class _Replay:
+    """The world a past call is judged again in: today's read-only facts, the user's
+    yes taken as given, and guard-github-issues' door as the transcript left it."""
+
+    def __init__(self, world, door):
+        self.world, self.door = world, door
+
+    def answer(self, need):
+        if need.kind == "approvals":
+            return {label: [None] * n for label, n in need.args[0].items()}
+        if need.kind == "door":
+            return self.door or ""
+        if need.kind not in _REPLAY_FACTS:
+            raise LookupError(f"not asked again for a past call: {need!r}")
+        return self.world.answer(need)
+
+
+def _past_wants(world, env):
+    """World's wants_of, for the approvals replay (languette.world.World._replay):
+    given a past call's payload and whether the human turn's door stood open,
+    ({label: runs} the runner would have spent for it, whether it took the door).
+    Every guard on for the call judges it again, as _spend would gather them; its
+    Acts are dropped. It assumes the default wiring: a run under `--guard NAME`
+    spent only that guard's labels, which this replay does not know."""
+    def wants_of(payload, door):
+        doc, replay, wants, took = Document(payload, env), _Replay(world, door), {}, False
+        for g in wired("PreToolUse", payload.get("tool_name")):
+            if not _on(g, env):
+                continue
+            r, _ = _finding(g, doc, replay, [])
+            for kind, *args in (r.get(SPEND) or ()) if isinstance(r, dict) else ():
+                if kind == "approvals":
+                    for label, n in args[0].items():
+                        wants[label] = max(wants.get(label, 0), n)
+                took = took or kind == "door"
+        return wants, took
+    return wants_of
 
 
 def _spend(world, event, findings, fields):

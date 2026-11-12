@@ -1,6 +1,7 @@
-"""A click pays for one run: a guard only reads it, the runner spends it once
-after the verdict, atomically, recorded against the tool call, and it comes
-back when the transcript shows the call never ran."""
+"""A click pays for one run: a guard only reads it, the runner checks it again
+once after the verdict, and the transcript alone says who spent it: the first
+later call that wanted its label and did not show it never ran. Nothing is
+read back: each spend is only logged beside the transcript."""
 
 import json
 import re
@@ -27,10 +28,29 @@ def _transcript(tmp_path, *recs):
     return tp
 
 
+def _use(call, ts=None):
+    """The tool_use Claude Code writes for a Bash call before its hooks run."""
+    rec = {"type": "assistant", "message": {"role": "assistant", "content": [{
+        "type": "tool_use", "id": call, "name": "Bash", "input": {"command": "npm run e2e"}}]}}
+    return {**rec, "timestamp": ts} if ts else rec
+
+
+def _append(tp, *recs):
+    with tp.open("a") as f:
+        f.writelines(json.dumps(r) + "\n" for r in recs)
+
+
+def _world(tp, call, wants=None):
+    """A World for `call` whose past calls each want `wants`, as a runner would replay them."""
+    w = World({}, {"transcript_path": str(tp), "tool_use_id": call})
+    w.wants_of = lambda payload, door: (dict(wants or {"Run e2e": 1}), False)
+    return w
+
+
 def _claim(tp, call, wants=None):
     """(what the guard reads, whether the runner's spend went through)."""
-    w = World({}, {"transcript_path": str(tp), "tool_use_id": call})
     wants = wants or {"Run e2e": 1}
+    w = _world(tp, call)
     return w.answer(Need("approvals", wants)), w.spend("approvals", wants)
 
 
@@ -40,29 +60,42 @@ def _result(call, content, is_error=True, tur=None):
     return {**rec, "toolUseResult": tur} if tur is not None else rec
 
 
-def test_one_approval_pays_for_one_of_many_parallel_runs(tmp_path):
-    tp = _transcript(tmp_path)
+def test_one_approval_pays_for_the_first_of_many_parallel_runs(tmp_path):
+    tp = _transcript(tmp_path, *(_use(f"toolu_B{n:02}", f"2026-11-10T09:00:{n:02}.000Z") for n in range(48)))
     with ThreadPoolExecutor(max_workers=16) as ex:
-        results = list(ex.map(lambda n: _claim(tp, f"toolu_B{n}")[1], range(64)))
-    assert results.count(True) == 1
+        results = list(ex.map(lambda n: _claim(tp, f"toolu_B{n:02}")[1], range(48)))
+    assert results == [True] + [False] * 47
+
+
+def test_subagent_calls_spend_from_their_own_files_in_time_order(tmp_path):
+    tp = _transcript(tmp_path, _use("toolu_B2", "2026-11-10T09:00:02.000Z"))
+    sub = tmp_path / "t" / "subagents"
+    sub.mkdir(parents=True)
+    (sub / "agent-x.jsonl").write_text(json.dumps(_use("toolu_B1", "2026-11-10T09:00:01.000Z")) + "\n")
+    assert _claim(tp, "toolu_B1")[1]
+    assert not _claim(tp, "toolu_B2")[1]
 
 
 def test_nothing_is_spent_when_one_label_is_short(tmp_path):
     tp = _transcript(tmp_path)
     assert _claim(tp, "toolu_B1", {"Run e2e": 1, "Run other": 1}) == ({"Run e2e": ["toolu_A"], "Run other": []}, False)
-    assert not (tmp_path / "t.jsonl.languette-ask").read_text()
 
 
-def test_the_spend_names_the_call(tmp_path):
-    _claim(_transcript(tmp_path), "toolu_B1")
-    rec = json.loads((tmp_path / "t.jsonl.languette-ask").read_text())
-    assert (rec["label"], rec["approval"], rec["call"]) == ("Run e2e", "toolu_A", "toolu_B1")
+def test_the_transcript_names_the_call_that_spent_it(tmp_path):
+    tp = _transcript(tmp_path, _use("toolu_B1"))
+    assert _world(tp, "toolu_B2")._replay({"Run e2e"}) == ({"Run e2e": []}, {"toolu_A": "toolu_B1"})
 
 
 def test_the_same_call_claims_once(tmp_path):
-    tp = _transcript(tmp_path)
+    tp = _transcript(tmp_path, _use("toolu_B1"))
     assert _claim(tp, "toolu_B1")[1] and _claim(tp, "toolu_B1")[1]
     assert not _claim(tp, "toolu_B2")[1]
+
+
+def test_a_yes_pays_only_for_calls_after_it(tmp_path):
+    tp = tmp_path / "t.jsonl"
+    tp.write_text("".join(json.dumps(r) + "\n" for r in (_use("toolu_B0"), ASK, YES)))
+    assert _claim(tp, "toolu_B1")[1]
 
 
 @pytest.mark.parametrize("result", [
@@ -73,37 +106,46 @@ def test_the_same_call_claims_once(tmp_path):
     _result("toolu_B1", "Permission for this action was denied by the Claude Code auto mode classifier."),
 ], ids=["declined", "hook-error", "guard-deny", "classifier"])
 def test_a_call_that_never_ran_gives_its_click_back(tmp_path, result):
-    tp = _transcript(tmp_path)
+    tp = _transcript(tmp_path, _use("toolu_B1"))
     assert _claim(tp, "toolu_B1")[1]
-    with tp.open("a") as f:
-        f.write(json.dumps(result) + "\n")
+    _append(tp, result)
     assert _claim(tp, "toolu_B2")[1]
 
 
 @pytest.mark.parametrize("result", [
+    None,
     _result("toolu_B1", "Exit code 1\nnpm ERR! e2e failed"),
     _result("toolu_B1", "ok", is_error=False),
     _result("toolu_B1", "some hook's own words, unrecognised"),
-], ids=["failed", "succeeded", "unknown-refusal"])
+], ids=["in-flight", "failed", "succeeded", "unknown-refusal"])
 def test_a_call_that_ran_or_may_have_keeps_its_click(tmp_path, result):
-    tp = _transcript(tmp_path)
+    tp = _transcript(tmp_path, _use("toolu_B1"))
     assert _claim(tp, "toolu_B1")[1]
-    with tp.open("a") as f:
-        f.write(json.dumps(result) + "\n")
+    if result:
+        _append(tp, result)
     assert not _claim(tp, "toolu_B2")[1]
 
 
-def test_a_spend_from_before_calls_were_recorded_stays_spent(tmp_path):
+def test_reading_writes_nothing(tmp_path):
     tp = _transcript(tmp_path)
-    (tmp_path / "t.jsonl.languette-ask").write_text("toolu_A\n")
-    assert not _claim(tp, "toolu_B1")[1]
+    assert _world(tp, "toolu_B1").answer(Need("approvals", {"Run e2e": 1})) == {"Run e2e": ["toolu_A"]}
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["t.jsonl"]
 
 
-def test_reading_the_approvals_writes_nothing(tmp_path):
+def test_a_spend_is_logged_and_the_log_is_never_read(tmp_path):
     tp = _transcript(tmp_path)
-    w = World({}, {"transcript_path": str(tp), "tool_use_id": "toolu_B1"})
-    assert w.answer(Need("approvals", {"Run e2e": 1})) == {"Run e2e": ["toolu_A"]}
-    assert not (tmp_path / "t.jsonl.languette-ask").exists()
+    log = tmp_path / "t.jsonl.languette-ask"
+    log.write_text("toolu_A\n" + json.dumps({"label": "Run e2e", "approval": "toolu_A", "call": "toolu_X"}) + "\n")
+    assert _claim(tp, "toolu_B1") == ({"Run e2e": ["toolu_A"]}, True)
+    rec = json.loads(log.read_text().splitlines()[-1])
+    assert (rec["label"], rec["approval"], rec["call"]) == ("Run e2e", "toolu_A", "toolu_B1")
+
+
+def test_a_spend_that_cannot_be_logged_raises(tmp_path):
+    tp = _transcript(tmp_path)
+    (tmp_path / "t.jsonl.languette-ask").mkdir()
+    with pytest.raises(OSError):
+        _claim(tp, "toolu_B1")
 
 
 def _asking(label):
@@ -113,23 +155,29 @@ def _asking(label):
     return check
 
 
-def _respond(tp, monkeypatch, *checks, call="toolu_B1"):
+def _guards(monkeypatch, *checks):
     guards = tuple(SimpleNamespace(NAME=f"g{i}", check=c) for i, c in enumerate(checks))
     monkeypatch.setattr(run, "GUARDS", (("PreToolUse", re.compile(r"Bash\Z"), guards),))
+
+
+def _respond(tp, monkeypatch, *checks, call="toolu_B1"):
+    _guards(monkeypatch, *checks)
     payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "npm run e2e"},
                "cwd": "/", "transcript_path": str(tp), "tool_use_id": call}
     return run.respond(json.dumps(payload), {})
 
 
-def _spent(tmp_path):
-    f = tmp_path / "t.jsonl.languette-ask"
-    return [json.loads(line) for line in f.read_text().splitlines()] if f.exists() else []
+def _spent(tp, *labels):
+    """{yes id: call}, as the runner's replay gives them for a call after every one so far."""
+    w = World({}, {"transcript_path": str(tp), "tool_use_id": "toolu_after", "cwd": "/"})
+    w.wants_of = run._past_wants(w, {})
+    return w._replay(labels)[1]
 
 
 def test_two_guards_wanting_one_label_for_one_command_need_one_click(tmp_path, monkeypatch):
-    tp = _transcript(tmp_path)
+    tp = _transcript(tmp_path, _use("toolu_B1"))
     assert _respond(tp, monkeypatch, _asking("Run e2e"), _asking("Run e2e")) == ""
-    assert [r["approval"] for r in _spent(tmp_path)] == ["toolu_A"]
+    assert _spent(tp, "Run e2e") == {"toolu_A": "toolu_B1"}
 
 
 def test_two_labels_answered_in_one_question_are_one_click(tmp_path, monkeypatch):
@@ -141,24 +189,25 @@ def test_two_labels_answered_in_one_question_are_one_click(tmp_path, monkeypatch
         "type": "tool_result", "tool_use_id": "toolu_C", "content": "answered"}]},
         "toolUseResult": {"answers": {"Run it?": "Run e2e", "Skip hooks?": "Skip hooks once"}}}
     tp = tmp_path / "t.jsonl"
-    tp.write_text(json.dumps(both) + "\n" + json.dumps(yes) + "\n")
+    tp.write_text("".join(json.dumps(r) + "\n" for r in (both, yes, _use("toolu_B1"))))
     assert _respond(tp, monkeypatch, _asking("Run e2e"), _asking("Skip hooks once")) == ""
-    assert sorted((r["label"], r["approval"], r["call"]) for r in _spent(tmp_path)) == [
-        ("Run e2e", "toolu_C", "toolu_B1"), ("Skip hooks once", "toolu_C", "toolu_B1")]
+    assert _spent(tp, "Run e2e", "Skip hooks once") == {"toolu_C": "toolu_B1"}
 
 
 def test_a_deny_from_another_guard_spends_nothing(tmp_path, monkeypatch):
-    tp = _transcript(tmp_path)
-    out = _respond(tp, monkeypatch, _asking("Run e2e"), lambda doc: deny("not this"))
+    tp = _transcript(tmp_path, _use("toolu_B1"))
+    out = _respond(tp, monkeypatch, _asking("Run e2e"), lambda doc: deny("guard-disks: not this"))
     assert json.loads(out)["hookSpecificOutput"]["permissionDecision"] == "deny"
-    assert _spent(tmp_path) == []
+    _append(tp, _result("toolu_B1", json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]))
+    assert _spent(tp, "Run e2e") == {}
 
 
 def test_a_click_spent_since_the_guard_looked_is_a_deny(tmp_path, monkeypatch):
     tp = _transcript(tmp_path)
 
     def racer(doc):
-        _claim(tp, "toolu_OTHER")              # a parallel call spends the click between read and spend
+        if doc.payload.get("tool_use_id") == "toolu_B1":
+            _append(tp, _use("toolu_OTHER"))   # a parallel call, ahead in the transcript, lands after the read
         return None
 
     out = _respond(tp, monkeypatch, _asking("Run e2e"), racer)

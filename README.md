@@ -241,8 +241,8 @@ command's working directory, stopping at the repo root, else the one in
 parse, that has a key besides `id`, `match`, `cost`, `approve_label` and
 `cheaper`, or that gives two commands the same `id` or `approve_label`,
 denies every command until it is fixed, because the guard can no longer tell what the repo
-meant. Spent approvals are kept beside the session transcript, in
-`<transcript>.languette-ask`.
+meant. One click pays for one run, read from the transcripts; each
+spend is logged in `<transcript>.languette-ask`, which no guard reads.
 
 In an unattended session, an ask is a deny
 (planned: [#164](https://github.com/mark-brannan/languette/issues/164)).
@@ -369,7 +369,6 @@ reads back to reach a verdict:
 | `$TMPDIR/languette-guard-github-issues.<session>` (and `.held`) | `guard-github-issues` | on | one issue write per human turn |
 | `$TMPDIR/languette-guard-cross-session-send.<session>` | `guard-cross-session-send` | on | whether untrusted content has been read, and which subagents are its own |
 | `$TMPDIR/languette-guard-worktrees.<session>[.<agent>]` (and `.arrive`) | `guard-worktrees`; read by `guard-git-work-loss` | opt-in | which linked worktrees were entered |
-| `<transcript>.languette-ask` | `ask-first`, `guard-infra`, `guard-bypass-hooks`, `guard-github-issues` | on | which approvals are already spent |
 | `~/.cache/languette/rulesets/<repo>/<branch>` | `guard-bypass-ruleset` | on | skipping the GitHub call for an hour after "needs a PR" |
 
 The second is what no verdict reads back:
@@ -378,6 +377,7 @@ The second is what no verdict reads back:
 |---|---|---|---|
 | `~/.config/languette/redacted-terms.tsv` | `guard-private-terms` | on | your configuration; written at SessionStart only when missing |
 | `~/.local/state/languette/decisions.jsonl` | `record_decisions` | opt-in | for you to read |
+| `<transcript>.languette-ask` | `ask-first`, `guard-infra`, `guard-bypass-hooks`, `guard-github-issues` | on | a log of which call spent which approval |
 
 The plugin cleans up none of these: no hook runs at session end.
 

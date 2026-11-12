@@ -271,10 +271,8 @@ Feature: ask-first
         """
         {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Run `npm run e2e` (e2e)?", "header": "Walk", "multiSelect": false, "options": [{"label": "Run e2e", "description": "46 min"}, {"label": "Skip", "description": ""}]}]}}]}}
         {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Run `npm run e2e` (e2e)?\"=\"Run e2e\". You can now continue with the user's answers in mind."}]}}
-        """
-      And the approvals already spent are:
-        """
-        toolu_A
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_R", "name": "Bash", "input": {"command": "npm run e2e"}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_R", "content": "done"}]}}
         """
       When the agent runs `npm run e2e`
       Then the guard denies
@@ -286,10 +284,8 @@ Feature: ask-first
         {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Run `npm run e2e` (e2e)?\"=\"Run e2e\". You can now continue with the user's answers in mind."}]}}
         {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_B", "name": "AskUserQuestion", "input": {"questions": [{"question": "Run `npm run e2e` (e2e)?", "header": "Walk", "multiSelect": false, "options": [{"label": "Run e2e", "description": "46 min"}, {"label": "Skip", "description": ""}]}]}}]}}
         {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_B", "content": "User has answered your questions: \"Run `npm run e2e` (e2e)?\"=\"Run e2e\". You can now continue with the user's answers in mind."}]}}
-        """
-      And the approvals already spent are:
-        """
-        toolu_A
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_R", "name": "Bash", "input": {"command": "npm run e2e"}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_R", "content": "done"}]}}
         """
       When the agent runs `npm run e2e`
       Then the guard is silent

@@ -249,10 +249,8 @@ Feature: guard-infra
         """
         {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Run `terraform destroy`?", "header": "Destroy", "multiSelect": false, "options": [{"label": "Run terraform destroy", "description": "irreversible"}, {"label": "Skip", "description": ""}]}]}}]}}
         {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Run `terraform destroy`?\"=\"Run terraform destroy\". You can now continue with the user's answers in mind."}]}}
-        """
-      And the approvals already spent are:
-        """
-        toolu_A
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_R", "name": "Bash", "input": {"command": "terraform destroy"}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_R", "content": "done"}]}}
         """
       When the agent runs `terraform destroy`
       Then the guard denies

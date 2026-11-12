@@ -6,7 +6,6 @@
   "narration": {
     "targets": ["README.md"],
     "grandfathered": [
-      {"file": "README.md", "hash": "69c254bca621"},
       {"file": "README.md", "hash": "8b962e83cf7d"}
     ]
   }
