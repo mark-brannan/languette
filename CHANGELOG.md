@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.24](https://github.com/mark-brannan/languette/compare/v0.0.23...v0.0.24) (2026-11-12)
+
+
+### Bug Fixes
+
+* **approvals:** read who spent a yes from the transcripts alone ([#410](https://github.com/mark-brannan/languette/issues/410)) ([2210528](https://github.com/mark-brannan/languette/commit/22105280b8a593314bf39720a1801b947511ae6c))
+
 ## [0.0.23](https://github.com/mark-brannan/languette/compare/v0.0.22...v0.0.23) (2026-11-12)
 
 
