@@ -175,39 +175,68 @@ _RM_PARENTS = re.compile(r"^(?:" + "|".join(sw.GIT_WRAPPERS) + r"|svn|hg|jj|gsut
 GENERATED_NAMES = ("node_modules", "dist", "coverage", ".pio")
 
 
-class _RmJudge:
-    """Find every recursive target in the command and either refuse it on
-    sight or return it resolved."""
+class _TargetJudge:
+    """The walk of a test that judges target paths: every target the command names is refused
+    on sight (blocked, raising Refuse) or kept resolved, as (path, what, raw)."""
+    resolve = staticmethod(paths.resolve_target)
 
     def __init__(self, cwd, home):
         self.cwd, self.home = cwd, home
-        self.trig, self.moved, self.targets = "rm", False, []
+        self.moved, self.targets = False, []
 
-    def lab(self, raw):
-        if self.trig == "find":
-            return "find" + ("" if raw == "" else " " + raw) + " -delete"
-        return "rm -r" + ("" if raw == "" else " " + raw)
+    def blocked(self, raw, what, why):
+        raise NotImplementedError
 
-    def blocked(self, raw, why):
-        raise Refuse(say("recursive_delete", label=self.lab(raw), why=why))
+    def inspect(self, t, raw, what):
+        """A further refusal of the resolved target `t`; none here."""
 
-    def target(self, s, idx):
+    def target(self, s, idx, what):
         raw = s.w[idx]
         try:
-            t = paths.resolve_target(raw, s.k[idx] == "q", self.cwd, self.home, self.moved)
+            t = self.resolve(raw, s.k[idx] == "q", self.cwd, self.home, self.moved)
         except paths.Unresolved as e:
-            self.blocked(raw, str(e))
-        self.targets.append((t, self.trig, raw))
+            self.blocked(raw, what, str(e))
+        self.inspect(t, raw, what)
+        self.targets.append((t, what, raw))
+
+    def scans(self, doc):
+        """[(text, scan, nested)] of the command; any cd anywhere makes every relative target unresolvable."""
+        out = [(t, doc.scan(t), nested) for t, nested in doc.texts()]
+        self.moved = paths.moves_directory([(s, nested) for _, s, nested in out])
+        return out
+
+    def run(self, doc):
+        paths.judge_segments(self, [(s, nested) for _, s, nested in self.scans(doc)])
+
+
+def _outside(targets, physical, allowed):
+    """The first target not `allowed`, as (path, what, raw, None), or whose physical path is
+    not, as (path, what, raw, physical path); None when every one is."""
+    for abs_, what, raw in targets:
+        if not allowed(abs_):
+            return abs_, what, raw, None
+        phys = physical(abs_)
+        if phys != abs_ and not allowed(phys):
+            return abs_, what, raw, phys
+    return None
+
+
+class _RmJudge(_TargetJudge):
+    """Every recursive target in the command; `what` is the trigger, rm or find."""
+
+    def blocked(self, raw, what, why):
+        label = ("find" + ("" if raw == "" else " " + raw) + " -delete" if what == "find"
+                 else "rm -r" + ("" if raw == "" else " " + raw))
+        raise Refuse(say("recursive_delete", label=label, why=why))
 
     def segment(self, s, a, b, nested):
         g = sw.cmd_index(s, a, b, _FIND, nested)
         if g is not None and "-delete" in s.w[g + 1:b + 1]:
-            self.trig, starts = "find", paths.find_starts(s, g, b)
+            starts = paths.find_starts(s, g, b)
             if not starts:
-                self.blocked("", say("rd_find_no_start"))
+                self.blocked("", "find", say("rd_find_no_start"))
             for i in starts:
-                self.target(s, i)
-            self.trig = "rm"
+                self.target(s, i, "find")
         g = sw.cmd_index(s, a, b, _RM, nested, _RM_PARENTS)
         if g is None:
             return
@@ -230,15 +259,9 @@ class _RmJudge:
         if not recursive:
             return
         if not tgt:
-            self.blocked("", say("rd_no_target"))
+            self.blocked("", "rm", say("rd_no_target"))
         for i in tgt:
-            self.target(s, i)
-
-    def run(self, doc):
-        scans = [(doc.scan(t), nested) for t, nested in doc.texts()]
-        # Any cd anywhere makes every relative target in the command unresolvable.
-        self.moved = paths.moves_directory(scans)
-        paths.judge_segments(self, scans)
+            self.target(s, i, "rm")
 
 
 def _rm_malformed(guard, err):
@@ -257,17 +280,14 @@ def _rm_verdict(targets, home, bases, physical, extra_roots=(), extra_names=()):
                 return depth != 1
         return False
 
-    def allowed(p):
-        return paths.under(p, roots) or is_generated(p)
-
-    for abs_, kind, raw in targets:
-        what = f"find {raw} -delete" if kind == "find" else f"rm -r {raw}"
-        if not allowed(abs_):
-            return deny(say("rd_not_allowed", what=what, raw=raw, abs_=abs_))
-        phys = physical(abs_)
-        if phys != abs_ and not allowed(phys):
-            return deny(say("rd_symlink_out", what=what, abs_=abs_, phys=phys))
-    return None
+    hit = _outside(targets, physical, lambda p: paths.under(p, roots) or is_generated(p))
+    if hit is None:
+        return None
+    abs_, kind, raw, phys = hit
+    what = f"find {raw} -delete" if kind == "find" else f"rm -r {raw}"
+    if phys is None:
+        return deny(say("rd_not_allowed", what=what, raw=raw, abs_=abs_))
+    return deny(say("rd_symlink_out", what=what, abs_=abs_, phys=phys))
 
 
 def recursive_delete(doc):
@@ -314,27 +334,16 @@ def _exec_perm(s, g, b):
     return None
 
 
-class _PermJudge:
-    """Find every judged target in the command and either refuse it on sight
-    or return it resolved."""
+class _PermJudge(_TargetJudge):
+    """Every judged target in the command; `what` is the change, chmod -R and the rest."""
 
-    def __init__(self, cwd, home):
-        self.cwd, self.home = cwd, home
-        self.moved, self.targets, self.what = False, [], ""
-
-    def blocked(self, raw, why):
-        raise Refuse(say("perm_blocked", target=f"{self.what}{' ' + raw if raw else ''}", why=why,
+    def blocked(self, raw, what, why):
+        raise Refuse(say("perm_blocked", target=f"{what}{' ' + raw if raw else ''}", why=why,
                          way_out=_PERM_WAY_OUT))
 
-    def target(self, s, idx):
-        raw = s.w[idx]
-        try:
-            t = paths.resolve_target(raw, s.k[idx] == "q", self.cwd, self.home, self.moved)
-        except paths.Unresolved as e:
-            self.blocked(raw, str(e))
+    def inspect(self, t, raw, what):
         if ".git" in t.split("/"):
-            self.blocked(raw, "it is inside a .git directory, the repository's own store")
-        self.targets.append((t, self.what, raw))
+            self.blocked(raw, what, "it is inside a .git directory, the repository's own store")
 
     def perm(self, s, g, b, sweep):
         """chown, chgrp or chmod at g. `sweep`: a find -exec runs it over a tree."""
@@ -370,34 +379,29 @@ class _PermJudge:
         world = name == "chmod" and mode is not None and bool(_WORLD.fullmatch(mode))
         if not (recursive or world or sweep):
             return
-        self.what = f"{name} -R" if recursive else f"{name} {mode}" if world else f"find -exec {name}"
+        what = f"{name} -R" if recursive else f"{name} {mode}" if world else f"find -exec {name}"
         if not ops:
             if sweep:
                 return
-            self.blocked("", "no target is visible to this hook -- xargs, brace expansion and quoted lists all "
-                             "look like this. Run it on the resolved paths directly")
+            self.blocked("", what, "no target is visible to this hook -- xargs, brace expansion and quoted lists "
+                                   "all look like this. Run it on the resolved paths directly")
         for i in ops:
-            self.target(s, i)
+            self.target(s, i, what)
 
     def segment(self, s, a, b, nested):
         g, sweep = sw.cmd_index(s, a, b, _FIND, nested), False
         if g is not None:
             name = _exec_perm(s, g, b)
             if name is not None:
-                sweep, self.what = True, "find -exec " + name
+                sweep, what = True, "find -exec " + name
                 starts = paths.find_starts(s, g, b)
                 if not starts:
-                    self.blocked("", "with no start path find sweeps the working directory")
+                    self.blocked("", what, "with no start path find sweeps the working directory")
                 for i in starts:
-                    self.target(s, i)
+                    self.target(s, i, what)
         g = sw.cmd_index(s, a, b, _PERM, nested)
         if g is not None:
             self.perm(s, g, b, sweep)
-
-    def run(self, doc):
-        scans = [(doc.scan(t), nested) for t, nested in doc.texts()]
-        self.moved = paths.moves_directory(scans)
-        paths.judge_segments(self, scans)
 
 
 def _perm_malformed(guard, err):
@@ -406,13 +410,13 @@ def _perm_malformed(guard, err):
 
 def _perm_verdict(targets, home, bases, physical, extra_roots=()):
     roots = paths.own_roots(home, bases, physical, extra_roots)
-    for abs_, what, raw in targets:
-        if not paths.under(abs_, roots):
-            return deny(say("perm_not_allowed", what=what, raw=raw, abs_=abs_, way_out=_PERM_WAY_OUT))
-        phys = physical(abs_)
-        if phys != abs_ and not paths.under(phys, roots):
-            return deny(say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys, way_out=_PERM_WAY_OUT))
-    return None
+    hit = _outside(targets, physical, lambda p: paths.under(p, roots))
+    if hit is None:
+        return None
+    abs_, what, raw, phys = hit
+    if phys is None:
+        return deny(say("perm_not_allowed", what=what, raw=raw, abs_=abs_, way_out=_PERM_WAY_OUT))
+    return deny(say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys, way_out=_PERM_WAY_OUT))
 
 
 def permissions(doc):
@@ -534,13 +538,15 @@ def redirect_targets(text):
     return out
 
 
-class _DiskJudge:
-    def __init__(self, cwd, home):
-        self.cwd, self.home = cwd, home
-        self.moved, self.dev_moved, self.targets = False, False, []
+class _DiskJudge(_TargetJudge):
+    resolve = staticmethod(paths.resolve)
+    dev_moved = False
 
     def refuse(self, what, why):
         raise Refuse(say("judged", guard=_DISKS_GUARD, why=say("disks_refused", what=what, why=why, way_out=_DISKS_WAY_OUT)))
+
+    def blocked(self, raw, what, why):
+        self.refuse(f"{what} {raw}", why)
 
     def lands_in_dev(self, s, a, b):
         """A cd (or `env -C`, `sudo -D`) in a..b that may leave the working directory under /dev, or
@@ -565,14 +571,6 @@ class _DiskJudge:
         if not raw.startswith("/") and self.dev_moved:
             self.refuse(f"{what} {raw}", say("disks_cd_moved"))
         return bool(_DISK_DEVICE.match(paths.lexical(raw if raw.startswith("/") else self.cwd + "/" + raw)))
-
-    def target(self, s, idx, what):
-        raw = s.w[idx]
-        try:
-            t = paths.resolve(raw, s.k[idx] == "q", self.cwd, self.home, self.moved)
-        except paths.Unresolved as e:
-            self.refuse(f"{what} {raw}", str(e))
-        self.targets.append((t, what, raw))
 
     def operands(self, s, g, b, opts, numeric=False):
         out, dashdash, i = [], False, g + 1
@@ -630,11 +628,9 @@ class _DiskJudge:
                     self.refuse(f"tee {s.w[i]}", "it writes onto a disk device")
 
     def run(self, doc):
-        texts = doc.texts()
-        scans = [(doc.scan(t), nested) for t, nested in texts]
-        self.moved = paths.moves_directory(scans)
-        self.dev_moved = any(a <= b and self.lands_in_dev(s, a, b) for s, _ in scans for a, b in s.segments())
-        for (t, _), (s, nested) in zip(texts, scans):
+        scans = self.scans(doc)
+        self.dev_moved = any(a <= b and self.lands_in_dev(s, a, b) for _, s, _ in scans for a, b in s.segments())
+        for t, s, nested in scans:
             for target in redirect_targets(t):
                 if self.is_device(target, ">"):
                     self.refuse(f"> {target}", "it writes onto a disk device")
@@ -645,16 +641,16 @@ class _DiskJudge:
 
 def _disks_verdict(targets, home, bases, physical):
     roots = paths.own_roots(home, bases, physical)
-    for abs_, what, raw in targets:
-        if not paths.under(abs_, roots):
-            kind = "a device node" if abs_.startswith("/dev/") else "outside the scratchpad, /tmp and agent worktrees"
-            why = say("disks_blocked", what=what, raw=raw, abs_=abs_, kind=kind, way_out=_DISKS_WAY_OUT)
-            return deny(say("judged", guard=_DISKS_GUARD, why=why))
-        phys = physical(abs_)
-        if phys != abs_ and not paths.under(phys, roots):
-            why = say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys, way_out=_DISKS_WAY_OUT)
-            return deny(say("judged", guard=_DISKS_GUARD, why=why))
-    return None
+    hit = _outside(targets, physical, lambda p: paths.under(p, roots))
+    if hit is None:
+        return None
+    abs_, what, raw, phys = hit
+    if phys is None:
+        kind = "a device node" if abs_.startswith("/dev/") else "outside the scratchpad, /tmp and agent worktrees"
+        why = say("disks_blocked", what=what, raw=raw, abs_=abs_, kind=kind, way_out=_DISKS_WAY_OUT)
+    else:
+        why = say("symlink_out", what=what, raw=raw, abs_=abs_, phys=phys, way_out=_DISKS_WAY_OUT)
+    return deny(say("judged", guard=_DISKS_GUARD, why=why))
 
 
 def disks(doc):

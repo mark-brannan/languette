@@ -206,7 +206,7 @@ Feature: guard-private-terms
       | gh api graphql -f query='mutation { addComment(input:{body:"Wanderlust"}) { clientMutationId } }' |
 
   # A query the command's words do not show cannot be shown to be a read.
-  @also_guard-signed-comments
+  @also_guard-signed-comments @also_guard-github-issues
   Scenario: a graphql call whose query is in a file or a heredoc is judged, its target unknown
     Given CLAUDE_PLUGIN_OPTION_PRIVATE_REPOS is "you/notes"
     And a project directory
@@ -1636,7 +1636,7 @@ Feature: guard-private-terms
         | gh issue create -R o/r -t x --body "$body"               | the `--body` value |
         | gh issue create -R o/r -t "$title" -b ok                 | the `-t` value     |
 
-      @also_guard-review-threads
+      @also_guard-review-threads @also_guard-github-issues
       Examples:
         | command                                                                  | named             |
         | gh api graphql -f query="mutation { addComment(body: $(cat f)) { id } }" | the `query` field |

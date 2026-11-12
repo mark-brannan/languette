@@ -26,9 +26,11 @@ the MCP create_issue, transfer_issue, delete_issue, and issue_write with
 method create. On GitLab, through `glab`: `glab issue create|new|delete|del`;
 `glab api` POST to projects/:id/issues or its issue's clone or move, DELETE
 of an issue; a graphql createIssue, workItemCreate, issueMove or
-workItemDelete. `sh -c`, `eval` and `xargs` bodies are read; a script file is
-not. The door file carries a languette- prefix (languette.world.DOOR), so
-another plugin's copy of this guard never spends it.
+workItemDelete. A graphql call whose query the command does not write out (an
+--input or @file, or a value built at run time, with no heredoc feeding it)
+counts as one write, whatever its mutation. `sh -c`, `eval` and `xargs` bodies
+are read; a script file is not. The door file carries a languette- prefix
+(languette.world.DOOR), so another plugin's copy of this guard never spends it.
 """
 
 import re
@@ -77,26 +79,17 @@ def _label(verb, number, repo=None):
     return f"{verb.title()} issue {repo}#{number}" if repo else f"{verb.title()} issue {number}"
 
 
-def _repo_flag(s, lo, hi):
-    """The repo a -R/--repo flag names between lo and hi, the last one as gh
-    reads them; or None."""
-    repo, i = None, lo
-    while i <= hi:
-        if r := sw.gh_repo_flag(s, i, hi, repo):
-            repo, i = r
-        i += 1
-    return repo
-
-
 class _Writes:
     """Walks a command for identifier writes: `found`, a (verb, issue number or
-    None, repo or None) per write, and `loop` when one sits in a loop body or after a word that
-    repeats it."""
+    None, repo or None) per write, `loop` when one sits in a loop body or after a word that
+    repeats it, and `unread` when a graphql write's query is not written out in the command."""
 
     def __init__(self, doc):
-        self.found, self.loop = [], False
-        self.hd = "".join(b + "\n" for b in doc.heredoc_bodies())
-        for text, nested in doc.texts():
+        self.found, self.loop, self.unread = [], False, False
+        ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
+        buf = str(ti.get("command", "")).replace("HEREDOC", "HEREDOC_")   # a typed HEREDOC must not pass for scan's mark
+        self.hd = "".join(b + "\n" for b in doc.heredoc_bodies(buf))
+        for text, nested in doc.texts(text=buf):
             s = doc.scan(text)
             self.depth = 0
             for a, b in s.segments():
@@ -142,7 +135,7 @@ class _Writes:
                 arg = sw.gh_verb(s, sub2 + 1, hi)
                 hit = _NUMBER.fullmatch(sw.word(s, arg)) if arg is not None else None
                 number = hit and (hit[1] or hit[3] or hit[5])
-                repo = number and ((hit[2] or hit[4] if hit else None) or _repo_flag(s, g + 1, hi))
+                repo = number and ((hit[2] or hit[4] if hit else None) or sw.gh_repo(s, lo, g, hi, cli))
                 self._emit(rep, verb, number, repo)
             return
         if s.w[sub1] != "api":
@@ -150,37 +143,45 @@ class _Writes:
         api = sw.gh_api(s, sub1 + 1, hi, cli)
         mutation = re.compile("(" + "|".join(row["mutation"]) + r")\s*\(")
         m = [x for i in range(sub1 + 1, hi + 1) if i not in api.skipped for x in mutation.findall(sw.word(s, i))]
-        method = api.method or ("POST" if api.sends else "GET")
-        verb = next((v for path, meth, v in row["rest"] if meth == method and re.fullmatch(path, api.path)), None)
+        verb = next((v for path, meth, v in row["rest"] if meth == api.sent and re.fullmatch(path, api.path)), None)
         if verb:
             self._emit(rep, verb)
-        if api.path == "graphql":
-            m += mutation.findall(self.hd)
-            self.hd = ""
+        if api.graphql:
+            hd, self.hd = self.hd, ""
+            m += mutation.findall(hd)
             for name in m:
                 self._emit(rep, row["mutation"][name])
+            # A query the command does not write out could be any mutation: one write, as
+            # guard-private-terms reads it, unless every source is stdin and a heredoc of
+            # this call's own (scan's HEREDOC mark among its words) feeds it.
+            srcs = [a.text for a in api.args if a.flag == "--input" or a.key == "query"]
+            fed = hd and any(s.k[i] == "w" and s.w[i] == "HEREDOC" for i in range(sub1 + 1, hi + 1))
+            if not m and api.writes is None and not (fed and srcs and all(x in ("-", "query=@-") for x in srcs)):
+                self.unread = True
+                self._emit(rep, "create")
 
 
 def _writes(doc):
-    """([(verb, issue number or None, repo or None)] for this call's identifier writes, whether one is in a loop)."""
+    """([(verb, issue number or None, repo or None)] for this call's identifier writes, whether one is in a loop,
+    whether one is a graphql query the command does not write out)."""
     tool = doc.tool
     ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
     if tool == "Bash":
         command = ti.get("command")
         if not isinstance(command, str):
-            return [], False
+            return [], False, False
         w = _Writes(doc)
-        return w.found, w.loop
+        return w.found, w.loop, w.unread
     if isinstance(tool, str) and _MCP_WRITE.match(tool):
         verb = re.search(r"(create|transfer|delete)_issue\Z", tool)[1]
         number = ti.get("issue_number")
         number = str(number) if isinstance(number, int) or (isinstance(number, str) and number.isdigit()) else None
         owner, name = ti.get("owner"), ti.get("repo")
         repo = f"{owner}/{name}" if isinstance(owner, str) and isinstance(name, str) and owner and name else None
-        return [(verb, number, number and repo)], False
+        return [(verb, number, number and repo)], False, False
     if isinstance(tool, str) and _MCP_ISSUE_WRITE.match(tool):
-        return ([("create", None, None)] if ti.get("method") == "create" else []), False
-    return [], False
+        return ([("create", None, None)] if ti.get("method") == "create" else []), False, False
+    return [], False, False
 
 
 def _session(payload):
@@ -196,13 +197,14 @@ def _never_ran(transcript, call):
 
 def written(doc):
     """The `issue-writes` test: {"writes": [(verb, issue number or None, repo or None)], "loop":
-    whether one sits in a loop}, or {"unreadable": the error's kind} when the call cannot be read;
-    None when it writes no issue identifier."""
+    whether one sits in a loop, "unread": whether one is a query the command does not write out},
+    or {"unreadable": the error's kind} when the call cannot be read; None when it writes no issue
+    identifier."""
     try:
-        found, loop = _writes(doc)
+        found, loop, unread = _writes(doc)
     except Exception as e:  # noqa: BLE001 -- fails closed
         return {"unreadable": type(e).__name__}
-    return {"writes": found, "loop": loop} if found else None
+    return {"writes": found, "loop": loop, "unread": unread} if found else None
 
 
 def door(doc, guard, found):
@@ -216,6 +218,8 @@ def door(doc, guard, found):
     if found["loop"]:
         return deny(say("gi_loop", guard=guard))
     why, take = yield from _door(doc.payload, _session(doc.payload))
+    if found["unread"]:
+        why = f"{say('gi_query_unread')}; {why}"
     label = _label(*found["writes"][0])
     if take:
         # Lost after the verdict, the door is another write's: the user's yes is the way left.

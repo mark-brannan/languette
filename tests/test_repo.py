@@ -258,7 +258,7 @@ def test_the_readme_table_is_the_scenarios_table():
 def test_the_prompt_hook_has_the_shape_that_opens_the_door():
     assert_that(prompt_hooks_shape((ROOT / "hooks/hooks.json").read_text()), empty())
     assert_that("--guard" in hooks_json_prompt_command(), is_(False))
-    assert_that(run.wired("UserPromptSubmit", None), equal_to([run.guard_github_issues]))
+    assert_that(run.wired("UserPromptSubmit", None), equal_to([run.GUARD["guard-github-issues"]]))
 
 
 def test_a_rule_set_names_under_on_every_state_event_run_wires_its_guard_to():
@@ -328,12 +328,12 @@ def _mcp_tools_the_guard_handles():
 
 @pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_handles())
 def test_the_guard_github_issues_matcher_covers_the_tool(tool):
-    assert_that(_reaches(run.guard_github_issues, tool), is_(True))
+    assert_that(_reaches(run.GUARD["guard-github-issues"], tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__add_issue_comment"])
 def test_the_guard_github_issues_matcher_leaves_other_tools_alone(tool):
-    assert_that(_reaches(run.guard_github_issues, tool), is_(False))
+    assert_that(_reaches(run.GUARD["guard-github-issues"], tool), is_(False))
 
 
 def _mcp_tools_the_guard_private_terms_handles():
@@ -345,35 +345,35 @@ def _mcp_tools_the_guard_private_terms_handles():
 
 @pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_private_terms_handles())
 def test_the_guard_private_terms_matcher_covers_the_tool(tool):
-    assert_that(_reaches(run.guard_private_terms, tool), is_(True))
+    assert_that(_reaches(run.GUARD["guard-private-terms"], tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__list_pull_requests"])
 def test_the_guard_private_terms_matcher_leaves_other_tools_alone(tool):
-    assert_that(_reaches(run.guard_private_terms, tool), is_(False))
+    assert_that(_reaches(run.GUARD["guard-private-terms"], tool), is_(False))
 
 
 # Any MCP tool may carry a labels field; the guard itself tells writes from reads.
 @pytest.mark.parametrize("tool", ["Bash", "mcp__github__update_issue", "mcp__plugin_github_github__issue_write",
                                   "mcp__gitea__edit_issue"])
 def test_the_guard_bypass_labels_matcher_covers_the_tool(tool):
-    assert_that(_reaches(run.guard_bypass_labels, tool), is_(True))
+    assert_that(_reaches(run.GUARD["guard-bypass-labels"], tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "Write", "Edit"])
 def test_the_guard_bypass_labels_matcher_leaves_other_tools_alone(tool):
-    assert_that(_reaches(run.guard_bypass_labels, tool), is_(False))
+    assert_that(_reaches(run.GUARD["guard-bypass-labels"], tool), is_(False))
 
 
 @pytest.mark.parametrize("tool", ["Bash"] + sorted(f"{prefix}{s}" for s in _mcp_suffixes(opened_prs.TOOLS)
                                                    for prefix in ("mcp__github__", "mcp__plugin_github_github__")))
 def test_the_guard_duplicate_pr_matcher_covers_the_tool(tool):
-    assert_that(_reaches(run.guard_duplicate_prs, tool), is_(True))
+    assert_that(_reaches(run.GUARD["guard-duplicate-prs"], tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__update_pull_request", "mcp__github__list_pull_requests"])
 def test_the_guard_duplicate_pr_matcher_leaves_other_tools_alone(tool):
-    assert_that(_reaches(run.guard_duplicate_prs, tool), is_(False))
+    assert_that(_reaches(run.GUARD["guard-duplicate-prs"], tool), is_(False))
 
 
 def _mcp_tools_the_guard_signed_comments_handles():
@@ -386,12 +386,12 @@ def _mcp_tools_the_guard_signed_comments_handles():
 
 @pytest.mark.parametrize("tool", ["Bash"] + _mcp_tools_the_guard_signed_comments_handles())
 def test_the_guard_signed_comments_matcher_covers_the_tool(tool):
-    assert_that(_reaches(run.guard_signed_comments, tool), is_(True))
+    assert_that(_reaches(run.GUARD["guard-signed-comments"], tool), is_(True))
 
 
 @pytest.mark.parametrize("tool", ["Read", "mcp__github__get_issue", "mcp__github__create_issue"])
 def test_the_guard_signed_comments_matcher_leaves_other_tools_alone(tool):
-    assert_that(_reaches(run.guard_signed_comments, tool), is_(False))
+    assert_that(_reaches(run.GUARD["guard-signed-comments"], tool), is_(False))
 
 
 def _gathered(gen):

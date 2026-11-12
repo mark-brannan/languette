@@ -146,6 +146,7 @@ class Act(Need):
         door-open       session             guard-github-issues' door, fresh; any claim dropped
         door-spend      session             that door and its claim, gone
         terms-init      (none)              the default redacted terms file, where none is there
+        send-fail       session             guard-cross-session-send's state, as a failed state hook leaves it
     """
 
     __slots__ = ()

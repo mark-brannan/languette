@@ -206,13 +206,12 @@ class _Read:
                 fields.append((a.key, self.file(a.value[1:], g, hi)))
             else:
                 fields.append((a.key, self.val(a.value, a.live)))
-        p = api.path
-        if p == "graphql":
+        if api.graphql:
             query = next((src for key, src in fields if key == "query"), None)
             if query is not None or inp is not None:
                 self.posts.append([("graphql", query, dict(fields), inp)])
             return
-        if not _COMMENTS.search(p) or api.method in ("GET", "HEAD") or (not fields and inp is None):
+        if not _COMMENTS.search(api.path) or not api.writes:
             return
         bodies = [src for key, src in fields if key == "body" or key.endswith("[body]")]
         if inp is not None:

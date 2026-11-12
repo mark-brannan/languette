@@ -27,6 +27,18 @@ GH_METHOD_FLAGS = ("-X", "--method")
 # value, where @path sends the file's contents.
 GH_API_FIELDS = ("-f", "-F", "--field", "--raw-field")
 
+# The GraphQL endpoint as gh_api_path leaves it: graphql, or an Enterprise
+# server's api/graphql when the call names the URL (api/v3/graphql read as one).
+GRAPHQL = re.compile(r"(?:api/(?:v3/)?)?graphql")
+
+# A query GraphQL can only run as a read: the shorthand `{` must be the lone
+# operation, and a named `query` takes a second operation only by operationName.
+GRAPHQL_READ = re.compile(r"\s*(?:\{|query(?![A-Za-z0-9_]))")
+
+# A GraphQL document that runs a mutation; read loosely, so a read that only
+# mentions the word counts as a write.
+_MUTATION = re.compile(r"(?<![A-Za-z0-9_])mutation(?![A-Za-z0-9_])")
+
 # `gh api` flags whose value no guard reads.
 GH_API_VALUED = frozenset("-H --header -q --jq -t --template -p --preview --hostname --cache".split())
 # Every `gh api` flag that takes the next word as its value.
@@ -85,6 +97,25 @@ def _gh_valued(s, i, hi, spaced, long_eq, short, default):
     if t.startswith(short) and len(t) > len(short):
         return t[len(short):], i
     return None
+
+
+def gh_env_repo(s, lo, g, cli="gh"):
+    """The repo a GH_REPO= (GITLAB_REPO= for glab) assignment before word g
+    names, the last one as the shell reads them; or None."""
+    env = "GITLAB_REPO=" if cli == "glab" else "GH_REPO="
+    return next((s.w[i][len(env):] for i in range(g - 1, lo - 1, -1)
+                 if s.k[i] == "w" and s.w[i].startswith(env)), None)
+
+
+def gh_repo(s, lo, g, hi, cli="gh"):
+    """The repo a gh or glab call at word g names: its last -R/--repo flag in
+    g+1..hi, else its GH_REPO= (gh_env_repo); or None."""
+    repo, i = gh_env_repo(s, lo, g, cli), g + 1
+    while i <= hi:
+        if r := gh_repo_flag(s, i, hi, repo):
+            repo, i = r
+        i += 1
+    return repo
 
 
 def gh_verb(s, i, hi):
@@ -171,6 +202,49 @@ class GhApi(namedtuple("GhApi", "path operands method args flags skipped")):
         """A field or --input is given, with a value or not: gh sends a body,
         and with no method set, sends it as a POST."""
         return bool(self.args)
+
+    @property
+    def sent(self):
+        """The HTTP method gh sends: the one set, else POST with a body, GET without."""
+        return self.method or ("POST" if self.sends else "GET")
+
+    @property
+    def graphql(self):
+        """The endpoint is the GraphQL one, on github.com or an Enterprise server."""
+        return bool(GRAPHQL.fullmatch(self.path))
+
+    def _query_arg(self):
+        """The query field when the command's words hold it: no --input, no @file."""
+        if any(a.flag == "--input" for a in self.args):
+            return None
+        q = next((a for a in self.args if a.key == "query"), None)
+        return None if q is None or (q.typed and q.value.startswith("@")) else q
+
+    @property
+    def query(self):
+        """The GraphQL query as the command's words write it out, or None when
+        they do not: no query field, an --input, an @file, or a value built at
+        run time."""
+        q = self._query_arg()
+        return None if q is None or (q.live and re.search(r"[$`]", q.value)) else q.value
+
+    @property
+    def writes(self):
+        """Whether the call changes something on the forge. GraphQL: True when
+        the query runs a mutation, None when the query is not written out (see
+        `query`), else False; a query that can only run as a read (GRAPHQL_READ,
+        with no operationName) is False however much of it is built at run
+        time. Any other endpoint: any method sent but GET and HEAD."""
+        if self.graphql:
+            if not any(a.flag == "--input" or a.key == "query" or (a.live and re.search(r"[$`]", a.key))
+                       for a in self.args):
+                return False   # no query is sent (no field name built at run time either): nothing can run
+            q = self._query_arg()
+            if q is not None and GRAPHQL_READ.match(q.value) and not any(a.key == "operationName" for a in self.args):
+                return False
+            text = self.query
+            return None if text is None else bool(_MUTATION.search(text))
+        return self.sent not in ("GET", "HEAD")
 
 
 def gh_api(s, lo, hi, cli="gh"):

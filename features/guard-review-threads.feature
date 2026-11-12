@@ -245,6 +245,7 @@ Feature: guard-review-threads
       | gh-agent[bot]  | gh-agent      | an app's token, which GraphQL gives no [bot]  |
       | gh-agent       | gh-agent[bot] | the other way round                           |
 
+  @also_guard-github-issues
   Scenario Outline: a graphql call whose query cannot be read is denied
     When the agent runs `<command>`
     Then the guard denies, naming "cannot tell which review thread"
@@ -275,7 +276,7 @@ Feature: guard-review-threads
       | command                                                                                                      | note                      |
       | gh api graphql -f query="mutation{addComment(input:{subjectId:\"$S\",body:\"x\"}){clientMutationId}}"    | a mutation built at run time |
 
-  @also_guard-bypass-labels @also_guard-signed-comments
+  @also_guard-bypass-labels @also_guard-signed-comments @also_guard-github-issues
   Scenario: a heredoc fed to another command does not make --input FILE readable
     When the agent runs:
       """
@@ -286,7 +287,7 @@ Feature: guard-review-threads
       """
     Then the guard denies, naming "cannot tell which review thread"
 
-  @also_guard-signed-comments
+  @also_guard-signed-comments @also_guard-github-issues
   Scenario: a heredoc fed to another command does not make piped stdin readable
     When the agent runs:
       """
@@ -439,17 +440,21 @@ Feature: guard-review-threads
 
     Examples:
       | command                                                                                         | verdict                                          | note                       |
-      | gh api graphql -F query=@resolve.graphql -f id=PRRT_t1                                         | denies, naming "no reply from me after"          | a resolve from a file      |
-      | gh api graphql --input resolve.json                                                            | denies, naming "no reply from me after"          | a resolve from --input     |
       | gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id}}} # PRRT_ok' -F id=@ids.txt | denies, naming "PRRT_t1" | the id from a file, past a decoy |
 
-    @also_guard-signed-comments
+    @also_guard-github-issues
+    Examples:
+      | command                                                                                         | verdict                                          | note                       |
+      | gh api graphql -F query=@resolve.graphql -f id=PRRT_t1                                         | denies, naming "no reply from me after"          | a resolve from a file      |
+      | gh api graphql --input resolve.json                                                            | denies, naming "no reply from me after"          | a resolve from --input     |
+
+    @also_guard-signed-comments @also_guard-github-issues
     Examples:
       | command                                                                                         | verdict                                          | note                       |
       | gh api graphql -F query=@reply.graphql -f id=PRRT_t1 -F b=@ids.txt                             | is silent                                        | a reply from a file        |
       | gh api graphql -F query=@reply.graphql -f id="$T" -F b=@ids.txt                                | is silent                                        | a reply, whatever its id   |
 
-    @also_guard-bypass-labels @also_guard-signed-comments
+    @also_guard-bypass-labels @also_guard-signed-comments @also_guard-github-issues
     Examples:
       | command                                                                                         | verdict                                          | note                       |
       | cd sub && gh api graphql -F query=@../resolve.graphql -f id=PRRT_t1                            | denies, naming "cannot tell which review thread" | a cd moves the file        |
