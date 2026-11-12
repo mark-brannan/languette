@@ -776,3 +776,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t071558z
 - Neither new row is ever a failure: off and unknown are a warning, so the exit code stays the guards' alone Undo: revert the line in doctor.py ([#385](https://github.com/mark-brannan/languette/issues/385)) (no PR, branch claude/doctor-layers-385)
+
+### 20261112t071600z
+- The read deny row checks two sample paths, .env in the working directory and a key under ~/.ssh, and is labelled read deny rather than secrets Undo: revert the line in doctor.py ([#385](https://github.com/mark-brannan/languette/issues/385)) (no PR, branch claude/doctor-layers-385)
