@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "languette"
-version = "0.0.21"
+version = "0.0.22"
 description = "A deterministic check against risky actions by coding agents: fail-closed PreToolUse guards for the commands that could ruin a day, such as recursive rm, git work loss, a disk wipe, a shutdown or a credential pasted into a command. The wheel also ships an installer that wires the guards into Claude Code and a doctor that says whether they are on."
 readme = "README.md"
 requires-python = ">=3.11"

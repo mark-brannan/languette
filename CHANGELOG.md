@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.22](https://github.com/mark-brannan/languette/compare/v0.0.21...v0.0.22) (2026-11-12)
+
+
+### Bug Fixes
+
+* **scan:** three probed faults in the shell-reading layer, and its small readers folded ([#375](https://github.com/mark-brannan/languette/issues/375)) ([#402](https://github.com/mark-brannan/languette/issues/402)) ([68a89e0](https://github.com/mark-brannan/languette/commit/68a89e0b0529c0fe05d18b153898bf69d6b254ac))
+
 ## [0.0.21](https://github.com/mark-brannan/languette/compare/v0.0.20...v0.0.21) (2026-11-11)
 
 
