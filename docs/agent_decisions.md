@@ -773,3 +773,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t071555z
 - General availability is Claude Code only Undo: revert the line in doctor.py ([#385](https://github.com/mark-brannan/languette/issues/385)) (no PR, branch claude/doctor-layers-385)
+
+### 20261112t071558z
+- Neither new row is ever a failure: off and unknown are a warning, so the exit code stays the guards' alone Undo: revert the line in doctor.py ([#385](https://github.com/mark-brannan/languette/issues/385)) (no PR, branch claude/doctor-layers-385)
