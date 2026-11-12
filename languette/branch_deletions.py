@@ -60,7 +60,7 @@ def _emit(out, repo, ref, forge=None):
         ref = ref[len("refs/heads/"):]
     if ref in ("", "HEAD"):
         return
-    out.append((repo, "?" if sw.UNRESOLVED.search(ref) else ref, forge))
+    out.append((repo, "?" if sw.UNREADABLE.search(ref) else ref, forge))
 
 
 def _git_push(s, a, b, nested, out):
@@ -73,7 +73,7 @@ def _git_push(s, a, b, nested, out):
     # Another repository's remote: -C, --git-dir or GIT_DIR=; a work tree moves no remote.
     repo = "?" if any(kind != "WORKTREE" for kind, _, _ in call.places) else "-"
     words, skip, delete = [], False, False
-    valued = [v for v in sw.PROGRAMS["git push"]["valued"] if v.startswith("--")]
+    valued = [v for v in sw.GIT_PUSH_VALUE if v.startswith("--")]
     for i in call.args:
         if s.k[i] != "w":
             continue
@@ -127,7 +127,7 @@ def _gh_api(s, a, b, nested, out):
         m = _REPO.search(w)
         if m:
             rest = re.sub(r"^/?repos/", "", m.group(0)).rstrip("/")
-            if not sw.UNRESOLVED.search(rest):
+            if not sw.UNREADABLE.search(rest):
                 repo = rest
     _emit(out, repo, w[w.index("refs/heads/") + len("refs/heads/"):], "github")
 

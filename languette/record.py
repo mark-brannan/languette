@@ -17,7 +17,6 @@ names the format, so a reader can refuse one it does not know.
 Standard library only.
 """
 
-import os
 import time
 
 from languette import scan, secrets
@@ -74,7 +73,7 @@ def programs(doc):
             c += 1
         if c is None or c > b or s.k[c] != "w" or s.w[c] in HEADERS:
             continue
-        out.append(os.path.basename(s.w[c]) or s.w[c])
+        out.append(scan.basename(s.w[c]) or s.w[c])
     return out
 
 

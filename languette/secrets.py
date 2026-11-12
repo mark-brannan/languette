@@ -33,9 +33,7 @@ import math
 import re
 from collections import namedtuple
 
-from re import _parser as _sre          # 3.11+ (requires-python floor)
-
-from languette import paths
+from languette import paths, reshape
 from languette import scan as sw
 from languette import secret_rules
 from languette.messages import say
@@ -194,7 +192,7 @@ def _glued_mysql_p(scan, i):
         return None
     j = i - 1
     while j >= 0 and scan.k[j] != ";":
-        if scan.k[j] == "w" and scan.w[j].rsplit("/", 1)[-1] in _MYSQL:
+        if scan.k[j] == "w" and sw.basename(scan.w[j]) in _MYSQL:
             return 2, len(scan.w[i])
         j -= 1
     return None
@@ -314,34 +312,6 @@ CONFIG = ".languette/secrets.json"
 MAX_REGEX = 512
 
 
-def _nested_repeat(pattern):
-    """Does pattern put an unbounded repeat inside another? `(a+)+`, `(a*)*`,
-    `(\\w+\\s?)+` are the shapes that backtrack for minutes on the wrong input.
-    Read from the stdlib's own parse of the pattern (a private module, so a
-    parse that fails here is no finding: re.compile judges the pattern)."""
-    def walk(items, inside):
-        for op, av in items:
-            if op in (_sre.MAX_REPEAT, _sre.MIN_REPEAT):
-                lo, hi, sub = av
-                unbounded = hi == _sre.MAXREPEAT
-                if (unbounded and inside) or walk(sub, inside or unbounded):
-                    return True
-            elif op == _sre.SUBPATTERN:
-                if walk(av[-1], inside):
-                    return True
-            elif op == _sre.BRANCH:
-                if any(walk(b, inside) for b in av[1]):
-                    return True
-            elif op in (_sre.ASSERT, _sre.ASSERT_NOT):
-                if walk(av[1], inside):
-                    return True
-        return False
-    try:
-        return walk(_sre.parse(pattern), False)
-    except Exception:  # noqa: BLE001 -- the parser's own refusal is re.compile's to report
-        return False
-
-
 _SHIPPED = frozenset(r.id for r in secret_rules.RULES)
 
 
@@ -369,8 +339,9 @@ def load(path):
             rx = re.compile(p["regex"])
         except re.error as e:
             raise Refuse(say("sec_regex_bad", where=where, err=e))
-        if _nested_repeat(p["regex"]):
-            raise Refuse(say("sec_regex_nested", where=where))
+        why = reshape.refusal(p["regex"])
+        if why:
+            raise Refuse(say("sec_regex_refused", where=where, why=why))
         ent = p.get("entropy", 0.0)
         if not isinstance(ent, (int, float)) or isinstance(ent, bool) or ent < 0:
             raise Refuse(say("sec_entropy", where=where))

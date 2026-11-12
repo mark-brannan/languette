@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.0.22](https://github.com/mark-brannan/languette/compare/v0.0.21...v0.0.22) (2026-11-12)
+
+
+### Bug Fixes
+
+* **scan:** three probed faults in the shell-reading layer, and its small readers folded ([#375](https://github.com/mark-brannan/languette/issues/375)) ([#402](https://github.com/mark-brannan/languette/issues/402)) ([68a89e0](https://github.com/mark-brannan/languette/commit/68a89e0b0529c0fe05d18b153898bf69d6b254ac))
+
+## [0.0.21](https://github.com/mark-brannan/languette/compare/v0.0.20...v0.0.21) (2026-11-11)
+
+
+### Documentation
+
+* list everything languette writes, and hold today's read-after-writes ([#368](https://github.com/mark-brannan/languette/issues/368)) ([#399](https://github.com/mark-brannan/languette/issues/399)) ([892bbe6](https://github.com/mark-brannan/languette/commit/892bbe601a560559ae27b2b08630982512a845fb))
+* **research:** state read after write, file by file ([#368](https://github.com/mark-brannan/languette/issues/368)) ([#393](https://github.com/mark-brannan/languette/issues/393)) ([99c5444](https://github.com/mark-brannan/languette/commit/99c5444918d52cee02eda7d49c742e3acde5937d))
+
+
+### Dependencies
+
+* bump coverage from 7.17.0 to 7.17.2 in the dev-dependencies group ([#405](https://github.com/mark-brannan/languette/issues/405)) ([5f34d23](https://github.com/mark-brannan/languette/commit/5f34d234fa815ef4c05d9d60bf7643fd53f90ecf))
+
 ## [0.0.20](https://github.com/mark-brannan/languette/compare/v0.0.19...v0.0.20) (2026-11-11)
 
 

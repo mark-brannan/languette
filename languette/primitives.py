@@ -29,7 +29,7 @@ def _power(s, a, b):
     if g is None:                              # `sh -c reboot`: a one-word script is not a nested text
         g = next((i for i in range(a + 1, b + 1) if s.k[i] == "w" and _POWER.search(s.w[i])
                   and re.fullmatch(r"-[A-Za-z]*c", s.w[i - 1])), None)
-    return None if g is None else os.path.basename(s.w[g])
+    return None if g is None else sw.basename(s.w[g])
 
 
 def power_word(doc):
@@ -132,7 +132,7 @@ def _pipe_why(doc, s, nested):
         fed = (b + 1 < len(s.w) and s.op[b + 1].startswith(_FED)
                and (b + 2 in segs and _has_dl(s, b + 2, segs[b + 2], nested)))
         if g is not None:
-            name = os.path.basename(s.w[g])
+            name = sw.basename(s.w[g])
             if carried and _reads_stdin(s, g, b):
                 return say("pipe_into", name=name)
             given, ops = _program(s, g, b)
@@ -325,7 +325,7 @@ def _exec_perm(s, g, b):
         m = _PERM.search(s.w[i + 1]) if s.k[i + 1] == "w" else None
         if m:
             return m.group(1)
-        if s.k[i + 1] != "w" or not _WRAPPERS.fullmatch(os.path.basename(s.w[i + 1])):
+        if s.k[i + 1] != "w" or not _WRAPPERS.fullmatch(sw.basename(s.w[i + 1])):
             continue
         for j in range(i + 1, b + 1):
             m = _PERM.search(s.w[j]) if s.k[j] == "w" else _PERM_IN_TEXT.search(s.q[j])
@@ -606,7 +606,7 @@ class _DiskJudge(_TargetJudge):
                     self.refuse(f"dd {x}", f"{p} is a device node, and dd overwrites whatever is on it")
         g = sw.cmd_index(s, a, b, _MKFS, nested)
         if g is not None:
-            what = os.path.basename(s.w[g])
+            what = sw.basename(s.w[g])
             ops = self.operands(s, g, b, _DISK_VALUE_OPTS["mkfs"], numeric=True)
             if not ops:
                 self.refuse(what, "no device or image file is visible to this hook")
@@ -614,7 +614,7 @@ class _DiskJudge(_TargetJudge):
                 self.target(s, i, what)
         g = sw.cmd_index(s, a, b, _WIPE, nested)
         if g is not None:
-            what = os.path.basename(s.w[g])
+            what = sw.basename(s.w[g])
             ops = self.operands(s, g, b, _DISK_VALUE_OPTS["wipe"])
             if not ops:
                 self.refuse(what, "no target is visible to this hook -- xargs and quoted lists look like this. "

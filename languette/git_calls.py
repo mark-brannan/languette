@@ -8,14 +8,14 @@ abbreviation (long_option, over GIT_LONG) and git add's options (add_options).
 import re
 
 from .lexer import word
-from .lexicon import GIT_VALUE, GIT_WRAPPERS, _base
+from .lexicon import basename, GIT_VALUE, GIT_WRAPPERS
 from .messages import say
 from .verdict import Refuse
 
 
 def git_wrapper(word):
     """(name, row) of the GIT_WRAPPERS entry a word that GIT matched names."""
-    name = word.rsplit("/", 1)[-1]
+    name = basename(word)
     return name, GIT_WRAPPERS[name]
 
 
@@ -73,7 +73,7 @@ def _git_walk(s, g, b):
         repo, j = (s.w[j] if j <= b else None), j + 1
     else:
         return None, b + 1, opts
-    if j <= b and s.k[j] == "w" and _base(s.w[j]) == "git":
+    if j <= b and s.k[j] == "w" and basename(s.w[j]) == "git":
         return repo, take(j + 1), opts
     return repo, b + 1, opts
 

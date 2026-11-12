@@ -219,8 +219,8 @@ def _push(s, a, b, nested, here, lits=None):
             return None                        # a deletion is other guards'
         elif _opt(x, "--dry-run") or re.match(r"-[^o-]*n", x):
             dry = True                         # a dry run pushes nothing
-        if x in sw.PROGRAMS["git push"]["valued"] or (
-                "=" not in x and any(_opt(x, v) for v in sw.PROGRAMS["git push"]["valued"] if v.startswith("--"))):
+        if x in sw.GIT_PUSH_VALUE or (
+                "=" not in x and any(_opt(x, v) for v in sw.GIT_PUSH_VALUE if v.startswith("--"))):
             i += 1
         i += 1
     if dry:

@@ -4,10 +4,9 @@ guard's rules and matching a rule against the command's words.
 
 import re
 
-from .quoting import _ASSIGN
-from .lexicon import (EXEC, LAUNCH, LAUNCH_SUB, LOOP, PM, PROSE_PROCESS, RUN, WRAP, _base, _FIND_EXECS,
+from .quoting import UNREADABLE, _ASSIGN
+from .lexicon import (basename, EXEC, LAUNCH, LAUNCH_SUB, LOOP, PM, PROSE_PROCESS, RUN, WRAP, _FIND_EXECS,
                       _FIND_WRAPPERS)
-from .lexer import UNREADABLE
 from .texts import cmd_index, segments
 from .cd_tracking import cd_present, cwds, _abspath
 from .stops import stop_of, unit_test
@@ -36,12 +35,12 @@ def _script_word(w, sc, place):
     if place is None:
         return False
     here, root = place
-    want, name = _abspath(root + "/" + sc), _base(sc)
+    want, name = _abspath(root + "/" + sc), basename(sc)
     if UNREADABLE.search(w) or w.startswith("~"):
-        return _base(w) == name
+        return basename(w) == name
     if w.startswith("/"):
         return _abspath(w) == want
-    return any(_abspath(h + "/" + w) == want if h else _base(w) == name for h in here)
+    return any(_abspath(h + "/" + w) == want if h else basename(w) == name for h in here)
 
 
 def _hit(match, name, rest, place=None):
@@ -55,7 +54,7 @@ def _hit(match, name, rest, place=None):
             if words and words[0] in LAUNCH_SUB:
                 words = words[1:]
             # The first word naming cmd: an option's value (npx -p x cmd) may come first.
-            w = next((w for w in words if _base(w) == cmd), None)
+            w = next((w for w in words if basename(w) == cmd), None)
             if w is not None:
                 return _hit(match, cmd, rest[rest.index(w) + 1:], place)
         return False
@@ -163,10 +162,10 @@ def _placed_index(s, a, b, rx):
         return None
     if rx.search(s.w[i]):
         return i
-    if _base(s.w[i]) == "find":                # find's -exec and kin start a command of their own
+    if basename(s.w[i]) == "find":                # find's -exec and kin start a command of their own
         return next((j for k in range(i + 1, b) if s.k[k] == "w" and s.w[k] in _FIND_EXECS
                      for j in [_placed_index(s, k + 1, b, rx)] if j is not None), None)
-    if _base(s.w[i]) not in _RUNS_A_COMMAND:
+    if basename(s.w[i]) not in _RUNS_A_COMMAND:
         return None
     return next((j for j in range(i + 1, b + 1) if s.k[j] == "w" and rx.search(s.w[j])), None)
 
@@ -198,7 +197,7 @@ def _word_hit(doc, match, prose, launchers, at=None):
         g = _placed_index(s, a, b, rx) if placed else cmd_index(s, a, b, rx, nested, prose=prose)
         # cmd_index stops at the first launcher; a later word may be the command.
         while g is not None:
-            if _hit(match, _base(s.w[g]), s.w[g + 1:b + 1], place):
+            if _hit(match, basename(s.w[g]), s.w[g + 1:b + 1], place):
                 n += 1
                 break
             if nested:
