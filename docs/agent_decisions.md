@@ -743,3 +743,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t060555z
 - the unattended deny says once, after every guard's ask, that the user makes the call themselves Undo: move the sentence into unattended_ask ([#164](https://github.com/mark-brannan/languette/issues/164)) ([#413](https://github.com/mark-brannan/languette/pull/413))
+
+### 20261112t062957z
+- ask-first and deny-always user lists live at $XDG_CONFIG_HOME/languette/ask-first.json and deny-always.json, the repo files' names Undo: rename the user file in paths.user_config callers (listed_runs.USER, deny_always RULE_SET user) ([#414](https://github.com/mark-brannan/languette/pull/414))
