@@ -427,6 +427,7 @@ transcript_unreadable: {guard}: cannot read the session transcript to look for t
 
 ```
 unattended_ask: {guard}: this needs the user's approval, and in {mode} no one is there to approve it, so it is denied instead of asked. What it would have asked: {why}
+unattended_way: Don't work around it: if the call still needs making, the user makes it themselves. Say what it is for and hand them the exact call.
 ```
 
 ## unknown

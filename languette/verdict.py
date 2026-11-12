@@ -14,13 +14,12 @@ import inspect
 
 from languette.messages import say
 
-# Claude Code's permission_mode values in which a hook's ask reaches no one:
-# dontAsk denies every prompt unseen, bypassPermissions skips it. A headless
-# run sends its configured mode, so it is not told apart here.
-NO_PROMPT = frozenset({"dontAsk", "bypassPermissions"})
-# ...and those in which AskUserQuestion reaches no one: dontAsk denies it even
-# when allowed; bypassPermissions still shows it.
-NO_QUESTION = frozenset({"dontAsk"})
+# Claude Code's permission_mode values in which neither a hook's ask nor
+# AskUserQuestion reaches anyone: dontAsk denies every prompt unseen, and
+# AskUserQuestion even when allowed. bypassPermissions is not one: a user who
+# picks it is there and chose to skip prompts, so an ask stays an ask. A
+# headless run sends its configured mode, so it is not told apart here.
+NO_PROMPT = frozenset({"dontAsk"})
 
 WAY_USER = "That is the user's to run, not an agent's: say what you need and hand them the exact command."
 
@@ -221,7 +220,8 @@ def verdict(event, findings, mode=None, chained=None):
     allow (a redaction), and an ask carries a rewrite along; the first rewrite wins, since two cannot both apply.
     A deny ends with the chain footer when `chained`, a callable read only then, says the
     command had more than one segment (languette.document.Document.chained).
-    In a permission `mode` where no one can answer (NO_PROMPT), an ask is a deny that says so."""
+    In a permission `mode` where no one can answer (NO_PROMPT), an ask is a deny that names
+    each ask and leaves the call to the user."""
     if event != "PreToolUse":                  # state-keeping events: nothing to decide
         return None
     reasons, asks, allows, notes, rewrites = [], [], [], [], []
@@ -242,7 +242,7 @@ def verdict(event, findings, mode=None, chained=None):
         return deny("\n\n".join(reasons + _footer(chained)))
     if asks and mode in NO_PROMPT:
         return deny("\n\n".join([say("unattended_ask", guard=n, mode=mode, why=r) for n, r in asks]
-                                 + _footer(chained)))
+                                 + [say("unattended_way")] + _footer(chained)))
     if asks:
         return {**ask("\n\n".join(r for _, r in asks)), **({"updatedInput": rewrites[0]} if rewrites else {})}
     if allows:
