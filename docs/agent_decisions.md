@@ -737,3 +737,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t052330z
 - A past call with no result yet counts as spent Undo: count only calls with a result ([#410](https://github.com/mark-brannan/languette/pull/410))
+
+### 20261112t052345z
+- Rewrite the already-spent scenarios to show the earlier run in the transcript Undo: restore the seeded-ledger step ([#410](https://github.com/mark-brannan/languette/pull/410))
