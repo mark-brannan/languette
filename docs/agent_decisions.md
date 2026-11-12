@@ -797,3 +797,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t081349z
 - doctor sandbox row: a ! line per setting Claude Code lists as loosening its sandbox, autoAllowBashIfSandboxed left out (prompt, not confinement); read deny row carries a bare line on what a Read deny stops Undo: drop _loosened and READ_REACH in languette/doctor.py ([#416](https://github.com/mark-brannan/languette/pull/416))
+
+### 20261112t081857z
+- doctor sandbox row names unread sources (managed-settings.d, MDM, server-managed, --settings) beneath an on/off row, a ! when a drop-in exists; drop-ins are not merged Undo: drop _unread in languette/doctor.py ([#416](https://github.com/mark-brannan/languette/pull/416))
