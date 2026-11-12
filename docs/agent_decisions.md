@@ -764,3 +764,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t071548z
 - Report only: the doctor reads Claude Code's sandbox and Read deny settings and never writes another tool's settings Undo: revert the line in doctor.py ([#385](https://github.com/mark-brannan/languette/issues/385)) (no PR, branch claude/doctor-layers-385)
+
+### 20261112t071550z
+- Reach: Claude Code's sandbox and Read deny rules only; container egress and secrets brokers are out Undo: revert the line in doctor.py ([#385](https://github.com/mark-brannan/languette/issues/385)) (no PR, branch claude/doctor-layers-385)
