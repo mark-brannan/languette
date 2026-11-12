@@ -241,10 +241,8 @@ command's working directory, stopping at the repo root, else the one in
 parse, that has a key besides `id`, `match`, `cost`, `approve_label` and
 `cheaper`, or that gives two commands the same `id` or `approve_label`,
 denies every command until it is fixed, because the guard can no longer tell what the repo
-meant. Which approvals are spent is read from the transcripts, a subagent's
-included: a click is spent by the first later call that wanted it
-and did not show it never ran. Each spend is logged in
-`<transcript>.languette-ask`, which no guard reads.
+meant. One click pays for one run, read from the session's transcripts; each
+spend is logged in `<transcript>.languette-ask`, which no guard reads.
 
 In an unattended session, an ask is a deny
 (planned: [#164](https://github.com/mark-brannan/languette/issues/164)).

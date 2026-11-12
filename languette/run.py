@@ -296,7 +296,8 @@ def _past_wants(world, env):
     given a past call's payload and whether the human turn's door stood open,
     ({label: runs} the runner would have spent for it, whether it took the door).
     Every guard on for the call judges it again, as _spend would gather them; its
-    Acts are dropped."""
+    Acts are dropped. It assumes the default wiring: a run under `--guard NAME`
+    spent only that guard's labels, which this replay does not know."""
     def wants_of(payload, door):
         doc, replay, wants, took = Document(payload, env), _Replay(world, door), {}, False
         for g in wired("PreToolUse", payload.get("tool_name")):

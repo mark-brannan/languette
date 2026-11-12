@@ -32,6 +32,10 @@ PR_LIST_TIMEOUT = 25                # past the `timeout 20` guard-git-stacked-ba
 SPENT = ".languette-ask"            # appended to the transcript path: the spends' log, never read
 # Seconds the approvals spend waits before its last read: past Claude Code's
 # transcript write timer (100 ms), so a call queued before this hook began is on disk.
+# An assumption about Claude Code, observed and not pinned to a version or its source:
+# a call's tool_use reaches the transcript before, or within this long of, its
+# PreToolUse hooks starting. Re-check it when Claude Code moves; if it fails, two
+# parallel calls can both read one yes and both be let through.
 SETTLE = 0.2
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
