@@ -740,3 +740,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t052345z
 - Rewrite the already-spent scenarios to show the earlier run in the transcript Undo: restore the seeded-ledger step ([#410](https://github.com/mark-brannan/languette/pull/410))
+
+### 20261112t060555z
+- the unattended deny says once, after every guard's ask, that the user makes the call themselves Undo: move the sentence into unattended_ask ([#164](https://github.com/mark-brannan/languette/issues/164)) ([#413](https://github.com/mark-brannan/languette/pull/413))
