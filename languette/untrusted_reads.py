@@ -37,7 +37,7 @@ import re
 from languette import scan as sw
 from languette.paths import config_dir
 from languette.messages import say
-from languette.verdict import NO_PROMPT, NO_QUESTION, Act, Need, ask, deny
+from languette.verdict import Act, Need, ask, deny
 
 FIRST_LINE = 80
 _FETCH = re.compile(r"(?:^|/)fetch\Z")      # BSD fetch, at command position only: never `git fetch`
@@ -62,9 +62,11 @@ _MCP_READ = frozenset("read get list search fetch query find view download expor
 _MCP_WRITE = frozenset("write create update delete add remove push merge set edit post send submit close assign "
                        "request fork transfer lock unlock move rename upload put patch insert reply resolve "
                        "dismiss approve label star unstar archive restore withdraw".split())
-# Modes where an ask would pass the call unseen. dontAsk is left out: it falls
-# through to the ask path, where verdict turns the ask into a deny.
-_UNSEEN_ASK = NO_PROMPT - NO_QUESTION
+# Modes that skip permission prompts, so an ask would pass the send unseen.
+# This guard's own rule, not the runner's unattended one: the user is there,
+# but a prompt is not. dontAsk is left out: it falls through to the ask path,
+# where verdict turns the ask into a deny (languette.verdict.NO_PROMPT).
+_UNSEEN_ASK = frozenset({"bypassPermissions"})
 # SessionStart sources that begin a context without what an earlier one read.
 _FRESH = frozenset({"startup", "clear"})
 _REF = re.compile(r" \[[^\]\n]*\]\Z")

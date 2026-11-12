@@ -140,23 +140,25 @@ Feature: guard-git-stacked-base
     Given the permission mode is "<mode>"
     When the agent runs `git push origin --delete "$b"`
     Then the guard denies, naming "guard-git-stacked-base: this needs the user's approval, and in <mode> no one is there to approve it"
+    And the guard denies, naming "if the call still needs making, the user makes it themselves"
 
     Examples:
-      | mode              |
-      | dontAsk           |
-      | bypassPermissions |
+      | mode    |
+      | dontAsk |
 
+  # bypassPermissions is a user who chose to skip prompts, not an absent one.
   Scenario Outline: an ask where someone can answer it stays an ask
     Given the permission mode is "<mode>"
     When the agent runs `git push origin --delete "$b"`
     Then the guard asks
 
     Examples:
-      | mode        |
-      | default     |
-      | auto        |
-      | acceptEdits |
-      | plan        |
+      | mode              |
+      | default           |
+      | auto              |
+      | acceptEdits       |
+      | plan              |
+      | bypassPermissions |
 
   Scenario: the --head lookup is bounded too
     # The --base lookup is the first gh call and finds nothing for this

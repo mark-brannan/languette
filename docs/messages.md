@@ -19,7 +19,7 @@ approval_lost: languette: another call spent the user's approval while this one 
 
 ```
 ask_first_cannot_look: ask-first: {err}. A gate that cannot look fails closed: retry from the project directory.
-ask_first_invalid: ask-first: {path} is invalid: {err}. Every Bash command is denied until it is fixed, because the guard cannot tell which commands the repo meant to cover. Fix it with the Edit tool, or tell the user.
+ask_first_invalid: ask-first: {path} is invalid: {err}. Every Bash command is denied until it is fixed, because the guard cannot tell which commands the list meant to cover. Fix it with the Edit tool, or tell the user.
 ask_first_times: ; this command runs it {n} times and has {have} unspent
 ask_first_cheaper:  Cheaper forms: {cheaper}.
 ask_first_need: `{id}` ({path}) needs the user's approval for each run{times}. Cost: {cost}.{cheaper} If a cheaper form answers the question, use it instead. Otherwise call AskUserQuestion: give the exact command (`{cmd}`), why it must run now, and the cost above, with one option labelled exactly "{label}" and one to skip. One approval is one run; ask again before running it again.
@@ -386,6 +386,8 @@ signature_graphql_variable: the graphql {field} comes from ${name}, which this h
 signature_wrong: {guard}: this may post a GitHub comment under the user's login, so it must be signed as an agent's, or a reader takes it for the user's own words. Here {problems}. {shape}
 signature_person: {guard}: this posts to GitHub as {login}, a person's account, so a reader takes it for that person's own words. Post it through the agent's GitHub App, whose login ends in [bot].{also}
 signature_mcp_account: {guard}: {tool} posts with its MCP server's own token, and this hook cannot read whose account that is, so it cannot tell that a bot posts it. Post it with gh, through the agent's GitHub App.{also}
+signature_mcp_ask: {guard}: {tool} posts with its MCP server's own token, and this hook cannot read whose account that is. Approve only if that server posts as the agent's GitHub App, whose login ends in [bot].
+signature_mcp_unknown: {guard}: the signed_comments_mcp setting `{rule}` is not one of {rules}, so a post through a GitHub MCP tool is denied. Fix the setting, or empty it to deny such posts.
 signature_account_unread: {guard}: this posts to GitHub, and gh could not say which account it posts as ({got}). Approve only if it posts through the agent's GitHub App, whose login ends in [bot].
 signature_also:  It is not signed as an agent's either: {problems}. {shape}
 ```
@@ -425,6 +427,7 @@ transcript_unreadable: {guard}: cannot read the session transcript to look for t
 
 ```
 unattended_ask: {guard}: this needs the user's approval, and in {mode} no one is there to approve it, so it is denied instead of asked. What it would have asked: {why}
+unattended_way: Don't work around it: if the call still needs making, the user makes it themselves. Say what it is for and hand them the exact call.
 ```
 
 ## unknown
@@ -443,6 +446,12 @@ unparsed: require-well-formed: this command does not parse ({rung}: {err}). Noth
 
 ```
 unreadable_file: cannot be read ({err})
+```
+
+## user
+
+```
+user_config_nowhere: neither $HOME nor $XDG_CONFIG_HOME is set, so the user's {name} cannot be looked for: a gate that cannot look fails closed
 ```
 
 ## wl

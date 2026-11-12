@@ -4,7 +4,7 @@ The runner (run.py) holds one World per payload and asks it for each Need a
 guard yields (languette.verdict.Need lists the kinds), then, after the verdict,
 does each Act (languette.verdict.Act) and spends what the findings ask for
 (languette.verdict.spend). World owns the budget: one timeout per kind of
-fact, the ruleset cache, the spent-file lock.
+fact, the ruleset cache, the wait before an approval is spent.
 Standard library only.
 """
 
@@ -19,6 +19,7 @@ import stat
 import subprocess
 import tempfile
 import time
+from datetime import datetime
 from urllib.parse import quote
 
 from languette import paths
@@ -28,7 +29,14 @@ from languette.verdict import short
 GIT_TIMEOUT = 5
 FORGE_TIMEOUT = 10
 PR_LIST_TIMEOUT = 25                # past the `timeout 20` guard-git-stacked-base wraps gh pr list in
-SPENT = ".languette-ask"            # appended to the transcript path
+SPENT = ".languette-ask"            # appended to the transcript path: the spends' log, never read
+# Seconds the approvals spend waits before its last read: past Claude Code's
+# transcript write timer (100 ms), so a call queued before this hook began is on disk.
+# An assumption about Claude Code, observed and not pinned to a version or its source:
+# a call's tool_use reaches the transcript before, or within this long of, its
+# PreToolUse hooks starting. Re-check it when Claude Code moves; if it fails, two
+# parallel calls can both read one yes and both be let through.
+SETTLE = 0.2
 RECORDS = "decisions.jsonl"         # under $XDG_STATE_HOME/languette
 RECORDS_MAX = 8 << 20               # bytes; past it the file becomes .1, the old .1 goes
 RECORDS_WAIT = 0.1                  # seconds a writer waits on the lock before dropping its record
@@ -54,7 +62,12 @@ SEND_FAILED = '{"subagents": [], "read": "an unknown tool (a state hook failed)"
 class World:
     def __init__(self, env, payload):
         self.env, self.payload = env, payload
-        self._seen = None                      # the transcript's scan; it only grows
+        self._seen = None                      # the transcripts' History (scan), read once
+        # (payload, door open) -> ({label: runs}, door taken): what the runner would have spent
+        # for a past call (run.py sets it); the approvals replay asks it of each.
+        self.wants_of = None
+        self.door_tools = None                 # the tool-name pattern of a call that can take the door (run.py)
+        self._wants = {}                       # (past call, door open) -> wants_of's answer
 
     def answer(self, need):
         if need.kind not in KINDS:
@@ -375,58 +388,90 @@ class World:
         call = self.payload.get("tool_use_id")
         return call if isinstance(call, str) and call else None
 
-    def _approved(self, wants, f):
-        """{label: approvals that are this call's or unspent}, from the spent file `f`
-        (None for none yet), and the ids spent. A click recorded against a call
-        the transcript shows never ran (the user declined it, or a hook denied
-        it) is unspent again; one already recorded against this call counts for
-        it, so one click is one run however often it is asked for."""
-        call = self._call()
-        answers, never_ran = self._scan()
-        held = [r for r in map(_record, f or ()) if r and (r["call"] is None or r["call"] not in never_ran)]
-        spent = {r["approval"] for r in held}
-        approved = {}
-        for label in wants:
-            mine = [r["approval"] for r in held if call and r["call"] == call and r["label"] == label]
-            approved[label] = mine + [i for i in _yes(answers, label) if i not in spent]
-        return approved, spent
+    def _replay(self, labels):
+        """({label: the yeses this call may still spend}, {yes id: the call that spent it}),
+        from the transcripts alone, by the credit rule: the user's yeses to each of `labels`,
+        less those spent by the calls after them and before this one, in transcript order
+        (scan), whose result does not show they never ran. A call with no
+        result yet counts as spent. What a past call spent is what the runner would have
+        spent for it (self.wants_of): every guard's labels at once, one yes per run, the
+        oldest first, and a yes that answered two labels spent for both. A past issue write
+        that took the human turn's door spent no yes. Raises OSError when the payload names
+        no transcript or it cannot be read."""
+        if self.wants_of is None:
+            raise ValueError("no runner to replay the past calls with")
+        hist = self._scan()
+        own = hist.own(self._call())
+        pool, used, door = {label: [] for label in labels}, {}, False
+        for key, kind, *rest in hist.events:
+            if key >= own:
+                break
+            if kind == "prompt":
+                door = True
+            elif kind == "yes":
+                ask_id, answer = rest
+                for label in labels:
+                    if _said(answer, label):
+                        pool[label].append(ask_id)
+            elif kind == "call" and rest[0] not in hist.never_ran and (
+                    any(pool.values()) or (door and self._may_take_door(rest[1]))):
+                if (rest[0], door) not in self._wants:     # the spend's second read judges none again
+                    self._wants[rest[0], door] = self.wants_of(self._past(*rest), door)
+                wants, took = self._wants[rest[0], door]
+                door = door and not took
+                picks = {i for label, n in wants.items() if label in pool for i in pool[label][:n]}
+                for i in picks:
+                    used[i] = rest[0]
+                for label in pool:
+                    pool[label] = [i for i in pool[label] if i not in picks]
+        return pool, used
+
+    def _may_take_door(self, tool):
+        """Whether a past call of this tool could have taken the door; without the
+        runner's pattern (door_tools), any call could."""
+        return self.door_tools is None or self.door_tools.match(tool or "") is not None
+
+    def _past(self, call, name, inp, cwd):
+        """The PreToolUse payload a past call was judged on, as near as the transcript gives it."""
+        p = {k: self.payload[k] for k in ("session_id", "transcript_path", "permission_mode") if k in self.payload}
+        return {**p, "hook_event_name": "PreToolUse", "tool_name": name, "tool_input": inp, "tool_use_id": call,
+                "cwd": cwd if isinstance(cwd, str) and cwd else self.payload.get("cwd")}
 
     def _approvals(self, wants):
         """The approvals this tool call may spend, per label of `wants`
-        ({approve_label: runs}), read under a shared lock and never written.
-        Raises OSError when the payload names no transcript, or it or the spent
-        file cannot be read."""
-        path = self._transcript() + SPENT
-        self._scan()                           # the transcript is read before the lock, not under it
-        try:
-            f = open(path, encoding="utf-8")
-        except FileNotFoundError:              # nothing spent yet
-            return self._approved(wants, None)[0]
-        with f:
-            fcntl.flock(f, fcntl.LOCK_SH)
-            return self._approved(wants, f)[0]
+        ({approve_label: runs}): the user's yeses, less the ones earlier calls spent
+        (_replay). Read only, and nothing is written. Raises OSError when the payload
+        names no transcript or it cannot be read."""
+        return self._replay(wants)[0]
 
     def _claim(self, wants):
-        """The approvals spend: one approval per run of each label in `wants`
-        ({approve_label: runs}, every asking guard's together), recorded against
-        this tool call, atomically. True when every label had its runs' worth,
-        now recorded; False, with nothing recorded, when one fell short (a
-        parallel call spent it since the guard looked). Read, check and record
-        happen under an exclusive lock on the spent file, so parallel hooks
-        cannot both pass on one click. Raises OSError when the payload names no
-        transcript, or it or the spent file cannot be read or written."""
-        call = self._call()
-        with open(self._transcript() + SPENT, "a+", encoding="utf-8") as f:
+        """The approvals spend: True when every label of `wants` ({approve_label:
+        runs}, every asking guard's together) still has its runs' worth, False when
+        one fell short (a parallel call spent it since the guard looked). The
+        transcript is the record of the spend, this call's tool_use and result in
+        it. The read waits SETTLE first, past Claude Code's transcript write timer,
+        and reads afresh, so a parallel call queued before this hook began is on
+        disk and counts, and of two the earlier in transcript order wins. Raises
+        OSError as _approvals does. A spend is then logged (_log_spend)."""
+        time.sleep(SETTLE)
+        self._seen = None
+        approved = self._replay(wants)[0]
+        if short(approved, wants):
+            return False
+        self._log_spend(wants, approved)
+        return True
+
+    def _log_spend(self, wants, approved):
+        """Append what this call spent to <transcript>.languette-ask, one JSON line per
+        yes: a log, which no guard reads. Whole lines, under an exclusive lock. Raises
+        OSError when it cannot be written: the runner denies a spend it cannot record."""
+        call, now = self._call(), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        lines = "".join(json.dumps({"t": now, "label": label, "approval": i, "call": call}) + "\n"
+                        for label, n in wants.items() for i in approved[label][:n])
+        fd = os.open(self._transcript() + SPENT, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
             fcntl.flock(f, fcntl.LOCK_EX)
-            f.seek(0)
-            approved, spent = self._approved(wants, f)
-            if short(approved, wants):
-                return False
-            now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            f.writelines(json.dumps({"t": now, "label": label, "approval": i, "call": call}) + "\n"
-                         for label, n in wants.items() for i in approved[label][:n]
-                         if i not in spent)
-            return True
+            f.write(lines)
 
     def _send_file(self, session):
         return self._session_file(SEND_STATE, session)
@@ -621,19 +666,6 @@ def _own(f):
         raise PermissionError("guard-cross-session-send state is not this user's alone")
 
 
-def _record(line):
-    """One spent-file line: a JSON record, or a bare approval id from before calls
-    were recorded (spent for good)."""
-    line = line.strip()
-    if not line:
-        return None
-    try:
-        r = json.loads(line)
-    except ValueError:
-        return {"label": None, "approval": line, "call": None}
-    return r if isinstance(r, dict) and isinstance(r.get("approval"), str) else None
-
-
 # --- reading a transcript ---------------------------------------------------
 
 def _text(content):
@@ -663,10 +695,6 @@ def _said(answer, label):
     return re.search(r'(?:^|: )' + re.escape(f'"{questions[0]}"="{label}"') + r'(?:\.|$)', text, re.M) is not None
 
 
-def _yes(answers, label):
-    return [i for i, answer in answers if _said(answer, label)]
-
-
 # A call that never ran, by the result Claude Code records for it: the user
 # declined the prompt, a hook or the classifier denied it, or a languette guard
 # did. Any other error is a call that ran and failed, and keeps its click.
@@ -678,31 +706,103 @@ def _never_ran(rec, c):
     return rec.get("toolUseResult") == "User rejected tool use" or _REFUSED.match(_text(c.get("content"))) is not None
 
 
+class History:
+    """A session's transcripts, read once (scan): `events`, each (key, kind, ...) in
+    transcript order, one of
+
+        prompt                        a human's turn (origin.kind human), which opens
+                                      guard-github-issues' door
+        yes     ask id, answer        an AskUserQuestion the user answered: (questions,
+                                      structured answers or None, result text)
+        call    id, name, input, cwd  any other tool call
+
+    and `never_ran`, the ids of calls whose result shows they never ran. A key is
+    (time, file, line, block): the entry's timestamp, or the last one before it in its
+    file, so the main transcript and each subagent's interleave as they were made."""
+
+    __slots__ = ("events", "never_ran", "calls")
+
+    def __init__(self, events, never_ran, calls):
+        self.events, self.never_ran, self.calls = events, never_ran, calls
+
+    def own(self, call):
+        """Where `call` stands in the order: its tool_use's key, or now when the
+        transcript does not show it yet, so every entry on disk comes before it."""
+        return self.calls.get(call) or (time.time(), -1, -1, -1)
+
+
+def transcripts(transcript):
+    """The session's transcript files: the main one, then each subagent's
+    (<transcript, less .jsonl>/subagents/*.jsonl), by name."""
+    base = transcript[:-len(".jsonl")] if transcript.endswith(".jsonl") else transcript
+    return [transcript] + sorted(glob.glob(os.path.join(glob.escape(base), "subagents", "*.jsonl")))
+
+
+def _when(rec, last):
+    ts = rec.get("timestamp")
+    if isinstance(ts, str):
+        try:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            pass
+    return last
+
+
+def _prompt(rec, content):
+    """A human's own turn: not a tool result, not Claude Code's meta text. Claude Code
+    2.1.319 and 2.1.321 mark an interactive turn `origin.kind` human and a notification
+    with another kind; a headless or older transcript has no `origin`, and there the
+    shape stands: a user record, not meta, with no tool result."""
+    origin = rec.get("origin")
+    return (rec.get("type") == "user" and (origin is None or isinstance(origin, dict) and origin.get("kind") == "human")
+            and not rec.get("isMeta") and not any(isinstance(c, dict) and c.get("type") == "tool_result"
+                                                  for c in (content if isinstance(content, list) else ())))
+
+
 def scan(transcript):
-    """(answers, never_ran) from a transcript: answers is [(ask id, (questions,
-    structured answers or None, result text))] for each AskUserQuestion the user
-    answered, never_ran the ids of tool calls whose result shows they never ran."""
-    asks, answers, never_ran = {}, [], set()
-    with open(transcript, encoding="utf-8") as f:
-        for line in f:
-            try:
-                rec = json.loads(line)
-            except ValueError:
-                continue
-            msg = rec.get("message") if isinstance(rec, dict) else None
-            content = msg.get("content") if isinstance(msg, dict) else None
-            if not isinstance(content, list):
-                continue
-            for c in content:
-                if not isinstance(c, dict):
+    """The History of the session whose main transcript is `transcript`. Raises
+    OSError when that file cannot be read; a subagent's file gone since it was
+    listed is skipped."""
+    asks, events, never_ran, calls = {}, [], set(), {}
+    for rank, path in enumerate(transcripts(transcript)):
+        try:
+            f = open(path, encoding="utf-8")
+        except FileNotFoundError:
+            if not rank:
+                raise
+            continue
+        t = float("-inf")
+        with f:
+            for n, line in enumerate(f):
+                try:
+                    rec = json.loads(line)
+                except ValueError:
                     continue
-                if c.get("type") == "tool_use" and c.get("name") == "AskUserQuestion":
-                    asks[c.get("id")] = _questions(c.get("input"))
-                elif c.get("type") == "tool_result" and c.get("is_error"):
-                    if _never_ran(rec, c):
-                        never_ran.add(c.get("tool_use_id"))
-                elif c.get("type") == "tool_result" and c.get("tool_use_id") in asks:
-                    tur = rec.get("toolUseResult")
-                    structured = tur["answers"] if isinstance(tur, dict) and isinstance(tur.get("answers"), dict) else None
-                    answers.append((c["tool_use_id"], (asks[c["tool_use_id"]], structured, _text(c.get("content")))))
-    return answers, never_ran
+                if not isinstance(rec, dict):
+                    continue
+                t = _when(rec, t)
+                msg = rec.get("message")
+                content = msg.get("content") if isinstance(msg, dict) else None
+                if _prompt(rec, content) and content:
+                    events.append(((t, rank, n, -1), "prompt"))
+                if not isinstance(content, list):
+                    continue
+                for j, c in enumerate(content):
+                    if not isinstance(c, dict):
+                        continue
+                    key = (t, rank, n, j)
+                    if c.get("type") == "tool_use" and c.get("name") == "AskUserQuestion":
+                        asks[c.get("id")] = _questions(c.get("input"))
+                    elif c.get("type") == "tool_use" and isinstance(c.get("id"), str) and c["id"] not in calls:
+                        calls[c["id"]] = key
+                        events.append((key, "call", c["id"], c.get("name"), c.get("input"), rec.get("cwd")))
+                    elif c.get("type") == "tool_result" and c.get("is_error"):
+                        if _never_ran(rec, c):
+                            never_ran.add(c.get("tool_use_id"))
+                    elif c.get("type") == "tool_result" and c.get("tool_use_id") in asks:
+                        tur = rec.get("toolUseResult")
+                        structured = tur["answers"] if isinstance(tur, dict) and isinstance(tur.get("answers"), dict) else None
+                        events.append((key, "yes", c["tool_use_id"],
+                                       (asks[c["tool_use_id"]], structured, _text(c.get("content")))))
+    events.sort(key=lambda e: e[0])
+    return History(events, never_ran, calls)

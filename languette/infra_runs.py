@@ -4,7 +4,8 @@ yes to it, once, through AskUserQuestion. The spec is features/guard-infra.featu
 
 The approval is ask-first's: an AskUserQuestion whose answer (not the
 question, which is the agent's text) is exactly the rule's label, spent
-through <transcript>.languette-ask, one click for one run. A command that runs
+by the first later call that runs the rule, as the transcript shows it, one
+click for one run. A command that runs
 a rule twice needs two approvals; one inside a loop or xargs is denied
 outright. Unlike ask-first, the list is built in, not the repo's.
 

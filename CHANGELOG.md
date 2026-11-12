@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.0.25](https://github.com/mark-brannan/languette/compare/v0.0.24...v0.0.25) (2026-11-12)
+
+
+### Features
+
+* **ask-first:** a user list beside the repo's, and except words ([#414](https://github.com/mark-brannan/languette/issues/414)) ([a2ad15f](https://github.com/mark-brannan/languette/commit/a2ad15f3cdaa41c4480c343969d159ae092dd49d))
+* **verdict:** an unattended ask's deny leaves the call to the user ([#413](https://github.com/mark-brannan/languette/issues/413)) ([fb21a8b](https://github.com/mark-brannan/languette/commit/fb21a8b4c336c7e25310bbc297c5a4f68ca8ffe9))
+
+
+### Documentation
+
+* **decisions:** a repo rule's why stays agent-facing, bounded ([#415](https://github.com/mark-brannan/languette/issues/415)) ([09b5677](https://github.com/mark-brannan/languette/commit/09b56772171a8ff71fb1e060509601d67922868f))
+
+## [0.0.24](https://github.com/mark-brannan/languette/compare/v0.0.23...v0.0.24) (2026-11-12)
+
+
+### Bug Fixes
+
+* **approvals:** read who spent a yes from the transcripts alone ([#410](https://github.com/mark-brannan/languette/issues/410)) ([2210528](https://github.com/mark-brannan/languette/commit/22105280b8a593314bf39720a1801b947511ae6c))
+
+## [0.0.23](https://github.com/mark-brannan/languette/compare/v0.0.22...v0.0.23) (2026-11-12)
+
+
+### Features
+
+* **guard-signed-comments:** signed_comments_mcp setting for MCP comment posts ([#408](https://github.com/mark-brannan/languette/issues/408)) ([9fd4cb0](https://github.com/mark-brannan/languette/commit/9fd4cb0a902b02a8ccd36c83dc67ce3bb5a0e009))
+
 ## [0.0.22](https://github.com/mark-brannan/languette/compare/v0.0.21...v0.0.22) (2026-11-12)
 
 

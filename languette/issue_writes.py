@@ -17,8 +17,8 @@ when the call names one, with its repo when the call does too ("File this
 issue", "Delete issue o/r#7", "Delete issue 7"). A yes
 to file opens no delete, and a yes to delete issue 7 opens no other. Each yes
 allows one write and is spent the way ask-first spends one
-(languette.verdict.claim), so several in a row take one question
-each.
+(languette.world.World._replay), so several in a row take one question
+each. A write that took the human turn's door spent no yes.
 
 Counts as an identifier write: `gh issue create|new|transfer|delete`; `gh api`
 POST to repos/o/r/issues; a graphql createIssue, transferIssue or deleteIssue;

@@ -227,7 +227,9 @@ is denied whatever you approved. Only your click counts, never what the agent
 wrote in the question.
 
 A match may also name `"flags"`, single option letters the command must carry
-(`{"cmd": "rm", "flags": ["r"]}` matches `rm -rf x`).
+(`{"cmd": "rm", "flags": ["r"]}` matches `rm -rf x`), and `"except"`, whole
+arguments that exempt a run (`["--help"]`); list only a flag the program
+honours.
 
 Matching sees through wrappers: `timeout 3h npm run e2e`, `sh -c "..."`,
 `pnpm exec node ./scripts/e2e.mjs` and `yarn e2e` all count, while `grep`,
@@ -237,15 +239,17 @@ seen.
 
 The guard reads the nearest `.languette/ask-first.json` at or above the
 command's working directory, stopping at the repo root, else the one in
-`$CLAUDE_PROJECT_DIR`. With no file, it stays silent. A file that doesn't
+`$CLAUDE_PROJECT_DIR`. Your own list, `~/.config/languette/ask-first.json`,
+applies in every repo, and a repo's never loosens it. With no file,
+it stays silent. A file that doesn't
 parse, that has a key besides `id`, `match`, `cost`, `approve_label` and
 `cheaper`, or that gives two commands the same `id` or `approve_label`,
-denies every command until it is fixed, because the guard can no longer tell what the repo
-meant. Spent approvals are kept beside the session transcript, in
-`<transcript>.languette-ask`.
+denies every command until it is fixed, because the guard can no longer tell what the list
+meant. One click pays for one run, read from the transcripts; each
+spend is logged in `<transcript>.languette-ask`, which no guard reads.
 
-In an unattended session, an ask is a deny
-(planned: [#164](https://github.com/mark-brannan/languette/issues/164)).
+In `dontAsk`, where no question reaches you, the guard says so and leaves
+the run to you.
 
 ## Deny always
 
@@ -257,7 +261,7 @@ A repo lists the commands it forbids in `.languette/deny-always.json`:
   "why": "production is reached through the release job, never by hand"}]}
 ```
 
-Matches, lookup and a broken file work as for ask-first; `{"cmd":
+Matches, lookup, your own list and a broken file work as for ask-first; `{"cmd":
 "terraform"}` alone forbids the whole program.
 
 ## Configuration
@@ -345,7 +349,8 @@ example `you,your-app`; empty, the default, counts the gh login alone.
 
 `guard-signed-comments` is experimental. On, it denies any comment not posted
 from a bot's account (a GitHub App's, its login ending in `[bot]`), and any
-through a GitHub MCP tool, whose account it cannot read. It checks a signature
+through a GitHub MCP tool, whose account it cannot read, unless
+`signed_comments_mcp` says `ask` or `allow` (`deny` is the default). It checks a signature
 only for the settings you give it: `signed_comments_opening` and
 `signed_comments_signature` are empty by default, and empty checks nothing.
 
@@ -368,7 +373,6 @@ reads back to reach a verdict:
 | `$TMPDIR/languette-guard-github-issues.<session>` (and `.held`) | `guard-github-issues` | on | one issue write per human turn |
 | `$TMPDIR/languette-guard-cross-session-send.<session>` | `guard-cross-session-send` | on | whether untrusted content has been read, and which subagents are its own |
 | `$TMPDIR/languette-guard-worktrees.<session>[.<agent>]` (and `.arrive`) | `guard-worktrees`; read by `guard-git-work-loss` | opt-in | which linked worktrees were entered |
-| `<transcript>.languette-ask` | `ask-first`, `guard-infra`, `guard-bypass-hooks`, `guard-github-issues` | on | which approvals are already spent |
 | `~/.cache/languette/rulesets/<repo>/<branch>` | `guard-bypass-ruleset` | on | skipping the GitHub call for an hour after "needs a PR" |
 
 The second is what no verdict reads back:
@@ -377,6 +381,7 @@ The second is what no verdict reads back:
 |---|---|---|---|
 | `~/.config/languette/redacted-terms.tsv` | `guard-private-terms` | on | your configuration; written at SessionStart only when missing |
 | `~/.local/state/languette/decisions.jsonl` | `record_decisions` | opt-in | for you to read |
+| `<transcript>.languette-ask` | `ask-first`, `guard-infra`, `guard-bypass-hooks`, `guard-github-issues` | on | a log of which call spent which approval |
 
 The plugin cleans up none of these: no hook runs at session end.
 
