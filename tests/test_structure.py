@@ -69,14 +69,15 @@ KNOWN_PAYLOAD_READS = {"posts": 1}
 # Answers whose text is anything but a messages.say call, at most, per guard.
 KNOWN_INLINE_TEXT = {}
 # What a guard may ask of World that languette did not write: git, GitHub, the filesystem, the clock.
-FACT_KINDS = {"git", "forge-api", "pr-list", "which", "read", "path", "physical", "clock", "run", "hostname"}
+# approvals: the user's yeses, and who spent them, read from Claude Code's own transcripts.
+FACT_KINDS = {"git", "forge-api", "pr-list", "which", "read", "path", "physical", "clock", "run", "hostname",
+              "approvals"}
 # The facts a verdict reads back from something languette wrote on an earlier call (read-after-write),
 # today's, as the README's "What languette writes" lists them. The list only shrinks: a new fact kind
 # is a read-after-write until it is shown to be one of FACT_KINDS.
 KNOWN_READ_AFTER_WRITE = {"door": "languette-guard-github-issues.<session>",
                           "send-state": "languette-guard-cross-session-send.<session>",
                           "worktree": "languette-guard-worktrees.<session>",
-                          "approvals": ".languette-ask",
                           "ruleset-cache": "languette/rulesets/"}
 # The acts and spends World makes after a verdict, at most (run.py's _state_failed writes outside them).
 KNOWN_WRITES = {"door-open", "door-spend", "send-keep", "send-fail", "worktree-keep", "worktree-leave", "ruleset-keep",

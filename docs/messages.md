@@ -393,7 +393,7 @@ signature_also:  It is not signed as an agent's either: {problems}. {shape}
 ## spend
 
 ```
-spend_failed: languette: cannot record the user's approval as spent ({guards}: {err}), so this call is denied. Ask the user to run it themselves.
+spend_failed: languette: cannot spend the user's approval ({guards}: {err}), so this call is denied. Ask the user to run it themselves.
 ```
 
 ## sudo

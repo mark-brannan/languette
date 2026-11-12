@@ -71,8 +71,9 @@ def pipeline(engine, request, monkeypatch):
         yield
         return
     io = {}
-    state = {"in": 0, "scans": None, "ladder": None}
+    state = {"in": 0, "scans": None, "ladder": None, "replay": False}
     real_finding, real_respond, real_parse, real_scan = run._finding, run.respond, scan.parse, scan.Scan
+    real_past = run._past_wants
 
     class Counted(real_scan):
         def __init__(self, text):
@@ -86,7 +87,23 @@ def pipeline(engine, request, monkeypatch):
         return real_parse(text, words)
 
     def finding(g, doc, world, acts):
-        return real_finding(g, doc, _Counted(world, io), acts)
+        # A replay starts no program (run._Replay refuses those Needs): nothing to pin.
+        return real_finding(g, doc, world if state["replay"] else _Counted(world, io), acts)
+
+    def past_wants(world, env):
+        # A past call the approvals replay judges again is a call of its own: parsed once too.
+        inner = real_past(world, env)
+
+        def wants_of(payload, door):
+            outer = state["scans"], state["ladder"]
+            state.update(scans={}, ladder=[], replay=True)
+            try:
+                return inner(payload, door)
+            finally:
+                state["replay"] = False
+                _parsed_once(state)
+                state["scans"], state["ladder"] = outer
+        return wants_of
 
     def respond(stdin_text, env, only=None):
         state.update(scans={}, ladder=[])
@@ -95,15 +112,14 @@ def pipeline(engine, request, monkeypatch):
             out = real_respond(stdin_text, env, only)
         finally:
             state["in"] -= 1
-        twice = {t: n for t, n in state["scans"].items() if n > 1}
-        assert not twice, f"scanned more than once in one call: {twice}"
-        assert len(state["ladder"]) <= 1, f"the parser ladder ran {len(state['ladder'])} times in one call"
+        _parsed_once(state)
         return out
 
     stand_in(monkeypatch, "Scan", Counted)
     stand_in(monkeypatch, "parse", parse)
     monkeypatch.setattr(run, "_finding", finding)
     monkeypatch.setattr(run, "respond", respond)
+    monkeypatch.setattr(run, "_past_wants", past_wants)
     yield
     rep = getattr(request.node, "_pipeline_call", None)
     if rep is None or not rep.passed:
@@ -118,6 +134,12 @@ def pipeline(engine, request, monkeypatch):
     assert got == want, (f"{key}: programs and forge calls {got}, pinned {want} in {PINS.name}. One more git or "
                          "network call per guard shows here; if it is meant, LANGUETTE_PIN_IO=update pytest "
                          "--full -n 0 tests/test_features.py")
+
+
+def _parsed_once(state):
+    twice = {t: n for t, n in state["scans"].items() if n > 1}
+    assert not twice, f"scanned more than once in one call: {twice}"
+    assert len(state["ladder"]) <= 1, f"the parser ladder ran {len(state['ladder'])} times in one call"
 
 
 def refuse_partial_update(config):

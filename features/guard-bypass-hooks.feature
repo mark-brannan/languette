@@ -232,10 +232,8 @@ Feature: guard-bypass-hooks
         """
         {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Run `git push --no-verify`?", "header": "Hooks", "multiSelect": false, "options": [{"label": "Skip hooks once", "description": "skip once"}, {"label": "Fix it", "description": ""}]}]}}]}}
         {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Run `git push --no-verify`?\"=\"Skip hooks once\". You can now continue with the user's answers in mind."}]}}
-        """
-      And the approvals already spent are:
-        """
-        toolu_A
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_R", "name": "Bash", "input": {"command": "git push --no-verify"}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_R", "content": "done"}]}}
         """
       When the agent runs `git push --no-verify`
       Then the guard denies
@@ -248,10 +246,8 @@ Feature: guard-bypass-hooks
         {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Run `git push --no-verify`?\"=\"Skip hooks once\". You can now continue with the user's answers in mind."}]}}
         {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_B", "name": "AskUserQuestion", "input": {"questions": [{"question": "Run `git push --no-verify`?", "header": "Hooks", "multiSelect": false, "options": [{"label": "Skip hooks once", "description": "skip once"}, {"label": "Fix it", "description": ""}]}]}}]}}
         {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_B", "content": "User has answered your questions: \"Run `git push --no-verify`?\"=\"Skip hooks once\". You can now continue with the user's answers in mind."}]}}
-        """
-      And the approvals already spent are:
-        """
-        toolu_A
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_R", "name": "Bash", "input": {"command": "git push --no-verify"}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_R", "content": "done"}]}}
         """
       When the agent runs `git push --no-verify`
       Then the guard is silent

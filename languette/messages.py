@@ -33,7 +33,7 @@ MESSAGES = {
         "so this call is denied. Ask the user again."
     ),
     "spend_failed": (
-        "languette: cannot record the user's approval as spent ({guards}: {err}), so this call is "
+        "languette: cannot spend the user's approval ({guards}: {err}), so this call is "
         "denied. Ask the user to run it themselves."
     ),
     # Appended once to a deny of a command with more than one segment (languette.verdict.verdict).

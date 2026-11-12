@@ -128,11 +128,6 @@ def _no_transcript(ctx):
     (ctx.proj / "t.jsonl").unlink()
 
 
-@given("the approvals already spent are:")
-def _spent(ctx, docstring):
-    (ctx.proj / "t.jsonl.languette-ask").write_text(docstring + "\n")
-
-
 @given(parsers.re(r'(?P<var>[A-Z][A-Z0-9_]*) is "(?P<value>.*)"'))
 def _setenv(ctx, var, value):
     ctx.env[var] = value
@@ -595,21 +590,36 @@ def _still_holds(ctx, target, content):
     assert Path(ctx.expand(target)).read_text() == content
 
 
+def _labels(answer):
+    """The labels one AskUserQuestion's answer gave, read as languette.world._said reads them."""
+    questions, structured, text = answer
+    if structured is not None:
+        return {v for q, v in structured.items() if q in questions and isinstance(v, str)}
+    if len(questions) != 1:
+        return set()
+    return set(re.findall(r'(?:^|: )' + re.escape(f'"{questions[0]}"="') + r'(.*?)"(?:\.|$)', text, re.M))
+
+
 def _spent_records(ctx):
-    f = ctx.proj / "t.jsonl.languette-ask"
-    return [json.loads(line) for line in f.read_text().splitlines() if line.strip()] if f.exists() else []
+    """{yes id: the call that spent it}, replayed from the transcript the way the runner replays it,
+    for a call that comes after every one so far."""
+    env = {"HOME": os.environ["HOME"], **ctx.scenario_env()}
+    w = world.World(env, {**json.loads(ctx.stdin), "tool_use_id": "toolu_after"})
+    w.wants_of = run._past_wants(w, env)
+    labels = {label for _, kind, *rest in w._scan().events if kind == "yes" for label in _labels(rest[1])}
+    return w._replay(labels)[1]
 
 
 @then("no approval is spent")
 def _none_spent(ctx):
-    assert _spent_records(ctx) == []
+    assert _spent_records(ctx) == {}
 
 
 @then(parsers.parse('the one approval "{approval}" is spent, on one call'))
 def _one_spent(ctx, approval):
-    recs = _spent_records(ctx)
-    assert {r["approval"] for r in recs} == {approval}, recs
-    assert len({r["call"] for r in recs}) == 1, recs
+    used = _spent_records(ctx)
+    assert set(used) == {approval}, used
+    assert len(set(used.values())) == 1, used
 
 
 @then("the decision record is empty")
