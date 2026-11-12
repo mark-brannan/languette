@@ -9,8 +9,8 @@ segment is led by a shell, so `echo ... | sh` is executed text).
 import re
 
 from . import ladder                           # ladder.parse, so a stand-in for it reaches this call too
-from .quoting import ansi_c, _ASSIGN, _sub_end
-from .lexicon import SHELL, _FIND_EXECS, _FIND_WRAPPERS
+from .quoting import ansi_c, UNREADABLE, _ASSIGN, _sub_end
+from .lexicon import basename, SHELL, _FIND_EXECS, _FIND_WRAPPERS
 from .ladder import RunFailed, TooBig, Unparseable
 
 
@@ -210,9 +210,9 @@ class Scan:
             i -= 1
         while i < n and self.k[i] == "w" and (
                 _ASSIGN.match(self.w[i]) or self.w[i].startswith("-")
-                or self.w[i].rsplit("/", 1)[-1] in _FIND_WRAPPERS):
+                or basename(self.w[i]) in _FIND_WRAPPERS):
             i += 1
-        if i >= n or self.k[i] != "w" or self.w[i].rsplit("/", 1)[-1] != "find":
+        if i >= n or self.k[i] != "w" or basename(self.w[i]) != "find":
             return False
         return any(self.k[x] == "w" and self.w[x] in _FIND_EXECS for x in range(i + 1, n))
 
@@ -238,6 +238,10 @@ class Scan:
                     break
                 self._cur += b[i + 1:e]
                 i = e + 1
+                continue
+            if c == "$" and at(i + 1) == "$":      # $$ is the shell's PID, so a ' after it opens a plain quote
+                self._cur += "$$"; self._have = self._livecur = True
+                i += 2
                 continue
             if c == "$" and at(i + 1) == "'":      # $'...': ANSI-C quoting, to the next unescaped '
                 self._quoted = self._have = True
@@ -316,10 +320,6 @@ def seg_cmd(s, a, b):
         if not _ASSIGN.match(s.w[i]):
             return i
     return None
-
-
-# A word the shell would still expand, glob or brace-expand, so its text is not yet its value.
-UNREADABLE = re.compile(r"[$`*?\[{]")
 
 
 def word_live(s, i):

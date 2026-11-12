@@ -5,10 +5,11 @@ front ends and the process killers.
 
 import difflib
 import fnmatch
-import os
 import re
 
-from .forges import GH_API_FIELDS, GH_API_VALUED, GH_METHOD_FLAGS, GH_REPO_FLAGS
+from . import reshape
+from .lexicon import basename
+from .messages import say
 from .texts import cmd_index
 
 
@@ -38,7 +39,7 @@ SERVICE_STOPS = {v: [] for v in sorted(_CTL_STOP | {"force-reload", "force-stop"
 # The SysV front ends; an init script under /etc/init.d is the fourth, the `script` of its description.
 SYSV_CMDS = ("service", "invoke-rc.d", "rc-service")
 
-# Program descriptions (docs/design/guard-rules.md, "A program description"): how a command rule
+# The stop programs' descriptions (docs/design/guard-rules.md, "A program description"): how a stop rule
 # reads a program's words. `valued`: options that take a value, so the value is no operand;
 # `flags`: options that take none; any other option before the first operand leaves the verb unknown.
 # `away`: options that send the call to another manager or host, so it stops nothing here.
@@ -66,29 +67,6 @@ PROGRAMS = {
                                    "--quiet --regexp --verbose --version --wait --ignore-case".split()),
                 "unit": "operand", "pattern": "name", "regex": {"-r", "--regexp"}, "fold": {"-I", "--ignore-case"},
                 "signal": True, "opaque": True},
-    # Descriptions that name only `valued`, read by operands(): an option outside it is a flag.
-    "terragrunt": {"valued": frozenset(
-        "--terragrunt-config --config --terragrunt-working-dir --working-dir --terragrunt-download-dir "
-        "--download-dir --terragrunt-iam-role --iam-assume-role --terragrunt-parallelism --parallelism "
-        "--terragrunt-include-dir --queue-include-dir --terragrunt-exclude-dir --queue-exclude-dir "
-        "--terragrunt-log-level --log-level --terragrunt-source --source".split())},
-    "pulumi": {"valued": frozenset("--color --cwd -C --profiling --tracing --memprofilerate --verbose -v".split())},
-    "cdk": {"valued": frozenset("-a --app -c --context -p --plugin --profile -r --role-arn -o --output --proxy "
-                                "--ca-bundle-path --toolkit-stack-name --build --lookups --notices".split())},
-    "aws": {"valued": frozenset("--profile --region --endpoint-url --output --query --ca-bundle --cli-read-timeout "
-                                "--cli-connect-timeout --color --cli-binary-format".split())},
-    "kubectl": {"valued": frozenset(
-        "-n --namespace --context --kubeconfig --cluster --user -s --server --token --as --as-group "
-        "--as-uid --certificate-authority --client-certificate --client-key --cache-dir "
-        "--request-timeout --tls-server-name --username --password --profile --profile-output "
-        "--log-flush-frequency -v --v --vmodule".split())},
-    "helm": {"valued": frozenset("-n --namespace --kube-context --kubeconfig --kube-apiserver --kube-token "
-                                 "--kube-as-user --kube-as-group --kube-ca-file --kube-tls-server-name "
-                                 "--registry-config --repository-cache --repository-config --burst-limit "
-                                 "--qps".split())},
-    # A push takes any unambiguous prefix of a long option; --exec is --receive-pack.
-    "git push": {"valued": frozenset("-o --push-option --repo --receive-pack --exec".split())},
-    "gh api": {"valued": frozenset(GH_REPO_FLAGS + GH_METHOD_FLAGS + GH_API_FIELDS + ("--input",)) | GH_API_VALUED},
 }
 _SIGNAL = re.compile(r"-(?:[0-9]+|(?:SIG)?[A-Z][A-Z0-9+-]+)\Z")
 
@@ -183,14 +161,14 @@ def stop_of(s, a, b, match, hit, host_verbs=()):
             arg = sh is not None and next((i for i in range(sh + 1, b + 1)
                                            if s.k[i] != "w" or not s.w[i].startswith("-")), None)
             g = arg if arg and s.k[arg] == "w" and script.search(s.w[arg]) else None
-        own = g is not None and os.path.basename(s.w[g])
+        own = g is not None and basename(s.w[g])
     if g is None:
         return None
     got = _read(s, g, b, prog)
     if got is None:
         return None
     ops, opts, words, known = got
-    head, verbs = s.w[g] if own else os.path.basename(s.w[g]), match.get("verbs", {})
+    head, verbs = s.w[g] if own else basename(s.w[g]), match.get("verbs", {})
     if prog["unit"] == "after":
         if known and ops and ops[0] in prog.get("reads", ()):
             return None
@@ -219,9 +197,11 @@ def stop_of(s, a, b, match, hit, host_verbs=()):
         ops.append(_Dark("`"))                 # a backtick substitution ends the segment: its words are elsewhere
     how = "regex" if any(o in opts for o in prog.get("regex", ())) else prog["pattern"]
     fold = any(o in opts for o in prog.get("fold", ()))
-    unit = next((u for u in ops if isinstance(u, _Dark) or hit(u, "name" if isinstance(u, _Path) else how, fold)),
-                None)
-    return None if unit is None else (head, unit)
+    for u in ops:
+        got = isinstance(u, _Dark) or hit(u, "name" if isinstance(u, _Path) else how, fold)
+        if got:
+            return head, got if isinstance(got, str) else u
+    return None
 
 
 def _opens_backtick(s, b):
@@ -243,17 +223,23 @@ def _may_match(pat, names, fold):
     or a word or path part of it, finds one of the names, or holds one, or a literal run of it (three
     characters or more) is part of a name or shares all but two of one's. It is tried without its
     anchors too, since a process's name or command line is not the unit's name (`^postgres$`
-    selects PostgreSQL's daemon); that try only adds hits. One that does not compile fails closed."""
+    selects PostgreSQL's daemon); that try only adds hits. Each regex passes the terms files'
+    screen (reshape.refusal) before it runs: one the screen refuses, a pattern that does not
+    compile among them, fails closed, and the hit is the screen's reason."""
     flags = re.I if fold else 0
 
     def finds(p):
-        parts = {p} | {f for f in re.split(r"[\s/]+", p) if f}
-        return any(re.search(f, n, flags) for f in parts for n in names)
-    try:                                       # dropping anchors may break `\$`: that fails closed too
-        if finds(pat) or finds(re.sub(r"\\[AZbB]|[\^$]", "", pat)):
-            return True
-    except re.error:
-        return True
+        for f in dict.fromkeys([p] + [f for f in re.split(r"[\s/]+", p) if f]):
+            why = reshape.refusal(f)
+            if why:
+                return say("protected_pattern_refused", pattern=f, why=why) if f == pat else True
+            if any(re.search(f, n, flags) for n in names):
+                return True
+        return False
+    # Dropping the anchors may break `\$`: the screen refuses that too.
+    got = finds(pat) or finds(re.sub(r"\\[AZbB]|[\^$]", "", pat))
+    if got:
+        return got
     low = pat.lower() if fold else pat
     names = {n.lower() if fold else n for n in names}
     if any(n in low for n in names):
