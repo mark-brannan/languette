@@ -404,7 +404,7 @@ def configs_row(options, cwd):
             lines.append(line(WARN, f"{where}: {one_line(why)}; {opt} is off, so nothing reads it", *mend))
     for label, where in shared.items():
         names = " and ".join(host.tilde(p) for p in where)
-        lines.append(line(WARN, f"approve_label '{one_line(label)}' is in both {names}: one click pays for a run of either",
+        lines.append(line(WARN, f"approve_label '{one_line(label)}' is in both {names}: one click pays for a run of both",
                           line("", f"to fix: give one of them its own approve_label, in {host.tilde(where[-1])} "
                                    f"or {host.tilde(where[0])}")))
     if deny_all:

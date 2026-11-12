@@ -347,7 +347,9 @@ def user_rules(env, name, *args, **kwargs):
     path), or (path, None) when there is none. Raises Refuse when the file is there and does
     not load: a broken user file is as unreadable as a broken repo file."""
     path = user_config(env, name)
-    if not path or not (yield Need("path", "lexists", path)):
+    if not path:
+        raise Refuse(say("user_config_nowhere", name=name))
+    if not (yield Need("path", "lexists", path)):
         return path, None
     return path, (yield from read_rules(path, *args, **kwargs))
 

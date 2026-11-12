@@ -525,6 +525,13 @@ Feature: ask-first
       When the agent runs `npm run e2e`
       Then the guard denies, naming "{TMP}/xdg/languette/ask-first.json"
 
+    @also_deny-always @also_guard-recursive-delete @also_guard-permissions @also_guard-disks @also_guard-worktrees
+    Scenario: with no HOME and no XDG_CONFIG_HOME the guard cannot look for the user's list and denies
+      Given XDG_CONFIG_HOME is unset
+      And HOME is ""
+      When the agent runs `ls`
+      Then the guard denies, naming "fails closed"
+
     Scenario: the user's list asks outside any project
       Given CLAUDE_PROJECT_DIR is unset
       And the working directory is "/"
@@ -570,11 +577,11 @@ Feature: ask-first
       When the agent runs `npm run e2e -- --help`
       Then the guard denies, naming "{TMP}/xdg/languette/ask-first.json"
 
-    Scenario: a label both files give is one button, not a deny
+    Scenario: a label both files give is one button: each run spends a yes
       Given the file ".languette/ask-first.json" holds:
         """
-        {"commands": [{"id": "e2e-repo",
-          "match": [{"cmd": "npm", "args": ["run", "e2e"]}],
+        {"commands": [{"id": "walk",
+          "match": [{"cmd": "npm", "args": ["run", "walk"]}],
           "cost": "c",
           "approve_label": "Run e2e"}]}
         """
@@ -585,7 +592,23 @@ Feature: ask-first
         """
       When the agent runs `npm run e2e`
       Then the guard is silent
-      When the agent runs it again
+      When the agent runs `npm run walk`
+      Then the guard denies
+
+    Scenario: one yes does not pay for both commands of a shared label
+      Given the file ".languette/ask-first.json" holds:
+        """
+        {"commands": [{"id": "walk",
+          "match": [{"cmd": "npm", "args": ["run", "walk"]}],
+          "cost": "c",
+          "approve_label": "Run e2e"}]}
+        """
+      Given the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Run `npm run e2e` (e2e)?", "header": "Walk", "multiSelect": false, "options": [{"label": "Run e2e", "description": "46 min"}, {"label": "Skip", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Run `npm run e2e` (e2e)?\"=\"Run e2e\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `npm run e2e && npm run walk`
       Then the guard denies
 
     Scenario Outline: a user list that does not load denies every command, naming the file

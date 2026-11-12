@@ -447,6 +447,12 @@ unparsed: require-well-formed: this command does not parse ({rung}: {err}). Noth
 unreadable_file: cannot be read ({err})
 ```
 
+## user
+
+```
+user_config_nowhere: neither $HOME nor $XDG_CONFIG_HOME is set, so the user's {name} cannot be looked for: a gate that cannot look fails closed
+```
+
 ## wl
 
 ```

@@ -42,6 +42,7 @@ MESSAGES = {
         "run each command in its own Bash call."
     ),
     "guard_crashed": "{guard}: guard crashed ({kind}: {err}), cannot inspect the command",
+    "user_config_nowhere": "neither $HOME nor $XDG_CONFIG_HOME is set, so the user's {name} cannot be looked for: a gate that cannot look fails closed",
     "home_not_absolute": "{guard}: $HOME is not an absolute path, cannot resolve targets",
     "too_many": (
         "require-well-formed: this command is too big to check: {err}. Nothing ran. "

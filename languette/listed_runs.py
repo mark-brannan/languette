@@ -42,7 +42,7 @@ Approval is in the transcript: an AskUserQuestion tool_use whose answer
 the question's text is the agent's and proves nothing. approve_labels are
 unique within a file, so one click approves one command. A label both files
 give is one button, which a run of either spends: the doctor warns of it,
-and the guard counts the widest run it is wanted for. Each approval
+and the guard adds the runs wanted of each. Each approval
 allows one run: the first later call that runs the command, in the
 transcript or a subagent's, and does not show it never ran, spends it for
 good. Each spend is logged to <transcript>.languette-ask, which no guard
@@ -173,10 +173,10 @@ def approval(doc, guard, found):
         return deny(say("loop", guard=guard, what=", ".join(f"`{c['id']}`" for c in looped),
                         then="Run it once, on its own."))
 
-    # A label two lists share is one button: a run of either spends it, the widest count wanted.
+    # A label two lists share is one button, and each run of either spends it: the counts add.
     wants = {}
     for _, c, n in hits:
-        wants[c["approve_label"]] = max(n, wants.get(c["approve_label"], 0))
+        wants[c["approve_label"]] = n + wants.get(c["approve_label"], 0)
     shown = quote(doc) or say("command_withheld")
     approved, done = yield from approve(
         wants,

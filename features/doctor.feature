@@ -392,7 +392,7 @@ Feature: doctor
     When the doctor runs
     Then the "configs" row is ! "every option and 1 file under .languette/ load as their guards read them; 1 user list"
     And beneath it "~/.config/languette/ask-first.json" is ✓
-    And beneath it "approve_label 'Run e2e' is in both ~/.config/languette/ask-first.json and ~/project/.languette/ask-first.json: one click pays for a run of either" is !
+    And beneath it "approve_label 'Run e2e' is in both ~/.config/languette/ask-first.json and ~/project/.languette/ask-first.json: one click pays for a run of both" is !
     And it prints "to fix: give one of them its own approve_label, in ~/project/.languette/ask-first.json or ~/.config/languette/ask-first.json"
     And the doctor exits 0
 

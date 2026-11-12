@@ -244,7 +244,7 @@ applies in every repo, and a repo's never loosens it. With no file,
 it stays silent. A file that doesn't
 parse, that has a key besides `id`, `match`, `cost`, `approve_label` and
 `cheaper`, or that gives two commands the same `id` or `approve_label`,
-denies every command until it is fixed, because the guard can no longer tell what the repo
+denies every command until it is fixed, because the guard can no longer tell what the list
 meant. One click pays for one run, read from the transcripts; each
 spend is logged in `<transcript>.languette-ask`, which no guard reads.
 
