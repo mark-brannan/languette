@@ -761,3 +761,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t063104z
 - deny-always reads the user's rules before the repo's; a repo rule may reuse a user rule's id, each denial naming its file Undo: swap the user and repo blocks in engine.Guard._judge ([#414](https://github.com/mark-brannan/languette/pull/414))
+
+### 20261112t071548z
+- Report only: the doctor reads Claude Code's sandbox and Read deny settings and never writes another tool's settings Undo: revert the line in doctor.py ([#385](https://github.com/mark-brannan/languette/issues/385)) (no PR, branch claude/doctor-layers-385)
