@@ -287,7 +287,7 @@ Feature: guard-review-threads
       """
     Then the guard denies, naming "cannot tell which review thread"
 
-  @also_guard-signed-comments @also_guard-github-issues
+  @also_guard-signed-comments @also_guard-github-issues @also_guard-bypass-labels
   Scenario: a heredoc fed to another command does not make piped stdin readable
     When the agent runs:
       """

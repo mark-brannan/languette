@@ -33,10 +33,11 @@ GitHub that cannot answer (gh missing, signed out, offline, an error), a
 timeline page filled with no open PR on it (an older one may sit past it),
 or a repo that cannot be told asks, as the other guards that ask GitHub do. A
 body the guard cannot read (built at run time, a file it cannot open or
-past paths.MAX_READ, stdin with no heredoc) is a deny that says why.
+past paths.MAX_READ, stdin with no heredoc) is a deny that says why. Where a
+body comes from is read as guard-signed-comments and guard-private-terms read
+it (languette.bodies).
 """
 
-import os
 import re
 from urllib.parse import quote, unquote
 
@@ -80,10 +81,6 @@ _GL_WEB = re.compile(rf"https?://[^/]+/({_GL_NAME})/(?:-/)?merge_requests/[0-9]+
 _GL_VALUED = frozenset("-a --assignee -H --head -l --label -m --milestone --reviewer -s --source-branch "
                        "-b --target-branch --template -t --title --attach".split())
 _GL_PROJECT = re.compile(r"(?:api/v4/)?projects/([^/]+)/merge_requests")
-# A path the command appends to: the file is its old text plus what is appended, never
-# a heredoc's text alone. Over-matches a `>>` inside a heredoc body, which only costs a deny.
-_APPEND = re.compile(r""">>[ \t]*(["']?)([^\s;|&<>"']+)\1""")
-
 
 def _deny(guard, why):
     return deny(say("judged", guard=guard, why=why))
@@ -109,60 +106,10 @@ def refs(rx, text, repo, host=None, more=None):
 
 class _Post:
     """One PR a command opens: its repo as written (None = the cwd's), the forge
-    it opens on (a scan.FORGES key), and its body as parts, (kind, value): text,
-    file (a path), stdin, opaque."""
+    it opens on (a scan.FORGES key), and its body as sources (languette.bodies)."""
 
     def __init__(self, repo=None, forge="github"):
         self.repo, self.forge, self.parts = repo, forge, []
-
-
-def _value(post, v, live):
-    """A body value: text, or opaque when built at run time and no heredoc on
-    the value itself feeds it."""
-    if not live:
-        post.parts.append(("text", v))
-    elif "<<" in v or "HEREDOC" in v:
-        post.parts.append(("stdin", v))        # $(cat <<EOF ...): the heredoc is the text
-    else:
-        post.parts.append(("opaque", v))
-
-
-def _file(post, v, live):
-    if live:
-        post.parts.append(("opaque", v))
-    elif v == "-":
-        post.parts.append(("stdin", v))
-    else:
-        post.parts.append(("file", v))
-
-
-def _pr_create(s, g, hi, repo):
-    post = _Post(repo)
-    i = g + 3
-    while i <= hi:
-        t, live = sw.word(s, i), s.live[i]
-        if r := sw.gh_repo_flag(s, i, hi, post.repo):
-            post.repo, i = r
-        elif t in ("-b", "--body"):
-            if i < hi:
-                i += 1
-                _value(post, sw.word(s, i), s.live[i])
-        elif t.startswith("--body="):
-            _value(post, t[7:], live)
-        elif t.startswith("-b") and len(t) > 2:
-            _value(post, t[2:], live)
-        elif t in ("-F", "--body-file"):
-            if i < hi:
-                i += 1
-                _file(post, sw.word(s, i), s.live[i])
-        elif t.startswith("--body-file="):
-            _file(post, t[12:], live)
-        elif t.startswith("-F") and len(t) > 2:
-            _file(post, t[2:], live)
-        elif t in _VALUED:
-            i += 1
-        i += 1
-    return post
 
 
 def _related(post, v, live):
@@ -171,51 +118,45 @@ def _related(post, v, live):
         post.parts.append(("text", f"Closes #{v.lstrip('#')}"))
 
 
-def _mr_create(s, g, hi, repo):
-    """`glab mr create|new`: the description from -d/--description or --description-file,
-    and -i/--related-issue, an MR for that issue, read as closing it."""
-    post = _Post(repo, "gitlab")
-    i = g + 3
-    while i <= hi:
-        t, live = sw.word(s, i), s.live[i]
-        if r := sw.gh_repo_flag(s, i, hi, post.repo):
-            post.repo, i = r
-        elif t in ("-d", "--description"):
-            if i < hi:
-                i += 1
-                _value(post, sw.word(s, i), s.live[i])
-        elif t.startswith("--description="):
-            _value(post, t[14:], live)
-        elif t.startswith("-d") and len(t) > 2:
-            _value(post, t[2:], live)
-        elif t == "--description-file":
-            if i < hi:
-                i += 1
-                _file(post, sw.word(s, i), s.live[i])
-        elif t.startswith("--description-file="):
-            _file(post, t[19:], live)
-        elif t in ("-i", "--related-issue"):
-            if i < hi:
-                i += 1
-                _related(post, sw.word(s, i), s.live[i])
-        elif t.startswith("--related-issue="):
-            _related(post, t[16:], live)
-        elif t.startswith("-i") and len(t) > 2:
-            _related(post, t[2:], live)
-        elif t in _GL_VALUED:
-            i += 1
-        i += 1
+# Per client, the flags that carry the body, the body file, and the flags whose value is no body.
+_PR_FLAGS = {"gh": (("-b", "--body"), ("-F", "--body-file"), ()),
+             "glab": (("-d", "--description"), ("--description-file",), ("-i", "--related-issue"))}
+
+
+def _create(r, s, lo, g, hi, repo, cli):
+    """`gh pr create|new` or `glab mr create|new`: the body from its body flag or body file;
+    for glab, -i/--related-issue too, an MR for that issue, read as closing it."""
+    post = _Post(repo, "gitlab" if cli == "glab" else "github")
+    body, files, related = _PR_FLAGS[cli]
+    valued = _GL_VALUED if cli == "glab" else _VALUED
+    for f in sw.flag_words(s, g + 3, hi, body + files + related + sw.GH_REPO_FLAGS + tuple(valued)):
+        if f.name is None or f.value is None:
+            continue
+        if f.name in sw.GH_REPO_FLAGS:
+            post.repo = f.value
+        elif f.name in body:
+            post.parts.append(r.value(f.value, f.live))
+        elif f.name in files:
+            post.parts.append(r.file(f.value, f.live, f.tilde, s, lo, hi))
+        elif f.name in related:
+            _related(post, f.value, f.live)
     return post
 
 
-def _glab_api(s, g, hi):
-    api, post = sw.gh_api(s, g + 2, hi, "glab"), _Post(forge="gitlab")
+def _api_body(r, s, lo, g, hi, cli, key):
+    """The post a `gh api` or `glab api` call's `key` field sends, and its GhApi."""
+    api, post = sw.gh_api(s, g + 2, hi, cli), _Post(forge="gitlab" if cli == "glab" else "github")
     for a in api.args:
-        if a.key == "description":
+        if a.key == key:
             if a.value.startswith("@") and a.typed:
-                _file(post, a.value[1:], a.live)
+                post.parts.append(r.file(a.value[1:], a.live, a.tilde, s, lo, hi))
             else:
-                _value(post, a.value, a.live)
+                post.parts.append(r.value(a.value, a.live))
+    return api, post
+
+
+def _glab_api(r, s, lo, g, hi):
+    api, post = _api_body(r, s, lo, g, hi, "glab", "description")
     m = _GL_PROJECT.fullmatch(api.path)
     if not m or not api.writes:
         return None
@@ -225,14 +166,8 @@ def _glab_api(s, g, hi):
     return post
 
 
-def _api(s, g, hi):
-    api, post = sw.gh_api(s, g + 2, hi), _Post()
-    for a in api.args:
-        if a.key == "body":
-            if a.value.startswith("@") and a.typed:
-                _file(post, a.value[1:], a.live)
-            else:
-                _value(post, a.value, a.live)
+def _api(r, s, lo, g, hi):
+    api, post = _api_body(r, s, lo, g, hi, "gh", "body")
     m = re.fullmatch(rf"repos/({_NAME}|\{{owner\}})/({_NAME}|\{{repo\}})/pulls", api.path)
     if not m or not api.writes:
         return None
@@ -241,11 +176,10 @@ def _api(s, g, hi):
     return post
 
 
-def posts(doc):
-    """(posts, cd, heredocs): each PR the command opens, whether it runs a cd,
-    and its heredoc bodies with whether any is built at run time."""
+def posts(doc, r):
+    """(posts, cd): each PR the command opens, read against its Bodies `r`, and whether it runs a cd."""
     out, cd = [], False
-    for text, nested in doc.texts():
+    for text, nested in r.texts():
         s = doc.scan(text)
         if sw.cd_present(s):
             cd = True
@@ -255,20 +189,15 @@ def posts(doc):
             g = sw.cmd_index(s, a, b, sw.CLIENTS, nested)
             if g is None or g + 2 > b:
                 continue
-            glab = sw.client(s.w[g]) == "glab"
-            repo = sw.gh_env_repo(s, a, g, "glab" if glab else "gh")
-            if glab:
-                p = _mr_create(s, g, b, repo) if s.w[g + 1] == "mr" and s.w[g + 2] in _CREATE else \
-                    _glab_api(s, g, b) if s.w[g + 1] == "api" else None
-                if p:
-                    out.append(p)
-            elif s.w[g + 1] == "pr" and s.w[g + 2] in _CREATE:
-                out.append(_pr_create(s, g, b, repo))
+            cli = sw.client(s.w[g])
+            repo = sw.gh_env_repo(s, a, g, cli)
+            if s.w[g + 1] == ("mr" if cli == "glab" else "pr") and s.w[g + 2] in _CREATE:
+                out.append(_create(r, s, a, g, b, repo, cli))
             elif s.w[g + 1] == "api":
-                p = _api(s, g, b)
+                p = _glab_api(r, s, a, g, b) if cli == "glab" else _api(r, s, a, g, b)
                 if p:
                     out.append(p)
-    return out, cd, doc.heredocs()
+    return out, cd
 
 
 def _fetch(p):
@@ -279,46 +208,28 @@ def _fetch(p):
         return paths.read_refusal(e)
 
 
-def _abs(p, cwd, cd, env):
-    """The absolute, collapsed path `p` names, or None when this command's own cd hides where it stands."""
-    if p == "~" or p.startswith("~/"):
-        p = (env.get("HOME") or "") + p[1:] if env.get("HOME") else None
-    elif not os.path.isabs(p):
-        p = os.path.join(cwd, p) if cwd and not cd else None
-    return os.path.normpath(p) if p else p
-
-
-def _body(post, cwd, cd, docs, writes, env, guard):
-    """The text of the body `post` sends, or the deny that says why it cannot be read.
-    `writes` maps each path the command writes to (times written, whether a heredoc
-    writes it, whether it is appended to); a heredoc's text stands for the file only
-    when it is the path's one write and that write replaces the file."""
+def _body(post, r, cwd, cd, env, guard):
+    """The text of the body `post` sends, or the deny that says why it cannot be read."""
+    home = env.get("HOME") or ""
+    resolve = lambda p, live, tilde: paths.word_path(p, None if cd else cwd, home, live, tilde)
     text = ""
-    for kind, v in post.parts:
-        if kind == "text":
-            text += v + "\n"
-        elif kind == "opaque":
-            return _deny(guard, say("dup_body_opaque", v=v))
-        elif kind == "stdin":
-            if not docs:
-                return _deny(guard, say("dup_body_stdin"))
-            text += "".join(body + "\n" for body, _ in docs)
-        elif got := writes.get(_abs(v, cwd, cd, env) or v):
-            n, fed, app = got
-            if n != 1:
-                return _deny(guard, say("dup_body_rewritten", v=v, n=n))
-            if app:
-                return _deny(guard, say("dup_body_appended", v=v))
-            if not fed:
-                return _deny(guard, say("dup_body_not_heredoc", v=v))
-            text += "".join(body + "\n" for body, _ in docs)    # its one write is a heredoc: that text, not the file's
+    for src in post.parts:
+        if src[0] == "file":
+            v, src = src[1], r.where(src, resolve)
+            if src[0] == "read":
+                got = yield from _fetch(src[1])
+                if isinstance(got, Refuse):
+                    return _deny(guard, say("dup_body_file", v=v, got=got))
+                text += got + "\n"
+                continue
+            if src[0] == "unread":
+                return _deny(guard, say("dup_body_file", v=v, got=src[1]))
+        if src[0] == "text":
+            text += src[1] + "\n"
+        elif src[0] == "doc":
+            text += r.docs[src[1]][0] + "\n"
         else:
-            p = _abs(v, cwd, cd, env)
-            got = Refuse(say("dp_relative_cd")) \
-                if p is None else (yield from _fetch(p))
-            if isinstance(got, Refuse):
-                return _deny(guard, say("dup_body_file", v=v, got=got))
-            text += got + "\n"
+            return _deny(guard, say("dup_body_opaque", why=src[1]))
     return text
 
 
@@ -436,44 +347,30 @@ def _judge(text, where, guard, forge="github", default=None):
 
 def opened(doc):
     """The `pr-opens` test: {"posts": each PR the call opens, "cd": whether the command runs a
-    cd, "docs": its heredoc bodies, "writes": each path it writes to, as (times written,
-    whether a heredoc writes it, whether it is appended to)}, or None when no PR it opens
+    cd, "read": the command's Bodies, None for the MCP tool}, or None when no PR it opens
     carries a body."""
-    env, tool = doc.env, doc.tool
+    tool = doc.tool
     if not isinstance(tool, str):
         return None
     ti = doc.tool_input if isinstance(doc.tool_input, dict) else {}
-    cwd = doc.payload.get("cwd")
     if tool == "Bash":
         cmd = ti.get("command")
         if not isinstance(cmd, str) or ("gh" not in cmd and "glab" not in cmd):
             return None
-        found, cd, docs = posts(doc)
-        written, fed = sw.writes(cmd + "\n", False), sw.writes(cmd + "\n", True)
-        appended = [m.group(2) for m in _APPEND.finditer(cmd)]
+        r = sw.Bodies(doc, cmd)
+        found, cd = posts(doc, r)
     elif _MCP.match(tool):
         body, owner, repo = ti.get("body"), ti.get("owner"), ti.get("repo")
         post = _Post(f"{owner}/{repo}" if isinstance(owner, str) and owner and isinstance(repo, str) and repo
                      else None)
         if isinstance(body, str):
             post.parts.append(("text", body))
-        found, cd, docs, written, fed, appended = [post], False, [], [], [], []
+        found, cd, r = [post], False, None
     else:
         return None
     if not any(p.parts for p in found):
         return None
-    writes = {}
-    for w in written:
-        k = _abs(w, cwd, cd, env) or w
-        writes[k] = (writes.get(k, (0, False, False))[0] + 1, False, False)
-    for w in fed:
-        k = _abs(w, cwd, cd, env) or w
-        writes[k] = (writes.get(k, (0, False, False))[0], True, False)
-    for w in appended:
-        k = _abs(w, cwd, cd, env) or w
-        if k in writes:
-            writes[k] = (writes[k][0], writes[k][1], True)
-    return {"posts": found, "cd": cd, "docs": docs, "writes": writes}
+    return {"posts": found, "cd": cd, "read": r}
 
 
 def timelines(doc, guard, found):
@@ -486,7 +383,7 @@ def timelines(doc, guard, found):
     for post in found["posts"]:
         if not post.parts:
             continue
-        text = yield from _body(post, cwd, cd, found["docs"], found["writes"], doc.env, guard)
+        text = yield from _body(post, found["read"], cwd, cd, doc.env, guard)
         if isinstance(text, dict):
             return text
         if not (CLOSES_GL if post.forge == "gitlab" else CLOSES).search(text):
