@@ -1,7 +1,8 @@
 # The guard pipeline
 
 The design behind epic #76. Present tense is the aim, not today's code;
-the decisions are in [decisions.md](../decisions.md).
+the decisions are in [decisions.md](../decisions.md). Step 5 and the human's
+yes have their own: [the verdict](verdict.md).
 
 ## Purpose
 
