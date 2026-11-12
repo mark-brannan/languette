@@ -782,3 +782,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t071603z
 - A sandbox on with failIfUnavailable off or unset is a warning, as is allowUnsandboxedCommands on or unset Undo: revert the line in doctor.py ([#385](https://github.com/mark-brannan/languette/issues/385)) (no PR, branch claude/doctor-layers-385)
+
+### 20261112t071606z
+- Only managed-settings.json is read of the managed tier; managed-settings.d, MDM and server-managed settings are why an unset key reads unknown Undo: revert the line in doctor.py ([#385](https://github.com/mark-brannan/languette/issues/385)) (no PR, branch claude/doctor-layers-385)
