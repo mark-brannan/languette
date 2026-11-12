@@ -734,3 +734,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t052322z
 - Model guard-github-issues' door in the replay from human-turn entries (origin.kind human) Undo: model the door as always shut in the replay ([#410](https://github.com/mark-brannan/languette/pull/410))
+
+### 20261112t052330z
+- A past call with no result yet counts as spent Undo: count only calls with a result ([#410](https://github.com/mark-brannan/languette/pull/410))
