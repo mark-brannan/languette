@@ -417,7 +417,7 @@ def _covers(rule, scope, cwd, h, path):
     """Whether a Read deny pattern, from a file of `scope`, matches `path` or a directory above it,
     anchored as Claude Code anchors it: //abs, ~/home, /the settings source, else cwd, at any depth
     for a bare name or one directory."""
-    if rule in (None, "", "*", "**"):
+    if rule in (None, ""):
         return True
     if rule.startswith("//"):
         base, rest = "/", rule[2:]
