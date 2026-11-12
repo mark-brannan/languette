@@ -1,7 +1,8 @@
 @python
 Feature: ask-first
-  A command the repo lists in .languette/ask-first.json is denied until the
-  user approves that one run through AskUserQuestion. Each scenario runs in a
+  A command the repo lists in .languette/ask-first.json, or the user lists in
+  $XDG_CONFIG_HOME/languette/ask-first.json (~/.config by default), is denied
+  until the user approves that one run through AskUserQuestion. Each scenario runs in a
   fresh git repo, from its top, with CLAUDE_PROJECT_DIR set to it and an
   empty transcript, unless it says otherwise.
 
@@ -507,3 +508,140 @@ Feature: ask-first
         | /sub  | cd .. && tsx run.ts | denies  |
         | /sub  | tsx run.ts        | is silent |
         |       | cd ~ && tsx run.ts | is silent |
+
+  Rule: the user's own list applies in every repo, beside the repo's, and the two add up
+
+    Background:
+      Given XDG_CONFIG_HOME is "{TMP}/xdg"
+      And the file "{TMP}/xdg/languette/ask-first.json" holds:
+        """
+        {"commands": [{"id": "e2e",
+          "match": [{"cmd": "npm", "args": ["run", "e2e"]}],
+          "cost": "> 40 minutes",
+          "approve_label": "Run e2e"}]}
+        """
+
+    Scenario: the user's list alone asks, naming the user's file
+      When the agent runs `npm run e2e`
+      Then the guard denies, naming "{TMP}/xdg/languette/ask-first.json"
+
+    Scenario: the user's list asks outside any project
+      Given CLAUDE_PROJECT_DIR is unset
+      And the working directory is "/"
+      When the agent runs `npm run e2e`
+      Then the guard denies, naming "call AskUserQuestion"
+
+    Scenario: the user's list is silent on a command it does not list
+      When the agent runs `npm test`
+      Then the guard is silent
+
+    Scenario: the repo's list adds its own commands
+      Given the file ".languette/ask-first.json" holds:
+        """
+        {"commands": [{"id": "walk",
+          "match": [{"cmd": "npm", "args": ["run", "walk"]}],
+          "cost": "> 1 hour",
+          "approve_label": "Run walk"}]}
+        """
+      When the agent runs `npm run walk && npm run e2e`
+      Then the guard denies, naming "`walk` ({PROJ}/.languette/ask-first.json)"
+      And the guard denies, naming "`e2e` ({TMP}/xdg/languette/ask-first.json)"
+
+    Scenario: an id may repeat across the files, and each ask names its file
+      Given the file ".languette/ask-first.json" holds:
+        """
+        {"commands": [{"id": "e2e",
+          "match": [{"cmd": "npm", "args": ["run", "e2e"]}],
+          "cost": "> 1 hour",
+          "approve_label": "Run the repo's e2e"}]}
+        """
+      When the agent runs `npm run e2e`
+      Then the guard denies, naming "`e2e` ({PROJ}/.languette/ask-first.json)"
+      And the guard denies, naming "`e2e` ({TMP}/xdg/languette/ask-first.json)"
+
+    Scenario: a repo's exemption never weakens the user's entry
+      Given the file ".languette/ask-first.json" holds:
+        """
+        {"commands": [{"id": "e2e-help",
+          "match": [{"cmd": "npm", "args": ["run", "e2e"], "except": ["--help"]}],
+          "cost": "c",
+          "approve_label": "Run the repo's e2e"}]}
+        """
+      When the agent runs `npm run e2e -- --help`
+      Then the guard denies, naming "{TMP}/xdg/languette/ask-first.json"
+
+    Scenario: a label both files give is one button, not a deny
+      Given the file ".languette/ask-first.json" holds:
+        """
+        {"commands": [{"id": "e2e-repo",
+          "match": [{"cmd": "npm", "args": ["run", "e2e"]}],
+          "cost": "c",
+          "approve_label": "Run e2e"}]}
+        """
+      Given the transcript holds:
+        """
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_A", "name": "AskUserQuestion", "input": {"questions": [{"question": "Run `npm run e2e` (e2e)?", "header": "Walk", "multiSelect": false, "options": [{"label": "Run e2e", "description": "46 min"}, {"label": "Skip", "description": ""}]}]}}]}}
+        {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_A", "content": "User has answered your questions: \"Run `npm run e2e` (e2e)?\"=\"Run e2e\". You can now continue with the user's answers in mind."}]}}
+        """
+      When the agent runs `npm run e2e`
+      Then the guard is silent
+      When the agent runs it again
+      Then the guard denies
+
+    Scenario Outline: a user list that does not load denies every command, naming the file
+      Given the file "{TMP}/xdg/languette/ask-first.json" holds:
+        """
+        <file>
+        """
+      When the agent runs `ls`
+      Then the guard denies, naming "{TMP}/xdg/languette/ask-first.json is invalid: <fault>"
+
+      Examples:
+        | file             | fault                 |
+        | {"commands": [   | not JSON              |
+        | {"commands": []} | the top level must be |
+
+  Rule: a match entry's except words exempt a run that carries one as a whole argument
+
+    Background:
+      Given the file ".languette/ask-first.json" holds:
+        """
+        {"commands": [{"id": "conformance",
+          "match": [{"cmd": "npm", "args": ["run", "conformance"], "except": ["--help", "-h"]},
+                    {"cmd": "tsx", "script": "research/conformance/run.ts", "except": ["--help", "-h"]}],
+          "cost": "> 40 minutes",
+          "approve_label": "Run conformance"}]}
+        """
+
+    Scenario Outline: an except word exempts its segment only
+      When the agent runs `<command>`
+      Then the guard <verdict>
+
+      Examples:
+        | command                                                 | verdict   | note                              |
+        | npm run conformance                                     | denies    | listed                            |
+        | npm run conformance -- --help                           | is silent | a usage flag                      |
+        | npx tsx research/conformance/run.ts --full -h           | is silent | through a launcher                |
+        | sh -c "npm run conformance -- -h"                       | is silent | nested                            |
+        | npm run conformance -- --help=all                       | denies    | not the whole argument            |
+        | npm run conformance -- --helper                         | denies    | a longer word                     |
+        | npm run conformance -- "$H"                             | denies    | a variable is not the word        |
+        | npm run conformance -- --help && npm run conformance    | denies    | the second segment runs it        |
+        | echo -h; npm run conformance                            | denies    | the word is in another segment    |
+
+    Scenario Outline: an except that is not a list of words denies every command
+      Given the file ".languette/ask-first.json" holds:
+        """
+        {"commands": [{"id": "x",
+          "match": [{"cmd": "npm", "args": ["run", "x"], "except": <except>}],
+          "cost": "c",
+          "approve_label": "Run x"}]}
+        """
+      When the agent runs `ls`
+      Then the guard denies, naming "except must be a non-empty list of whole words"
+
+      Examples:
+        | except       |
+        | "--help"     |
+        | []           |
+        | ["a b"]      |

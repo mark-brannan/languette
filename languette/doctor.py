@@ -17,7 +17,8 @@ last row. For guard-private-terms it also writes: --init-redacted-terms and
 one on a yes; --redact prints what a post would become. Every other config, each option and
 each file under .languette/, is judged by its guard's own loader (languette/loaders.py); an
 option it refuses is offered back at its default as a diff, written through `languette config`
-on a yes. Standard library only.
+on a yes; the user's own ask-first and deny-always lists are judged the same way, and a broken one
+gets the way to mend it. Standard library only.
 """
 
 import json
@@ -372,29 +373,40 @@ def refused_options(options):
 
 
 def configs_row(options, cwd):
-    """(mark, "configs", text, lines): each installed option and each file under .languette/ judged
-    by its guard's own loader. A file that does not load is a ✗ while its guard is on, since every
-    Bash command is denied until it does; off, a !. A file no guard reads is a !."""
+    """(mark, "configs", text, lines): each installed option, each file under .languette/ and each
+    of the user's own lists judged by its guard's own loader. A file that does not load is a ✗
+    while its guard is on, since every Bash command is denied until it does; off, a !. A file no
+    guard reads is a !, and so is an approve_label the user's ask-first list and the repo's share."""
     from languette import loaders
     from languette.engine import one_line   # a repo's file supplies the loader's message
     lines, deny_all, refused = [], [], refused_options(options)
     for name, why in refused.items():
         lines.append(line(FAIL, f"{name}: {why}", line("", "to put it back to its default: languette doctor --fix")))
+    env = host.guard_env(options)
     try:
-        files = loaders.repo_files(cwd, host.guard_env(options))
+        files = loaders.repo_files(cwd, env)
+        user = loaders.user_files(env)
+        shared = loaders.shared_labels(cwd, env)
     except Exception as e:  # noqa: BLE001 -- what the doctor cannot read is a ! row
         return WARN, "configs", f".languette/ could not be read ({type(e).__name__}: {one_line(str(e))})", lines
-    for path, opt, why in files:
+    for path, opt, why in user + files:
         where = host.tilde(path)
+        mend = [line("", f"to fix: edit {where} until `languette doctor` shows it ✓, or move it aside "
+                         "to stop it denying")] if (path, opt, why) in user else []
         if opt is None:
             lines.append(line(WARN, f"{where}: no guard reads it"))
         elif why is None:
             lines.append(line(OK, where))
         elif is_on("=", options.get(opt)):
             deny_all.append(where)
-            lines.append(line(FAIL, f"{where}: {one_line(why)}"))
+            lines.append(line(FAIL, f"{where}: {one_line(why)}", *mend))
         else:
-            lines.append(line(WARN, f"{where}: {one_line(why)}; {opt} is off, so nothing reads it"))
+            lines.append(line(WARN, f"{where}: {one_line(why)}; {opt} is off, so nothing reads it", *mend))
+    for label, where in shared.items():
+        names = " and ".join(host.tilde(p) for p in where)
+        lines.append(line(WARN, f"approve_label '{one_line(label)}' is in both {names}: one click pays for a run of either",
+                          line("", f"to fix: give one of them its own approve_label, in {host.tilde(where[-1])} "
+                                   f"or {host.tilde(where[0])}")))
     if deny_all:
         return FAIL, "configs", f"{DENIES_ALL} until {', '.join(deny_all)} loads", lines
     if refused:
@@ -402,6 +414,8 @@ def configs_row(options, cwd):
     n = len(files)
     text = f"every option and {n} file{'' if n == 1 else 's'} under .languette/ load as their guards read them" \
         if n else "every option loads as its guard reads it; no .languette/ files"
+    if user:
+        text += f"; {len(user)} user list{'' if len(user) == 1 else 's'}"
     return worst([m for m, _, _ in lines]), "configs", text, lines
 
 
