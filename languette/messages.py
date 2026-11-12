@@ -27,6 +27,11 @@ MESSAGES = {
         "{guard}: this needs the user's approval, and in {mode} no one is there to approve it, "
         "so it is denied instead of asked. What it would have asked: {why}"
     ),
+    # Said once after every unattended_ask in a deny: the call is the user's now.
+    "unattended_way": (
+        "Don't work around it: if the call still needs making, the user makes it themselves. Say what "
+        "it is for and hand them the exact call."
+    ),
     # A spend the runner could not make after the verdict (run._spend).
     "approval_lost": (
         "languette: another call spent the user's approval while this one was judged ({guards}), "
@@ -42,6 +47,7 @@ MESSAGES = {
         "run each command in its own Bash call."
     ),
     "guard_crashed": "{guard}: guard crashed ({kind}: {err}), cannot inspect the command",
+    "user_config_nowhere": "neither $HOME nor $XDG_CONFIG_HOME is set, so the user's {name} cannot be looked for: a gate that cannot look fails closed",
     "home_not_absolute": "{guard}: $HOME is not an absolute path, cannot resolve targets",
     "too_many": (
         "require-well-formed: this command is too big to check: {err}. Nothing ran. "
@@ -338,7 +344,7 @@ MESSAGES = {
     "ask_first_cannot_look": "ask-first: {err}. A gate that cannot look fails closed: retry from the project directory.",
     "ask_first_invalid": (
         "ask-first: {path} is invalid: {err}. Every Bash command is denied until it is fixed, "
-        "because the guard cannot tell which commands the repo meant to cover. Fix it with "
+        "because the guard cannot tell which commands the list meant to cover. Fix it with "
         "the Edit tool, or tell the user."
     ),
     "ask_first_times": "; this command runs it {n} times and has {have} unspent",

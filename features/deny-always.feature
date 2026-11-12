@@ -1,7 +1,8 @@
 @python
 Feature: deny-always
-  A command the repo lists in .languette/deny-always.json is denied every
-  time, with the reason the list gives. The list is found as ask-first's is;
+  A command the repo lists in .languette/deny-always.json, or the user lists
+  in $XDG_CONFIG_HOME/languette/deny-always.json (~/.config by default), is
+  denied every time, with the reason the list gives. The two lists add up. The list is found as ask-first's is;
   its match entries are written as ask-first's. The guard is a rule set alone
   (languette/rules/deny_always.py), read by languette/engine.py. Each
   scenario runs in a fresh git repo, from its top, with CLAUDE_PROJECT_DIR set
@@ -70,3 +71,56 @@ Feature: deny-always
       | value | verdict                          |
       | false | is silent                        |
       | true  | denies, naming "rule `prod-db`"  |
+
+  Rule: the user's own list denies in every repo, beside the repo's
+
+    Background:
+      Given XDG_CONFIG_HOME is "{TMP}/xdg"
+      And the file "{TMP}/xdg/languette/deny-always.json" holds:
+        """
+        {"rules": [{"id": "prod-db", "match": [{"cmd": "psql", "args": ["prod"]}],
+                    "why": "production is reached through the release job"}]}
+        """
+
+    Scenario Outline: the user's list denies, naming the user's file
+      Given CLAUDE_PROJECT_DIR is unset
+      And the working directory is "<cwd>"
+      When the agent runs `psql prod`
+      Then the guard denies, naming "rule `prod-db` in {TMP}/xdg/languette/deny-always.json"
+
+      Examples:
+        | cwd     |
+        | {PROJ}  |
+        | /       |
+
+    Scenario: the repo's list adds denies, and may repeat the user's id
+      Given the file ".languette/deny-always.json" holds:
+        """
+        {"rules": [{"id": "prod-db", "match": [{"cmd": "psql", "args": ["staging"]}], "why": "w"}]}
+        """
+      When the agent runs `psql staging`
+      Then the guard denies, naming "rule `prod-db` in {PROJ}/.languette/deny-always.json"
+
+    Scenario: the repo's list cannot take a user rule away
+      Given the file ".languette/deny-always.json" holds:
+        """
+        {"rules": []}
+        """
+      When the agent runs `psql prod`
+      Then the guard denies, naming "rule `prod-db` in {TMP}/xdg/languette/deny-always.json"
+
+    Scenario: a user list that does not load denies every command, naming the file
+      Given the file "{TMP}/xdg/languette/deny-always.json" holds:
+        """
+        {"rules": 3}
+        """
+      When the agent runs `ls`
+      Then the guard denies, naming "{TMP}/xdg/languette/deny-always.json is invalid: the top level must be"
+
+    Scenario: a match entry takes no except here: a deny has no exemptions
+      Given the file "{TMP}/xdg/languette/deny-always.json" holds:
+        """
+        {"rules": [{"id": "x", "match": [{"cmd": "psql", "except": ["-h"]}], "why": "w"}]}
+        """
+      When the agent runs `ls`
+      Then the guard denies, naming "must be an object holding only"

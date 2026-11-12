@@ -28,7 +28,7 @@ import os
 import re
 from collections import namedtuple
 
-from languette import reshape
+from languette import paths, reshape
 from languette.verdict import Need
 
 # kind -> (the option, the default file, the second column's name, the option's environment variable)
@@ -81,8 +81,7 @@ def where(kind, env):
     if value:
         m = re.match(r"(?:~|\$HOME|\$\{HOME\})(?=/|\Z)", value)
         return (home + value[m.end():] if m else value), True
-    base = env.get("XDG_CONFIG_HOME") or (home + "/.config" if home else "")
-    return (os.path.join(base, "languette", name) if base else ""), False
+    return paths.user_config(env, name), False
 
 
 def _value(find, is_re, env):
