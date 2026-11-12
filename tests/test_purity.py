@@ -206,7 +206,7 @@ def test_install_writes_nothing_itself():
     found = {w for _, w in escapes((ROOT / "languette" / "install.py").read_text())}
     assert_that(sorted(found), equal_to(["import shutil", "os.getcwd", "shutil.which"]))
     found = {w for _, w in escapes((ROOT / "languette" / "host.py").read_text())}
-    assert_that(sorted(found), equal_to([".read_text()", "import shutil", "import subprocess", "input", "pathlib.Path",
+    assert_that(sorted(found), equal_to([".exists()", ".glob()", ".read_text()", "import shutil", "import subprocess", "input", "pathlib.Path",
                                          "pathlib.Path.home", "shutil.which", "subprocess.SubprocessError",
                                          "subprocess.TimeoutExpired", "subprocess.run", "sys.stdin.isatty"]))
 

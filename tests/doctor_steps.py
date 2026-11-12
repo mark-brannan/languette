@@ -229,6 +229,18 @@ def _options(doctor, options):
     doctor.write_settings(s)
 
 
+@given(parsers.parse("the user's settings also hold `{keys}`"))
+def _user_keys(doctor, keys):
+    doctor.write_settings({**doctor.settings(), **json.loads(keys)})
+
+
+@given(parsers.parse('the project is a git worktree of "{main}"'))
+def _worktree(doctor, main):
+    gitdir = Path(doctor.expand(main)) / ".git/worktrees/project"
+    gitdir.mkdir(parents=True)
+    (doctor.home / "project/.git").write_text(f"gitdir: {gitdir}\n")
+
+
 @given("the user's settings.json has a by-hand guard-recursive-delete hook")
 def _by_hand(doctor):
     # The README's "If you cannot run the installer" entry, pointed at this repo.
@@ -314,6 +326,11 @@ def _beneath_two(doctor, a, ma, b, mb):
 @then(parsers.re(r'beneath it "(?P<text>[^"]+)" is (?P<mark>[✓!✗])'))
 def _beneath(doctor, text, mark):
     doctor.beneath(doctor.last, text, mark)
+
+
+@then(parsers.re(r'beneath it "(?P<text>[^"]+)" is bare'))
+def _beneath_bare(doctor, text):
+    doctor.beneath(doctor.last, text, "")
 
 
 @then(parsers.re(r'beneath the "(?P<label>[^"]+)" row "(?P<text>[^"]+)" is (?P<mark>[✓!✗])'))

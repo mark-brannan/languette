@@ -23,7 +23,7 @@ helps write a config that works.
 4. **Assists with configuration,** not only repair. (planned)
 
 The checks run in order, and a ✗ never stops a later one: version, shell parser, parse-check and fail-closed
-probes, the install with its guards beneath it, the forge clients, the configs, the terms
+probes, the install with its guards beneath it, the sandbox and Read deny rules beside them, the forge clients, the configs, the terms
 files. `shfmt`, the preferred parser, has top billing; without it the doctor
 names the rung that reads commands instead. `gh` is optional; without it guards ask the user. Every other forge client installed gets a
 row, a warning when signed in: the agent can act through it unseen. The configs are the plugin's options and every file
@@ -45,6 +45,44 @@ touching yours, and `--redact` printing what a post would become, from a file
 or stdin. A `re:` is refused by its shape alone (`languette/reshape.py`), never
 by a clock: one that can backtrack without bound. Its marks follow the guard,
 except that an empty file is a !.
+
+## Beside the guards
+
+A guard is one layer. It judges a command before it runs, and cannot see
+what a script does once it starts, a file the agent opens with its Read
+tool, or data leaving over the network. A green doctor must not read as
+"protected", so beneath the guards it reports two of Claude Code's own
+layers that stand next to them: the sandbox and the Read deny rules.
+
+```
+✓ Claude Code   plugin 2697369, user scope
+    ✓ guards enabled: 22
+    ✓ guards disabled: 0
+! sandbox       on, in ~/.claude/settings.json
+    ! allowUnsandboxedCommands unknown: no settings file sets it; Claude Code's default is on, so a command the sandbox blocks may retry outside it
+    ✓ failIfUnavailable on: Claude Code will not start where the sandbox cannot
+    ! excludedCommands: docker may run outside the sandbox
+      not read, and may override this: managed-settings.d, MDM, server-managed settings, --settings
+! read deny     Read deny rules cover .env here, not ~/.ssh (1 rule)
+      the Read tool and file commands Claude Code recognises, such as cat; not a script that opens the file itself
+```
+
+and on a machine that sets neither:
+
+```
+! sandbox       unknown: no settings file sets sandbox.enabled; Claude Code's default is off (/sandbox)
+! read deny     no Read deny rule covers .env here or ~/.ssh
+```
+
+- **Report only.** Another tool's settings: read, never written; `/sandbox` changes them.
+- **On or off, never safe.** A ✓ says a setting is on; neither row is ever a ✗.
+- **A loosened sandbox is a !.** Each setting Claude Code itself names as loosening its sandbox gets a line beneath it.
+- **A Read deny rule says what it stops:** the Read tool and the file commands Claude Code recognises, not a script that opens the file itself.
+- **Unread, not absent.** A sandbox that is on or off names the sources that could override it; a drop-in present is a !.
+- **Unknown, not off.** A key no file sets reads "unknown", Claude Code's default beside it.
+- **Read as Claude Code reads them.** Four files, highest first; deny lists merge, with its anchors.
+- **Claude Code only.** Each host has its own sandbox and settings (#5, #102).
+- **Drift.** Names from the [sandboxing](https://code.claude.com/docs/en/sandboxing) and [permissions](https://code.claude.com/docs/en/permissions) docs; a rename reads "unknown".
 
 ## Limits
 

@@ -1,5 +1,6 @@
 """`languette doctor`: say whether languette protects Claude Code on this
 machine, one row per check, each ✓, ! or ✗. Exits 1 on any ✗, so CI can run it.
+Beside the guards it reports Claude Code's sandbox and Read deny rules, read only.
 
 The doctor reads settings and runs programs, so it sits outside the pure
 steps of the guard pipeline (docs/design/guard-pipeline.md): no guard imports
@@ -322,6 +323,7 @@ def check(cwd):
             else:
                 rows.append((FAIL, label, f"`{sent}` was not denied {how}: {what}", []))
     rows.append(claude)
+    rows += beside_rows(cwd)
 
     paths = {name: shutil.which(name) for name in FORGES}
     # The probes may reach the network: in parallel, a dead one costs one timeout, not one per client.
@@ -354,6 +356,211 @@ def render(rows):
     for mark, label, text, lines in rows:
         yield f"{mark} {label:<13} {text}"
         yield from details(lines, 1)
+
+
+# --- what stands beside the guards: Claude Code's sandbox and Read deny rules ---
+# Report only: these are another tool's settings, read as Claude Code reads them
+# (docs/design/doctor.md, "Beside the guards"); the doctor never writes them. A line says
+# whether a setting is on, never that the machine is safe.
+
+# sandbox.<key> -> (Claude Code's default, the line when on, the line when off, the mark when on).
+SANDBOX = {
+    "allowUnsandboxedCommands": (True, "a command the sandbox blocks may retry outside it",
+                                 "a command the sandbox blocks is not retried outside it", WARN),
+    "failIfUnavailable": (False, "Claude Code will not start where the sandbox cannot",
+                          "where the sandbox cannot start, commands run outside it", OK),
+}
+# sandbox.<key> -> what it costs when on: the settings Claude Code itself names as loosening its sandbox.
+LOOSENS = {
+    "filesystem.disabled": "filesystem confinement is off",
+    "allowNestedUserNamespaces": "sandboxed commands can get around file deny rules",
+    "enableWeakerNestedSandbox": "the host's /proc is exposed",
+    "enableWeakerNetworkIsolation": "the network lock is loosened",
+    "allowAppleEvents": "macOS automation is not isolated",
+}
+UNREAD = "not read, and may override this: managed-settings.d, MDM, server-managed settings, --settings"
+READ_REACH = "the Read tool and file commands Claude Code recognises, such as cat; not a script that opens the file itself"
+# What a Read deny rule is checked against: (as shown, the path tried, from cwd and $HOME).
+SECRETS = ((".env here", lambda cwd, h: Path(cwd) / ".env"),
+           ("~/.ssh", lambda cwd, h: h / ".ssh/id_ed25519"))
+READ_RULE = re.compile(r"Read(?:\((.*)\))?")
+
+
+def _sandbox(layers, key):
+    """(value, path) of sandbox.<key> from the highest file that sets it, (None, None) when none
+    does; Unreadable when a file above any that sets it cannot be read. A false
+    allowUnsandboxedCommands in the user's or managed settings holds over a project's true."""
+    found = None
+    for scope, path, s in layers:
+        if isinstance(s, Unreadable):
+            if found is None or (key == "allowUnsandboxedCommands" and scope in ("managed", "user")):
+                raise s
+            continue
+        v = _at(s, f"sandbox.{key}")
+        if not isinstance(v, bool):
+            continue
+        if found is None:
+            found = (v, path)
+        elif key == "allowUnsandboxedCommands" and v is False and scope in ("managed", "user"):
+            return v, path
+    return found or (None, None)
+
+
+def _unread():
+    """The sources above the files read that may override what the row says: ! where a drop-in is there."""
+    dropins = host.managed_dropins()
+    if dropins:
+        return line(WARN, f"{host.tilde(dropins[0].parent)} holds {len(dropins)} file{'' if len(dropins) == 1 else 's'} "
+                          "the doctor does not merge; they may override this")
+    return line("", UNREAD)
+
+
+def _at(settings, dotted):
+    """settings[a][b]... for "a.b...", None where a step is missing or not an object."""
+    for k in dotted.split("."):
+        settings = settings.get(k) if isinstance(settings, dict) else None
+    return settings
+
+
+def _loosened(layers):
+    """Detail lines for each setting that loosens a sandbox that is on: Claude Code's own list."""
+    lines = []
+    for key, cost in LOOSENS.items():
+        try:
+            v, at = _sandbox(layers, key)
+        except Unreadable as e:                 # one line for the lot, not one per key
+            lines.append(line(WARN, f"settings that loosen the sandbox unknown: {e}"))
+            break
+        if v:
+            lines.append(line(WARN, f"{key} on, in {host.tilde(at)}: {cost}"))
+    excluded = [c for _, _, s in layers if not isinstance(s, Unreadable)
+                for c in (_at(s, "sandbox.excludedCommands") or []) if isinstance(c, str)]
+    if excluded:                                # lists merge across files
+        lines.append(line(WARN, f"excludedCommands: {', '.join(dict.fromkeys(excluded))} may run outside the sandbox"))
+    for scope, path, s in layers:               # read from managed settings alone
+        allowed = _at(s, "sandbox.enabledPlatforms") if scope == "managed" else None
+        if isinstance(allowed, list) and host.platform() not in allowed:
+            lines.append(line(WARN, f"enabledPlatforms excludes {host.platform()}, in {host.tilde(path)}: "
+                                    "the sandbox is off on this platform"))
+    return lines
+
+
+def _glob(pattern):
+    """A gitignore pattern as a regular expression over the path below its anchor."""
+    out, i = "", 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            out, i = out + "(?:.*/)?", i + 3
+        elif pattern.startswith("**", i):
+            out, i = out + ".*", i + 2
+        elif pattern[i] == "*":
+            out, i = out + "[^/]*", i + 1
+        elif pattern[i] == "?":
+            out, i = out + "[^/]", i + 1
+        else:
+            out, i = out + re.escape(pattern[i]), i + 1
+    return out
+
+
+def _covers(rule, scope, cwd, h, path):
+    """Whether a Read deny pattern, from a file of `scope`, matches `path` or a directory above it,
+    anchored as Claude Code anchors it: //abs, ~/home, /the settings source, else cwd, at any depth
+    for a bare name or one directory."""
+    if rule in (None, ""):
+        return True
+    if rule.startswith("//"):
+        base, rest = "/", rule[2:]
+    elif rule.startswith("~/"):
+        base, rest = str(h), rule[2:]
+    elif rule.startswith("/"):
+        base, rest = str(host.config_dir() if scope == "user" else cwd), rule[1:]
+    else:
+        rest = rule[2:] if rule.startswith("./") else rule
+        base = str(cwd)
+        if "/" not in rest.removesuffix("/**").strip("/"):
+            rest = "**/" + rest
+    rx = re.compile(re.escape(base.rstrip("/")) + "/" + _glob(rest.rstrip("/")))
+    p = Path(path)
+    return any(rx.fullmatch(str(q)) for q in (p, *p.parents))
+
+
+def _read_denies(layers):
+    """[(scope, [patterns, a bare Read as None])] for each file's permissions.deny, in order."""
+    out = []
+    for scope, _, s in layers:
+        perms = s.get("permissions") if isinstance(s, dict) else None
+        deny = perms.get("deny") if isinstance(perms, dict) else None
+        rules = [m[1] for r in (deny if isinstance(deny, list) else ()) if isinstance(r, str)
+                 for m in [READ_RULE.fullmatch(r.strip())] if m]
+        out.append((scope, rules))
+    return out
+
+
+def _denied(found, cwd, h, path):
+    """Whether any file's Read deny rules cover `path`; a later `!` rule carves out of the same file's."""
+    for scope, rules in found:
+        hit = False
+        for r in rules:
+            if r and r.startswith("!"):
+                # Read from cwd even after /, ~/ or //, so such a carve-out carves nothing.
+                hit = hit and (r[1:2] in ("/", "~") or not _covers(r[1:], scope, cwd, h, path))
+            elif _covers(r, scope, cwd, h, path):
+                hit = True
+        if hit:
+            return True
+    return False
+
+
+def beside_rows(cwd):
+    """The sandbox row and the read deny row, from the settings files Claude Code reads here. A
+    setting no file sets reads "unknown": a source the doctor cannot see may set it."""
+    found = host.layers(cwd)
+    h = host.home()
+    rows = []
+    try:
+        on, where = _sandbox(found, "enabled")
+    except Unreadable as e:
+        rows.append((WARN, "sandbox", f"unknown: {e}", []))
+    else:
+        if on is None:
+            rows.append((WARN, "sandbox", "unknown: no settings file sets sandbox.enabled; "
+                                          "Claude Code's default is off (/sandbox)", []))
+        elif not on:
+            rows.append((WARN, "sandbox", f"off, in {host.tilde(where)}: the guards judge commands, "
+                                          "nothing confines what they let through (/sandbox)", [_unread()]))
+        else:
+            lines = []
+            for key, (default, said_on, said_off, mark_on) in SANDBOX.items():
+                try:
+                    v, at = _sandbox(found, key)
+                except Unreadable as e:
+                    lines.append(line(WARN, f"{key} unknown: {e}"))
+                    continue
+                if v is None:
+                    lines.append(line(WARN, f"{key} unknown: no settings file sets it; Claude Code's default is "
+                                            f"{'on' if default else 'off'}, so {said_on if default else said_off}"))
+                else:
+                    mark = mark_on if v else (OK if mark_on == WARN else WARN)
+                    lines.append(line(mark, f"{key} {'on' if v else 'off'}: {said_on if v else said_off}"))
+            lines += [*_loosened(found), _unread()]
+            rows.append((worst([m for m, _, _ in lines]), "sandbox", f"on, in {host.tilde(where)}", lines))
+    bad = [(scope, p, s) for scope, p, s in found if isinstance(s, Unreadable)]
+    denies = _read_denies(found)
+    n = sum(len(rules) for _, rules in denies)
+    covered = {label: _denied(denies, cwd, h, at(cwd, h)) for label, at in SECRETS}
+    missed = [label for label, hit in covered.items() if not hit]
+    count = f" ({n} rule{'' if n == 1 else 's'})" if n else ""
+    hits = [label for label, hit in covered.items() if hit]
+    if not missed:
+        text = f"Read deny rules cover {' and '.join(hits)}{count}"
+    elif bad:                                  # deny rules merge, so only a miss is unknown
+        text = f"unknown for {' or '.join(missed)}: {bad[0][2]}"
+    elif hits:
+        text = f"Read deny rules cover {', '.join(hits)}, not {' or '.join(missed)}{count}"
+    else:
+        text = f"no Read deny rule covers {' or '.join(missed)}{count}"
+    rows.append((WARN if missed else OK, "read deny", text, [line("", READ_REACH)] if hits else []))
+    return rows
 
 
 # --- every other config, through its guard's own loader ---------------------
