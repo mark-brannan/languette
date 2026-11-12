@@ -452,18 +452,15 @@ class World:
 
     def _log_spend(self, wants, approved):
         """Append what this call spent to <transcript>.languette-ask, one JSON line per
-        yes: a log for the user, which no guard reads. Whole lines, under an exclusive
-        lock; silent on any failure, since nothing is decided from it."""
+        yes: a log, which no guard reads. Whole lines, under an exclusive lock. Raises
+        OSError when it cannot be written: the runner denies a spend it cannot record."""
         call, now = self._call(), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         lines = "".join(json.dumps({"t": now, "label": label, "approval": i, "call": call}) + "\n"
                         for label, n in wants.items() for i in approved[label][:n])
-        try:
-            fd = os.open(self._transcript() + SPENT, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
-            with os.fdopen(fd, "a", encoding="utf-8") as f:
-                fcntl.flock(f, fcntl.LOCK_EX)
-                f.write(lines)
-        except OSError:
-            pass
+        fd = os.open(self._transcript() + SPENT, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            f.write(lines)
 
     def _send_file(self, session):
         return self._session_file(SEND_STATE, session)

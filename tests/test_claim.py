@@ -141,10 +141,11 @@ def test_a_spend_is_logged_and_the_log_is_never_read(tmp_path):
     assert (rec["label"], rec["approval"], rec["call"]) == ("Run e2e", "toolu_A", "toolu_B1")
 
 
-def test_a_log_that_cannot_be_written_spends_all_the_same(tmp_path):
+def test_a_spend_that_cannot_be_logged_raises(tmp_path):
     tp = _transcript(tmp_path)
     (tmp_path / "t.jsonl.languette-ask").mkdir()
-    assert _claim(tp, "toolu_B1")[1]
+    with pytest.raises(OSError):
+        _claim(tp, "toolu_B1")
 
 
 def _asking(label):
@@ -225,7 +226,7 @@ def _broken(kind, *args):
 def test_a_spend_that_cannot_be_recorded_is_a_deny():
     out = _spending(SimpleNamespace(spend=_broken))
     assert out["permissionDecision"] == "deny"
-    assert out["permissionDecisionReason"].startswith("languette: cannot spend")
+    assert out["permissionDecisionReason"].startswith("languette: cannot record")
     assert "Read-only file system" in out["permissionDecisionReason"]
 
 
