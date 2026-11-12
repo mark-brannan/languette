@@ -348,6 +348,22 @@ Feature: guard-signed-comments
         | read -r b < notes.txt    |
         | printf -v b '%s' later   |
         | for b in x y; do :; done |
+        | eval 'b=x'               |
+        | source ./env.sh          |
+        | let 'b=1'                |
+        | declare -n r=b; r=x      |
+
+    Scenario: a typed HEREDOC0 word does not pass for the call's own heredoc
+      When the agent runs:
+        """
+        cat <<'EOF' > /dev/null
+        🤖 Fixed.
+
+        🤖 claude-opus-5-5 · high · 5a74df74
+        EOF
+        gh pr comment 1 --body "$(cat HEREDOC0)"
+        """
+      Then the guard denies, naming "heredoc"
 
     Scenario: a heredoc built at run time cannot be read
       When the agent runs:

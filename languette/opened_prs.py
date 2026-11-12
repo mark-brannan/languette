@@ -143,20 +143,20 @@ def _create(r, s, lo, g, hi, repo, cli):
     return post
 
 
-def _api_body(r, s, g, hi, cli, key):
+def _api_body(r, s, lo, g, hi, cli, key):
     """The post a `gh api` or `glab api` call's `key` field sends, and its GhApi."""
     api, post = sw.gh_api(s, g + 2, hi, cli), _Post(forge="gitlab" if cli == "glab" else "github")
     for a in api.args:
         if a.key == key:
             if a.value.startswith("@") and a.typed:
-                post.parts.append(r.file(a.value[1:], a.live, True, s, g, hi))
+                post.parts.append(r.file(a.value[1:], a.live, True, s, lo, hi))
             else:
                 post.parts.append(r.value(a.value, a.live))
     return api, post
 
 
-def _glab_api(r, s, g, hi):
-    api, post = _api_body(r, s, g, hi, "glab", "description")
+def _glab_api(r, s, lo, g, hi):
+    api, post = _api_body(r, s, lo, g, hi, "glab", "description")
     m = _GL_PROJECT.fullmatch(api.path)
     if not m or not api.writes:
         return None
@@ -166,8 +166,8 @@ def _glab_api(r, s, g, hi):
     return post
 
 
-def _api(r, s, g, hi):
-    api, post = _api_body(r, s, g, hi, "gh", "body")
+def _api(r, s, lo, g, hi):
+    api, post = _api_body(r, s, lo, g, hi, "gh", "body")
     m = re.fullmatch(rf"repos/({_NAME}|\{{owner\}})/({_NAME}|\{{repo\}})/pulls", api.path)
     if not m or not api.writes:
         return None
@@ -194,7 +194,7 @@ def posts(doc, r):
             if s.w[g + 1] == ("mr" if cli == "glab" else "pr") and s.w[g + 2] in _CREATE:
                 out.append(_create(r, s, a, g, b, repo, cli))
             elif s.w[g + 1] == "api":
-                p = _glab_api(r, s, g, b) if cli == "glab" else _api(r, s, g, b)
+                p = _glab_api(r, s, a, g, b) if cli == "glab" else _api(r, s, a, g, b)
                 if p:
                     out.append(p)
     return out, cd

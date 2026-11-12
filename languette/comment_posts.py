@@ -113,7 +113,7 @@ class _Read:
             self.account = self.account or f"gh auth {s.w[g + 2]}"
         self.account = self.account or next((w for w in s.w[g + 1:hi + 1] if w.split("=")[0] == "--hostname"), None)
         if s.w[g + 1] == "api":
-            self.api(g, hi)
+            self.api(lo, g, hi)
             return
         v = g + 2                          # -R/--repo may come before the verb
         while v <= hi and (r := sw.gh_repo_flag(s, v, hi)):
@@ -127,7 +127,7 @@ class _Read:
                 if verb == "b" and f.value.startswith("--body"):
                     bodies.append(("opaque", say("signature_flag_shape", flag=_short(f.value))))
             elif f.value is None:
-                continue
+                bodies.append(("opaque", say("signature_flag_shape", flag=f.name)))
             elif f.name in ("--body-file", "-F"):
                 bodies.append(self.file(f, lo, hi))
             else:
@@ -135,15 +135,15 @@ class _Read:
         if bodies:
             self.posts.append(bodies)
 
-    def api(self, g, hi):
+    def api(self, lo, g, hi):
         api, fields, inp = sw.gh_api(self.s, g + 2, hi), [], None
         for a in api.args:
             if a.text is None:
                 continue
             if a.flag == "--input":
-                inp = self.bodies.file(a.text, a.live, True, self.s, g, hi)
+                inp = self.bodies.file(a.text, a.live, True, self.s, lo, hi)
             elif a.typed and a.value.startswith("@"):
-                fields.append((a.key, self.bodies.file(a.value[1:], a.live, True, self.s, g, hi)))
+                fields.append((a.key, self.bodies.file(a.value[1:], a.live, True, self.s, lo, hi)))
             elif a.key == "query" and a.live and not sw.VAR_REF.fullmatch(a.value) and not re.search(r"\$\(|`", a.value):
                 # A query is read for its shape: a $NAME inside it changes a value, never the mutation.
                 fields.append((a.key, ("text", a.value)))

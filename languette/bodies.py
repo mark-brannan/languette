@@ -37,7 +37,8 @@ class Bodies:
         self.doc = doc
         self.buf = command + "\n"
         docs = doc.heredocs(self.buf)
-        parts = doc.stripped(self.buf).split(_MARK)
+        # A typed HEREDOC must not pass for scan's mark (the bodies are read from the command as written).
+        parts = doc.stripped(self.buf.replace("HEREDOC", "HEREDOC_")).split(_MARK)
         if len(parts) - 1 == len(docs):
             self.text = "".join(p + (f" HEREDOC{k} " if k < len(parts) - 1 else "") for k, p in enumerate(parts))
             self.docs = docs
@@ -62,7 +63,7 @@ class Bodies:
         return out
 
     def heredoc(self, k):
-        if self.docs is None:
+        if self.docs is None or k >= len(self.docs):
             return ("opaque", say("body_unpaired"))
         if self.docs[k][1]:
             return ("opaque", say("body_heredoc_live"))
@@ -85,15 +86,17 @@ class Bodies:
     def _fed_var(self, name):
         """The heredoc a $NAME holds when this command assigns it once, from `$(cat <<EOF)`,
         before its first use, and never assigns it again (=, +=, read, printf -v,
-        mapfile, for, unset); else None."""
+        mapfile, for, unset), and runs nothing that could (eval, source, let, a nameref); else None."""
         t, n = self.text, re.escape(name)
         # A shell assignment, not a gh field (-f NAME=...) of the same name.
         sets = [a for a in re.finditer(r"(?:^|[\s;&|(])" + n + r"(?:\[[^\]]*\])?\+?=", t)
                 if not re.search(r"(?:-[fF]|--field|--raw-field)\s*\Z", t[:a.start() + 1])]
         again = re.search(r"(?:^|[\s;&|(`])(?:read|printf|mapfile|readarray|unset|getopts|for|select)\b"
                           r"[^;&|\n]*?(?<![$\w{])" + n + r"\b", t)
+        # eval, source, . and let assign from text these regexes never see; a nameref (declare -n) does too.
+        blind = re.search(r"(?:^|[\s;&|(`])(?:(?:eval|source|let)\b|\.(?=\s)|(?:declare|typeset|local)\s+-\w*n\b)", t)
         use = re.search(r"\$\{?" + n + r"\b", t)
-        if len(sets) != 1 or again or not use or sets[0].end() > use.start() or "+=" in sets[0].group():
+        if len(sets) != 1 or again or blind or not use or sets[0].end() > use.start() or "+=" in sets[0].group():
             return None
         fed = re.match(r"""["']?""" + _FROM_DOC.pattern, t[sets[0].end():])
         return int(fed.group(1)) if fed else None
