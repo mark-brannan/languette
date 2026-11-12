@@ -5,7 +5,7 @@
 # and network, so it is the feature's postCreateCommand, `languette install`.
 set -eu
 
-version=0.0.21 # x-release-please-version
+version=0.0.22 # x-release-please-version
 venv=/usr/local/lib/languette
 
 python_ok() {
