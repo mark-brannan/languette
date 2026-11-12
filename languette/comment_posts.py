@@ -13,7 +13,10 @@ bot's account, always: gh's GraphQL viewer is an App's (refs.bot), read with one
 gh call; gh that cannot say is an ask, as is a command that picks gh's account
 itself (a token or host variable it sets or unsets, `gh auth switch`,
 `--hostname`), where the hook's gh would answer for another; and a GitHub MCP
-tool, whose server posts with a token this hook cannot read, is a deny. And the body's first line
+tool, whose server posts with a token this hook cannot read, is what
+signed_comments_mcp says: deny, the default and the reading of an unset or
+unknown value, ask, or allow, which trusts the server's account. The
+body is judged either way. And the body's first line
 begins with signed_comments_opening and its last non-empty line matches
 signed_comments_signature, a regular expression the whole line matches, its
 `{session}` the payload's first eight hex (any eight without one). Both
@@ -50,6 +53,9 @@ TOOLS = re.compile(rf"(?:Bash|mcp__.*__(?:{_MCP}))\Z")
 _MCP_TOOL = re.compile(rf"mcp__.*__(?:{_MCP})\Z")
 OPENING = "CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_OPENING"
 SIGNATURE = "CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_SIGNATURE"
+MCP = "CLAUDE_PLUGIN_OPTION_SIGNED_COMMENTS_MCP"
+# What signed_comments_mcp may say of a post through a GitHub MCP tool; unset is the first.
+MCP_RULES = ("deny", "ask", "allow")
 _ANY_HEX = "[0-9a-f]{8}"
 _MUTATION = re.compile(r"\b(?:addComment|addPullRequestReviewComment|addPullRequestReviewThreadReply|"
                        r"addPullRequestReview|submitPullRequestReview|updateIssueComment|"
@@ -416,7 +422,14 @@ def signatures(doc, guard, found):
         return None
     also = say("signature_also", problems="; ".join(problems), shape=shape) if problems else ""
     if r is None:
-        return deny(say("signature_mcp_account", guard=guard, tool=tool, also=also))
+        rule = env.get(MCP) or MCP_RULES[0]
+        if rule not in MCP_RULES:
+            return deny(say("signature_mcp_unknown", guard=guard, rule=_short(rule), rules=", ".join(MCP_RULES)))
+        if rule == "deny":
+            return deny(say("signature_mcp_account", guard=guard, tool=tool, also=also))
+        if problems:
+            return deny(say("signature_wrong", guard=guard, problems="; ".join(problems), shape=shape))
+        return ask(say("signature_mcp_ask", guard=guard, tool=tool)) if rule == "ask" else None
     if r.account:
         # gh's own account is not the one this command posts as: reading it would answer for another.
         who = f"this command picks gh's account itself, with `{_short(r.account)}`"

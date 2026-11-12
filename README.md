@@ -345,7 +345,8 @@ example `you,your-app`; empty, the default, counts the gh login alone.
 
 `guard-signed-comments` is experimental. On, it denies any comment not posted
 from a bot's account (a GitHub App's, its login ending in `[bot]`), and any
-through a GitHub MCP tool, whose account it cannot read. It checks a signature
+through a GitHub MCP tool, whose account it cannot read, unless
+`signed_comments_mcp` says `ask` or `allow` (`deny` is the default). It checks a signature
 only for the settings you give it: `signed_comments_opening` and
 `signed_comments_signature` are empty by default, and empty checks nothing.
 

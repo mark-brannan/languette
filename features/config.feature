@@ -50,6 +50,7 @@ Feature: config
       | setting                         | row                                                                                    |
       | guard_sudo=yes                  | guard_sudo: is a switch, exactly true or false; 'yes' would leave the gate as if unset |
       | signed_comments_signature=(     | signed_comments_signature: is not a regular expression (missing ), unterminated subpattern at position 0) |
+      | signed_comments_mcp=yes         | signed_comments_mcp: is not one of deny, ask, allow                                    |
       | redacted_terms_file=~/none.tsv  | redacted_terms_file: ~/none.tsv does not exist                                         |
       | no_such_option=1                | no_such_option: languette has no such option; languette config lists them             |
       | guard_disks                     | guard_disks: is not name=value                                                         |
