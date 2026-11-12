@@ -758,3 +758,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t063054z
 - a script in the user's ask-first list matches the word as written, not resolved against a project root Undo: pass an at root for the user's list in listed_runs.approval ([#414](https://github.com/mark-brannan/languette/pull/414))
+
+### 20261112t063104z
+- deny-always reads the user's rules before the repo's; a repo rule may reuse a user rule's id, each denial naming its file Undo: swap the user and repo blocks in engine.Guard._judge ([#414](https://github.com/mark-brannan/languette/pull/414))
