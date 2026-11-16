@@ -42,6 +42,9 @@ are not running it. Not seen: a run inside a script (`make destroy`), behind a
 variable (`terraform $ACTION`), in a config file (cdk.json's requireApproval),
 or applying a saved plan (`terraform apply plan.tfplan`); nor eksctl, oc,
 helmfile, docker, ansible or a database's DROP.
+
+In dontAsk, where AskUserQuestion is denied unseen, the deny leaves the run to
+the user instead of sending the agent to ask.
 """
 
 import re
@@ -49,7 +52,7 @@ import re
 from languette import scan as sw
 from languette.messages import say
 from languette.secrets import quote
-from languette.verdict import approve, deny
+from languette.verdict import NO_PROMPT, approve, deny
 
 # id -> (approve_label, what it does, cost, what to run instead). {tool} is the
 # command word as written (terraform or tofu).
@@ -312,7 +315,13 @@ def approval(doc, guard, found):
         n, have = len(found[r]), len(approved[label])
         if have >= n:
             continue
+        if doc.mode in NO_PROMPT:  # any other mode, unknown or missing included, stays an ask
+            parts.append(say("infra_unattended", cmd=shown, what=what, rule=r, cost=cost,
+                             instead=instead.format(tool=found[r][0]), mode=doc.mode))
+            continue
         parts.append(say("infra_need", cmd=shown, what=what, rule=r,
                          times=(say("infra_times", n=n, have=have) if n > 1 else ""),
                          cost=cost, instead=instead.format(tool=found[r][0]), label=label))
+    if doc.mode in NO_PROMPT:
+        parts.append(say("unattended_way"))
     return deny(say("judged", guard=guard, why="\n\n".join(parts)))

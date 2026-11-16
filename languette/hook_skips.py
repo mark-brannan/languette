@@ -19,6 +19,9 @@ text proves nothing, and each approval allows one run: the first later call
 that skips the hooks, as the transcript shows it, spends it for good. A command that skips the
 hooks twice needs two approvals; one inside a loop or xargs is denied
 outright.
+
+In dontAsk, where AskUserQuestion is denied unseen, the deny leaves the run to
+the user instead of sending the agent to ask.
 """
 
 import re
@@ -26,7 +29,7 @@ import re
 from languette import scan as sw
 from languette.messages import say
 from languette.secrets import quote
-from languette.verdict import approve, deny
+from languette.verdict import NO_PROMPT, approve, deny
 
 APPROVE_LABEL = "Skip hooks once"
 
@@ -110,6 +113,8 @@ def approval(doc, guard, found):
                       then="Fix what the blocking hook reported, or ask the user to run it themselves."))
     if done:
         return done[0]
+    if doc.mode in NO_PROMPT:  # any other mode, unknown or missing included, stays an ask
+        return deny(say("hooks_skipped_unattended", guard=guard, mode=doc.mode, way=say("unattended_way")))
     have = len(approved[APPROVE_LABEL])
     return deny(say("hooks_skipped", guard=guard, cmd=shown, runs=runs, runs_s="s" * (runs > 1),
                     have=have, have_s="s" * (have != 1), label=APPROVE_LABEL))
