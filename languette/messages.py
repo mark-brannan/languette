@@ -389,7 +389,8 @@ MESSAGES = {
     # hooks_skipped where no one can approve (languette.verdict.NO_PROMPT).
     "hooks_skipped_unattended": (
         "{guard}: --no-verify, -n or core.hooksPath skips this repo's hooks, and that is the user's call, not "
-        "yours: a hook that blocks a commit, push or merge is telling you something. In {mode} no one is "
+        "yours: a hook that blocks a commit, push or merge is telling you something. "
+        "`{cmd}` skips them {runs} time{runs_s}. In {mode} no one is "
         "there to approve skipping them: AskUserQuestion is denied unseen. Fix what the blocking hook "
         "reported and run it without the flag. {way}"
     ),

@@ -114,7 +114,8 @@ def approval(doc, guard, found):
     if done:
         return done[0]
     if doc.mode in NO_PROMPT:  # any other mode, unknown or missing included, stays an ask
-        return deny(say("hooks_skipped_unattended", guard=guard, mode=doc.mode, way=say("unattended_way")))
+        return deny(say("hooks_skipped_unattended", guard=guard, cmd=shown, runs=runs, runs_s="s" * (runs > 1),
+                         mode=doc.mode, way=say("unattended_way")))
     have = len(approved[APPROVE_LABEL])
     return deny(say("hooks_skipped", guard=guard, cmd=shown, runs=runs, runs_s="s" * (runs > 1),
                     have=have, have_s="s" * (have != 1), label=APPROVE_LABEL))

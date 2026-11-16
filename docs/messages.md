@@ -152,7 +152,7 @@ home_not_absolute: {guard}: $HOME is not an absolute path, cannot resolve target
 
 ```
 hooks_skipped: {guard}: --no-verify, -n or core.hooksPath skips this repo's hooks, and that is the user's call, not yours: a hook that blocks a commit, push or merge is telling you something. `{cmd}` skips them {runs} time{runs_s} and has {have} unspent approval{have_s}. Better, fix what the blocking hook reported and run it without the flag. If the user must have the hooks skipped, call AskUserQuestion: give the exact command and why it cannot pass the hooks, with one option labelled exactly "{label}" and one to decline. One approval is one run; ask again before skipping the hooks again.
-hooks_skipped_unattended: {guard}: --no-verify, -n or core.hooksPath skips this repo's hooks, and that is the user's call, not yours: a hook that blocks a commit, push or merge is telling you something. In {mode} no one is there to approve skipping them: AskUserQuestion is denied unseen. Fix what the blocking hook reported and run it without the flag. {way}
+hooks_skipped_unattended: {guard}: --no-verify, -n or core.hooksPath skips this repo's hooks, and that is the user's call, not yours: a hook that blocks a commit, push or merge is telling you something. `{cmd}` skips them {runs} time{runs_s}. In {mode} no one is there to approve skipping them: AskUserQuestion is denied unseen. Fix what the blocking hook reported and run it without the flag. {way}
 ```
 
 ## host
