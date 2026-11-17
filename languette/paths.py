@@ -395,12 +395,8 @@ def read_json(path):
     """The file at path, parsed as JSON, or Refuse naming why it cannot be."""
     try:
         text = yield Need("read", path, MAX_READ)
-    except UnicodeDecodeError as e:
-        raise Refuse(f"not JSON ({e})")
-    except ValueError as e:                    # not a regular file, or past MAX_READ
-        raise Refuse(str(e))
-    except OSError as e:
-        raise Refuse(f"unreadable ({e.strerror})")
+    except (UnicodeDecodeError, OSError, ValueError) as e:
+        raise read_refusal(e)
     try:
         return json.loads(text)
     except ValueError as e:
