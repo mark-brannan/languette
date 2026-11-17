@@ -55,7 +55,7 @@ try:
     from languette.messages import say
     from languette import comment_posts, engine, issue_writes, opened_prs, posts, record, secrets
     from languette.document import Document
-    from languette.verdict import LOST, SPEND, Act, deny, verdict
+    from languette.verdict import ASKS, LOST, SPEND, Act, deny, verdict
     from languette.world import ACTS, World
 
     def _load(name):
@@ -265,7 +265,7 @@ def _respond(payload, env, only):
         r, crashed = _finding(g, doc, world, acts)
         findings.append((g.NAME, r, crashed))
     judged = (world, payload, findings, acts, doc)
-    fields = _spend(world, event, findings, verdict(event, findings, doc.mode, lambda: doc.chained))
+    fields = _spend(world, event, findings, verdict(event, findings, doc.mode, lambda: doc.chained, env.get(ASKS)))
     return (_out(event, fields) if fields else ""), judged
 
 
