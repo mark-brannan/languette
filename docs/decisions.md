@@ -9,9 +9,10 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 - An approval has no time limit: it stands until a run spends it or its
   transcript ends, a resumed session included
   ([#84](https://github.com/mark-brannan/languette/issues/84)).
-- Why: a timer costs a second question and click and buys nothing. Over
-  9,954 local transcripts (2026-11-16), 16 of 18 guard-label yeses were spent
-  within 12 s of the click, none across a resume. Of the 2 unspent, one's
+- Why (the agent's reading, not a quote): a timer costs a second question and
+  click and buys nothing. Over 9,954 local transcripts (2026-11-16), 16 of 18
+  guard-label yeses were spent within 12 s of the click, none across a resume.
+  Of the 2 unspent, one's
   write was refused by another guard and its session ended 3 min later; the
   other was left over by a write that took the human turn's door, a defect at
   that write, not a reason for a clock.
