@@ -13,8 +13,8 @@ No guard is changed here. Follows [#183](https://github.com/mark-brannan/languet
 | Corpus | the October 2026 replay's 108,896 distinct Bash commands, recorded from agent sessions (`features/require-well-formed.feature` names 101,671 of them). Kept privately, with its paths; only the anonymised examples below are published. |
 | Code | `main` at `e20b2ad` |
 | Guards | all of them; the five opt-in ones (guard-review-threads, guard-signed-comments, guard-sudo, guard-worktrees, prose-budget-commit) switched on; every option else at its default. No blocked-terms file, no signature set, no `prose_budget_command`. |
-| World | stubbed: no git, no `gh api`, no transcript, no rulesets. The cwd is an empty directory that is no repository. A command that `cd`s somewhere finds nothing there. |
-| Cost | 1,000 commands took 4.8 s on 8 worker processes, so the whole corpus would take about 520 s, over the 5-minute bound. **Sample: every third command, 36,299 of 108,896, 254 s** (load 14 to 23 from other work on the machine, 16 cores). |
+| World | stubbed: no git, no transcript, no rulesets, and no forge `gh api` read, except gh's account read (below). The cwd is an empty directory that is no repository. A command that `cd`s somewhere finds nothing there. |
+| Cost | 1,000 commands took 4.8 s on 8 worker processes, so the whole corpus would take about 520 s, longer than the run was meant to take (kept under five minutes). **Sample: every third command, 36,299 of 108,896, 254 s** (load 14 to 23 from other work on the machine, 16 cores). |
 | Result | 32,194 allowed (88.7%); 4,105 denied or asked (11.3%). A command can trip several guards: 3,786 tripped one, 319 tripped two to four, so the per-guard counts below sum to more than 4,105. |
 
 Every guard not listed (prose-budget-commit and guard-private-terms among
@@ -64,6 +64,9 @@ invented, the shape is kept.
 
 The guard is on with no signature set, so it checks only the account, and the
 replay's `gh` account is a person's. Every post is a deny there, as designed.
+This needs gh's account read to answer with a person's login: a read that fails
+gives an ask, not a deny (checked on one command each way). The 1,492 count was not
+re-derived when this was corrected.
 
 | Example | Verdict |
 |---|---|
@@ -72,9 +75,11 @@ replay's `gh` account is a person's. Every post is a deny there, as designed.
 | `gh api graphql -f query='query{repository(owner:"o",name:"r"){pullRequest(number:3){reviewThreads(first:20){nodes{id isResolved}}}}}'` | deny: **looks false**, a read |
 
 **Looks false, 592 rows:** a `gh api graphql` query with no mutation in it posts
-nothing, yet it is denied as a post. `bodies()` in `languette/comment_posts.py`
-returns no body for it, and `posted` starts true when no opening or signature is set,
-so the account check fires on a read. With a signature set the read passes.
+nothing, yet it is denied as a post. `posted()` in `languette/comment_posts.py`
+counts every `gh api graphql` call that carries a query as a post (`_Read.api`),
+and `signatures()` reads the bodies, where a query with no mutation has none, only
+when an opening or signature is set. With neither set nothing is read, so the
+account check fires on a read. With a signature set the read passes.
 `gh api graphql -f query='query{viewer{login}}'` alone reproduces it.
 
 ### guard-bypass-ruleset (840 asks, 3 denies)
@@ -130,10 +135,10 @@ missing directory; both are the replay's missing directories.
 | Example | Verdict |
 |---|---|
 | `S=/tmp/scratch; cd "$S"; echo hi > notes.txt` | deny: **looks false** |
-| `cd $S && cat > LICENSE <<'EOF' ...` | deny: **looks false** |
+| `S=/tmp/w; cd "$S" && cat > LICENSE <<'EOF' ...` | deny: **looks false** |
 | `S=/tmp/s; cd "$S"; printf x > out.log` | deny: **looks false** |
 
-**Looks false, about 175 rows:** a redirect to a relative file after a `cd "$VAR"`
+**Looks false, up to about 175 rows (an upper bound):** a redirect to a relative file after a `cd "$VAR"`
 is denied because the `cd` "may move the working directory into /dev". The same
 command assigns `S` a literal path one statement earlier, so the hook could know
 where it lands. It is a fail-closed read of a `cd`; it fires on the most common scratch-directory pattern.
@@ -142,14 +147,17 @@ existing still denies, with the same reason, and so does the same command with t
 directory missing. The hook does not expand `$S` either way, so the empty replay
 world does not decide it (the "needs a fact the replay lacks" count of 175 for this guard
 is the reason's words matching `cd`, and overstates the stub's part).
+The 175 is every `cd "$VAR"` followed by a relative redirect, so it includes
+correct denies, where the variable was never set in the command (`cd "$S" && echo hi > notes.txt`
+is rightly denied). How many assign a literal path first was not re-counted.
 
 ### guard-github-issues (173 denies)
 
 | Example | Verdict |
 |---|---|
-| `gh issue create --title "Bug" --body "..."` | deny: no transcript to find the user's yes; the door is shut by default |
+| `gh issue create --title "Bug" --body "..."` | deny: cannot read the transcript to find the user's yes, so the door is shut |
 | `gh issue create` twice in one call | deny: one per human turn: as designed |
-| `gh api graphql ... resolveReviewThread ...` | deny: may resolve a thread, the guard can't tell which |
+| `gh api graphql -f query="$Q" -f id=x` | deny: the graphql query is not written out in the command, so it counts as an issue write |
 
 Of the 173, 96 are the missing transcript and 11 are a batch of creates.
 
@@ -175,14 +183,14 @@ Of the 173, 96 are the missing transcript and 11 are a batch of creates.
 |---|---|
 | `git push --no-verify -u origin feature-x` | deny: no transcript for the user's approval |
 | `git push --no-verify origin HEAD:fix-y` | deny: as above |
-| `git commit --no-verify -am "docs"` | deny: `-a` is itself blocked |
+| `git commit --no-verify -am "docs"` | deny: no transcript for the user's approval; guard-git-work-loss also denies the `-a` |
 
 ### guard-secrets (43 asks, 9 denies)
 
 | Example | Verdict |
 |---|---|
 | `ssh host 'date -u +"now: %Y-%m-%dT%H:%M:%SZ"'` | ask: **looks false**, `-u` read as a user:password flag |
-| `curl -s localhost:8080/api -H 'Cookie: mockstate=watch'` | ask: **looks false**, a test cookie |
+| `curl -s localhost:8080/api -H 'Cookie: mode=watch'` | ask: **looks false**, a test cookie |
 | `TOK=$(cat $S/tok.txt); curl -H "Authorization: Bearer $TOK" ...` | ask: reads a secret into a variable |
 
 **Looks false, at least 6 rows:** the `date -u` and test-cookie shapes. The
@@ -192,7 +200,7 @@ other asks name `password`, `token` or `Authorization` and were not judged one b
 
 | Example | Verdict |
 |---|---|
-| `git push origin --delete fix-or-greater-grading` | ask: the open-PR list could not be read |
+| `git push origin --delete fix-sample-branch` | ask: the open-PR list could not be read |
 | `git push origin --delete feature-y` | ask: as above |
 | `git -C ../other push origin --delete b` | ask: a repository other than the cwd's |
 
@@ -218,7 +226,7 @@ Eleven of 36,299, matching the earlier 1 in 3,000.
 
 ## What this says
 
-- Of 4,105 firings, about 2,100 need a fact the replay lacks (a repository,
+- Of the 4,507 firings (the table's counts; 4,105 commands fired), about 2,100 need a fact the replay lacks (a repository,
   a transcript, a cwd); a live session would pass some of them.
 - Two guards fire on commands that are plainly harmless and need a look in
   the audit: guard-signed-comments on a graphql read (592) and guard-secrets
