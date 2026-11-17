@@ -71,6 +71,9 @@ did not run (#84).
   call are spent together. A spend lost to a parallel call, or one that
   cannot be recorded, makes the call a deny: act's one refusal, the only
   decision after the verdict.
+- **A yes has no clock.** It stands until a run spends it or its transcript
+  ends, a resumed session included; a yes left unspent is fixed where it was
+  left, not by a clock ([decisions](../decisions.md), Approval credit).
 - **Nobody to answer:** an ask falls back to a deny, in the verdict, from the
   mode. The fallback sits outside every guard so it can change without
   touching one; whether it is configurable is open (#84).
