@@ -809,3 +809,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261117t001934z
 - seven new I/O pins added by hand from the failing assertions, not by the full regenerate run Undo: run LANGUETTE_PIN_IO=update pytest --full -n 0 tests/test_features.py ([#422](https://github.com/mark-brannan/languette/pull/422))
+
+### 20261117t094327z
+- Only the first unclosed heredoc opener holds the rest of the text as its body, a later one holds nothing; the walk goes on (replaces: the walk ends at the first unclosed opener) Undo: Restore the early return after an unclosed opener in quoting._heredocs ([#430](https://github.com/mark-brannan/languette/pull/430))
