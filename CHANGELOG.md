@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.28](https://github.com/mark-brannan/languette/compare/v0.0.27...v0.0.28) (2026-11-17)
+
+
+### Bug Fixes
+
+* **reads:** cap the uncapped reads, hold an unclosed heredoc's text once ([#430](https://github.com/mark-brannan/languette/issues/430)) ([9167eb1](https://github.com/mark-brannan/languette/commit/9167eb10c770326f646a5e74fc50d765721211ea))
+
+
+### Documentation
+
+* **approvals:** a yes keeps no clock, and why that costs the user less ([#425](https://github.com/mark-brannan/languette/issues/425)) ([21158ff](https://github.com/mark-brannan/languette/commit/21158ff57369438da4c78d45348a4f97f41e91ed))
+* **decisions:** languette does not detect a headless run ([#427](https://github.com/mark-brannan/languette/issues/427)) ([f040cb0](https://github.com/mark-brannan/languette/commit/f040cb004580f649d6dcc1d62daacb4a844666fa))
+* **forges:** glab mr note verbs verified; why two guards have no GitLab row ([#429](https://github.com/mark-brannan/languette/issues/429)) ([dcca87b](https://github.com/mark-brannan/languette/commit/dcca87b0be8d5cf00d2cae76496a3b676eb029c3))
+* **research:** every guard on, replayed over recorded agent commands (sampled) ([#431](https://github.com/mark-brannan/languette/issues/431)) ([91396c8](https://github.com/mark-brannan/languette/commit/91396c882f02ec1b6e428620416735abb2abc5ad))
+
 ## [0.0.27](https://github.com/mark-brannan/languette/compare/v0.0.26...v0.0.27) (2026-11-17)
 
 
