@@ -435,6 +435,12 @@ MESSAGES = {
         "whether the push goes around a rule that requires a pull request. Name the branch, "
         "written out: `{prog} push {remote} <branch>`."
     ),
+    "ruleset_heads_unknown": (
+        "guard-bypass-ruleset: this vcsh push sends the current branch of every repository, and the "
+        "hook can't tell which branches those are, so it can't check whether a push goes around a "
+        "rule that requires a pull request. Push one repository at a time, its branch written out: "
+        "`vcsh <repo> push <remote> <branch>`."
+    ),
     "ruleset_repo_unknown": (
         "guard-bypass-ruleset: this pushes to `{branch}` through remote `{remote}`, in a repository the "
         "hook can't find (a cd or -C it can't follow, or GIT_DIR), so it can't ask GitHub whether "

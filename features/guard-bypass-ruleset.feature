@@ -234,6 +234,14 @@ Feature: guard-bypass-ruleset
       | gh $p merge 5                     | a gh subcommand built at run time     |
       | gh -R $R api x                    | a run-time repo value may split into a group |
 
+  Scenario: a bare vcsh push asks with a fix it can follow, one repository at a time
+    When the agent runs `vcsh push`
+    Then the guard asks, naming "vcsh <repo> push <remote> <branch>"
+
+  Scenario: a current-branch push the hook can't read names the push's own remote in its fix
+    When the agent runs `cd "$d" && git push upstream`
+    Then the guard asks, naming "git push upstream <branch>"
+
   Scenario Outline: a cd the shell may undo before the push asks
     Given a clone of "https://gitlab.com/o/r.git" at "{TMP}/g" on branch "main"
     When the agent runs `<command>`
