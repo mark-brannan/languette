@@ -137,6 +137,11 @@ missing directory; both are the replay's missing directories.
 is denied because the `cd` "may move the working directory into /dev". The same
 command assigns `S` a literal path one statement earlier, so the hook could know
 where it lands. It is a fail-closed read of a `cd`; it fires on the most common scratch-directory pattern.
+Not a stub artifact: the first example run alone with `/tmp/scratch` really
+existing still denies, with the same reason, and so does the same command with the
+directory missing. The hook does not expand `$S` either way, so the empty replay
+world does not decide it (the "needs a fact the replay lacks" count of 175 for this guard
+is the reason's words matching `cd`, and overstates the stub's part).
 
 ### guard-github-issues (173 denies)
 
