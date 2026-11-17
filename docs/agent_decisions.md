@@ -818,3 +818,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261117t095624z
 - An unclosed heredoc ends the heredoc walk: nothing below it is stripped, at the cost of a false deny on prose below a delimiter the parser reads short Undo: let the heredoc walk go on past an unclosed opener, the first one holding the rest (commit 907b7ae) ([#430](https://github.com/mark-brannan/languette/pull/430#issuecomment-6944701748)) ([#430](https://github.com/mark-brannan/languette/pull/430))
+
+### 20261117t220830z
+- replay asks sorted into #433's three situations from per-guard counts and example reasons, shown as ranges Undo: recount per site from the private corpus ([#436](https://github.com/mark-brannan/languette/pull/436))
