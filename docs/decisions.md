@@ -4,6 +4,18 @@ Decisions that settle languette's public interface. The README says what the
 interface is; this file says what was decided and why, one line each. Every
 line is the maintainer's (@mark-brannan) unless it says otherwise.
 
+## Headless runs: 2026-11-16
+
+- Languette does not detect a headless run
+  ([#164](https://github.com/mark-brannan/languette/issues/164)).
+- Measured 2026-11-16: with `claude -p --permission-mode bypassPermissions`,
+  a push that `guard-bypass-ruleset` asks about was denied, and the agent
+  read the ask's text as the reason.
+- Why: an unattended launcher passing `dontAsk` was the proposed design. "if
+  we are not currently passing 'dontAsk' to our headless sessions, then why
+  would we have any reason to think the average, casual user would do the
+  same?"
+
 ## Approval credit: 2026-11-16
 
 - An approval has no time limit: it stands until a run spends it or its
