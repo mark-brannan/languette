@@ -4,6 +4,20 @@ Decisions that settle languette's public interface. The README says what the
 interface is; this file says what was decided and why, one line each. Every
 line is the maintainer's (@mark-brannan) unless it says otherwise.
 
+## Approval credit: 2026-11-16
+
+- An approval has no time limit: it stands until a run spends it, for the
+  life of the session's transcript, a resumed session included
+  ([#84](https://github.com/mark-brannan/languette/issues/84)). The README's
+  Ask first section gives the user the reason in terms of cost.
+- Why: "Seems like a hedge to add 5 minutes. If we have a yes per
+  session/per-transcript then it still has a fairly strong guarantee on
+  duration." And: "re-asking will cost tokens at a high cost". Measured
+  2026-11-16 over 9,954 local transcripts: of 18 guard-label yeses, 16 were
+  spent, the slowest 12 s after the click, and none crossed a resume. The one
+  stale yes found was left unspent by its own write, a defect at that write,
+  not a reason for a clock.
+
 ## Rules engine: 2026-11-05
 
 - Current thinking: the aim is a rules engine with no hand-built guards; a
