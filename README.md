@@ -355,11 +355,10 @@ only for the settings you give it: `signed_comments_opening` and
 `signed_comments_signature` are empty by default, and empty checks nothing.
 
 `asks` says what a guard's ask becomes. `prompt`, the default, shows you the
-permission prompt. `deny` denies the call instead and tells the agent what
-the guard would have asked. Most asks are a guard that could not read the
-call (a branch held in a variable, a `cd` it cannot follow), so the agent
-writes it out and runs it again, and you see no prompt; a call that is yours
-to approve is left for you to run. Any other value denies too.
+permission prompt. `deny` denies the call and tells the agent what the guard
+would have asked, so it restates the call and you see no prompt. A call only
+you can approve is then yours to run, and one with no command, such as an MCP
+post, can't be made.
 
 `record_decisions`, off by default, keeps every verdict, with its command and
 secrets masked, in `$XDG_STATE_HOME/languette/decisions.jsonl`, readable only by you.
