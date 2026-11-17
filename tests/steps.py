@@ -57,16 +57,6 @@ def _project(ctx):
     (ctx.proj / "t.jsonl").touch()             # a session has a transcript, if an empty one
 
 
-@given("the project directory is not a git repository")
-def _not_a_repo(ctx):
-    shutil.rmtree(ctx.proj / ".git")
-
-
-@given("the project's git index is corrupt")
-def _corrupt_index(ctx):
-    (ctx.proj / ".git/index").write_text("not an index\n")
-
-
 @given(parsers.parse('the file "{rel}" holds:'))
 def _file(ctx, rel, docstring):
     # A path under {HOME} or {TMP} is absolute once expanded; any other is the project's.
@@ -74,12 +64,6 @@ def _file(ctx, rel, docstring):
     f = Path(ctx.proj or "/", ctx.expand(rel))
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(ctx.expand(docstring))
-
-
-@given(parsers.parse('the file "{rel}" is committed'))
-def _file_committed(ctx, rel):
-    _git(str(ctx.proj), "add", "--", rel)
-    _git(ctx.proj, "commit", "-q", "-m", "x", "--", rel)
 
 
 @given(parsers.re(r"the (?P<kind>blocked|redacted) terms file holds:"))
@@ -138,11 +122,6 @@ def _all_off(ctx):
     # An ordinary guard's option exactly "false"; an opt-in guard's unset, its default.
     for g in {g for _, _, gs in run.GUARDS for g in gs}:
         ctx.env[run.option(g)] = None if hasattr(g, "OPT_IN") else "false"
-
-
-@given("no engine is configured")
-def _no_engine(ctx):
-    ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = None
 
 
 @given(parsers.re(r"(?P<var>[A-Z][A-Z0-9_]*) is unset"))
@@ -376,33 +355,6 @@ def _add_remote(ctx, path, name, url):
 @given(parsers.parse('"{path}" has remote.{name}.gh-resolved "{value}"'))
 def _gh_resolved_value(ctx, path, name, value):
     _git(ctx.expand(path), "config", f"remote.{name}.gh-resolved", value)
-
-
-def _engine(ctx, command):
-    # The prose_budget_command option names the engine.
-    ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = command
-
-
-@given('the stub "prose-budget" is the engine')
-def _prose_budget_stub(ctx):
-    ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
-    _engine(ctx, str(ROOT / "tests/stubs/prose-budget"))
-
-
-@given('the stub "prose-budget" is the engine, at a relative path')
-def _prose_budget_stub_relative(ctx):
-    assert ctx.proj, "test setup: a relative engine path needs a project directory"
-    ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
-    dest = ctx.proj / "prose-budget"
-    shutil.copy(ROOT / "tests/stubs/prose-budget", dest)
-    dest.chmod(0o755)
-    _engine(ctx, "./prose-budget")
-
-
-@given('the stub "prose-budget" is the engine, by bare name on PATH')
-def _prose_budget_stub_bare(ctx):
-    ctx.stubs, ctx.stub_log = ("prose-budget",), ctx.stub_log or ctx.mkdtemp()
-    _engine(ctx, "prose-budget")
 
 
 @given(parsers.re(r'PATH holds only "(?P<tools>[^"]*)"(?P<gh> and the stub "gh")?'))

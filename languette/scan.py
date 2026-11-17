@@ -18,7 +18,7 @@ from .lexicon import (basename, CD, client, CLIENTS, getopt, GH, GIT, GIT_PUSH_V
                       PROSE, PROSE_PROCESS, SHELL)
 from .ladder import (BASH_TIMEOUT, check, KEYWORD_LEADS, LENGTH_MAX, parse, RunFailed, RUNGS, shfmt,
                      SHFMT_MIN, SHFMT_TIMEOUT, TooBig, TooMany, Unparseable, weight)
-from .git_calls import add_options, git_env, git_wrapper, GitCall, long_option, UnreadOption, wrapper_git
+from .git_calls import add_options, git_env, git_wrapper, GitCall, long_option, wrapper_git
 from .lexer import Scan, seg_cmd, UNREADABLE, word, word_live
 from .forges import (Flag, flag_value, flag_words, FORGES, gh_api, gh_api_arg, gh_api_path, GH_API_VALUE, gh_env_repo, gh_repo, gh_repo_flag,
                      GH_REPO_FLAGS, gh_verb, gl_project, GRAPHQL, GRAPHQL_READ, norm_repo, PAGE, Remote, remote)

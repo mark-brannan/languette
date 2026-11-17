@@ -293,3 +293,15 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 - 2026-11-01: the session-start hook regenerates it too:
   `/plugin install languette` runs no `languette` command. Pencil
   ([#338](https://github.com/mark-brannan/languette/pull/338)).
+
+## Evict prose-budget-commit: 2026-11-16
+
+- `prose-budget-commit` and its `prose_budget_commit` and
+  `prose_budget_command` settings are removed: a shipped guard must not know
+  the maintainer's own tooling, because it named an engine no stranger has.
+  Pencil ([#428](https://github.com/mark-brannan/languette/pull/428)).
+- No migration. A settings file that still names either key is read as any
+  unknown key is: ignored.
+- `tests/test_portability.py` holds the line over the package, the hooks, the
+  plugin manifest, the devcontainer feature, the specs, the tests, the README
+  and the design docs; dated records and the repo's own CI are left out.

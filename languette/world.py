@@ -146,8 +146,6 @@ class World:
         return data.decode("utf-8")
 
     def _path(self, op, path):
-        if op == "executable":
-            return os.path.isfile(path) and os.access(path, os.X_OK)
         if op not in ("isdir", "isfile", "islink", "exists", "lexists", "realpath"):
             raise ValueError(f"no path fact {op!r}")
         return getattr(os.path, op)(path)

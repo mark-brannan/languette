@@ -1093,7 +1093,7 @@ Feature: guard-private-terms
       @also_guard-signed-comments
       Examples:
         | command                                                      | verdict                      |
-        | gh pr comment 3 -R o/r -b 'Fixed in `abc123`, see `prose-budget`.' | is silent             |
+        | gh pr comment 3 -R o/r -b 'Fixed in `abc123`, see `make-lint`.' | is silent             |
         | gh pr comment 3 -R o/r -b "Fixed in `git rev-parse HEAD`"    | denies                       |
         | gh pr comment 3 -R o/r -b 'Fixed on `Wanderlust`.'           | denies, naming "Wanderlust"  |
 

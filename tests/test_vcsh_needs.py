@@ -10,7 +10,7 @@ from languette.document import Document
 from languette.run import GUARD
 from languette.verdict import Need
 
-guard_bypass_ruleset, prose_budget_commit = GUARD["guard-bypass-ruleset"], GUARD["prose-budget-commit"]
+guard_bypass_ruleset = GUARD["guard-bypass-ruleset"]
 
 ENV = {"HOME": "/home/u", "XDG_CONFIG_HOME": "/home/u/.config"}
 
@@ -44,13 +44,6 @@ def test_ruleset_runs_nothing_for_a_vcsh_word_that_is_not_a_repository(command):
     assert [n for n in seen if n.kind == "git"] == []
 
 
-@pytest.mark.parametrize("repo", ["init", "clone", "delete", "run", "rename", "dots/x", "../dots", ".dots", "-x", ""])
-def test_a_commit_listing_runs_nothing_for_a_vcsh_word_that_is_not_a_repository(repo):
-    seen = needs(prose_budget_commit, f"vcsh {repo} commit -a -m x")
-    assert "vcsh" not in programs(seen)
-    assert [n for n in seen if n.kind == "run" and any(str(a).startswith("--git-dir") for a in n.args)] == []
-
-
 @pytest.mark.parametrize("command", ["vcsh dots push origin main", "vcsh run dots git push origin main"])
 def test_ruleset_asks_git_about_the_repositorys_own_git_dir_never_vcsh(command):
     seen = needs(guard_bypass_ruleset, command)
@@ -65,10 +58,3 @@ def test_the_git_dir_follows_xdg_config_home_and_a_relative_one_is_refused():
     assert {n.args[2] for n in seen if n.kind == "git"} == {"--git-dir=/x/vcsh/repo.d/dots.git"}
     seen = needs(guard_bypass_ruleset, "vcsh dots push origin main", {"HOME": "/h", "XDG_CONFIG_HOME": "x"})
     assert [n for n in seen if n.kind == "git"] == []
-
-
-def test_a_commit_listing_runs_git_against_the_repositorys_git_dir():
-    seen = needs(prose_budget_commit, "vcsh dots commit -a -m x")
-    runs = [n.args for n in seen if n.kind == "run" and n.args[2] == "/usr/bin/git"]
-    assert runs and all(a[3:5] == ("--git-dir=/home/u/.config/vcsh/repo.d/dots.git", "--work-tree=/home/u") for a in runs)
-    assert "vcsh" not in programs(seen)

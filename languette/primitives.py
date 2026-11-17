@@ -14,7 +14,7 @@ import os
 import re
 
 from languette import (branch_deletions, comment_posts, hook_skips, infra_runs, issue_writes, labels, listed_runs,
-                       opened_prs, paths, posts, prose_commits, pushes, secrets, thread_resolves, untrusted_reads,
+                       opened_prs, paths, posts, pushes, secrets, thread_resolves, untrusted_reads,
                        work_losses, worktree_reaches)
 from languette import scan as sw
 from languette.messages import say
@@ -669,8 +669,7 @@ TESTS = {"power-word": power_word, "fork-bomb": fork_bomb, "pipe-to-shell": pipe
          "send-elsewhere": untrusted_reads.sent,
          "issue-writes": issue_writes.written, "pr-opens": opened_prs.opened,
          "work-losses": work_losses.losses, "worktree-reaches": worktree_reaches.reaches,
-         "thread-resolves": thread_resolves.resolves, "comment-posts": comment_posts.posted,
-         "prose-commits": prose_commits.commits}
+         "thread-resolves": thread_resolves.resolves, "comment-posts": comment_posts.posted}
 
 # The handlers a rule's `handler` may name: a stateful guard's code, which gathers the facts
 # its rule needs and judges them. handler(doc, guard, found) is a generator, given the call,
@@ -684,7 +683,7 @@ HANDLERS = {"hooks-approval": hook_skips.approval, "open-prs": branch_deletions.
             "door-spend": issue_writes.door_spend, "issue-timelines": opened_prs.timelines,
             "terms-init": posts.terms_init, "tree-state": work_losses.tree_state,
             "own-places": worktree_reaches.own_places, "thread-replies": thread_resolves.replies,
-            "signatures": comment_posts.signatures, "prose-budget": prose_commits.budget}
+            "signatures": comment_posts.signatures}
 
 
 def judges(name):

@@ -1,7 +1,6 @@
 """The harness the step vocabulary and fixtures share: engines, the scrubbed
 environment, a scenario's Ctx, and the hooks.json lookups."""
 
-import atexit
 import json
 import os
 import random
@@ -33,8 +32,7 @@ def stand_in(monkeypatch, name, value):
             monkeypatch.setattr(mod, name, value)
 # Never inherited from the caller's shell: each would change a verdict.
 SCRUB = ("LANGUETTE_RM_ALLOW", "LANGUETTE_PERM_ALLOW", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT", "GH_FAIL", "GH_TAB",
-         "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "PROSE_BUDGET_FAIL", "PROSE_BUDGET_CRASH", "CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND",
-         "CLAUDE_CODE_TMPDIR", "CLAUDE_CONFIG_DIR", "GH_RULES", "GH_PROTECTION", "GH_TIMELINE", "GH_LOGIN", "GH_THREADS", "XDG_CACHE_HOME", "XDG_CONFIG_HOME")
+         "TIMEOUT_HANG", "LANGUETTE_STUB_LOG", "CLAUDE_CODE_TMPDIR", "CLAUDE_CONFIG_DIR", "GH_RULES", "GH_PROTECTION", "GH_TIMELINE", "GH_LOGIN", "GH_THREADS", "XDG_CACHE_HOME", "XDG_CONFIG_HOME")
 
 
 _REAL_HOME = os.environ.get("HOME")
@@ -328,28 +326,9 @@ def _respond_all(stdin, env, seen, docs):
 
 
 
-_SHADOWS = {}
-
-
-def _without_prose_budget(d):
-    """`d` itself when it holds no real prose-budget; else a directory linking every other program
-    in `d` (made once, removed at exit), so only that one program is hidden."""
-    if not os.access(os.path.join(d, "prose-budget"), os.X_OK):
-        return d
-    if d not in _SHADOWS:
-        shadow = tempfile.mkdtemp(prefix="languette-shadow-")
-        atexit.register(shutil.rmtree, shadow, ignore_errors=True)
-        for name in os.listdir(d):
-            if name != "prose-budget":
-                os.symlink(os.path.join(d, name), os.path.join(shadow, name))
-        _SHADOWS[d] = shadow
-    return _SHADOWS[d]
-
-
 def real_path():
-    """The machine's PATH with only a real prose-budget hidden (its directory's other programs stay),
-    so no verdict or pinned count depends on whether this machine has the engine installed."""
-    return os.pathsep.join(_without_prose_budget(d) for d in os.environ["PATH"].split(os.pathsep))
+    """The machine's PATH."""
+    return os.environ["PATH"]
 
 
 def answered(check, answer):
