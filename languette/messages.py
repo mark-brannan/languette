@@ -386,7 +386,7 @@ MESSAGES = {
         " If a cheaper form answers the question, use it instead. Otherwise call AskUserQuestion: "
         "give the exact command (`{cmd}`), why it must run now, and the "
         "cost above, with one option labelled exactly \"{label}\" and one to skip. "
-        "One approval is one run; ask again before running it again. {way}"
+        "One approval is one run; ask again before running it again."
     ),
     "ask_first_unattended": (
         "`{id}` ({path}) needs the user's approval for each run, and in {mode} no one is there to "
@@ -606,7 +606,7 @@ MESSAGES = {
         "`{cmd}` {what} (`{rule}`){times}. Cost: {cost}. Instead, look first: {instead}."
         " If the user then wants this run, call AskUserQuestion: give the exact command, why it must run "
         "now and the cost above, with one option labelled exactly \"{label}\" and one to skip. "
-        "One approval is one run; ask again before running it again. {way}"
+        "One approval is one run; ask again before running it again."
     ),
     # infra_need where no one can approve (languette.verdict.NO_PROMPT); unattended_way follows once.
     "infra_unattended": (
@@ -825,7 +825,7 @@ MESSAGES = {
         "directory; elsewhere it sweeps in files a parallel session is working on."
     ),
 }
-# Said at the end of every ask outside NO_PROMPT: the same hand-over, for a run no one is watching.
+# Said at the end of every AskUserQuestion ask outside NO_PROMPT: the same hand-over, for a run no one is watching.
 MESSAGES["ask_way"] = "No one at the prompt? " + MESSAGES["unattended_way"]
 
 

@@ -196,8 +196,6 @@ def approval(doc, guard, found):
             continue
         parts.append(say("ask_first_need", id=c["id"], path=path,
                          times=(say("ask_first_times", n=n, have=have) if n > 1 else ""),
-                         cost=c["cost"], cheaper=cheaper, cmd=shown, label=c["approve_label"],
-                         way=say("ask_way")))
-    if doc.mode in NO_PROMPT:
-        parts.append(say("unattended_way"))
+                         cost=c["cost"], cheaper=cheaper, cmd=shown, label=c["approve_label"]))
+    parts.append(say("unattended_way") if doc.mode in NO_PROMPT else say("ask_way"))
     return deny(say("judged", guard=guard, why="\n\n".join(parts)))
