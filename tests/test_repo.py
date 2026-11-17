@@ -13,7 +13,7 @@ import pytest
 from hamcrest import assert_that, contains_string, empty, equal_to, is_, is_not
 
 import readme_table
-from harness import answered, hooks_json,hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
+from harness import answered, hooks_json, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
 from languette import engine, run, scan
 from languette import comment_posts, issue_writes, opened_prs, posts
 from languette.world import World
