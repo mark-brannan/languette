@@ -32,6 +32,24 @@ MESSAGES = {
         "Don't work around it: if the call still needs making, the user makes it themselves. Say what "
         "it is for and hand them the exact call."
     ),
+    # An ask under the asks option's deny (languette.verdict.ASKS), in any mode.
+    "asks_denied": (
+        "{guard}: the asks setting is `{rule}`, so this is denied instead of asked. What it would "
+        "have asked: {why}"
+    ),
+    # An asks value that is neither: the gate stays closed, and the reason says the setting is wrong.
+    "asks_unknown": (
+        "{guard}: the asks setting `{rule}` is not one of {rules}, so this is denied instead of asked. "
+        "Fix the setting, or empty it to be asked. What it would have asked: {why}"
+    ),
+    # Said once after every asks_denied in a deny: restate what the hook could not read; leave
+    # the user's own call to the user.
+    "asks_denied_way": (
+        "No one will be asked. Where the hook says it can't tell or can't read something, write the "
+        "call so it can and run it again: the branch, repo or path written out in place of a "
+        "variable, no cd before it, one call in place of a loop. Where the call is the user's to "
+        "approve, don't work around it: say what it is for and hand them the exact call."
+    ),
     # A spend the runner could not make after the verdict (run._spend).
     "approval_lost": (
         "languette: another call spent the user's approval while this one was judged ({guards}), "
@@ -422,13 +440,20 @@ MESSAGES = {
     "ruleset_head_unknown": (
         "guard-bypass-ruleset: this {prog} push sends the current branch, and the hook can't "
         "tell which branch that is (another directory, or a detached HEAD), so it can't check "
-        "whether the push goes around a rule that requires a pull request."
+        "whether the push goes around a rule that requires a pull request. Name the branch, "
+        "written out: `{prog} push {remote} <branch>`."
+    ),
+    "ruleset_heads_unknown": (
+        "guard-bypass-ruleset: this vcsh push sends the current branch of every repository, and the "
+        "hook can't tell which branches those are, so it can't check whether a push goes around a "
+        "rule that requires a pull request. Push one repository at a time, its branch written out: "
+        "`vcsh <repo> push <remote> <branch>`."
     ),
     "ruleset_repo_unknown": (
         "guard-bypass-ruleset: this pushes to `{branch}` through remote `{remote}`, in a repository the "
         "hook can't find (a cd or -C it can't follow, or GIT_DIR), so it can't ask GitHub whether "
         "`{branch}` requires a pull request. An agent that pushes with your credentials can use "
-        "your bypass."
+        "your bypass. Run it from the repository, or with -C and its path written out."
     ),
     "ruleset_needs_pr": (
         "guard-bypass-ruleset: `{branch}` on {slug} requires a pull request, and this push would go "

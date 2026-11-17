@@ -286,6 +286,13 @@
       "description": "On by default; applies only when guard_worktrees is on. Set false to keep only the other control.",
       "default": true
     },
+    "asks": {
+      "type": "string",
+      "title": "What a guard's ask becomes",
+      "description": "What happens when a guard would ask you to approve a call: prompt, the default, shows the permission prompt; deny denies the call and tells the agent what the guard would have asked, so the agent restates the call where the guard can read it (a branch or repo written out, no cd before it) and you see no prompt. Under deny, a call only you can approve is yours to run from your terminal, and one with no command, such as a post through a GitHub MCP tool, can't be made. Any other value denies too.",
+      "default": "prompt",
+      "required": false
+    },
     "record_decisions": {
       "type": "boolean",
       "title": "Record decisions",

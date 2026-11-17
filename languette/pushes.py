@@ -506,7 +506,9 @@ def _judge(p, env):
         dsts.remove(HEAD)
         cur = yield from _git(p, env, "symbolic-ref", "--short", "HEAD")
         if cur is None:
-            return ask(say("ruleset_head_unknown", prog=p.prog))
+            if p.prog == "vcsh" and p.repo is None:   # a bare vcsh push spans every repository: no one branch to name
+                return ask(say("ruleset_heads_unknown"))
+            return ask(say("ruleset_head_unknown", prog=p.prog, remote=remote or "<remote>"))
         dsts.append(cur)
     if remote is None:
         cur = (yield from _git(p, env, "symbolic-ref", "--short", "HEAD")) or ""

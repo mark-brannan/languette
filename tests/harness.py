@@ -279,7 +279,8 @@ class Ctx:
                 # answered before any guard judged (no cwd, say), and that answer stands.
                 event = json.loads(stdin).get("hook_event_name") or "PreToolUse"
                 fields = verdict.verdict(event, [f for f in seen if f[0] == self.guard],
-                                         json.loads(stdin).get("permission_mode"), lambda: docs[-1].chained)
+                                         json.loads(stdin).get("permission_mode"), lambda: docs[-1].chained,
+                                         env.get(verdict.ASKS))
                 self.verdict = Verdict(run._out(event, fields) if fields else "")
             return
         env = {k: v for k, v in os.environ.items() if k not in SCRUB and not k.startswith("CLAUDE_PLUGIN_OPTION_")}

@@ -8,7 +8,7 @@ no guard imports it. Standard library only.
 import os
 import re
 
-from languette import comment_posts, engine, host, listed_runs, paths, secrets, terms
+from languette import comment_posts, engine, host, listed_runs, paths, secrets, terms, verdict
 from languette.rules import deny_always
 
 # A repo's file under .languette/ -> (the option that switches its guard, its loader: path -> generator).
@@ -51,6 +51,8 @@ def option(name, value, env):
             return f"is not a regular expression ({e})"
     if name == "signed_comments_mcp" and value not in comment_posts.MCP_RULES:
         return f"is not one of {', '.join(comment_posts.MCP_RULES)}"
+    if name == "asks" and value not in verdict.ASKS_RULES:
+        return f"is not one of {', '.join(verdict.ASKS_RULES)}"
     return None
 
 

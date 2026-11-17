@@ -146,6 +146,36 @@ Feature: guard-git-stacked-base
       | mode    |
       | dontAsk |
 
+  # The asks option's rule for every guard's ask, shown on this one: no prompt in any mode.
+  Scenario Outline: with asks set to deny, an ask is a deny that says how to restate the call
+    Given CLAUDE_PLUGIN_OPTION_ASKS is "deny"
+    And the permission mode is "<mode>"
+    When the agent runs `git push origin --delete "$b"`
+    Then the guard denies, naming "guard-git-stacked-base: the asks setting is `deny`, so this is denied instead of asked"
+    And the guard denies, naming "write the call so it can and run it again"
+
+    Examples:
+      | mode              |
+      | default           |
+      | auto              |
+      | acceptEdits       |
+      | bypassPermissions |
+
+  Scenario Outline: asks unset, empty or prompt leaves an ask an ask
+    Given CLAUDE_PLUGIN_OPTION_ASKS is "<value>"
+    When the agent runs `git push origin --delete "$b"`
+    Then the guard asks
+
+    Examples:
+      | value  |
+      |        |
+      | prompt |
+
+  Scenario: a value asks does not know closes the gate, naming the setting
+    Given CLAUDE_PLUGIN_OPTION_ASKS is "yes"
+    When the agent runs `git push origin --delete "$b"`
+    Then the guard denies, naming "the asks setting `yes` is not one of prompt, deny"
+
   # bypassPermissions is a user who chose to skip prompts, not an absent one.
   Scenario Outline: an ask where someone can answer it stays an ask
     Given the permission mode is "<mode>"

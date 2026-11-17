@@ -21,6 +21,13 @@ from languette.messages import say
 # headless run sends its configured mode, so it is not told apart here.
 NO_PROMPT = frozenset({"dontAsk"})
 
+# The asks option: what a guard's ask becomes, in every mode. `prompt`, the default and the
+# reading of an unset or empty value, puts it to the user; `deny` denies it with what it
+# would have asked, so the agent restates the call and no prompt shows. A setting can only
+# close a gate, so any other value denies too, and the reason names the setting.
+ASKS = "CLAUDE_PLUGIN_OPTION_ASKS"
+ASKS_RULES = ("prompt", "deny")
+
 WAY_USER = "That is the user's to run, not an agent's: say what you need and hand them the exact command."
 
 
@@ -213,7 +220,7 @@ def _footer(chained):
     return [say("chain_footer")] if chained is not None and chained() else []
 
 
-def verdict(event, findings, mode=None, chained=None):
+def verdict(event, findings, mode=None, chained=None, asks=None):
     """The one decision for a call, from every guard's finding: the fields of
     hookSpecificOutput, or None for silence. `findings` is [(guard name, result,
     crashed)] in the order the guards judged. A deny outranks an ask, an ask an
@@ -221,17 +228,18 @@ def verdict(event, findings, mode=None, chained=None):
     A deny ends with the chain footer when `chained`, a callable read only then, says the
     command had more than one segment (languette.document.Document.chained).
     In a permission `mode` where no one can answer (NO_PROMPT), an ask is a deny that names
-    each ask and leaves the call to the user."""
+    each ask and leaves the call to the user. `asks`, the asks option's value (ASKS), makes
+    an ask a deny in every other mode too, unless it is unset, empty or `prompt`."""
     if event != "PreToolUse":                  # state-keeping events: nothing to decide
         return None
-    reasons, asks, allows, notes, rewrites = [], [], [], [], []
+    reasons, asks_found, allows, notes, rewrites = [], [], [], [], []
     for name, r, _ in findings:
         if not r:
             continue
         if r.get("permissionDecision") == "deny":
             reasons.append(r["permissionDecisionReason"])
         if r.get("permissionDecision") == "ask":
-            asks.append((name, r["permissionDecisionReason"]))
+            asks_found.append((name, r["permissionDecisionReason"]))
         if r.get("permissionDecision") == "allow":
             allows.append(r["permissionDecisionReason"])
         if "updatedInput" in r:
@@ -240,11 +248,19 @@ def verdict(event, findings, mode=None, chained=None):
             notes.append(r["additionalContext"])
     if reasons:
         return deny("\n\n".join(reasons + _footer(chained)))
-    if asks and mode in NO_PROMPT:
-        return deny("\n\n".join([say("unattended_ask", guard=n, mode=mode, why=r) for n, r in asks]
+    if asks_found and mode in NO_PROMPT:
+        return deny("\n\n".join([say("unattended_ask", guard=n, mode=mode, why=r) for n, r in asks_found]
                                  + [say("unattended_way")] + _footer(chained)))
-    if asks:
-        return {**ask("\n\n".join(r for _, r in asks)), **({"updatedInput": rewrites[0]} if rewrites else {})}
+    if asks_found and (asks or "prompt") != "prompt":
+        if asks in ASKS_RULES:
+            said = [say("asks_denied", guard=n, rule=asks, why=r) for n, r in asks_found]
+        else:
+            said = [say("asks_unknown", guard=n, rule=" ".join(str(asks).split())[:80], rules=", ".join(ASKS_RULES), why=r)
+                    for n, r in asks_found]
+        return deny("\n\n".join(said
+                                 + [say("asks_denied_way")] + _footer(chained)))
+    if asks_found:
+        return {**ask("\n\n".join(r for _, r in asks_found)), **({"updatedInput": rewrites[0]} if rewrites else {})}
     if allows:
         out = {"permissionDecision": "allow", "permissionDecisionReason": "\n\n".join(allows),
                "updatedInput": rewrites[0]}
