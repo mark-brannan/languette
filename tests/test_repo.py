@@ -13,9 +13,10 @@ import pytest
 from hamcrest import assert_that, contains_string, empty, equal_to, is_, is_not
 
 import readme_table
-from harness import hooks_json, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
+from harness import answered, hooks_json, hooks_json_commands, hooks_json_event_command, hooks_json_prompt_command
 from languette import engine, run, scan
 from languette import comment_posts, issue_writes, opened_prs, posts
+from languette.world import World
 from paths import ROOT
 
 # Spelled out, not read from run.GUARDS, so a guard dropped from run.GUARDS fails the comparisons below.
@@ -395,16 +396,8 @@ def test_the_guard_signed_comments_matcher_leaves_other_tools_alone(tool):
 
 
 def _gathered(gen):
-    """Drive a guard's gather generator against the real disk, the way world answers
-    the path and read Needs it yields."""
-    answer = None
-    while True:
-        try:
-            need = gen.send(answer)
-        except StopIteration as stop:
-            return stop.value
-        op, path = need.args[0], need.args[-1]
-        answer = Path(path).read_text() if need.kind == "read" else getattr(os.path, op)(path)
+    """A guard's gather generator driven against the real disk, world answering its Needs."""
+    return answered(gen, World(dict(os.environ), {}).answer)[1]
 
 
 @pytest.mark.parametrize("rule_file", sorted((ROOT / "languette" / "rules").glob("*.json")), ids=lambda p: p.name)

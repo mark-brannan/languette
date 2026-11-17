@@ -5,6 +5,7 @@ runs nothing."""
 
 import pytest
 
+from harness import answered
 from languette.document import Document
 from languette.run import GUARD
 from languette.verdict import Need
@@ -18,14 +19,8 @@ def needs(guard, command, env=ENV):
     """Every Need the guard yields for the command, each answered as a machine with no
     repository, no network and an engine that finds nothing would."""
     doc = Document({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": "/home/u"}, env)
-    gen, seen, answer = guard.check(doc), [], None
-    try:
-        while True:
-            need = gen.send(answer)
-            seen.append(need)
-            answer = {"which": "/usr/bin/" + need.args[0], "path": True, "run": (0, "", "")}.get(need.kind)
-    except StopIteration:
-        return seen
+    return answered(guard.check(doc), lambda need: {"which": "/usr/bin/" + need.args[0], "path": True,
+                                                    "run": (0, "", "")}.get(need.kind))[0]
 
 
 def programs(seen):
