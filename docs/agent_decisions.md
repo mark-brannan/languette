@@ -803,3 +803,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261112t082807z
 - The verdict and approvals design sits in its own doc, docs/design/verdict.md, budgeted at 90 lines Undo: fold verdict.md back into guard-pipeline.md and raise its cap ([#409](https://github.com/mark-brannan/languette/pull/409))
+
+### 20261117t001915z
+- the option that turns a guard's ask into a deny is named asks, with values prompt and deny; an unknown value denies Undo: rename in plugin.json, verdict.ASKS and the features before release ([#422](https://github.com/mark-brannan/languette/pull/422))
