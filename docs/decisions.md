@@ -144,7 +144,7 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 - No Need writes or runs a host-named program. Scar: #107.
 - The readable set is the read kinds in `KINDS` in `languette/world.py`.
 - Whether `prose-budget-commit` keeps running the engine `prose_budget_bin`
-  names was open; settled below ("Evict prose-budget-commit").
+  names is open.
 
 ## New guards: 2026-10-09
 
@@ -275,7 +275,9 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 - `prose-budget-commit` and its `prose_budget_commit` and
   `prose_budget_command` settings are removed: a shipped guard must not know
   the maintainer's own tooling. Because it named an engine no stranger has.
+  Pencil ([#428](https://github.com/mark-brannan/languette/pull/428)).
 - No migration. A settings file that still names either key is read as any
   unknown key is: ignored.
-- `tests/test_portability.py` holds the line over everything shipped, the
-  plugin manifest included.
+- `tests/test_portability.py` holds the line over the package, the hooks, the
+  plugin manifest, the devcontainer feature, the specs, the tests, the README
+  and the design docs; dated records and the repo's own CI are left out.

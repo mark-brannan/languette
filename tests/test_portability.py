@@ -4,10 +4,11 @@ the maintainer's setup. The project's own homepage, install coordinates and
 issue links are the one exception, and so is the maintainer's handle on the
 attribution line of docs/decisions.md, which names whose decisions they are.
 
-The same holds for the names of the maintainer's own tools, over what ships
-(the package, the hooks, the plugin manifest, the specs, the README and the
-design docs): a shipped guard must not know them. Dated records and research
-notes may name a tool that was once shipped.
+The same holds for the names of the maintainer's own tools, over the package,
+the hooks, the plugin manifest, the devcontainer feature, the specs, the
+tests, the README, the design docs and the messages doc: a shipped guard must
+not know them. Dated records, research notes and the repo's own CI workflows
+are left out on purpose.
 
 A denylist, not a proof: it catches the identifier that slips into a fixture,
 not every way a setup can leak."""
@@ -18,9 +19,10 @@ from pathlib import Path
 from hamcrest import assert_that, empty
 from paths import ROOT
 
-DIRS = ("languette", "hooks", ".claude-plugin", "features", "tests", "docs", "README.md")
-# What ships, or specifies what ships; docs/decisions.md and the research notes are dated records.
-SHIPPED = ("languette", "hooks", ".claude-plugin", "devcontainer", "features", "tests", "docs/design", "docs/messages.md", "README.md")
+DIRS = ("languette", "hooks", ".claude-plugin", "devcontainer", "features", "tests", "docs", "README.md")
+# Where a tool name is checked; docs/decisions.md and the research notes are dated records,
+# and .github is the repo's own CI.
+TOOL_DIRS = ("languette", "hooks", ".claude-plugin", "devcontainer", "features", "tests", "docs/design", "docs/messages.md", "README.md")
 # The maintainer's identifiers, and the words of the workflow languette was born in.
 DENY = re.compile(r"mark-brannan|markbrannan|solace|claude_prompts_scratch"
                   r"|claim.?stamp|\bcuria\b|\bagora\b", re.IGNORECASE)
@@ -52,5 +54,5 @@ def test_no_maintainer_identity_in_package_hooks_specs_tests_or_docs():
     assert_that(list(_hits()), empty())
 
 
-def test_no_maintainer_tooling_in_what_ships():
-    assert_that(list(_hits(SHIPPED, TOOLS)), empty())
+def test_no_maintainer_tooling_in_the_named_dirs():
+    assert_that(list(_hits(TOOL_DIRS, TOOLS)), empty())

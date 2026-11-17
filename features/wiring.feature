@@ -355,6 +355,20 @@ Feature: wiring
     When the agent runs `git checkout some-branch`
     Then the guard denies
 
+  # A warn passes through the hooks.json command as a deny does.
+  Scenario: with the opt-in guard on, a note passes through the hooks.json command
+    Given the hook is the hooks.json command for "guard-worktrees"
+    And HOME is "{TMP}"
+    And a git repository at "{TMP}"
+    And a git repository at "{TMP}/repo"
+    And a linked worktree "{TMP}/repo/.claude/worktrees/mine" of the repository at "{TMP}/repo"
+    And the session is "aaaaaaaa-1111-4222-8333-444444444444"
+    And the working directory is "{TMP}/repo/.claude/worktrees/mine"
+    And CLAUDE_PLUGIN_OPTION_GUARD_WORKTREES is "true"
+    When the agent runs `git status`
+    And the agent runs `cd "$SOMEWHERE" && git checkout some-branch`
+    Then the guard warns about "allowed, but unchecked"
+
   # guard-worktrees runs two parts; each has its own off switch under the
   # guard's.
   Scenario: with the opt-in guard on, a reach into another worktree is a deny

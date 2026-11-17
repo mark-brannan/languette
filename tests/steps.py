@@ -57,16 +57,6 @@ def _project(ctx):
     (ctx.proj / "t.jsonl").touch()             # a session has a transcript, if an empty one
 
 
-@given("the project directory is not a git repository")
-def _not_a_repo(ctx):
-    shutil.rmtree(ctx.proj / ".git")
-
-
-@given("the project's git index is corrupt")
-def _corrupt_index(ctx):
-    (ctx.proj / ".git/index").write_text("not an index\n")
-
-
 @given(parsers.parse('the file "{rel}" holds:'))
 def _file(ctx, rel, docstring):
     # A path under {HOME} or {TMP} is absolute once expanded; any other is the project's.
@@ -74,12 +64,6 @@ def _file(ctx, rel, docstring):
     f = Path(ctx.proj or "/", ctx.expand(rel))
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(ctx.expand(docstring))
-
-
-@given(parsers.parse('the file "{rel}" is committed'))
-def _file_committed(ctx, rel):
-    _git(str(ctx.proj), "add", "--", rel)
-    _git(ctx.proj, "commit", "-q", "-m", "x", "--", rel)
 
 
 @given(parsers.re(r"the (?P<kind>blocked|redacted) terms file holds:"))

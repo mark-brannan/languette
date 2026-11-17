@@ -48,7 +48,7 @@ class Need:
         read          path, limit=None    -> the regular file's text, opened non-blocking; ValueError
                                              when it is not regular or past limit bytes
         path          op, path            -> os.path.<op>(path): isdir, isfile, islink, exists,
-                                             lexists, realpath; or executable
+                                             lexists, realpath
         physical      path                -> the longest existing prefix of path resolved through
                                              symlinks, the rest appended as written; "" for /
         ruleset-cache slug, branch        -> (mtime, text), or None
