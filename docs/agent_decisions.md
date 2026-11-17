@@ -812,3 +812,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261117t094327z
 - Only the first unclosed heredoc opener holds the rest of the text as its body, a later one holds nothing; the walk goes on (replaces: the walk ends at the first unclosed opener) Undo: Restore the early return after an unclosed opener in quoting._heredocs ([#430](https://github.com/mark-brannan/languette/pull/430))
+
+### 20261117t094347z
+- The 1,492 guard-signed-comments denies and the 175 guard-disks rows were not re-derived after review; the doc narrows each to what a minimal command shows Undo: Recount over the private corpus and restore the figures ([#431](https://github.com/mark-brannan/languette/pull/431))
