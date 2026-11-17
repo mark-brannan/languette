@@ -22,7 +22,11 @@ rules, so the push is GitLab's one door. Not protected, by name or by a wildcard
 Both deny. The user's own terminal never reaches a hook, so the user keeps
 the bypass. When GitHub cannot answer (no gh, signed out, offline, a 10 s
 timeout, an error) or the destination cannot be read (a variable refspec,
-GIT_DIR, a detached HEAD), the guard asks, so the user decides. A refspec
+GIT_DIR), the guard asks, so the user decides. A push of the current branch
+whose branch cannot be read (a cd or -C the walk can't follow, a detached
+HEAD) is denied instead, naming the remedy: the agent names the branch and
+retries, and the guard judges that, so no dialog asks the user what nobody
+can see. A refspec
 whose only run-time part is `$NAME` is read when the same command line set
 NAME to a literal earlier, where the push is sure to see it, and is judged
 as if that literal were written in its place. GitHub's
@@ -506,7 +510,9 @@ def _judge(p, env):
         dsts.remove(HEAD)
         cur = yield from _git(p, env, "symbolic-ref", "--short", "HEAD")
         if cur is None:
-            return ask(say("ruleset_head_unknown", prog=p.prog))
+            # git can name the branch on a retry; vcsh's bare push spans every repository.
+            v = deny if p.prog == "git" else ask
+            return v(say("ruleset_head_unknown", prog=p.prog))
         dsts.append(cur)
     if remote is None:
         cur = (yield from _git(p, env, "symbolic-ref", "--short", "HEAD")) or ""
@@ -560,7 +566,8 @@ def pushed(doc):
 def branch_rules(doc, guard, found):
     """The `branch-rules` handler: an admin merge is denied; a push that lands on the remote's
     default branch asks GitHub, through the cache, whether that branch requires a pull
-    request, and is denied when it does; it asks when GitHub or the walk cannot tell."""
+    request, and is denied when it does; it asks when GitHub or the walk cannot tell, but
+    denies a current-branch push whose branch it cannot read, naming the remedy."""
     if found["admin"]:
         return deny(say("ruleset_admin"))
     asked = None

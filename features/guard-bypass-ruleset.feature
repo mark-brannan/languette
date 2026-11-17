@@ -300,13 +300,16 @@ Feature: guard-bypass-ruleset
     When the agent runs `cd ~ && git push origin HEAD`
     Then the guard is silent
 
+  # A current-branch push whose branch the walk can't read is denied, not asked: the
+  # reason names the remedy, the agent names the branch and retries, and no dialog asks
+  # the user to judge a push nobody can see the branch of.
   Scenario Outline: a cd the shell undoes, or a directory it can't read, never lends the push its branch
     Given HOME is "{TMP}"
     And a clone of "https://github.com/o/r.git" at "{TMP}/m" on branch "main"
     And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
     And the working directory is "{TMP}/m"
     When the agent runs `<command>`
-    Then the guard asks
+    Then the guard denies, naming "Name the branch"
 
     Examples:
       | command                                                 | note                                     |
@@ -322,6 +325,28 @@ Feature: guard-bypass-ruleset
       | test -d {TMP}/x && cd {TMP}/repo; git push origin HEAD  | the test may skip the cd                 |
       | git status \|\| cd {TMP}/repo && git push origin HEAD   | the push runs when the cd was skipped    |
       | cd {TMP}/nope \|\| cd {TMP}/repo; git push origin HEAD  | the second cd may not run                |
+
+  Scenario Outline: a current-branch push from a directory in a loop variable is denied, naming the remedy
+    Given a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
+    And the working directory is "{TMP}"
+    When the agent runs `<command>`
+    Then the guard denies, naming "Name the branch"
+
+    Examples:
+      | command                                                              | note                          |
+      | for r in repo; do (cd $r; git push -q origin HEAD); done             | a cd to a loop variable       |
+      | for r in repo; do git -C $r push -q origin HEAD; done                | -C through a loop variable    |
+
+  Scenario Outline: the same push with its branch named is judged, not denied
+    Given a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
+    And the working directory is "{TMP}"
+    When the agent runs `<command>`
+    Then the guard is silent
+
+    Examples:
+      | command                                                              | note                          |
+      | for r in repo; do (cd $r; git push -q origin claude/topic); done     | the branch named in the loop  |
+      | git -C {TMP}/repo push -q origin HEAD                                | -C a literal path, HEAD read  |
 
   # The next rows start on claude/topic in {TMP}/repo and cd to main in {TMP}/m, so a cd the
   # guard misses reads silent.
@@ -345,7 +370,7 @@ Feature: guard-bypass-ruleset
     And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
     And the working directory is "{TMP}/repo"
     When the agent runs `<command>`
-    Then the guard asks
+    Then the guard denies, naming "Name the branch"
 
     Examples:
       | command                                                   | note                                  |
@@ -362,7 +387,7 @@ Feature: guard-bypass-ruleset
     And a clone of "https://github.com/o/r.git" at "{TMP}/repo" on branch "claude/topic"
     And the working directory is "{TMP}/m"
     When the agent runs `<command>`
-    Then the guard asks
+    Then the guard denies, naming "Name the branch"
 
     Examples:
       | command                                                              | note                              |

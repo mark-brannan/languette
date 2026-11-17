@@ -414,7 +414,9 @@ MESSAGES = {
     "ruleset_head_unknown": (
         "guard-bypass-ruleset: this {prog} push sends the current branch, and the hook can't "
         "tell which branch that is (another directory, or a detached HEAD), so it can't check "
-        "whether the push goes around a rule that requires a pull request."
+        "whether the push goes around a rule that requires a pull request. Name the branch: "
+        "`{prog} push origin <branch>`, or `HEAD:<branch>` from a detached HEAD, and run each "
+        "push in its own call with a literal `cd` or `-C` path."
     ),
     "ruleset_repo_unknown": (
         "guard-bypass-ruleset: this pushes to `{branch}` through remote `{remote}`, in a repository the "
