@@ -223,7 +223,8 @@ form the entry lists under `"cheaper"`, and a button labelled with
 `approve_label`. Click it and the next matching command runs. One click is
 one run: a command that runs it twice needs two, and one in a loop or `xargs`
 is denied whatever you approved. Only your click counts, never what the agent
-wrote in the question.
+wrote in the question. A click has no clock: it stands until a run spends it
+or the transcript ends, across a resume. A timer would make you click twice.
 
 A match may also name `"flags"`, single option letters the command must carry
 (`{"cmd": "rm", "flags": ["r"]}` matches `rm -rf x`), and `"except"`, whole
