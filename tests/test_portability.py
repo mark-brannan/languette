@@ -22,7 +22,8 @@ from paths import ROOT
 DIRS = ("languette", "hooks", ".claude-plugin", "devcontainer", "features", "tests", "docs", "README.md")
 # Where a tool name is checked; docs/decisions.md and the research notes are dated records,
 # and .github is the repo's own CI.
-TOOL_DIRS = ("languette", "hooks", ".claude-plugin", "devcontainer", "features", "tests", "docs/design", "docs/messages.md", "README.md")
+TOOL_DIRS = ("languette", "hooks", ".claude-plugin", "devcontainer", "features", "tests", "docs/design", "docs/messages.md",
+             "docs/approved-guard-names.md", "docs/budgets.json", "README.md")
 # The maintainer's identifiers, and the words of the workflow languette was born in.
 DENY = re.compile(r"mark-brannan|markbrannan|solace|claude_prompts_scratch"
                   r"|claim.?stamp|\bcuria\b|\bagora\b", re.IGNORECASE)

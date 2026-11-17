@@ -80,7 +80,8 @@ habits, because that is where it is tested. This document is the line.
 
 A test holds rule 1: a denylist of the maintainer's identifiers and
 workflow words over the package, the hooks, the plugin manifest, the
-feature files, the tests, the README and the docs, with an allowlist for
+devcontainer feature, the feature files, the tests, the README and the
+docs, with an allowlist for
 the project's own metadata, install coordinates and issue links. A second
 denylist holds the names of the maintainer's own tools over the same set,
 less the dated records (the decisions files and research notes); the repo's
