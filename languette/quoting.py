@@ -231,7 +231,10 @@ def _heredocs(b):
     was quoted, so the shell expands nothing in it; an unquoted one's body
     keeps its command
     substitutions (heredoc_subs). A body whose closing line never comes stays
-    in the text as commands. body is "" when the opener ends the text. The
+    in the text as commands, and ends the walk: nothing below it is stripped,
+    so a later body the shell would run is never hidden behind an opener the
+    parser could not close (`<<END-A`, which it reads as END), and the text is
+    held once, not once per such opener. body is "" when the opener ends the text. The
     search resumes after each heredoc, never inside what it kept, so a `<<X`
     in a kept substitution cannot pair with a later X line. The walk reads b
     once: each closing line is looked up, not searched for."""
@@ -274,6 +277,9 @@ def _heredocs(b):
             return "".join(done), docs
         if q >= len(b):
             done.append("\n")
+            return "".join(done), docs
+        if not closed:                      # nothing below an unclosed opener is stripped
+            done.append(b[q - 1:])
             return "".join(done), docs
         at = q - 1                          # the newline before the rest, as the line break it is
 

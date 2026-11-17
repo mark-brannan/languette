@@ -45,8 +45,9 @@ class Need:
                                              or (None, None)
         pr-list       cwd, *argv          -> stdout of argv run in cwd, stripped, or None
         which         name                -> the program's path on the env's PATH, or None
-        read          path, limit=None    -> the regular file's text, opened non-blocking; ValueError
-                                             when it is not regular or past limit bytes
+        read          path, limit=None,   -> the regular file's text, opened non-blocking; ValueError
+                      tail=False             when it is not regular or past limit bytes (with tail,
+                                             the whole lines of its last limit bytes instead)
         path          op, path            -> os.path.<op>(path): isdir, isfile, islink, exists,
                                              lexists, realpath; or executable
         physical      path                -> the longest existing prefix of path resolved through

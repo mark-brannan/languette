@@ -35,7 +35,7 @@ import os
 import re
 
 from languette import scan as sw
-from languette.paths import config_dir
+from languette.paths import MAX_READ, config_dir
 from languette.messages import say
 from languette.verdict import Act, Need, ask, deny
 
@@ -245,7 +245,8 @@ def door(doc, guard, found):
         return None
     if to and not _REF.search(to) and sid is not None:
         try:
-            team = yield Need("read", os.path.join(config_dir(env), "teams", f"session-{sid[:8]}", "config.json"))
+            team = yield Need("read", os.path.join(config_dir(env), "teams", f"session-{sid[:8]}", "config.json"),
+                              MAX_READ)
             if to in _teammates(team):
                 return None
         except Exception:  # noqa: BLE001 -- no team, or one this guard cannot read: no teammates known
