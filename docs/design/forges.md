@@ -51,8 +51,18 @@ they become rule data, one `match` entry per client (planned).
 | guard-git-stacked-base | branch deletions by git or `glab api`, judged by `glab mr list` on target and source branch |
 | guard-cross-session-send | glab's issue, merge request, note, pipeline, job log, release and repo reads, and `glab api` reads |
 | guard-bypass-ruleset | a push to a protected default branch no role may push to; a user or group allowed there is the bypass |
-| guard-review-threads, guard-signed-comments | none: GitLab's resolvable discussions and its bot accounts answer in another API shape (planned) |
+| guard-review-threads, guard-signed-comments | none (planned): the reads and writes a port needs are documented, but not whose account is a bot (below) |
 | GitLab's MCP tools | (planned), once their names are verified |
+
+Why those two have no row. GitLab resolves a thread by `PUT
+projects/:id/merge_requests/:iid/discussions/:discussion_id` with `resolved=true`, or by
+`glab mr note resolve [<mr>] <discussion-id|note-id>` (an 8-character prefix or a note
+id, so the guard would list the merge request's discussions to find the thread), and reads
+it with `GET` on the same path; both are in GitLab's and glab's docs. What the docs leave
+out is what makes a note's author a bot: GitLab's note author has no documented `bot`
+field, so which usernames count (project and group access-token accounts, a named list) is
+a design choice, and so is how guard-signed-comments tells its bot's account. Both wait for
+that choice; a glab write of either kind is not read by the guards that read GitHub's.
 
 Each row's glab verbs and API paths are cited from glab's and GitLab's own
 docs in that guard's feature file. A verb those docs do not show stays out

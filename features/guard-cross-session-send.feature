@@ -214,7 +214,7 @@ Feature: guard-cross-session-send
 
   # glab's own docs: https://docs.gitlab.com/cli/issue/ and /cli/mr/ (their
   # verbs; mr view alias show, merge alias accept, note alias comment),
-  # /cli/mr/note/ (its list), /cli/ci/ (view, trace, get; aliases pipe,
+  # /cli/mr/note/ (its list; create, delete, draft, reopen, resolve and update write), /cli/ci/ (view, trace, get; aliases pipe,
   # pipeline), /cli/ci/trace/ (a job's log), /cli/release/ (view, download),
   # /cli/repo/ (view; alias project) and /cli/api/ (GET unless -X or a field).
   Scenario Outline: on GitLab, a glab read opens the door and a glab write does not
@@ -238,6 +238,9 @@ Feature: guard-cross-session-send
       | glab api projects/:id/issues/12/notes            | denies, naming "glab api"            |
       | glab api graphql -f query='{ currentUser { username } }' | denies, naming "glab api graphql" |
       | glab mr approve 7                                | is silent                            |
+      | glab mr note resolve 7 abc12345                  | is silent                            |
+      | glab mr note reopen 7 abc12345                   | is silent                            |
+      | glab mr note create 7 -m x                       | is silent                            |
       | glab mr rebase 7                                 | is silent                            |
       | glab issue close 12                              | is silent                            |
       | glab ci list                                     | is silent                            |
