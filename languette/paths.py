@@ -394,13 +394,19 @@ def read_refusal(exc):
 def read_json(path):
     """The file at path, parsed as JSON, or Refuse naming why it cannot be."""
     try:
-        return json.loads((yield Need("read", path)))
+        text = yield Need("read", path, MAX_READ)
+    except UnicodeDecodeError as e:
+        raise Refuse(f"not JSON ({e})")
+    except ValueError as e:                    # not a regular file, or past MAX_READ
+        raise Refuse(str(e))
+    except OSError as e:
+        raise Refuse(f"unreadable ({e.strerror})")
+    try:
+        return json.loads(text)
     except ValueError as e:
         raise Refuse(f"not JSON ({e})")
     except RecursionError:
         raise Refuse("not JSON (nested too deep to parse)")
-    except OSError as e:
-        raise Refuse(f"unreadable ({e.strerror})")
 
 
 def read_rules(path, *args, **kwargs):

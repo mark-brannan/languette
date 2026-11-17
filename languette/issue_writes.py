@@ -37,7 +37,7 @@ are read; a script file is not. The door file carries a languette- prefix
 
 import re
 
-from languette import scan as sw
+from languette import paths, scan as sw
 from languette.messages import say
 from languette.verdict import NO_PROMPT, Act, Need, approve, deny, spend
 
@@ -274,7 +274,7 @@ def _door(payload, session):
     if not got or not isinstance(tp, str) or not tp:
         return SHUT, None
     try:
-        transcript = yield Need("read", tp)
+        transcript = yield Need("read", tp, paths.MAX_READ, True)   # the claim is recent: its result is near the end
     except Exception:  # noqa: BLE001
         return SHUT, None
     if not _never_ran(transcript, got):

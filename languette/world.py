@@ -116,20 +116,27 @@ class World:
     def _which(self, name):
         return shutil.which(name, path=os.pathsep.join(os.get_exec_path(self.env)))
 
-    def _read(self, path, limit=None):
+    def _read(self, path, limit=None, tail=False):
         """The text of the regular file `path`. Opened non-blocking, so a FIFO
         cannot stall the hook into its timeout; a file that is not regular, or
         is past `limit` bytes, is a ValueError naming why, and one that is not
-        UTF-8 the UnicodeDecodeError."""
+        UTF-8 the UnicodeDecodeError. With `tail`, a file past `limit` is not
+        refused: its last `limit` bytes are read, from the first whole line in them."""
         fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
         try:
-            if not stat.S_ISREG(os.fstat(fd).st_mode):
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode):
                 raise ValueError("is not a regular file")
         except BaseException:
             os.close(fd)
             raise
         with os.fdopen(fd, "rb") as f:
+            cut = tail and limit is not None and st.st_size > limit
+            if cut:                            # one byte before: a line that starts at the cut is whole
+                f.seek(st.st_size - limit - 1)
             data = f.read(-1 if limit is None else limit + 1)
+        if cut:
+            return data.partition(b"\n")[2].decode("utf-8")
         if limit is not None and len(data) > limit:
             raise ValueError(f"is over {limit} bytes")
         return data.decode("utf-8")
