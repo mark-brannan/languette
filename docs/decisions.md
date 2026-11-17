@@ -4,6 +4,27 @@ Decisions that settle languette's public interface. The README says what the
 interface is; this file says what was decided and why, one line each. Every
 line is the maintainer's (@mark-brannan) unless it says otherwise.
 
+## Headless runs: 2026-11-16
+
+- Languette never detects a headless run, and asks the host for no mark of
+  one ([#164](https://github.com/mark-brannan/languette/issues/164)). The
+  host denies an ask it cannot show, in every mode: measured 2026-11-16 with
+  `claude -p --permission-mode bypassPermissions` on a push the ruleset guard
+  can only ask about; the call was denied and the agent read the ask's text
+  as the reason, nothing passed, nothing hung.
+- So every ask is worded for a reader who may not be there: what it would
+  have asked, and what to do with no one at the prompt. `dontAsk` keeps its
+  deny, the one mode where the host says prompts are impossible. The `asks`
+  option (`deny`) is a launcher's knob for the stricter text, not a
+  requirement; a per-run `--settings` value reaches it (measured the same
+  day).
+- Why: an unattended launcher passing `dontAsk` was the proposed design, and
+  the maintainer's own launchers do not pass it: "if we are not currently
+  passing 'dontAsk' to our headless sessions, then why would we have any
+  reason to think the average, casual user would do the same?" `dontAsk` also
+  denies every tool call outside the allow list, so a worker in it cannot
+  commit or push.
+
 ## Rules engine: 2026-11-05
 
 - Current thinking: the aim is a rules engine with no hand-built guards; a
