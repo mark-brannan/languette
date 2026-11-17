@@ -61,8 +61,8 @@ id, so the guard would list the merge request's discussions to find the thread),
 it with `GET` on the same path; both are in GitLab's and glab's docs. What the docs leave
 out is what makes a note's author a bot: GitLab's note author has no documented `bot`
 field, so which usernames count (project and group access-token accounts, a named list) is
-a design choice, and so is how guard-signed-comments tells its bot's account. Both wait for
-that choice; a glab write of either kind is not read by the guards that read GitHub's.
+a design choice, and so is how guard-signed-comments tells its bot's account. Until that
+choice, neither guard reads glab: a GitLab thread resolved or note posted passes both unjudged.
 
 Each row's glab verbs and API paths are cited from glab's and GitLab's own
 docs in that guard's feature file. A verb those docs do not show stays out
