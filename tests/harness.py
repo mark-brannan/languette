@@ -331,17 +331,23 @@ def real_path():
     return os.environ["PATH"]
 
 
-def drive(check, *answers):
-    """Run a guard's generator to its end, answering each Need it yields from `answers`
-    in order (None once they run out); returns (the Needs and Acts yielded, its result)."""
+def answered(check, answer):
+    """(the Needs and Acts a guard's generator yields, in order, its result), driven by
+    run.drive, the runner's own driver: each Need is answered with answer(need), and what
+    answer raises is thrown into the guard, as a fact world cannot have is."""
     yielded = []
-    try:
-        step = next(check)
-        while True:
-            yielded.append(step)
-            step = check.send(answers[len(yielded) - 1] if len(yielded) <= len(answers) else None)
-    except StopIteration as stop:
-        return yielded, stop.value
+
+    class Scripted:
+        def answer(self, need):
+            yielded.append(need)
+            return answer(need)
+    return yielded, run.drive(check, Scripted(), yielded)
+
+
+def drive(check, *answers):
+    """answered, each Need answered from `answers` in order (None once they run out)."""
+    rest = iter(answers)
+    return answered(check, lambda need: next(rest, None))
 
 
 def hooks_json():
