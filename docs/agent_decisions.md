@@ -806,3 +806,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261117t001915z
 - the option that turns a guard's ask into a deny is named asks, with values prompt and deny; an unknown value denies Undo: rename in plugin.json, verdict.ASKS and the features before release ([#422](https://github.com/mark-brannan/languette/pull/422))
+
+### 20261117t001934z
+- seven new I/O pins added by hand from the failing assertions, not by the full regenerate run Undo: run LANGUETTE_PIN_IO=update pytest --full -n 0 tests/test_features.py ([#422](https://github.com/mark-brannan/languette/pull/422))
