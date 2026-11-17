@@ -6,24 +6,15 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 
 ## Headless runs: 2026-11-16
 
-- Languette never detects a headless run, and asks the host for no mark of
-  one ([#164](https://github.com/mark-brannan/languette/issues/164)). The
-  host denies an ask it cannot show, in every mode: measured 2026-11-16 with
-  `claude -p --permission-mode bypassPermissions` on a push the ruleset guard
-  can only ask about; the call was denied and the agent read the ask's text
-  as the reason, nothing passed, nothing hung.
-- So every ask is worded for a reader who may not be there: what it would
-  have asked, and what to do with no one at the prompt. `dontAsk` keeps its
-  deny, the one mode where the host says prompts are impossible. The `asks`
-  option (`deny`) is a launcher's knob for the stricter text, not a
-  requirement; a per-run `--settings` value reaches it (measured the same
-  day).
-- Why: an unattended launcher passing `dontAsk` was the proposed design, and
-  the maintainer's own launchers do not pass it: "if we are not currently
-  passing 'dontAsk' to our headless sessions, then why would we have any
-  reason to think the average, casual user would do the same?" `dontAsk` also
-  denies every tool call outside the allow list, so a worker in it cannot
-  commit or push.
+- Languette does not detect a headless run
+  ([#164](https://github.com/mark-brannan/languette/issues/164)).
+- Measured 2026-11-16: with `claude -p --permission-mode bypassPermissions`,
+  a push that `guard-bypass-ruleset` asks about was denied, and the agent
+  read the ask's text as the reason.
+- Why: an unattended launcher passing `dontAsk` was the proposed design. "if
+  we are not currently passing 'dontAsk' to our headless sessions, then why
+  would we have any reason to think the average, casual user would do the
+  same?"
 
 ## Approval credit: 2026-11-16
 
