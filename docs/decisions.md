@@ -6,17 +6,15 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 
 ## Approval credit: 2026-11-16
 
-- An approval has no time limit: it stands until a run spends it, for the
-  life of the session's transcript, a resumed session included
-  ([#84](https://github.com/mark-brannan/languette/issues/84)). The README's
-  Ask first section gives the user the reason in terms of cost.
-- Why: "Seems like a hedge to add 5 minutes. If we have a yes per
-  session/per-transcript then it still has a fairly strong guarantee on
-  duration." And: "re-asking will cost tokens at a high cost". Measured
-  2026-11-16 over 9,954 local transcripts: of 18 guard-label yeses, 16 were
-  spent, the slowest 12 s after the click, and none crossed a resume. The one
-  stale yes found was left unspent by its own write, a defect at that write,
-  not a reason for a clock.
+- An approval has no time limit: it stands until a run spends it or its
+  transcript ends, a resumed session included
+  ([#84](https://github.com/mark-brannan/languette/issues/84)).
+- Why: a timer costs a second question and click and buys nothing. Over
+  9,954 local transcripts (2026-11-16), 16 of 18 guard-label yeses were spent
+  within 12 s of the click, none across a resume. Of the 2 unspent, one's
+  write was refused by another guard and its session ended 3 min later; the
+  other was left over by a write that took the human turn's door, a defect at
+  that write, not a reason for a clock.
 
 ## Rules engine: 2026-11-05
 
