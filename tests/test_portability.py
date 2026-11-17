@@ -35,7 +35,7 @@ ATTRIBUTION = ("docs/decisions.md", "line is the maintainer's (@mark-brannan) un
 
 def _hits(dirs=DIRS, deny=DENY):
     for d in dirs:
-        assert (ROOT / d).exists(), f"test setup: {d} is gone; update DIRS or SHIPPED"
+        assert (ROOT / d).exists(), f"test setup: {d} is gone; update DIRS or TOOL_DIRS"
         for f in sorted((ROOT / d).rglob("*")) if (ROOT / d).is_dir() else [ROOT / d]:
             if not f.is_file() or f == Path(__file__).resolve() or "__pycache__" in f.parts:
                 continue
