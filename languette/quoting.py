@@ -231,15 +231,14 @@ def _heredocs(b):
     was quoted, so the shell expands nothing in it; an unquoted one's body
     keeps its command
     substitutions (heredoc_subs). A body whose closing line never comes stays
-    in the text as commands, and the walk goes on, so a later heredoc that
-    does close is still stripped, as the parser may read an opener the shell
-    does not (`<<END-A`, a `<<n` in `$((1 <<n))`). Only the first such opener
-    holds the rest of the text as its body, a later one holds "", so the text
-    is held once, not once per opener. body is "" when the opener ends the text. The
+    in the text as commands, and ends the walk: nothing below it is stripped,
+    so a later body the shell would run is never hidden behind an opener the
+    parser could not close (`<<END-A`, which it reads as END), and the text is
+    held once, not once per such opener. body is "" when the opener ends the text. The
     search resumes after each heredoc, never inside what it kept, so a `<<X`
     in a kept substitution cannot pair with a later X line. The walk reads b
     once: each closing line is looked up, not searched for."""
-    done, docs, at, closers, rest_held = [], [], 0, None, False
+    done, docs, at, closers = [], [], 0, None
     while True:
         m = _OPENER.search(b, at)
         if not m:
@@ -271,14 +270,16 @@ def _heredocs(b):
                     body, q = b[q:max(q, e[0] - 1)], e[1]
                     subs += "" if quoted else heredoc_subs(body)
                 else:                       # never closes: keep it, as commands
-                    body, closed = ("" if rest_held else b[q:]), False
-                    rest_held = True
+                    body, closed = b[q:], False
             docs.append((body, quoted))
         done.append(head + seg + subs)
         if nl < 0:
             return "".join(done), docs
         if q >= len(b):
             done.append("\n")
+            return "".join(done), docs
+        if not closed:                      # nothing below an unclosed opener is stripped
+            done.append(b[q - 1:])
             return "".join(done), docs
         at = q - 1                          # the newline before the rest, as the line break it is
 

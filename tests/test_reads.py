@@ -50,21 +50,23 @@ def test_unclosed_heredocs_hold_the_text_once():
         if not was:
             tracemalloc.stop()
     assert peak < 50 * len(text)                 # linear: a body per opener held over 3000 times this
-    assert docs == [(text[len("cat <<EOF\n"):], False)] + [("", False)] * 6499   # the first takes the rest, the others none
-    assert stripped == "cat  HEREDOC \n" * 6500
+    assert docs == [(text[len("cat <<EOF\n"):], False)]   # the first takes the rest, openers and all
+    assert stripped == "cat  HEREDOC \n" + text[len("cat <<EOF\n"):]
 
 
-def test_a_closed_heredoc_after_an_unclosed_one_is_still_stripped():
+def test_nothing_below_an_unclosed_heredoc_is_stripped():
     stripped, docs = _heredocs("cat <<A\nbash <<B\nrm -rf /\nB\n")
-    assert docs == [("bash <<B\nrm -rf /\nB\n", False), ("rm -rf /", False)]   # A never closes: its body is the rest
-    assert stripped == "cat  HEREDOC \nbash  HEREDOC \n"   # the closed one is stripped, as on main
+    assert docs == [("bash <<B\nrm -rf /\nB\n", False)]
+    assert "rm -rf /" in stripped                 # kept as commands
 
-    # `<<END-A` reads as the delimiter END to the parser, which never finds it; bash closes it at END-A.
-    # The prose heredoc below is still stripped, as it was before the unclosed one held the rest.
-    text = "cat <<END-A > a.txt\nhello\nEND-A\ncat <<'EOF' > notes.md\nnever git push --force origin main\nEOF\n"
-    stripped, docs = _heredocs(text)
-    assert docs == [(text[len("cat <<END-A > a.txt\n"):], False), ("never git push --force origin main", True)]
-    assert "git push" not in stripped                     # the closed prose heredoc is stripped; END-A's own lines stay
+
+@pytest.mark.parametrize("opener", ["cat <<END-A", "cat <<END.A"])
+def test_a_body_the_shell_runs_is_not_hidden_below_an_opener_the_parser_cannot_close(opener):
+    # bash closes the first heredoc at its own delimiter and then runs the push: `<<EOF` in $(( )) is a shift.
+    # The parser reads the delimiter as END and never closes it, so it must not strip the "body" below.
+    closer = opener.split("<<")[1]
+    text = opener + "\nhello\n" + closer + "\necho $((1 <<EOF))\ngit push --force origin main\nEOF\n"
+    assert "git push --force origin main" in _heredocs(text)[0]
 
 
 def test_a_second_opener_on_the_last_line_adds_no_argument():
