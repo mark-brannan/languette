@@ -79,11 +79,14 @@ habits, because that is where it is tested. This document is the line.
 ## What enforces it
 
 A test holds rule 1: a denylist of the maintainer's identifiers and
-workflow words, and the names of the maintainer's own tools, over the package, the hooks, the feature files, the tests,
-the README and the docs, plus the plugin manifest, with an allowlist for the project's own metadata,
-install coordinates and issue links. Rule 8 is held today by the per-test
-I/O budget. The rest are review rules until each gets a check (#278 lists
-today's gaps); this document is what the reviewer reads.
+workflow words over the package, the hooks, the plugin manifest, the
+feature files, the tests, the README and the docs, with an allowlist for
+the project's own metadata, install coordinates and issue links. A second
+denylist holds the names of the maintainer's own tools over the same set,
+less the dated records (the decisions files and research notes). Rule 8
+is held today by the per-test I/O budget. The rest are review rules until
+each gets a check (#278 lists today's gaps); this document is what the
+reviewer reads.
 
 ## What this document is not
 

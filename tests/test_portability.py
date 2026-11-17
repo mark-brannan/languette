@@ -20,7 +20,7 @@ from paths import ROOT
 
 DIRS = ("languette", "hooks", ".claude-plugin", "features", "tests", "docs", "README.md")
 # What ships, or specifies what ships; docs/decisions.md and the research notes are dated records.
-SHIPPED = ("languette", "hooks", ".claude-plugin", "features", "tests", "docs/design", "docs/messages.md", "README.md")
+SHIPPED = ("languette", "hooks", ".claude-plugin", "devcontainer", "features", "tests", "docs/design", "docs/messages.md", "README.md")
 # The maintainer's identifiers, and the words of the workflow languette was born in.
 DENY = re.compile(r"mark-brannan|markbrannan|solace|claude_prompts_scratch"
                   r"|claim.?stamp|\bcuria\b|\bagora\b", re.IGNORECASE)
@@ -33,6 +33,7 @@ ATTRIBUTION = ("docs/decisions.md", "line is the maintainer's (@mark-brannan) un
 
 def _hits(dirs=DIRS, deny=DENY):
     for d in dirs:
+        assert (ROOT / d).exists(), f"test setup: {d} is gone; update DIRS or SHIPPED"
         for f in sorted((ROOT / d).rglob("*")) if (ROOT / d).is_dir() else [ROOT / d]:
             if not f.is_file() or f == Path(__file__).resolve() or "__pycache__" in f.parts:
                 continue
