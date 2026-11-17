@@ -51,17 +51,20 @@ they become rule data, one `match` entry per client (planned).
 | guard-git-stacked-base | branch deletions by git or `glab api`, judged by `glab mr list` on target and source branch |
 | guard-cross-session-send | glab's issue, merge request, note, pipeline, job log, release and repo reads, and `glab api` reads |
 | guard-bypass-ruleset | a push to a protected default branch no role may push to; a user or group allowed there is the bypass |
-| guard-review-threads, guard-signed-comments | none (planned): the reads and writes a port needs are documented, but not whose account is a bot (below) |
+| guard-review-threads, guard-signed-comments | none (planned): the reads and writes a port needs are documented, but not on the note itself whose account is a bot (below) |
 | GitLab's MCP tools | (planned), once their names are verified |
 
 Why those two have no row. GitLab resolves a thread by `PUT
 projects/:id/merge_requests/:iid/discussions/:discussion_id` with `resolved=true`, or by
-`glab mr note resolve [<mr>] <discussion-id|note-id>` (an 8-character prefix or a note
-id, so the guard would list the merge request's discussions to find the thread), and reads
-it with `GET` on the same path; both are in GitLab's and glab's docs. What the docs leave
-out is what makes a note's author a bot: GitLab's note author has no documented `bot`
-field, so which usernames count (project and group access-token accounts, a named list) is
-a design choice, and so is how guard-signed-comments tells its bot's account. Until that
+`glab mr note resolve [<mr>] <discussion-id|note-id>` (a discussion id, a prefix of 8 or
+more characters of it, or a note id; glab marks the verb experimental), and reads it with
+`GET` on the same path. A note is posted by `POST
+projects/:id/merge_requests/:iid/notes`; all of these are in GitLab's and glab's docs.
+What the docs leave out is a bot field on the note: its embedded author object carries
+none. The Users API does (`GET /users/:id` shows `bot`; `GET /users` filters with
+`humans` and `without_project_bots`), so telling a bot costs a second read per author,
+and which usernames count (project and group access-token accounts, a named list) is a
+design choice, as is how guard-signed-comments tells its bot's account. Until that
 choice, neither guard reads glab: a GitLab thread resolved or note posted passes both unjudged.
 
 Each row's glab verbs and API paths are cited from glab's and GitLab's own
