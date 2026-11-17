@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.27](https://github.com/mark-brannan/languette/compare/v0.0.26...v0.0.27) (2026-11-17)
+
+
+### Features
+
+* **guards:** in dontAsk, the approval guards leave the call to the user ([#421](https://github.com/mark-brannan/languette/issues/421)) ([35e315e](https://github.com/mark-brannan/languette/commit/35e315e62d2ae9e896f5d711a7d08355d6b2d7ab))
+* **verdict:** an asks option that denies a guard's ask, with how to restate the call ([#422](https://github.com/mark-brannan/languette/issues/422)) ([3d6339b](https://github.com/mark-brannan/languette/commit/3d6339b7cdfd714250c8bd9e6028aefe057aacdb))
+
+
+### Documentation
+
+* **research:** the rows of [#375](https://github.com/mark-brannan/languette/issues/375) that are still open ([#420](https://github.com/mark-brannan/languette/issues/420)) ([8a6f5c4](https://github.com/mark-brannan/languette/commit/8a6f5c4e66c63b61cef5bf679a115908dad2cc3c))
+
 ## [0.0.26](https://github.com/mark-brannan/languette/compare/v0.0.25...v0.0.26) (2026-11-12)
 
 
