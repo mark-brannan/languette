@@ -22,8 +22,9 @@ ask_first_cannot_look: ask-first: {err}. A gate that cannot look fails closed: r
 ask_first_invalid: ask-first: {path} is invalid: {err}. Every Bash command is denied until it is fixed, because the guard cannot tell which commands the list meant to cover. Fix it with the Edit tool, or tell the user.
 ask_first_times: ; this command runs it {n} times and has {have} unspent
 ask_first_cheaper:  Cheaper forms: {cheaper}.
-ask_first_need: `{id}` ({path}) needs the user's approval for each run{times}. Cost: {cost}.{cheaper} If a cheaper form answers the question, use it instead. Otherwise call AskUserQuestion: give the exact command (`{cmd}`), why it must run now, and the cost above, with one option labelled exactly "{label}" and one to skip. One approval is one run; ask again before running it again.
+ask_first_need: `{id}` ({path}) needs the user's approval for each run{times}. Cost: {cost}.{cheaper} If a cheaper form answers the question, use it instead. Otherwise call AskUserQuestion: give the exact command (`{cmd}`), why it must run now, and the cost above, with one option labelled exactly "{label}" and one to skip. One approval is one run; ask again before running it again. {way}
 ask_first_unattended: `{id}` ({path}) needs the user's approval for each run, and in {mode} no one is there to approve it: AskUserQuestion is denied unseen. Cost: {cost}.{cheaper} If a cheaper form answers the question, use it instead; otherwise leave `{cmd}` for the user to run.
+ask_way: No one at the prompt? Don't work around it: if the call still needs making, the user makes it themselves. Say what it is for and hand them the exact call.
 ```
 
 ## asks
@@ -133,7 +134,7 @@ dup_open: PR {named} is open and already references {issue}, which this PR would
 ## gi
 
 ```
-gi_ask: Show the human the draft and wait for their yes: call AskUserQuestion with the title or number and the repo, one option labelled exactly "{label}" and one to decline. One yes is one write; ask again for the next.
+gi_ask: Show the human the draft and wait for their yes: call AskUserQuestion with the title or number and the repo, one option labelled exactly "{label}" and one to decline. One yes is one write; ask again for the next. {way}
 gi_ask_unattended: In {mode} no one is there to say yes: AskUserQuestion is denied unseen. {way}
 gi_unreadable: {guard}: the command could not be read ({kind}), so this call could not be checked
 gi_batch: {guard}: {n} issue creates, transfers or deletes in one call. One per human turn, never a batch.
@@ -159,7 +160,7 @@ home_not_absolute: {guard}: $HOME is not an absolute path, cannot resolve target
 ## hooks
 
 ```
-hooks_skipped: {guard}: --no-verify, -n or core.hooksPath skips this repo's hooks, and that is the user's call, not yours: a hook that blocks a commit, push or merge is telling you something. `{cmd}` skips them {runs} time{runs_s} and has {have} unspent approval{have_s}. Better, fix what the blocking hook reported and run it without the flag. If the user must have the hooks skipped, call AskUserQuestion: give the exact command and why it cannot pass the hooks, with one option labelled exactly "{label}" and one to decline. One approval is one run; ask again before skipping the hooks again.
+hooks_skipped: {guard}: --no-verify, -n or core.hooksPath skips this repo's hooks, and that is the user's call, not yours: a hook that blocks a commit, push or merge is telling you something. `{cmd}` skips them {runs} time{runs_s} and has {have} unspent approval{have_s}. Better, fix what the blocking hook reported and run it without the flag. If the user must have the hooks skipped, call AskUserQuestion: give the exact command and why it cannot pass the hooks, with one option labelled exactly "{label}" and one to decline. One approval is one run; ask again before skipping the hooks again. {way}
 hooks_skipped_unattended: {guard}: --no-verify, -n or core.hooksPath skips this repo's hooks, and that is the user's call, not yours: a hook that blocks a commit, push or merge is telling you something. `{cmd}` skips them {runs} time{runs_s}. In {mode} no one is there to approve skipping them: AskUserQuestion is denied unseen. Fix what the blocking hook reported and run it without the flag. {way}
 ```
 
@@ -176,7 +177,7 @@ host_fork_bomb: `:(){{ :|:& }};:` is blocked: that is the fork-bomb shape, a fun
 
 ```
 infra_times: ; it runs the rule {n} times and has {have} unspent approvals
-infra_need: `{cmd}` {what} (`{rule}`){times}. Cost: {cost}. Instead, look first: {instead}. If the user then wants this run, call AskUserQuestion: give the exact command, why it must run now and the cost above, with one option labelled exactly "{label}" and one to skip. One approval is one run; ask again before running it again.
+infra_need: `{cmd}` {what} (`{rule}`){times}. Cost: {cost}. Instead, look first: {instead}. If the user then wants this run, call AskUserQuestion: give the exact command, why it must run now and the cost above, with one option labelled exactly "{label}" and one to skip. One approval is one run; ask again before running it again. {way}
 infra_unattended: `{cmd}` {what} (`{rule}`). Cost: {cost}. Instead, look first: {instead}. In {mode} no one is there to approve it: AskUserQuestion is denied unseen.
 ```
 

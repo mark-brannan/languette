@@ -218,6 +218,7 @@ Feature: guard-infra
         | dontAsk           | In dontAsk no one is there to approve it |
         | dontAsk           | the user makes it themselves            |
         | bypassPermissions | call AskUserQuestion                    |
+        | bypassPermissions | No one at the prompt? Don't work around it |
 
     Scenario: in dontAsk the deny does not send the agent to AskUserQuestion
       Given the permission mode is "dontAsk"

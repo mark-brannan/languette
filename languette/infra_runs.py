@@ -321,7 +321,8 @@ def approval(doc, guard, found):
             continue
         parts.append(say("infra_need", cmd=shown, what=what, rule=r,
                          times=(say("infra_times", n=n, have=have) if n > 1 else ""),
-                         cost=cost, instead=instead.format(tool=found[r][0]), label=label))
+                         cost=cost, instead=instead.format(tool=found[r][0]), label=label,
+                         way=say("ask_way")))
     if doc.mode in NO_PROMPT:
         parts.append(say("unattended_way"))
     return deny(say("judged", guard=guard, why="\n\n".join(parts)))

@@ -38,6 +38,7 @@ Feature: guard-bypass-hooks
       | dontAsk           | the user makes it themselves                   |
       | dontAsk           | Fix what the blocking hook reported            |
       | bypassPermissions | call AskUserQuestion                           |
+      | bypassPermissions | No one at the prompt? Don't work around it    |
 
   @also_guard-bypass-ruleset
   Scenario: in dontAsk the deny does not send the agent to AskUserQuestion
