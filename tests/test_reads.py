@@ -36,12 +36,16 @@ def test_a_tail_read_under_the_cap_is_the_whole_file(tmp_path):
 
 def test_unclosed_heredocs_hold_the_text_once():
     text = "cat <<EOF\n" * 6500                   # about 64 KB
+    was = tracemalloc.is_tracing()
     tracemalloc.start()
+    tracemalloc.reset_peak()
+    base = tracemalloc.get_traced_memory()[0]    # a tracer already on counts from its own start
     try:
         stripped, docs = _heredocs(text)
-        peak = tracemalloc.get_traced_memory()[1]
+        peak = tracemalloc.get_traced_memory()[1] - base
     finally:
-        tracemalloc.stop()
+        if not was:
+            tracemalloc.stop()
     assert peak < 50 * len(text)                 # linear: a body per opener held over 3000 times this
     assert docs == [(text[len("cat <<EOF\n"):], False)]   # the first takes the rest, openers and all
     assert stripped == "cat  HEREDOC \n" + text[len("cat <<EOF\n"):]
