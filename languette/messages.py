@@ -404,6 +404,14 @@ MESSAGES = {
         "\"{label}\" and one to decline. One approval is one run; ask again "
         "before skipping the hooks again."
     ),
+    # hooks_skipped where no one can approve (languette.verdict.NO_PROMPT).
+    "hooks_skipped_unattended": (
+        "{guard}: --no-verify, -n or core.hooksPath skips this repo's hooks, and that is the user's call, not "
+        "yours: a hook that blocks a commit, push or merge is telling you something. "
+        "`{cmd}` skips them {runs} time{runs_s}. In {mode} no one is "
+        "there to approve skipping them: AskUserQuestion is denied unseen. Fix what the blocking hook "
+        "reported and run it without the flag. {way}"
+    ),
     "disks_way_out": (
         "Work on an image file in /tmp or the scratchpad instead; a real disk is the user's to write, so "
         "hand them the exact command."
@@ -581,6 +589,8 @@ MESSAGES = {
         "and the repo, one option labelled exactly \"{label}\" and one to decline. One yes is one write; "
         "ask again for the next."
     ),
+    # gi_ask where no one can say yes (languette.verdict.NO_PROMPT).
+    "gi_ask_unattended": "In {mode} no one is there to say yes: AskUserQuestion is denied unseen. {way}",
     "gi_unreadable": "{guard}: the command could not be read ({kind}), so this call could not be checked",
     "gi_batch": "{guard}: {n} issue creates, transfers or deletes in one call. One per human turn, never a batch.",
     "gi_loop": "{guard}: an issue create, transfer or delete inside a loop. One per human turn, never a batch.",
@@ -597,6 +607,11 @@ MESSAGES = {
         " If the user then wants this run, call AskUserQuestion: give the exact command, why it must run "
         "now and the cost above, with one option labelled exactly \"{label}\" and one to skip. "
         "One approval is one run; ask again before running it again."
+    ),
+    # infra_need where no one can approve (languette.verdict.NO_PROMPT); unattended_way follows once.
+    "infra_unattended": (
+        "`{cmd}` {what} (`{rule}`). Cost: {cost}. Instead, look first: {instead}. In {mode} no one is "
+        "there to approve it: AskUserQuestion is denied unseen."
     ),
     "rd_not_allowed": (
         "`{what}` is blocked: only the scratchpad, /tmp, agent worktrees and the generated "
