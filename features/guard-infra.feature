@@ -206,6 +206,24 @@ Feature: guard-infra
 
   Rule: a destructive command needs the user's approval for each run
 
+    # dontAsk denies AskUserQuestion unseen; bypassPermissions still shows it.
+    Scenario Outline: where no one can approve, the deny leaves the run to the user
+      Given the permission mode is "<mode>"
+      When the agent runs `terraform destroy`
+      Then the guard denies, naming "<says>"
+
+      Examples:
+        | mode              | says                                    |
+        | dontAsk           | terraform plan -destroy                 |
+        | dontAsk           | In dontAsk no one is there to approve it |
+        | dontAsk           | the user makes it themselves            |
+        | bypassPermissions | call AskUserQuestion                    |
+
+    Scenario: in dontAsk the deny does not send the agent to AskUserQuestion
+      Given the permission mode is "dontAsk"
+      When the agent runs `terraform destroy`
+      Then the guard denies, not naming "call AskUserQuestion"
+
     Scenario: approved once
       Given the transcript holds:
         """

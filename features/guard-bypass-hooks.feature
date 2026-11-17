@@ -25,6 +25,26 @@ Feature: guard-bypass-hooks
     And the guard denies, naming "Skip hooks once"
     And the guard denies, naming "fix what the blocking hook reported"
 
+  # dontAsk denies AskUserQuestion unseen; bypassPermissions still shows it.
+  @also_guard-bypass-ruleset
+  Scenario Outline: where no one can approve, the deny leaves the run to the user
+    Given the permission mode is "<mode>"
+    When the agent runs `git push --no-verify`
+    Then the guard denies, naming "<says>"
+
+    Examples:
+      | mode              | says                                           |
+      | dontAsk           | In dontAsk no one is there to approve skipping |
+      | dontAsk           | the user makes it themselves                   |
+      | dontAsk           | Fix what the blocking hook reported            |
+      | bypassPermissions | call AskUserQuestion                           |
+
+  @also_guard-bypass-ruleset
+  Scenario: in dontAsk the deny does not send the agent to AskUserQuestion
+    Given the permission mode is "dontAsk"
+    When the agent runs `git push --no-verify`
+    Then the guard denies, not naming "call AskUserQuestion"
+
   @also_guard-secrets @also_guard-bypass-ruleset
   Scenario Outline: a credential in the denied command is not quoted back whole
     When the agent runs `<command>`
