@@ -37,6 +37,11 @@ MESSAGES = {
         "{guard}: the asks setting is `{rule}`, so this is denied instead of asked. What it would "
         "have asked: {why}"
     ),
+    # An asks value that is neither: the gate stays closed, and the reason says the setting is wrong.
+    "asks_unknown": (
+        "{guard}: the asks setting `{rule}` is not one of {rules}, so this is denied instead of asked. "
+        "Fix the setting, or empty it to be asked. What it would have asked: {why}"
+    ),
     # Said once after every asks_denied in a deny: restate what the hook could not read; leave
     # the user's own call to the user.
     "asks_denied_way": (
@@ -428,7 +433,7 @@ MESSAGES = {
         "guard-bypass-ruleset: this {prog} push sends the current branch, and the hook can't "
         "tell which branch that is (another directory, or a detached HEAD), so it can't check "
         "whether the push goes around a rule that requires a pull request. Name the branch, "
-        "written out: `{prog} push origin <branch>`."
+        "written out: `{prog} push {remote} <branch>`."
     ),
     "ruleset_repo_unknown": (
         "guard-bypass-ruleset: this pushes to `{branch}` through remote `{remote}`, in a repository the "

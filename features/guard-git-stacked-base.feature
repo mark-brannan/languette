@@ -174,7 +174,7 @@ Feature: guard-git-stacked-base
   Scenario: a value asks does not know closes the gate, naming the setting
     Given CLAUDE_PLUGIN_OPTION_ASKS is "yes"
     When the agent runs `git push origin --delete "$b"`
-    Then the guard denies, naming "the asks setting is `yes`"
+    Then the guard denies, naming "the asks setting `yes` is not one of prompt, deny"
 
   # bypassPermissions is a user who chose to skip prompts, not an absent one.
   Scenario Outline: an ask where someone can answer it stays an ask

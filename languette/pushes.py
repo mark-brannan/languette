@@ -506,7 +506,7 @@ def _judge(p, env):
         dsts.remove(HEAD)
         cur = yield from _git(p, env, "symbolic-ref", "--short", "HEAD")
         if cur is None:
-            return ask(say("ruleset_head_unknown", prog=p.prog))
+            return ask(say("ruleset_head_unknown", prog=p.prog, remote=remote or "<remote>"))
         dsts.append(cur)
     if remote is None:
         cur = (yield from _git(p, env, "symbolic-ref", "--short", "HEAD")) or ""

@@ -252,7 +252,12 @@ def verdict(event, findings, mode=None, chained=None, asks=None):
         return deny("\n\n".join([say("unattended_ask", guard=n, mode=mode, why=r) for n, r in asks_found]
                                  + [say("unattended_way")] + _footer(chained)))
     if asks_found and (asks or "prompt") != "prompt":
-        return deny("\n\n".join([say("asks_denied", guard=n, rule=asks, why=r) for n, r in asks_found]
+        if asks in ASKS_RULES:
+            said = [say("asks_denied", guard=n, rule=asks, why=r) for n, r in asks_found]
+        else:
+            said = [say("asks_unknown", guard=n, rule=" ".join(str(asks).split())[:80], rules=", ".join(ASKS_RULES), why=r)
+                    for n, r in asks_found]
+        return deny("\n\n".join(said
                                  + [say("asks_denied_way")] + _footer(chained)))
     if asks_found:
         return {**ask("\n\n".join(r for _, r in asks_found)), **({"updatedInput": rewrites[0]} if rewrites else {})}

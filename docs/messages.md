@@ -30,6 +30,7 @@ ask_first_unattended: `{id}` ({path}) needs the user's approval for each run, an
 
 ```
 asks_denied: {guard}: the asks setting is `{rule}`, so this is denied instead of asked. What it would have asked: {why}
+asks_unknown: {guard}: the asks setting `{rule}` is not one of {rules}, so this is denied instead of asked. Fix the setting, or empty it to be asked. What it would have asked: {why}
 asks_denied_way: No one will be asked. Where the hook says it can't tell or can't read something, write the call so it can and run it again: the branch, repo or path written out in place of a variable, no cd before it, one call in place of a loop. Where the call is the user's to approve, don't work around it: say what it is for and hand them the exact call.
 ```
 
@@ -309,7 +310,7 @@ rules_cannot_look: the payload's cwd {cwd!r} is not a directory, so the repo's l
 
 ```
 ruleset_admin: guard-bypass-ruleset: `gh pr merge --admin` merges past the PR's required reviews and checks on the user's bypass. Merge without --admin, or with --auto to merge once the checks pass. Bypassing is the user's to do, from their own terminal.
-ruleset_head_unknown: guard-bypass-ruleset: this {prog} push sends the current branch, and the hook can't tell which branch that is (another directory, or a detached HEAD), so it can't check whether the push goes around a rule that requires a pull request. Name the branch, written out: `{prog} push origin <branch>`.
+ruleset_head_unknown: guard-bypass-ruleset: this {prog} push sends the current branch, and the hook can't tell which branch that is (another directory, or a detached HEAD), so it can't check whether the push goes around a rule that requires a pull request. Name the branch, written out: `{prog} push {remote} <branch>`.
 ruleset_repo_unknown: guard-bypass-ruleset: this pushes to `{branch}` through remote `{remote}`, in a repository the hook can't find (a cd or -C it can't follow, or GIT_DIR), so it can't ask GitHub whether `{branch}` requires a pull request. An agent that pushes with your credentials can use your bypass. Run it from the repository, or with -C and its path written out.
 ruleset_needs_pr: guard-bypass-ruleset: `{branch}` on {slug} requires a pull request, and this push would go around it on the user's bypass. Push a branch and open a PR. A direct push is the user's to make, from their own terminal.
 ruleset_needs_mr: guard-bypass-ruleset: `{branch}` on {slug} is a protected branch no role may push to, so it takes a merge request, and this push would go around it on the user's bypass. Push a branch and open a merge request. A direct push is the user's to make, from their own terminal.
