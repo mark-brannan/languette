@@ -18,7 +18,9 @@ issue", "Delete issue o/r#7", "Delete issue 7"). A yes
 to file opens no delete, and a yes to delete issue 7 opens no other. Each yes
 allows one write and is spent the way ask-first spends one
 (languette.world.World._replay), so several in a row take one question
-each. A write that took the human turn's door spent no yes.
+each. A write that took the human turn's door spent no yes. In dontAsk, where
+AskUserQuestion is denied unseen, a shut door's deny leaves the write to the
+user instead of sending the agent to ask.
 
 Counts as an identifier write: `gh issue create|new|transfer|delete`; `gh api`
 POST to repos/o/r/issues; a graphql createIssue, transferIssue or deleteIssue;
@@ -37,7 +39,7 @@ import re
 
 from languette import scan as sw
 from languette.messages import say
-from languette.verdict import Act, Need, approve, deny, spend
+from languette.verdict import NO_PROMPT, Act, Need, approve, deny, spend
 
 # The tools hooks.json wires this guard to; the MCP ones by their name's tail.
 TOOLS = re.compile(r"(?:Bash|mcp__.*__(?:create_issue|issue_write|transfer_issue|delete_issue))\Z")
@@ -221,12 +223,21 @@ def door(doc, guard, found):
     if found["unread"]:
         why = f"{say('gi_query_unread')}; {why}"
     label = _label(*found["writes"][0])
+    ask = _ask(doc.mode, label)
     if take:
         # Lost after the verdict, the door is another write's: the user's yes is the way left.
-        return spend("door", *take, lost=say("gi_door", guard=guard, why=IN_FLIGHT, ask=say("gi_ask", label=label)))
+        return spend("door", *take, lost=say("gi_door", guard=guard, why=IN_FLIGHT, ask=ask))
     _, done = yield from approve(
-        {label: 1}, lambda e: say("gi_transcript", guard=guard, err=e, why=why, ask=say("gi_ask", label=label)))
-    return done[0] if done else deny(say("gi_door", guard=guard, why=why, ask=say("gi_ask", label=label)))
+        {label: 1}, lambda e: say("gi_transcript", guard=guard, err=e, why=why, ask=ask))
+    return done[0] if done else deny(say("gi_door", guard=guard, why=why, ask=ask))
+
+
+def _ask(mode, label):
+    """How a deny sends the agent to the user's yes; where no one can say yes (NO_PROMPT),
+    it leaves the write to the user instead."""
+    if mode in NO_PROMPT:  # any other mode, unknown or missing included, stays an ask
+        return say("gi_ask_unattended", mode=mode, way=say("unattended_way"))
+    return say("gi_ask", label=label)
 
 
 def door_open(doc, guard, found):

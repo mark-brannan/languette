@@ -288,6 +288,24 @@ Feature: guard-github-issues
     When the agent runs `gh issue create -t t -b b`
     Then the guard denies, naming "wait for their yes"
 
+  # dontAsk denies AskUserQuestion unseen; bypassPermissions still shows it.
+  Scenario Outline: where no one can say yes, a shut door's deny leaves the write to the user
+    Given the permission mode is "<mode>"
+    When the agent runs `gh issue create -t t -b b`
+    Then the guard denies, naming "<says>"
+
+    Examples:
+      | mode              | says                                   |
+      | dontAsk           | the door is shut                       |
+      | dontAsk           | In dontAsk no one is there to say yes  |
+      | dontAsk           | the user makes it themselves           |
+      | bypassPermissions | call AskUserQuestion                   |
+
+  Scenario: in dontAsk a shut door's deny does not send the agent to AskUserQuestion
+    Given the permission mode is "dontAsk"
+    When the agent runs `gh issue create -t t -b b`
+    Then the guard denies, not naming "call AskUserQuestion"
+
   Scenario: this door and another plugin's door do not spend each other
     Given another plugin's door file is already present
     When the human speaks, opening the door
