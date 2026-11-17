@@ -140,11 +140,6 @@ def _all_off(ctx):
         ctx.env[run.option(g)] = None if hasattr(g, "OPT_IN") else "false"
 
 
-@given("no engine is configured")
-def _no_engine(ctx):
-    ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = None
-
-
 @given(parsers.re(r"(?P<var>[A-Z][A-Z0-9_]*) is unset"))
 def _unsetenv(ctx, var):
     ctx.env[var] = None
@@ -376,33 +371,6 @@ def _add_remote(ctx, path, name, url):
 @given(parsers.parse('"{path}" has remote.{name}.gh-resolved "{value}"'))
 def _gh_resolved_value(ctx, path, name, value):
     _git(ctx.expand(path), "config", f"remote.{name}.gh-resolved", value)
-
-
-def _engine(ctx, command):
-    # The prose_budget_command option names the engine.
-    ctx.env["CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMAND"] = command
-
-
-@given('the stub "prose-budget" is the engine')
-def _prose_budget_stub(ctx):
-    ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
-    _engine(ctx, str(ROOT / "tests/stubs/prose-budget"))
-
-
-@given('the stub "prose-budget" is the engine, at a relative path')
-def _prose_budget_stub_relative(ctx):
-    assert ctx.proj, "test setup: a relative engine path needs a project directory"
-    ctx.stub_log = ctx.stub_log or ctx.mkdtemp()
-    dest = ctx.proj / "prose-budget"
-    shutil.copy(ROOT / "tests/stubs/prose-budget", dest)
-    dest.chmod(0o755)
-    _engine(ctx, "./prose-budget")
-
-
-@given('the stub "prose-budget" is the engine, by bare name on PATH')
-def _prose_budget_stub_bare(ctx):
-    ctx.stubs, ctx.stub_log = ("prose-budget",), ctx.stub_log or ctx.mkdtemp()
-    _engine(ctx, "prose-budget")
 
 
 @given(parsers.re(r'PATH holds only "(?P<tools>[^"]*)"(?P<gh> and the stub "gh")?'))

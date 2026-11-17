@@ -2677,7 +2677,7 @@
  "tests/test_features.py::test_session_in_the_signature_is_this_sessions_hex": {"git": 6, "run": 2},
  "tests/test_features.py::test_single_quotes_make__and_a_backtick_ordinary_characters_double_quotes_do_not[gh issue create -R o/r -t x -b 'run $(date) yourself'-is silent]": {"git": 2},
  "tests/test_features.py::test_single_quotes_make__and_a_backtick_ordinary_characters_double_quotes_do_not[gh pr comment 3 -R o/r -b \"Fixed in `git rev-parse HEAD`\"-denies]": {"git": 2},
- "tests/test_features.py::test_single_quotes_make__and_a_backtick_ordinary_characters_double_quotes_do_not[gh pr comment 3 -R o/r -b 'Fixed in `abc123`, see `prose-budget`.'-is silent]": {"git": 2, "run": 1},
+ "tests/test_features.py::test_single_quotes_make__and_a_backtick_ordinary_characters_double_quotes_do_not[gh pr comment 3 -R o/r -b 'Fixed in `abc123`, see `make-lint`.'-is silent]": {"git": 2, "run": 1},
  "tests/test_features.py::test_single_quotes_make__and_a_backtick_ordinary_characters_double_quotes_do_not[gh pr comment 3 -R o/r -b 'Fixed on `Wanderlust`.'-denies, naming \"Wanderlust\"]": {"git": 2, "run": 1},
  "tests/test_features.py::test_skipping_the_hooks_is_denied_however_it_is_spelled[/usr/bin/git push --no-verify-git by path]": {"git": 10},
  "tests/test_features.py::test_skipping_the_hooks_is_denied_however_it_is_spelled[X=1 git push --no-verify-assignment prefix]": {"git": 9},

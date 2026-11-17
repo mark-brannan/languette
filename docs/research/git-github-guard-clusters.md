@@ -42,7 +42,7 @@ languette's shipped and pending members:
 | #125 `guard-duplicate-pr` | opening a PR that closes an issue an open PR already references | yes (issue timeline) |
 | `guard-github-issues` (approved) | more than one issue create/transfer/delete per human turn | per-turn door |
 | `guard-private-terms` (approved) | a private term in text bound for a public repo | terms file |
-| `guard-commits` (approved) | a commit failing a check the repo lists (today: `prose-budget-commit`, which warns) | engine on PATH |
+| `guard-commits` (approved) | a commit failing a check the repo lists | engine on PATH |
 | `guard-worktrees` (approved) | branch switch in a `$HOME` worktree; another session's worktree | worktree list |
 
 ## Clusters by harm

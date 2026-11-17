@@ -22,8 +22,6 @@ Feature: wiring
       """
       {"patterns": [{"id": "acme-key", "description": "Acme API key", "regex": "acme_[a-z0-9]{24}"}]}
       """
-    And the stub "prose-budget" is the engine
-    And PROSE_BUDGET_FAIL is "1"
     And CLAUDE_PLUGIN_OPTION_PROTECTED_SERVICES is "postgresql"
 
   Scenario Outline: each hooks.json command judges a payload
@@ -188,7 +186,6 @@ Feature: wiring
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | gh issue comment 3 -R o/r -b Wanderlust |
       | guard-duplicate-prs | CLAUDE_PLUGIN_OPTION_GUARD_DUPLICATE_PRS | gh pr create -t t -b "Closes #1" |
       | guard-bypass-labels       | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_LABELS       | gh pr edit 4 --add-label churn-ok |
-      | prose-budget-commit    | CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT    | git commit -m x               |
       | require-well-formed | CLAUDE_PLUGIN_OPTION_REQUIRE_WELL_FORMED | echo "unterminated |
       | guard-secrets | CLAUDE_PLUGIN_OPTION_GUARD_SECRETS | echo acme_k7q2m9x4c1v8b3n6z5w0t2r4 |
       | guard-bypass-ruleset | CLAUDE_PLUGIN_OPTION_GUARD_BYPASS_RULESET | git push origin HEAD:$b |
@@ -305,33 +302,6 @@ Feature: wiring
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | no    | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | true  | gh issue comment 3 -R o/r -b Wanderlust | denies  |
       | guard-private-terms     | CLAUDE_PLUGIN_OPTION_GUARD_PRIVATE_TERMS     | 1     | gh issue comment 3 -R o/r -b Wanderlust | denies  |
-
-  # prose-budget-commit is opt-in too: it runs only when its option is exactly "true".
-  Scenario: the opt-in prose-budget guard warns when its option is true
-    Given the hook is the hooks.json command for "prose-budget-commit"
-    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is "true"
-    When the agent runs `git commit -m x`
-    Then the guard warns about "CI fails on this"
-
-  Scenario: the opt-in prose-budget guard stays silent when its option is unset
-    Given the hook is the hooks.json command for "prose-budget-commit"
-    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is unset
-    When the agent runs `git commit -m x`
-    Then the guard is silent
-
-  Scenario: a missing script is a deny for the opt-in prose-budget guard when it is on
-    Given the hook is the hooks.json command for "prose-budget-commit"
-    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is "true"
-    And CLAUDE_PLUGIN_ROOT is "/nonexistent"
-    When the agent runs `git commit -m x`
-    Then the guard denies
-
-  Scenario: a crashing script is a deny for the opt-in prose-budget guard when it is on
-    Given the hook is the hooks.json command for "prose-budget-commit"
-    And CLAUDE_PLUGIN_OPTION_PROSE_BUDGET_COMMIT is "true"
-    And the plugin's script for "prose-budget-commit" crashes
-    When the agent runs `git commit -m x`
-    Then the guard denies
 
   # guard-worktrees is opt-in, the reverse of the guards above: it runs only
   # when its option is exactly "true", so a misconfiguration leaves it off.

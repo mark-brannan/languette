@@ -20,17 +20,17 @@ from paths import ROOT
 
 # Spelled out, not read from run.GUARDS, so a guard dropped from run.GUARDS fails the comparisons below.
 GUARDS = {"guard-git-work-loss", "guard-recursive-delete", "guard-git-stacked-base", "ask-first", "guard-github-issues",
-          "guard-private-terms", "prose-budget-commit", "guard-worktrees",
+          "guard-private-terms", "guard-worktrees",
           "guard-bypass-labels", "require-well-formed", "guard-infra", "guard-bypass-hooks", "guard-bypass-ruleset",
           "guard-permissions", "guard-pipe-to-shell", "guard-disks",
           "guard-host-availability", "guard-protected-services", "guard-scheduled-jobs", "guard-cross-session-send",
           "guard-secrets", "guard-review-threads", "guard-signed-comments",
           "guard-duplicate-prs", "deny-always", "guard-sudo"}
 # Guards that are off unless the user turns them on: their option defaults to false.
-OPT_IN = {"guard_worktrees", "guard_review_threads", "guard_signed_comments", "guard_sudo", "prose_budget_commit"}
+OPT_IN = {"guard_worktrees", "guard_review_threads", "guard_signed_comments", "guard_sudo"}
 # Options that are not a guard's on/off toggle: name -> type.
 OTHER_OPTIONS = {"redacted_terms_file": "file", "blocked_terms_file": "file", "private_repos": "string", "bypass_labels": "string", "review_thread_logins": "string",
-                 "protected_services": "string", "prose_budget_command": "string",
+                 "protected_services": "string",
                  "signed_comments_opening": "string", "signed_comments_signature": "string", "signed_comments_mcp": "string", "asks": "string",
                  "record_decisions": "boolean", "record_raw_commands": "boolean"}
 # Per-rule switches inside one guard: boolean, on by default.
@@ -234,7 +234,7 @@ def test_every_call_to_a_guard_generator_is_a_yield_from():
         ROOT / "languette" / f"{m}.py" for m in ("hook_skips", "branch_deletions", "infra_runs", "listed_runs",
                                                  "pushes", "untrusted_reads", "issue_writes", "opened_prs",
                                                  "work_losses", "worktree_reaches", "thread_resolves",
-                                                 "comment_posts", "prose_commits")]
+                                                 "comment_posts")]
     trees = {f.stem: ast.parse(f.read_text()) for f in files}
     gens = {m: _generators(t) for m, t in trees.items()}
     bad = []

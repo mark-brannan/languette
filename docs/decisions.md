@@ -144,7 +144,7 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 - No Need writes or runs a host-named program. Scar: #107.
 - The readable set is the read kinds in `KINDS` in `languette/world.py`.
 - Whether `prose-budget-commit` keeps running the engine `prose_budget_bin`
-  names is open.
+  names was open; settled below ("Evict prose-budget-commit").
 
 ## New guards: 2026-10-09
 
@@ -269,3 +269,13 @@ line is the maintainer's (@mark-brannan) unless it says otherwise.
 - 2026-11-01: the session-start hook regenerates it too:
   `/plugin install languette` runs no `languette` command. Pencil
   ([#338](https://github.com/mark-brannan/languette/pull/338)).
+
+## Evict prose-budget-commit: 2026-11-16
+
+- `prose-budget-commit` and its `prose_budget_commit` and
+  `prose_budget_command` settings are removed: a shipped guard must not know
+  the maintainer's own tooling. Because it named an engine no stranger has.
+- No migration. A settings file that still names either key is read as any
+  unknown key is: ignored.
+- `tests/test_portability.py` holds the line over everything shipped, the
+  plugin manifest included.

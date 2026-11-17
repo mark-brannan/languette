@@ -158,7 +158,6 @@ turns one off:
 - [`guard-protected-services`](features/guard-protected-services.feature): `systemctl stop postgresql`, for the services the `protected_services` setting names
 - [`guard-review-threads`](features/guard-review-threads.feature): opt-in; resolving a bot's review thread with no reply naming a commit or a link
 - [`guard-signed-comments`](features/guard-signed-comments.feature): opt-in; a comment not from a bot's account, or without the signature you set
-- [`prose-budget-commit`](features/prose-budget-commit.feature): opt-in; a `git commit` whose staged prose runs over the repo's word budgets
 - `guard-databases` (planned)
 - `guard-protected-paths` (planned)
 
@@ -267,8 +266,8 @@ Matches, lookup, your own list and a broken file work as for ask-first; `{"cmd":
 ## Configuration
 
 Every guard is on by default except `guard-worktrees`,
-`guard-review-threads`, `guard-signed-comments`, `guard-sudo` and
-`prose-budget-commit`, which are opt-in. Turn one off (or those on) with
+`guard-review-threads`, `guard-signed-comments` and `guard-sudo`,
+which are opt-in. Turn one off (or those on) with
 `/plugin configure languette@languette`,
 or at install, by its name with underscores:
 
@@ -420,7 +419,6 @@ for beyond the command, it declares:
 | `guard-bypass-labels` | the `bypass_labels` setting, and a file `gh api --input` names |
 | `guard-cross-session-send` | the payload's `session_id` and `permission_mode`, a record per session in `$TMPDIR`, and the agent-team config |
 | `guard-worktrees` | `$HOME`; git, for the repo's top level and where each path lands; a record per session in `$TMPDIR` |
-| `prose-budget-commit` | the staged diff, and the working-tree files a commit names, through `prose-budget` |
 
 A guard that crashes is a deny naming the guard; the runner holds that rule,
 so no guard has to.

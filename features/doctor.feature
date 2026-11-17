@@ -20,10 +20,10 @@ Feature: doctor
 
   Scenario: a plugin install whose hooks deny both probes
     Given languette "cd31356ad5db" is installed at user scope
-    And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true}`
+    And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true}`
     When the doctor runs
     Then the "Claude Code" row is ✓ "plugin cd31356, user scope"
-    And beneath it "guards enabled: 26" is ✓ and "guards disabled: 0" is ✓
+    And beneath it "guards enabled: 25" is ✓ and "guards disabled: 0" is ✓
     And the "shell parser" row is there
     And the "version" row comes before the "shell parser" row
     And the "shell parser" row comes before the "parse check" row
@@ -64,7 +64,7 @@ Feature: doctor
 
   Scenario: an opt-in guard set false explicitly is not counted as disabled
     Given languette "cd31356ad5db" is installed at user scope
-    And the languette options are `{"prose_budget_commit": false}`
+    And the languette options are `{"guard_sudo": false}`
     When the doctor runs
     Then the "Claude Code" row is ✓ "plugin cd31356, user scope"
     And beneath it "guards disabled: 0" is ✓
@@ -202,11 +202,11 @@ Feature: doctor
 
   Scenario: without the claude CLI the doctor reads installed_plugins.json
     Given languette "cd31356ad5db" is installed at user scope
-    And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true, "prose_budget_commit": true}`
+    And the languette options are `{"guard_worktrees": true, "guard_review_threads": true, "guard_signed_comments": true, "guard_sudo": true}`
     And claude plugin list fails
     When the doctor runs
     Then the "Claude Code" row is ✓ "plugin cd31356, user scope"
-    And beneath it "guards enabled: 26" is ✓
+    And beneath it "guards enabled: 25" is ✓
     And the doctor exits 0
 
   Scenario Outline: what the doctor cannot read is a warning row, never a traceback
