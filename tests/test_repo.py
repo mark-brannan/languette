@@ -224,12 +224,23 @@ def test_languette_imports_only_the_standard_library():
     assert_that(bad, empty())
 
 
+def _python_floor():
+    """requires-python's floor as a tuple, read with a regex: tomllib is not on the floor itself."""
+    m = re.search(r'^requires-python = ">=(\d+)\.(\d+)"$', (ROOT / "pyproject.toml").read_text(), re.M)
+    return int(m[1]), int(m[2])
+
+
+def test_run_gates_on_the_python_floor():
+    """run.py names the floor before an import fails on an older python3: the gate and requires-python agree."""
+    assert_that((ROOT / "languette" / "run.py").read_text(), contains_string(f"if sys.version_info < {_python_floor()}:"))
+
+
 def test_languette_parses_as_the_python_floor():
-    """requires-python's floor, 3.9, is Apple's python3 on macOS: newer syntax there is a deny on every call."""
+    """requires-python's floor is Apple's python3 on macOS: newer syntax there is a deny on every call."""
     bad = []
     for f in (ROOT / "languette").rglob("*.py"):
         try:
-            ast.parse(f.read_text(), feature_version=(3, 9))
+            ast.parse(f.read_text(), feature_version=_python_floor())
         except SyntaxError as e:
             bad.append(f"{f.relative_to(ROOT)}:{e.lineno}: {e.msg}")
     assert_that(bad, empty())

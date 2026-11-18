@@ -39,7 +39,7 @@ jobs:
   # the README table.
   # Python 3.9 is the floor (`requires-python`): macOS's own python3, the one a
   # plugin install runs the guards on. The macOS leg runs on that python3, with
-  # the test pins that still install there (requirements-dev-py39.txt). Ubuntu
+  # the test pins that still install there (.github/requirements-dev-py39.txt). Ubuntu
   # runs 3.11 to 3.13, the newest the suite pins; coverage needs 3.11.
   tests:
     name: tests (${{ matrix.os }}, ${{ matrix.python }})
@@ -88,7 +88,7 @@ jobs:
             sudo apt-get update -q
             sudo apt-get install -y -q shfmt
           fi
-      - run: pip install -r ${{ matrix.python == 'system' && 'requirements-dev-py39.txt' || 'requirements-dev.txt' }}
+      - run: pip install -r ${{ matrix.python == 'system' && '.github/requirements-dev-py39.txt' || 'requirements-dev.txt' }}
       # smoke_steps.py builds its own PATHs and venvs: the smoke job runs it.
       # pytest-xdist on min(4, cores) workers: pyproject's -n auto, capped in tests/conftest.py.
       # Branch coverage with subprocess patching costs about a third of a leg's

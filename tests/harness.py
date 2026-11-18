@@ -397,7 +397,9 @@ class FakeHome:
         `stdin` as its input, nothing when None."""
         env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "LANGUETTE_")) and k not in SCRUB}
         env.update(HOME=str(self.home), USER=self.home.name, PATH=f"{self.bin}{os.pathsep}{path}", TMPDIR=str(self.aside),
-                   PYTHONPATH=str(ROOT), HOSTNAME=PINNED_HOST, **self.env)
+                   PYTHONPATH=str(ROOT), HOSTNAME=PINNED_HOST,
+                   PYTHONDONTWRITEBYTECODE="1",   # macOS's own python3 caches bytecode under HOME/Library
+                   **self.env)
         self.before = self.snapshot()
         r = subprocess.run([sys.executable, "-m", "languette", *args], cwd=cwd, env=env, capture_output=True,
                            text=True, timeout=60, input=stdin or "")
