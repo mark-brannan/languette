@@ -821,3 +821,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261117t220830z
 - replay asks sorted into #433's three situations from per-guard counts and example reasons, shown as ranges Undo: recount per site from the private corpus ([#436](https://github.com/mark-brannan/languette/pull/436))
+
+### 20261118t053704z
+- CI's macOS leg runs the suite on the runner's own /usr/bin/python3, not a setup-python 3.9 Undo: set the macOS leg back to setup-python with python-version 3.9 ([#437](https://github.com/mark-brannan/languette/pull/437))
