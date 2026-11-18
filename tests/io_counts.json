@@ -2819,6 +2819,7 @@
  "tests/test_features.py::test_the_agents_own_files_modes_are_its_own[chmod 755 bin/tool-]": {"git": 2},
  "tests/test_features.py::test_the_agents_own_files_modes_are_its_own[ssh-keygen -t ed25519 -f /tmp/k -N ''-a throwaway key]": {"git": 2},
  "tests/test_features.py::test_the_answer_is_cached": {"git": 6, "forge-api": 1},
+ "tests/test_features.py::test_the_ask_leaves_the_run_to_the_user_where_no_one_may_be_there": {"git": 3, "forge-api": 1},
  "tests/test_features.py::test_the_blocked_terms_file_option_may_start_with__or_home[$HOME/pt-terms.txt]": {"git": 2},
  "tests/test_features.py::test_the_blocked_terms_file_option_may_start_with__or_home[~/pt-terms.txt]": {"git": 2},
  "tests/test_features.py::test_the_body_from_a_heredoc_command_substitution_is_read": {"git": 7, "forge-api": 1},

@@ -203,6 +203,13 @@ Feature: guard-bypass-ruleset
     When the agent runs `git push origin main`
     Then the guard asks
 
+  # bypassPermissions can run with no one at the prompt: the ask text is all the agent reads.
+  Scenario: the ask leaves the run to the user where no one may be there
+    Given GH_FAIL is "1"
+    And the permission mode is "bypassPermissions"
+    When the agent runs `git push origin main`
+    Then the guard asks, naming "No one at the prompt?"
+
   Scenario Outline: a destination the hook can't read asks
     When the agent runs `<command>`
     Then the guard asks

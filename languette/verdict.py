@@ -261,7 +261,7 @@ def verdict(event, findings, mode=None, chained=None, asks=None):
         return deny("\n\n".join(said
                                  + [say("asks_denied_way")] + _footer(chained)))
     if asks_found:
-        return {**ask("\n\n".join(r for _, r in asks_found)), **({"updatedInput": rewrites[0]} if rewrites else {})}
+        return {**ask("\n\n".join([r for _, r in asks_found] + [say("ask_way")])), **({"updatedInput": rewrites[0]} if rewrites else {})}
     if allows:
         out = {"permissionDecision": "allow", "permissionDecisionReason": "\n\n".join(allows),
                "updatedInput": rewrites[0]}
