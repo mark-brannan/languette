@@ -44,14 +44,19 @@ jobs:
   # macOS runner can wait past its queue limit and cancel the gate. 3.11 to 3.13
   # are the newest the suite pins; coverage needs 3.11.
   tests:
-    name: tests (ubuntu-latest, ${{ matrix.python }})
-    runs-on: ubuntu-latest
+    name: tests (${{ matrix.os }}, ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
     # Measured per push: 1m20s to 3m20s.
     timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.9", "3.11", "3.12", "3.13"]
+        os: [ubuntu-latest]
+        python: ["3.11", "3.12", "3.13"]
+        include:
+          # The newest image setup-python has a 3.9 build for.
+          - os: ubuntu-24.04
+            python: "3.9"
     env:
       REQUIREMENTS: ${{ matrix.python == '3.9' && '.github/requirements-dev-py39.txt' || 'requirements-dev.txt' }}
     steps:
