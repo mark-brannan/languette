@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.30](https://github.com/mark-brannan/languette/compare/v0.0.29...v0.0.30) (2026-11-18)
+
+
+### Bug Fixes
+
+* run on python3 3.9, the one macOS ships, instead of denying every call ([#437](https://github.com/mark-brannan/languette/issues/437)) ([ac6789b](https://github.com/mark-brannan/languette/commit/ac6789b846a6e83511a59c03f81e016a24ec510c))
+
+
+### Documentation
+
+* **research:** what a user says about asks, against the verdict design ([#436](https://github.com/mark-brannan/languette/issues/436)) ([d8d47b6](https://github.com/mark-brannan/languette/commit/d8d47b662d9cb240d88715ef763381f90f5d973f))
+
 ## [0.0.29](https://github.com/mark-brannan/languette/compare/v0.0.28...v0.0.29) (2026-11-17)
 
 
