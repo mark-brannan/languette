@@ -1,4 +1,4 @@
-# The test pins for Python 3.9, the floor (CI's macOS leg on Apple's python3):
+# The test pins for Python 3.9, the floor (CI's 3.9 leg, and the nightly run on Apple's python3):
 # pytest 9 needs 3.10, so these are the newest releases that still run on 3.9.
 pytest==8.4.2
 pytest-bdd==8.1.0
