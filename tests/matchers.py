@@ -1,6 +1,8 @@
 """PyHamcrest matchers that speak the promise: a guard denies, asks, warns
 or says nothing. A mismatch prints the guard's raw output and its reason."""
 
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass, field
 

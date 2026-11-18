@@ -213,6 +213,7 @@ def test_a_command_rules_cmd_picks_the_program_it_matches():
 LADDER = {"languette/ladder.py": {"tree_sitter", "tree_sitter_bash", "bashlex"}}
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="sys.stdlib_module_names is 3.10+; the newer legs run it")
 def test_languette_imports_only_the_standard_library():
     bad = [f"{f.relative_to(ROOT)}: {n}" for f in (ROOT / "languette").rglob("*.py")
            for node in ast.walk(ast.parse(f.read_text()))
@@ -220,6 +221,28 @@ def test_languette_imports_only_the_standard_library():
                      [node.module] if isinstance(node, ast.ImportFrom) and node.level == 0 else [])
            if n.split(".")[0] not in sys.stdlib_module_names | {"languette"}
            | LADDER.get(str(f.relative_to(ROOT)), set())]
+    assert_that(bad, empty())
+
+
+def _python_floor():
+    """requires-python's floor as a tuple, read with a regex: tomllib is not on the floor itself."""
+    m = re.search(r'^requires-python = ">=(\d+)\.(\d+)"$', (ROOT / "pyproject.toml").read_text(), re.M)
+    return int(m[1]), int(m[2])
+
+
+def test_run_gates_on_the_python_floor():
+    """run.py names the floor before an import fails on an older python3: the gate and requires-python agree."""
+    assert_that((ROOT / "languette" / "run.py").read_text(), contains_string(f"if sys.version_info < {_python_floor()}:"))
+
+
+def test_languette_parses_as_the_python_floor():
+    """requires-python's floor is Apple's python3 on macOS: newer syntax there is a deny on every call."""
+    bad = []
+    for f in (ROOT / "languette").rglob("*.py"):
+        try:
+            ast.parse(f.read_text(), feature_version=_python_floor())
+        except SyntaxError as e:
+            bad.append(f"{f.relative_to(ROOT)}:{e.lineno}: {e.msg}")
     assert_that(bad, empty())
 
 
@@ -413,7 +436,7 @@ def test_every_shipped_rule_file_loads_and_is_packaged(rule_file):
 def _packaged(path):
     """`path`, a file under languette/, is in the wheel's package data."""
     import fnmatch
-    import tomllib
+    tomllib = pytest.importorskip("tomllib")
     data = tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["setuptools"]["package-data"]["languette"]
     rel = path.relative_to(ROOT / "languette").as_posix()
     return any(fnmatch.fnmatch(rel, g) for g in data)

@@ -21,8 +21,15 @@ Latin-1 and a few others, case-folded. Standard library only.
 
 import re
 
-from re import _constants as C
-from re import _parser as P
+try:
+    from re import _constants as C, _parser as P
+except ImportError:                                    # Python before 3.11
+    import sre_constants as C
+    import sre_parse as P
+
+# 3.11 added possessive repeats and atomic groups; before it no pattern parses to either.
+_REPEATS = tuple(getattr(C, n) for n in ("MAX_REPEAT", "MIN_REPEAT", "POSSESSIVE_REPEAT") if hasattr(C, n))
+_ATOMIC = getattr(C, "ATOMIC_GROUP", object())
 
 _ALPHA = frozenset(chr(i) for i in range(0x250)) | {"中", "٣"}
 _CATEGORY = {"DIGIT": r"\d", "NOT_DIGIT": r"\D", "SPACE": r"\s", "NOT_SPACE": r"\S", "WORD": r"\w", "NOT_WORD": r"\W"}
@@ -67,9 +74,9 @@ def _children(op, av):
         return [av[3]]
     if op is C.BRANCH:
         return av[1]
-    if op in (C.MAX_REPEAT, C.MIN_REPEAT, C.POSSESSIVE_REPEAT):
+    if op in _REPEATS:
         return [av[2]]
-    if op is C.ATOMIC_GROUP:
+    if op is _ATOMIC:
         return [av]
     if op in (C.ASSERT, C.ASSERT_NOT):
         return [av[1]]
@@ -102,7 +109,7 @@ def _first(seq):
         for chars, _ in parts:
             out |= chars
         nullable = any(n for _, n in parts) or (op is C.BRANCH and not av[1]) \
-            or (op in (C.MAX_REPEAT, C.MIN_REPEAT, C.POSSESSIVE_REPEAT) and av[0] == 0)
+            or (op in _REPEATS and av[0] == 0)
         if not nullable:
             return out, False
     return out, True

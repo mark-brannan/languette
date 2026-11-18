@@ -37,9 +37,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-if sys.version_info < (3, 11):                 # the guards read re's parser; name the floor before they fail to import
+if sys.version_info < (3, 9):                  # name the floor before the guards fail to import
     sys.stdout.write('{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny",'
-                     '"permissionDecisionReason":"languette needs python3 3.11 or newer, and this is older. '
+                     '"permissionDecisionReason":"languette needs python3 3.9 or newer, and this is older. '
                      'This is a gate and fails closed: install a newer python3."}}\n')
     sys.exit(0)
 

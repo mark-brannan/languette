@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.0.29](https://github.com/mark-brannan/languette/compare/v0.0.28...v0.0.29) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove prose-budget-commit and hold the portability line over what ships ([#428](https://github.com/mark-brannan/languette/issues/428))
+
+### Features
+
+* remove prose-budget-commit and hold the portability line over what ships ([#428](https://github.com/mark-brannan/languette/issues/428)) ([18f8de6](https://github.com/mark-brannan/languette/commit/18f8de6ce2e85bf3aec55248e40ac73e7257b0c4))
+
 ## [0.0.28](https://github.com/mark-brannan/languette/compare/v0.0.27...v0.0.28) (2026-11-17)
 
 

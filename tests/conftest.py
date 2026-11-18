@@ -29,6 +29,12 @@ import sys
 import tempfile
 
 import pytest
+import pytest_bdd.gherkin_parser
+
+# pytest-bdd 8, the newest on Python 3.9 (.github/requirements-dev-py39.txt), doubles every
+# backslash in a table cell; 9 reads the cell as written, which the features spell.
+if hasattr(pytest_bdd.gherkin_parser, "_to_raw_string"):
+    pytest_bdd.gherkin_parser._to_raw_string = str
 
 import harness
 import pipeline_checks
