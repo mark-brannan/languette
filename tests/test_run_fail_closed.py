@@ -1,4 +1,4 @@
-"""run.py fails closed before it can judge anything: on a Python older than 3.11,
+"""run.py fails closed before it can judge anything: on a Python older than 3.9,
 and when a guard's module will not import. Each answers with a deny and exits 0."""
 
 import json
@@ -26,9 +26,9 @@ def test_a_guard_that_fails_to_import_is_a_deny(tmp_path):
     assert _decision([str(tmp_path / "languette/run.py")], tmp_path) == "deny"
 
 
-def test_python_older_than_3_11_is_a_deny(tmp_path):
+def test_python_older_than_3_9_is_a_deny(tmp_path):
     script = tmp_path / "old_python.py"
     script.write_text("import runpy, sys\n"
-                      "sys.version_info = (3, 10, 0)\n"
+                      "sys.version_info = (3, 8, 0)\n"
                       f"runpy.run_path({str(ROOT / 'languette/run.py')!r}, run_name='__main__')\n")
     assert _decision([str(script)], tmp_path) == "deny"

@@ -4,6 +4,17 @@ Decisions that settle languette's public interface. The README says what the
 interface is; this file says what was decided and why, one line each. Every
 line is the maintainer's (@mark-brannan) unless it says otherwise.
 
+## Python floor: 2026-11-17
+
+- Languette runs on python3 3.9 or newer, the python3 macOS ships; CI's macOS
+  leg runs the suite on it. This replaces the 3.11 floor of
+  [#332](https://github.com/mark-brannan/languette/pull/332).
+- Measured 2026-11-17: on 3.9 the suite passes once the regex reader takes
+  re's parser from its pre-3.11 home; the 3.11 floor had denied every call.
+- Why: "If we have a Mac with an older python3 (3.9.x?) then I do not want to
+  fail everything... I don't want this to happen to a new Mac user trying it
+  out."
+
 ## Headless runs: 2026-11-16
 
 - Languette does not detect a headless run
