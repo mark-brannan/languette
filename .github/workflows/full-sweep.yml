@@ -2,8 +2,8 @@ name: Full sweep
 
 # What a push skips (tests/conftest.py): the shfmt engine over every
 # scenario, not only features/big.feature's; the @planned rows; and the
-# @full tests. Not a gate: a red run shows in the Actions tab and the
-# failure email.
+# @full tests. And the suite on macOS's own python3. Not a gate: a red run
+# shows in the Actions tab and the failure email.
 
 on:
   schedule:
@@ -34,3 +34,34 @@ jobs:
           sudo apt-get install -y -q shfmt
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q --full
+
+  # The push tier (not --full) on macOS's own python3, the 3.9 floor a plugin
+  # install runs the guards on, with the test pins that still install there.
+  # Off the PR gate: a macOS runner can wait past its queue limit, and the gate
+  # read that as red. Measured 2026-11-18: 5 to 7.5 minutes on macos-latest.
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Use macOS's own python3
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 --version
+          /usr/bin/python3 -m venv "$RUNNER_TEMP/py"
+          echo "$RUNNER_TEMP/py/bin" >> "$GITHUB_PATH"
+      # The shfmt 3.8.0 binary, checked by hash: shfmt's parse-error columns
+      # differ between releases and features/ spells 3.8's.
+      - name: Install shfmt
+        run: |
+          set -euo pipefail
+          curl -fsSL -o shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_darwin_arm64
+          echo "1481240d2a90d4f0b530688d76d4f9117d17a756b6027cfa42b96f0707317f83  shfmt" | shasum -a 256 -c -
+          sudo install -m 755 shfmt /usr/local/bin/shfmt
+          # guard-git-stacked-base wants a timeout; macOS ships none, Homebrew's coreutils has gtimeout
+          # (the scenarios link gh and timeout from the real PATH onto their own, tests/harness.py system_path).
+          brew install coreutils
+      - run: pip install -r .github/requirements-dev-py39.txt
+      - run: python -m pytest -q
