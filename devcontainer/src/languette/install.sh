@@ -1,5 +1,5 @@
 #!/bin/sh
-# The devcontainer feature's build step, run as root: python3 3.11 or newer,
+# The devcontainer feature's build step, run as root: python3 3.9 or newer,
 # shfmt and gh where apt can bring them, then languette from PyPI, pinned to this
 # release, on PATH for every user. The wiring needs the container's own user
 # and network, so it is the feature's postCreateCommand, `languette install`.
@@ -9,7 +9,7 @@ version=0.0.29 # x-release-please-version
 venv=/usr/local/lib/languette
 
 python_ok() {
-    command -v python3 >/dev/null 2>&1 && python3 -c 'import sys, ensurepip; sys.exit(sys.version_info < (3, 11))' 2>/dev/null
+    command -v python3 >/dev/null 2>&1 && python3 -c 'import sys, ensurepip; sys.exit(sys.version_info < (3, 9))' 2>/dev/null
 }
 
 if command -v apt-get >/dev/null 2>&1; then
@@ -29,7 +29,7 @@ if command -v apt-get >/dev/null 2>&1; then
 fi
 
 if ! python_ok; then
-    echo "languette: needs python3 3.11 or newer with venv; add ghcr.io/devcontainers/features/python before this feature" >&2
+    echo "languette: needs python3 3.9 or newer with venv; add ghcr.io/devcontainers/features/python before this feature" >&2
     exit 1
 fi
 

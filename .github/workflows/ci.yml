@@ -37,9 +37,10 @@ jobs:
   # runs them. The same run checks the hooks.json shape (`claude plugin validate
   # --strict` passes a garbage one), the stdlib-only rule for languette/ and
   # the README table.
-  # Python 3.11 is the floor (`requires-python`): 3.10 lacks re's possessive
-  # repeats, which guard-private-terms reads. 3.12 sits between, 3.13 is the
-  # newest the suite pins. One macOS leg, on 3.13, covers the other OS.
+  # Python 3.9 is the floor (`requires-python`): macOS's own python3, the one a
+  # plugin install runs the guards on. The macOS leg runs on that python3, with
+  # the test pins that still install there (.github/requirements-dev-py39.txt). Ubuntu
+  # runs 3.11 to 3.13, the newest the suite pins; coverage needs 3.11.
   tests:
     name: tests (${{ matrix.os }}, ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
@@ -52,16 +53,24 @@ jobs:
         python: ["3.11", "3.12", "3.13"]
         include:
           - os: macos-latest
-            python: "3.13"
+            python: system
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v7
+      - if: matrix.python != 'system'
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: requirements-dev.txt
+      - if: matrix.python == 'system'
+        name: Use macOS's own python3
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 --version
+          /usr/bin/python3 -m venv "$RUNNER_TEMP/py"
+          echo "$RUNNER_TEMP/py/bin" >> "$GITHUB_PATH"
       # shfmt for the Python engine's shfmt rung: noble's is 3.8, past the 3.6 floor.
       # macOS gets the same 3.8.0 binary, checked by hash: shfmt's parse-error
       # columns differ between releases and features/ spells 3.8's.
@@ -79,7 +88,7 @@ jobs:
             sudo apt-get update -q
             sudo apt-get install -y -q shfmt
           fi
-      - run: pip install -r requirements-dev.txt
+      - run: pip install -r ${{ matrix.python == 'system' && '.github/requirements-dev-py39.txt' || 'requirements-dev.txt' }}
       # smoke_steps.py builds its own PATHs and venvs: the smoke job runs it.
       # pytest-xdist on min(4, cores) workers: pyproject's -n auto, capped in tests/conftest.py.
       # Branch coverage with subprocess patching costs about a third of a leg's
