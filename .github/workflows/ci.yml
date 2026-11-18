@@ -38,57 +38,38 @@ jobs:
   # --strict` passes a garbage one), the stdlib-only rule for languette/ and
   # the README table.
   # Python 3.9 is the floor (`requires-python`): macOS's own python3, the one a
-  # plugin install runs the guards on. The macOS leg runs on that python3, with
-  # the test pins that still install there (.github/requirements-dev-py39.txt). Ubuntu
-  # runs 3.11 to 3.13, the newest the suite pins; coverage needs 3.11.
+  # plugin install runs the guards on. The 3.9 leg runs with the test pins that
+  # still install there (.github/requirements-dev-py39.txt); the suite on
+  # macOS's own python3 runs nightly (full-sweep.yml), off the gate, since a
+  # macOS runner can wait past its queue limit and cancel the gate. 3.11 to 3.13
+  # are the newest the suite pins; coverage needs 3.11.
   tests:
-    name: tests (${{ matrix.os }}, ${{ matrix.python }})
-    runs-on: ${{ matrix.os }}
-    # Measured per push: ubuntu 1m20s to 3m20s, macOS 4m20s.
-    timeout-minutes: ${{ matrix.os == 'macos-latest' && 8 || 5 }}
+    name: tests (ubuntu-latest, ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    # Measured per push: 1m20s to 3m20s.
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        python: ["3.11", "3.12", "3.13"]
-        include:
-          - os: macos-latest
-            python: system
+        python: ["3.9", "3.11", "3.12", "3.13"]
+    env:
+      REQUIREMENTS: ${{ matrix.python == '3.9' && '.github/requirements-dev-py39.txt' || 'requirements-dev.txt' }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - if: matrix.python != 'system'
-        uses: actions/setup-python@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-          cache-dependency-path: requirements-dev.txt
-      - if: matrix.python == 'system'
-        name: Use macOS's own python3
-        run: |
-          set -euo pipefail
-          /usr/bin/python3 --version
-          /usr/bin/python3 -m venv "$RUNNER_TEMP/py"
-          echo "$RUNNER_TEMP/py/bin" >> "$GITHUB_PATH"
+          cache-dependency-path: ${{ env.REQUIREMENTS }}
       # shfmt for the Python engine's shfmt rung: noble's is 3.8, past the 3.6 floor.
-      # macOS gets the same 3.8.0 binary, checked by hash: shfmt's parse-error
-      # columns differ between releases and features/ spells 3.8's.
       - name: Install shfmt
         run: |
           set -euo pipefail
-          if [ "$RUNNER_OS" = macOS ]; then
-            curl -fsSL -o shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_darwin_arm64
-            echo "1481240d2a90d4f0b530688d76d4f9117d17a756b6027cfa42b96f0707317f83  shfmt" | shasum -a 256 -c -
-            sudo install -m 755 shfmt /usr/local/bin/shfmt
-            # guard-git-stacked-base wants a timeout; macOS ships none, Homebrew's coreutils has gtimeout
-            # (the scenarios link gh and timeout from the real PATH onto their own, tests/harness.py system_path).
-            brew install coreutils
-          else
-            sudo apt-get update -q
-            sudo apt-get install -y -q shfmt
-          fi
-      - run: pip install -r ${{ matrix.python == 'system' && '.github/requirements-dev-py39.txt' || 'requirements-dev.txt' }}
+          sudo apt-get update -q
+          sudo apt-get install -y -q shfmt
+      - run: pip install -r "$REQUIREMENTS"
       # smoke_steps.py builds its own PATHs and venvs: the smoke job runs it.
       # pytest-xdist on min(4, cores) workers: pyproject's -n auto, capped in tests/conftest.py.
       # Branch coverage with subprocess patching costs about a third of a leg's
@@ -96,15 +77,15 @@ jobs:
       # leg that uploads the report runs it.
       # --cov reads pyproject's [tool.coverage.run]; the report feeds the coverage job.
       # Absolute, so hook child processes (cwd elsewhere) write where the combine reads.
-      - if: matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
+      - if: matrix.python == '3.13'
         run: python -m pytest -q --cov --cov-report=xml
         env:
           COVERAGE_FILE: ${{ github.workspace }}/.coverage
-      - if: matrix.os != 'ubuntu-latest' || matrix.python != '3.13'
+      - if: matrix.python != '3.13'
         run: python -m pytest -q
       # On main too: main's report at a PR's merge base is what the total's delta is measured against.
       # One leg uploads, so the artifact name never collides.
-      - if: (github.event_name == 'pull_request' || github.event_name == 'push') && matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
+      - if: (github.event_name == 'pull_request' || github.event_name == 'push') && matrix.python == '3.13'
         uses: actions/upload-artifact@v7.0.2
         with:
           name: coverage
