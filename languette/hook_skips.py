@@ -118,4 +118,5 @@ def approval(doc, guard, found):
                          mode=doc.mode, way=say("unattended_way")))
     have = len(approved[APPROVE_LABEL])
     return deny(say("hooks_skipped", guard=guard, cmd=shown, runs=runs, runs_s="s" * (runs > 1),
-                    have=have, have_s="s" * (have != 1), label=APPROVE_LABEL))
+                    have=have, have_s="s" * (have != 1), label=APPROVE_LABEL,
+                    way=say("ask_way")))

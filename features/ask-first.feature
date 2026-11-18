@@ -149,6 +149,8 @@ Feature: ask-first
         | dontAsk           | ask-first: `e2e`                         |
         | dontAsk           | in dontAsk no one is there to approve it |
         | bypassPermissions | call AskUserQuestion                     |
+        | bypassPermissions | No one at the prompt? Don't work around it |
+        | dontAsk           | the user makes it themselves             |
 
     Scenario: in dontAsk the deny does not send the agent to AskUserQuestion
       Given the permission mode is "dontAsk"

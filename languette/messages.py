@@ -402,7 +402,7 @@ MESSAGES = {
         "If the user must have the hooks skipped, call AskUserQuestion: give the exact "
         "command and why it cannot pass the hooks, with one option labelled exactly "
         "\"{label}\" and one to decline. One approval is one run; ask again "
-        "before skipping the hooks again."
+        "before skipping the hooks again. {way}"
     ),
     # hooks_skipped where no one can approve (languette.verdict.NO_PROMPT).
     "hooks_skipped_unattended": (
@@ -587,7 +587,7 @@ MESSAGES = {
     "gi_ask": (
         "Show the human the draft and wait for their yes: call AskUserQuestion with the title or number "
         "and the repo, one option labelled exactly \"{label}\" and one to decline. One yes is one write; "
-        "ask again for the next."
+        "ask again for the next. {way}"
     ),
     # gi_ask where no one can say yes (languette.verdict.NO_PROMPT).
     "gi_ask_unattended": "In {mode} no one is there to say yes: AskUserQuestion is denied unseen. {way}",
@@ -825,6 +825,8 @@ MESSAGES = {
         "directory; elsewhere it sweeps in files a parallel session is working on."
     ),
 }
+# Said at the end of every AskUserQuestion ask outside NO_PROMPT: the same hand-over, for a run no one is watching.
+MESSAGES["ask_way"] = "No one at the prompt? " + MESSAGES["unattended_way"]
 
 
 def say(code, **blanks):

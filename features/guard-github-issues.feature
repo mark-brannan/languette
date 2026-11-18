@@ -300,6 +300,7 @@ Feature: guard-github-issues
       | dontAsk           | In dontAsk no one is there to say yes  |
       | dontAsk           | the user makes it themselves           |
       | bypassPermissions | call AskUserQuestion                   |
+      | bypassPermissions | No one at the prompt? Don't work around it |
 
   Scenario: in dontAsk a shut door's deny does not send the agent to AskUserQuestion
     Given the permission mode is "dontAsk"

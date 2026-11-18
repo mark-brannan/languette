@@ -237,7 +237,7 @@ def _ask(mode, label):
     it leaves the write to the user instead."""
     if mode in NO_PROMPT:  # any other mode, unknown or missing included, stays an ask
         return say("gi_ask_unattended", mode=mode, way=say("unattended_way"))
-    return say("gi_ask", label=label)
+    return say("gi_ask", label=label, way=say("ask_way"))
 
 
 def door_open(doc, guard, found):
