@@ -824,3 +824,6 @@ heading is the UTC stamp, so `agent_decisions.md#<stamp>` links one entry.
 
 ### 20261118t053704z
 - CI's macOS leg runs the suite on the runner's own /usr/bin/python3, not a setup-python 3.9 Undo: set the macOS leg back to setup-python with python-version 3.9 ([#437](https://github.com/mark-brannan/languette/pull/437))
+
+### 20261118t061709z
+- No 3.10 CI leg: 3.10 takes the same sre_parse branch the macOS 3.9 leg runs Undo: add 3.10 to the ubuntu python list ([#437](https://github.com/mark-brannan/languette/pull/437#discussion_r4609692470)) ([#437](https://github.com/mark-brannan/languette/pull/437))
