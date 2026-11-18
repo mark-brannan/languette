@@ -45,14 +45,14 @@ jobs:
     name: tests (${{ matrix.os }}, ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
     # Measured per push: ubuntu 1m20s to 3m20s, macOS 4m20s.
-    timeout-minutes: ${{ matrix.os == 'macos-latest' && 8 || 5 }}
+    timeout-minutes: ${{ startsWith(matrix.os, 'macos') && 8 || 5 }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
         python: ["3.11", "3.12", "3.13"]
         include:
-          - os: macos-latest
+          - os: macos-15-intel
             python: system
     steps:
       - uses: actions/checkout@v7
@@ -78,8 +78,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$RUNNER_OS" = macOS ]; then
-            curl -fsSL -o shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_darwin_arm64
-            echo "1481240d2a90d4f0b530688d76d4f9117d17a756b6027cfa42b96f0707317f83  shfmt" | shasum -a 256 -c -
+            curl -fsSL -o shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_darwin_amd64
+            echo "c0218b47a0301bb006f49fad85d2c08de23df303472834faf5639d04121320f8  shfmt" | shasum -a 256 -c -
             sudo install -m 755 shfmt /usr/local/bin/shfmt
             # guard-git-stacked-base wants a timeout; macOS ships none, Homebrew's coreutils has gtimeout
             # (the scenarios link gh and timeout from the real PATH onto their own, tests/harness.py system_path).
